@@ -1,0 +1,41 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider / VS
+.idea/
+.vs/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# RTL / simulation (későbbi fázisok)
+*.vcd
+*.fst
+*.ghw
+build/
+sim-build/
+work/
+transcript
+
+# OpenLane / Tiny Tapeout (F3, F6)
+runs/
+results/
+reports/
+tmp/
+*.lef
+*.def
+*.gds
+*.mag
+
+# Python (cocotb, esetleges scriptek)
+__pycache__/
+*.pyc
+.venv/
+venv/
