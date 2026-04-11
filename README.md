@@ -35,15 +35,15 @@ Részletek a `docs/architecture.md` **„Stratégiai pozicionálás: Cognitive F
 3. **Shared-nothing skálázódás** — mivel a core-ok között nincs megosztott memória, a teljesítmény **lineárisan nő** a core-számmal. Nincs MESI, nincs cache coherency overhead, nincs lock contention, nincs cross-core side-channel.
 4. **Event-driven power profile** — a core-ok alapértelmezésben alvó üzemmódban vannak, és csak akkor ébrednek, amikor mailbox üzenet érkezik. **Ultra-alacsony alapfogyasztás**, ami kulcsfontosságú IoT, kritikus infrastruktúra és neuromorphic workload-okon.
 
-## Kétpályás pozicionálás
+## Kétpályás pozicionálás — hosszú távon a Linux utódja
 
-A CLI-CPU **két párhuzamos piaci narratívát** követ, ugyanazzal a hardverrel:
+A CLI-CPU + Neuron OS **két párhuzamos piaci narratívát** követ, ugyanazzal a hardverrel, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
 
 **Pálya 1 — „Cognitive Fabric"**: programozható kognitív szubsztrátum AI kutatóknak, Akka.NET / Orleans actor rendszereknek, spiking neural network szimulációnak, multi-agent szimulációnak, IoT edge gateway-nek. **Hosszú távú vízió.**
 
 **Pálya 2 — „Trustworthy Silicon"**: formálisan verifikálható, tanúsítható processzor regulated industries-nek — automotive (ISO 26262 ASIL-B/C/D), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog, confidential computing. **Rövid-közép távú bevételi lehetőség.**
 
-Ugyanaz a chip, két különböző piaci szegmens.
+Ugyanaz a chip, két különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Neuron OS lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`docs/neuron-os.md`](docs/neuron-os.md) „A Linux öröklött problémái és a Neuron OS válasza" szekciójában.
 
 ## Heterogén multi-core: Nano + Rich
 
