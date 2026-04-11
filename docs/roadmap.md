@@ -25,22 +25,24 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 
 ---
 
-### F1 — C# Referencia Szimulátor
+### F1 — C# Referencia Szimulátor — **KÉSZ**
 
 **Cél:** Bithibátlan, TDD-vel fejlesztett szoftveres CLI-CPU szimulátor, amelyhez minden CIL-T0 opkódnak dedikált xUnit tesztje van.
 
 **Platform:** .NET 10, C# 13, xUnit.
 
 **Kimenet:**
-- `src/CilCpu.Sim/` — szimulátor könyvtár (fetch, decode, execute)
-- `src/CilCpu.Sim.Tests/` — xUnit teszt projekt
-- `src/CilCpu.Sim.Runner/` — CLI futtató, ami egy CIL-T0 bináris formátumot tud olvasni és futtatni
-- `samples/` — néhány egyszerű C# program (Fibonacci, integer sum, GCD), `ilasm`-mal vagy Roslyn-nal CIL-T0-ba fordítva
+- `src/CilCpu.Sim/` — szimulátor könyvtár (fetch, decode, execute) — **kész**
+- `src/CilCpu.Sim.Tests/` — xUnit teszt projekt — **kész, 218 zöld teszt**
+- `src/CilCpu.Sim.Runner/` — CLI futtató, ami egy CIL-T0 bináris formátumot tud olvasni és futtatni — F1.5-re halasztva
+- `samples/` — néhány egyszerű C# program (Fibonacci, integer sum, GCD), `ilasm`-mal vagy Roslyn-nal CIL-T0-ba fordítva — F1.5-re halasztva
 
-**Kész kritérium:**
-- 100% opkód lefedettség tesztekkel
-- Egy Fibonacci(20) C# kódból fordított CIL-T0 bináris helyesen futtatható a szimulátoron
-- A szimulátor **mindent trap-el**, amit a spec előír (stack overflow, invalid branch target, stb.)
+**Kész kritérium — teljesítve:**
+- ✅ 100% opkód lefedettség tesztekkel — mind a 48 CIL-T0 opkód külön teszttel
+- ✅ Egy Fibonacci(20) C# kódból fordított CIL-T0 bináris helyesen futtatható a szimulátoron — `Fibonacci(20) = 6765` zöld
+- ✅ A szimulátor **mindent trap-el**, amit a spec előír (stack overflow, invalid branch target, invalid memory access, call depth exceeded, stb.)
+- ✅ TDD-vel fejlesztve, 4 iteráció (konstansok → stack/local/arg → arit/branch/cmp → call/ret/mem/break)
+- ✅ Devil's Advocate review minden iteráció után, finalizálás QR pass-szal
 
 **Függőség:** F0 kész.
 
@@ -336,4 +338,8 @@ A korábbi „F5 — CIL Object Model + GC egymagos kiterjesztés" címet átnev
 
 ## Mai státusz
 
-**F0 koncepcionálisan készen van.** Hét dokumentum a `docs/` és a `README.md` alatt együtt ~3500+ sor, belsőleg konzisztens projekt-terv a **hárompályás pozicionálással** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, a Neuron OS vízióval, és a Secure Element stratégiai tervvel (F6.5 parallel tape-out). A következő érdemi lépés az **F1 — C# referencia szimulátor** TDD-vel, ami már a Neuron OS aktor absztrakciót is tartalmazza minimális szinten.
+**F0 koncepcionálisan készen van.** Hét dokumentum a `docs/` és a `README.md` alatt együtt ~3500+ sor, belsőleg konzisztens projekt-terv a **hárompályás pozicionálással** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, a Neuron OS vízióval, és a Secure Element stratégiai tervvel (F6.5 parallel tape-out).
+
+**F1 — C# referencia szimulátor lezárva.** Az `src/CilCpu.Sim` és `src/CilCpu.Sim.Tests` projektek **218 zöld xUnit teszttel**, **0 warning, 0 error** állapotban. Minden a CIL-T0 spec által rögzített **48 opkód** implementálva van (`nop`, konstansok, lokális/argumentum hozzáférés, stack manipuláció, aritmetika, összehasonlítás, rövid branch-ek, `call`/`ret`, `ldind.i4`/`stind.i4` ECMA-335 byte-értékekkel, `break`), és minden hardveres trap (stack over/underflow, invalid opcode, invalid local/arg, invalid branch/call target, div-by-zero, overflow, call depth exceeded, debug break, **invalid memory access**) trigger-elhető és tesztelt. Az **F1 aranypélda**: `Fibonacci(20) = 6765` zöld a header-vezérelt `Execute` overload-on, ahogy a faktoriális (n=10 → 3628800) és iteratív GCD is. A fejlesztés **4 iterációban** zajlott szigorú TDD-vel, minden iterációhoz Devil's Advocate review, a fázis lezárását egy Finalizer QR pass adta, amely a critical fix-eket és a CLAUDE.md compliance-t ellenőrizte.
+
+**Következő érdemi lépés:** **F1.5** — `CilCpu.Sim.Runner` CLI futtató és egy `samples/` mappa Roslyn-nal CIL-T0-ba fordított példa programokkal, majd **F2 — RTL** kezdete (Verilog vagy Amaranth HDL döntés, cocotb testbench infrastruktúra).

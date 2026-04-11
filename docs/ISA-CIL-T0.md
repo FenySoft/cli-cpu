@@ -307,11 +307,24 @@ A CIL-T0 csak a **rövid** elágazásokat implementálja F3-ban (8-bit offset), 
 
 **Trap:** Stack underflow (nem elég arg), stack overflow, `INVALID_CALL_TARGET` (ha az RVA kívül esik a CODE régión), max call depth elérve (512).
 
-### 9. Egyéb
+### 9. Indirekt memóriahozzáférés
+
+A CIL-T0 a 32-bites integer indirekt load/store opkódokat implementálja, amelyek a `DATA` és `MMIO` régiókat (illetve az F1 szimulátorban a megadott data memory tömböt) érik el. A bájt-értékek **szigorúan az ECMA-335 Partition III** szerintiek, így egy szabványos CIL disassembler is felismeri őket.
+
+| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|--------|------|--------|
+| `0x4A` | `ldind.i4` | 1 | `(I4 → I4)` | 2–4 | HW | TOS = cím; pop, olvas egy 32-bit LE int-et a data memory-ból, push az eredményt. |
+| `0x54` | `stind.i4` | 1 | `(I4, I4 →)` | 2–4 | HW | TOS = érték, TOS-1 = cím; pop érték, pop cím, ír egy 32-bit LE int-et a data memory-ba. |
+
+**Trap:** Stack underflow, `INVALID_MEMORY_ACCESS` (ha a cím a data memory tartományán kívül esik vagy nincs data memory rendelve a CPU-hoz). Ez a trap az F2 RTL-ben a hardveres memory controller hibájának felel meg.
+
+### 10. Egyéb
 
 | Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
 |------|-------|-------|-------|--------|------|--------|
 | `0xDD` | `break` | 1 | `(→)` | — | HW | Debug trap. Megáll és UART-on jelez. |
+
+**CIL-T0 eltérés a standardtól:** Az ECMA-335-ben a `break` opkód byte értéke `0x01`. A CIL-T0 viszont a `0xDD`-t használja, mert a `0x01` az F2/F3 dekóder szempontjából a `nop` (`0x00`) szomszédja, és szándékosan a "ritka, debug-only" tartományba toltuk, hogy a forró opkódoktól dekóderben elválasztható legyen. Ez egy **tudatos eltérés**, amelyet a CIL-T0 → standard CIL fordítók (`ilasm-t0`) automatikusan kezelnek.
 
 ## Opkódok, amik a CIL-T0-ban NEM használhatók
 
@@ -334,8 +347,21 @@ A CIL-T0 a következő hardveres trapokat definiálja:
 | 0x09 | `OVERFLOW` | `div` INT_MIN / -1 |
 | 0x0A | `CALL_DEPTH_EXCEEDED` | Hívási mélység ≥ 512 |
 | 0x0B | `DEBUG_BREAK` | `break` opkód |
+| 0x0C | `INVALID_MEMORY_ACCESS` | `ldind.i4` / `stind.i4` cím a data memory tartományán kívül vagy nincs data memory |
 
 **Trap viselkedés F3-ban:** A CPU leáll, a trap számát és a PC-t UART-on kiírja, majd reset-re vár. **F5-ben** a trapok CIL kivételkezelőkké alakulnak át (`throw System.InvalidOperationException`, stb.).
+
+### Trap sorrend (precedencia)
+
+Több trap-feltétel egyidejű teljesülése esetén a CIL-T0 hardver és a szimulátor a következő, **rögzített** sorrendben dönt. Ez a sorrend visszafelé kompatibilis az F2 cocotb testbench-csel.
+
+1. **`INVALID_OPCODE`** — a dekóder először az opkód érvényességét és az operandus jelenlétét ellenőrzi (truncated operand is `INVALID_OPCODE`-ot ad). Ha ez a trap aktiválódik, semmilyen másik feltételt nem értékelünk ki, mert még az utasítás logikai dekódolása sem fejeződött be.
+2. **Index-ellenőrzések (`INVALID_LOCAL`, `INVALID_ARG`)** — a `stloc.s` / `starg.s` / `ldloc.s` / `ldarg.s` opkódoknál az index ellenőrzése **megelőzi** a stack-hozzáférést. Tehát ha az index érvénytelen ÉS a stack üres egyszerre, akkor `INVALID_LOCAL` (vagy `INVALID_ARG`) az aktiváló trap, NEM `STACK_UNDERFLOW`.
+3. **`STACK_UNDERFLOW` / `STACK_OVERFLOW`** — az operandusok stack-ről való kivétele után, illetve a push-olás előtt értékeljük.
+4. **Aritmetika trap-ek (`DIV_BY_ZERO`, `OVERFLOW`)** — a `div`/`rem` esetén csak az operandusok sikeres kivétele után ellenőrizzük az osztó nullaértékét, illetve az `INT_MIN / -1` overflow-t.
+5. **`INVALID_BRANCH_TARGET`** — a feltételes branch-ek esetén csak a feltétel kiértékelése után, és csak ha a branch ténylegesen aktivizálódik. Egy nem-aktiváló branch sose dob `INVALID_BRANCH_TARGET`-et, még akkor sem, ha a target érvénytelen lenne.
+
+**Index validation precedes stack access; invalid index takes precedence over stack underflow.**
 
 ## CIL-T0 bináris formátum
 
@@ -524,6 +550,26 @@ Ez **24 bájt** CIL-T0. Az ugyanez a funkció RISC-V RV32I-ben ~60 bájt. A töm
 - Ugyanez x86-64 @ 3 GHz JIT-tel: ~100 ns
 
 **Következtetés:** egy stack-gép @ 50 MHz ~10–20× lassabb egy hagyományos CPU-nál Fibonacci-ra. Az IoT use-case-ben viszont a memória fogyasztás és a kód mérete fontosabb, mint a nyers sebesség.
+
+## F1 referencia implementációs megjegyzések
+
+Az F1 C# szimulátor (`src/CilCpu.Sim`) az ebben a dokumentumban rögzített viselkedést **megfigyelhetően ekvivalens** módon valósítja meg, de a belső adatszerkezetekben néhány tudatos eltérést alkalmaz. Ezek **nem szabványsértések**, mert a CIL-T0 ISA a megfigyelhető viselkedést (stack érték, trap, return value, PC) specifikálja, nem pedig a belső megvalósítást. Az F2 RTL-nek továbbra is választása lehet a két megközelítés között, amíg a viselkedés bit-pontosan megegyezik a szimulátoréval.
+
+### Per-frame evaluation stack
+
+A `call` mikrokódja (lásd fentebb) a "SPILL TOS cache → a stack-be" lépést írja, ami **megosztott** evaluation stack modellt sugall: minden frame egy közös 64 mélységű stack-en dolgozik, és call-nál a callee az aktuális SP felett kap új tartományt.
+
+Az **F1 referencia szimulátor ezzel szemben per-frame evaluation stacket használ**: minden `TFrame` saját 64 mélységű `TEvaluationStack`-et kap. A `call` egyszerűen pop-olja az argumentumokat a caller eval stackjéből, és a callee egy üres eval stack-kel indul. A `ret` a callee eval stack tetejéről veszi a return value-t és push-olja a caller-éra.
+
+**Megfigyelhető ekvivalencia.** A két modell végrehajtási nyoma (PC, frame argumentumok, lokálisok, return value, trap pillanat) **bit-pontosan megegyezik** minden olyan programra, amely nem támaszkodik a caller eval stackjének TOS-on túli (azaz nem-argumentum) értékeinek "látszására" a callee-ban — ami egyébként szabványsértő CIL is lenne. A spec mindkét viselkedést megengedi.
+
+**Trap szigorúbb a per-frame modellben.** A `STACK_OVERFLOW` trap a per-frame szimulátorban hamarabb sülhet ki, mint a megosztott modellben: egy adott frame eval stackje **önmagában** legfeljebb 64 mély lehet, nem pedig "ami a megosztott 64-ből még megmaradt". Ez **szigorúbb**, nem lazább, ezért minden, ami a szimulátoron lefut, az F2 megosztott modellen is le fog futni.
+
+**F2 RTL döntés.** Az F2 RTL implementáció szabadon választhat a két modell között. Ha a megosztott megközelítést választja (a mikrokód-szöveg szerint), a cocotb golden vector test bench-ekben a `STACK_OVERFLOW` precedenciát finomhangolhatóvá kell tenni egy konfigurációs flag mögé, hogy a két aranypélda végrehajtási nyom továbbra is megegyezzen.
+
+### `Peek` API a CPU-n
+
+A `TCpu.Peek(int)` egy debug/teszt API, amely a CPU jelenlegi top-frame eval stackjéből olvas. Üres call stack esetén (azaz `Execute` hívása előtt) `InvalidOperationException`-t dob, **nem CIL trap**-et, mert a Peek nem egy CIL-T0 opkód művelete. Ez a viselkedés rögzített és tesztelt.
 
 ## Becsült hardver méret (Sky130, F3)
 

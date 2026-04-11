@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>CilCpu.Sim</RootNamespace>
+    <AssemblyName>CilCpu.Sim</AssemblyName>
+  </PropertyGroup>
+
+</Project>
