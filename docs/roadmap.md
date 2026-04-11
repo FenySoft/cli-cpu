@@ -218,6 +218,43 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 
 ---
 
+### F6.5 — Secure Edition parallel tape-out (opcionális)
+
+**Cél:** A CLI-CPU Secure Edition parallel tape-out változata, amely a Secure Element / TEE / JavaCard piacot célozza. Ugyanaz az alap architektúra (Nano + Rich core), **plusz** Secure Element-specifikus hardveres komponensek: Crypto Actor (SPECT-ihletett), TRNG, PUF, secure boot + attestation, tamper detection, DPA countermeasures, OTP kulcstárolás.
+
+**Részletes dokumentum:** [`docs/secure-element.md`](secure-element.md) — ez rögzíti a teljes Secure Element pozicionálást, a TROPIC01 (Tropic Square első nyílt kereskedelmi SE) részletes elemzését, a megkülönböztető architektúrális előnyöket (multi-core, több független security domain egyetlen chipen), a tanúsítási útvonalat (EAL-5+), és a konkrét termékcsaládot (open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X, open medical SE).
+
+**Miért „F6.5" és nem „F6"?** Mert ez **egy parallel tape-out variáns**, nem egy önálló fázis. Ugyanaz a F5 RTL alap, csak kiegészítve a Secure Element hardveres komponensekkel. Az F6 Cognitive Fabric tape-out után **~6 hónappal** készíthető el.
+
+**Új funkciók az F6-hoz képest:**
+- **Crypto Actor** — SPECT-ihletett dedikált kriptográfiai egység (AES, SHA, ECC, post-quantum: Kyber/Dilithium/Falcon)
+- **TRNG** — true random number generator (ring oscillator jitter + whitening)
+- **PUF** — Physically Unclonable Function (SRAM PUF + error correction)
+- **OTP / eFuse tároló** — write-once root key storage
+- **Secure boot + remote attestation** — mérési lánc és chip identity
+- **Tamper detection** — 6 komponens (EM pulse, voltage glitch, temperature, laser, active shield, frequency monitor)
+- **DPA countermeasures** — masking, hiding, constant-time, noise injection
+
+**Becsült plusz tervezési munka:** ~30-50 mérnökhónap (F6-hoz képest), egy 3-5 fős csapat számára ~1-1.5 év.
+
+**Becsült plusz terület:** ~64k std cell Sky130-on (~32% növekedés az F6 ~200k-hoz képest). **Belefér** egy ChipIgnite MPW-ba (~10 mm²) vagy egy IHP SG13G2 MPW-ba (~15 mm²).
+
+**Kész kritérium:**
+- F6.5 tape-out sikeresen elkészül
+- Első bring-up board legyártva
+- Crypto Actor helyesen implementálja a cél algoritmusokat
+- Tamper detection triggerel a tesztelt támadásokra (voltage glitch, EM, laser)
+- TRNG megfelel a NIST SP 800-90B entrópia követelményeknek
+- Első **Common Criteria pre-evaluation** megkezdődik
+
+**Függőség:** F6 Cognitive Fabric tape-out kész.
+
+**Költség-nagyságrend:** ~$10-50k (MPW tape-out) + ~$0.5-1.2M (plusz mérnökbér) + ~$400k-1M (later Common Criteria evaluation).
+
+**Tanúsítási cél (F7 utáni):** **Common Criteria EAL-5+** a BSI (Németország) vagy ANSSI (Franciaország) akkreditált laborban. **Idő**: 2-3 év az evaluation-re. **Várható első kereskedelmi termékek**: 2033-2034.
+
+---
+
 ### F7 — Demonstrációs platform + Neuron OS fejlesztői SDK
 
 **Cél:** A Cognitive Fabric + Neuron OS kombináció mint **demonstrálható, fejleszthető platform** több valós use-case-re. A `Neuron OS` itt lép ki kutatási státuszból valós fejlesztői platform szintre.
@@ -262,15 +299,27 @@ Részletek és fejlesztői API példák: [`docs/neuron-os.md`](neuron-os.md).
 ```
                           ┌── Nano core út ──┐         ┌── Rich core út ──┐
                           │                  │         │                  │
-F0 ──► F1 ──► F2 ──► F3 ──┘──► F4 ──►────────┘─► F5 ──┴──► F6 ──► F7
-  spec   sim    RTL    TT       multi-         heterogén   heterogén  demo
-              │         1×      Nano          (Rich+Nano) (2-4 Rich  + Neuron
-              │         +        4×            FPGA       + 32-48    OS
-              │        mbox     FPGA                       Nano MPW)
-              │              ▲
-              └──── FPGA ────┘
-                 (opcionális
-                  korai F2 után)
+F0 ──► F1 ──► F2 ──► F3 ──┘──► F4 ──►────────┘─► F5 ──┴──► F6 ────► F7
+  spec   sim    RTL    TT       multi-         heterogén   heterogén   demo
+              │         1×      Nano          (Rich+Nano) (Cognitive  + Neuron
+              │         +        4×            FPGA       Fabric MPW)  OS
+              │        mbox     FPGA                        │          SDK
+              │              ▲                              │
+              └──── FPGA ────┘                               │
+                 (opcionális                                 ▼
+                  korai F2 után)                        F6.5 ──► Secure Edition
+                                                          parallel tape-out
+                                                          (Crypto Actor + TRNG +
+                                                          PUF + tamper + DPA)
+                                                              │
+                                                              ▼
+                                                     Common Criteria EAL-5+
+                                                     evaluation (~2-3 év)
+                                                              │
+                                                              ▼
+                                                   Kereskedelmi SE termékek
+                                                   (open wallet, eSIM, eID,
+                                                    FIDO, TPM, V2X, medical)
 ```
 
 Az F2 után opcionálisan FPGA-n is futtatható a CIL-T0 subset, még F3 (Tiny Tapeout) előtt — ez segít a bring-up board tervezésében.
@@ -287,4 +336,4 @@ A korábbi „F5 — CIL Object Model + GC egymagos kiterjesztés" címet átnev
 
 ## Mai státusz
 
-**F0 koncepcionálisan készen van.** Hat dokumentum a `docs/` és a `README.md` alatt együtt ~2400+ sor, belsőleg konzisztens projekt-terv a Cognitive Fabric iránnyal, a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, és a Neuron OS vízióval. A következő érdemi lépés az **F1 — C# referencia szimulátor** TDD-vel, ami már a Neuron OS aktor absztrakciót is tartalmazza minimális szinten.
+**F0 koncepcionálisan készen van.** Hét dokumentum a `docs/` és a `README.md` alatt együtt ~3500+ sor, belsőleg konzisztens projekt-terv a **hárompályás pozicionálással** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, a Neuron OS vízióval, és a Secure Element stratégiai tervvel (F6.5 parallel tape-out). A következő érdemi lépés az **F1 — C# referencia szimulátor** TDD-vel, ami már a Neuron OS aktor absztrakciót is tartalmazza minimális szinten.

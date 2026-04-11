@@ -35,15 +35,17 @@ Részletek a `docs/architecture.md` **„Stratégiai pozicionálás: Cognitive F
 3. **Shared-nothing skálázódás** — mivel a core-ok között nincs megosztott memória, a teljesítmény **lineárisan nő** a core-számmal. Nincs MESI, nincs cache coherency overhead, nincs lock contention, nincs cross-core side-channel.
 4. **Event-driven power profile** — a core-ok alapértelmezésben alvó üzemmódban vannak, és csak akkor ébrednek, amikor mailbox üzenet érkezik. **Ultra-alacsony alapfogyasztás**, ami kulcsfontosságú IoT, kritikus infrastruktúra és neuromorphic workload-okon.
 
-## Kétpályás pozicionálás — hosszú távon a Linux utódja
+## Hárompályás pozicionálás — hosszú távon a Linux utódja
 
-A CLI-CPU + Neuron OS **két párhuzamos piaci narratívát** követ, ugyanazzal a hardverrel, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
+A CLI-CPU + Neuron OS **három párhuzamos piaci narratívát** követ, ugyanazzal a hardveres alappal, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
 
 **Pálya 1 — „Cognitive Fabric"**: programozható kognitív szubsztrátum AI kutatóknak, Akka.NET / Orleans actor rendszereknek, spiking neural network szimulációnak, multi-agent szimulációnak, IoT edge gateway-nek. **Hosszú távú vízió.**
 
 **Pálya 2 — „Trustworthy Silicon"**: formálisan verifikálható, tanúsítható processzor regulated industries-nek — automotive (ISO 26262 ASIL-B/C/D), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog, confidential computing. **Rövid-közép távú bevételi lehetőség.**
 
-Ugyanaz a chip, két különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Neuron OS lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`docs/neuron-os.md`](docs/neuron-os.md) „A Linux öröklött problémái és a Neuron OS válasza" szekciójában.
+**Pálya 3 — „Secure Edition"**: a JavaCard / TEE / Secure Element piac átalakítása — egy parallel tape-out a fő F6 mellett, Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures kiegészítésekkel. **Első termékek: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Megkülönböztető: **több független hardveres security domain egy chipen**, amit a meglévő nyílt alternatívák (TROPIC01, OpenTitan) **nem kínálnak**. Részletek: [`docs/secure-element.md`](docs/secure-element.md).
+
+Ugyanaz a chip-család, három különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Neuron OS lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`docs/neuron-os.md`](docs/neuron-os.md) „A Linux öröklött problémái és a Neuron OS válasza" szekciójában.
 
 ## Heterogén multi-core: Nano + Rich
 
@@ -67,11 +69,12 @@ Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
 
 ## Dokumentumok
 
-- [docs/roadmap.md](docs/roadmap.md) — Hétfázisú ütemterv F0-tól F7-ig, a Cognitive Fabric pivottal F4-ben
+- [docs/roadmap.md](docs/roadmap.md) — Hétfázisú ütemterv F0-tól F7-ig, a Cognitive Fabric pivottal F4-ben, F6.5 Secure Edition variánssal
 - [docs/architecture.md](docs/architecture.md) — CLI-CPU mikroarchitektúra, Cognitive Fabric pozicionálás, prior art elemzés (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogén Nano + Rich multi-core
 - [docs/ISA-CIL-T0.md](docs/ISA-CIL-T0.md) — CIL-T0 subset specifikáció (48 opkód), mailbox MMIO interfész
 - [docs/security.md](docs/security.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
 - [docs/neuron-os.md](docs/neuron-os.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon"
+- [docs/secure-element.md](docs/secure-element.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv
 
 ## Gyártási útvonal
 
