@@ -2,7 +2,62 @@
 
 Ez a dokumentum a CLI-CPU **mikroarchitektúráját** írja le magas szinten: a stack-gép modellt, a pipeline-t, a memória térképet, a dekódolási stratégiát, a GC és kivételkezelés hardveres támogatását, valamint az elődprojektek (picoJava, Jazelle, Transmeta) közül átvett technikákat.
 
-> **Megjegyzés:** Ez az architektúra fokozatosan épül fel az F0–F6 fázisokban. Az itt leírt teljes funkciókészlet **F6-ra** készül el (eFabless ChipIgnite). A **Tiny Tapeout (F3)** csak a CIL-T0 subset-et valósítja meg, amit egy külön dokumentum (`ISA-CIL-T0.md`) ír le.
+> **Megjegyzés:** Ez az architektúra fokozatosan épül fel az F0–F7 fázisokban. Az itt leírt teljes funkciókészlet **F6-ra** készül el (eFabless ChipIgnite, multi-core). A **Tiny Tapeout (F3)** csak az egymagos CIL-T0 subset-et valósítja meg, amit egy külön dokumentum (`ISA-CIL-T0.md`) ír le.
+
+## Stratégiai pozicionálás: Cognitive Fabric
+
+A CLI-CPU **nem klasszikus bytecode CPU-ként** pozicionálja magát, mint annak idején a Sun picoJava vagy az ARM Jazelle. Azt az utat **már megpróbálták, és megbukott**: a szoftveres JIT + hagyományos CPU olcsóbb és gyorsabb lett, mint a dedikált bytecode hardver. Ugyanezt az utat megismételni **nem lenne értelmes**.
+
+Ehelyett a CLI-CPU egy **programozható kognitív szubsztrátum** — sok kis, független CIL-natív core, amelyek **üzenet-alapú kommunikációval** egy heterogén, eseményvezérelt hálózatot alkotnak. Minden core egy **teljes CIL programot** futtat saját lokális állapottal; a core-ok **mailbox FIFO-kon keresztül** beszélnek egymással, nincs megosztott memória, nincs cache koherencia protokoll, nincs lock contention. A használati mód a programtól függ: egy chip lehet **Akka.NET actor cluster**, **programozható spiking neural network**, **multi-agent szimuláció**, vagy **event-driven IoT edge**.
+
+### Miért más ez, mint a létező megoldások
+
+| Rendszer | Csomópont programozható? | Hardveres? | Nyílt? | .NET natív? |
+|---------|--------------------------|------------|--------|-------------|
+| Intel Loihi 2 | ❌ rögzített LIF neuron variánsok | ✓ | ❌ | ❌ |
+| IBM TrueNorth | ❌ rögzített LIF | ✓ | ❌ | ❌ |
+| BrainChip Akida | ❌ MetaTF-ből fordított fix modell | ✓ | ❌ | ❌ |
+| GrAI Matter Labs GrAI-1 | ❌ fix | ✓ | ❌ | ❌ |
+| SpiNNaker 2 (Manchester) | ✓ C/C++ ARM magokon | ✓ | részben | ❌ |
+| Akka.NET / Orleans | ✓ teljes C#/F# | ❌ szoftveres | ✓ | ✓ |
+| Erlang BEAM | ✓ Erlang | ❌ szoftveres | ✓ | ❌ |
+| **CLI-CPU (Cognitive Fabric)** | **✓ teljes CIL** | **✓** | **✓** | **✓** |
+
+A **neuromorphic versenytársak** (Loihi, TrueNorth, Akida, GrAI) mind **rögzített neuron-modellel** dolgoznak — nem lehet rajtuk tetszőleges algoritmust futtatni, csak a súlyokat és a topológiát beállítani. A **SpiNNaker** az egyetlen, amely programozható csomópontokat kínál, de **C/C++ ARM magokon**, sok mérnökmunkával, akadémiai keretek között. A **szoftveres actor rendszerek** (Akka.NET, Erlang) rugalmasak, de a host CPU-n versenyeznek a scheduler, GC, lock overhead-jével.
+
+**A CLI-CPU az egyetlen pozíció**, ahol **mind a hat oszlop** teljesül: programozható csomópont + hardveres + nyílt + .NET natív + event-driven + stack-kompakt ISA. Ez nem csak „egy újabb bytecode CPU", hanem **egy új kategória**.
+
+### Neuromorphic-ihletett, de nem neuromorphic
+
+A CLI-CPU **átveszi** a neuromorphic architektúrák legértékesebb elveit:
+
+- **Sok kis független egység** saját lokális állapottal
+- **Üzenet-alapú kommunikáció** (nem shared memory)
+- **Event-driven working mode** (a core alszik, amíg üzenet nem érkezik)
+- **Ultra-alacsony alapfogyasztás**
+- **Lineáris skálázódás** core-számmal
+
+De **nem neuromorphic** a szigorú értelmben, mert:
+
+- A csomópontok **nem 1-bit spike-okat** küldenek, hanem **32-bit üzeneteket** (ami elegendő pontosságot ad minden folytonos értéknek digitalizált formában)
+- A csomópontok **tetszőleges CIL algoritmust** futtathatnak — egy LIF neuron, egy Izhikevich neuron, egy DSP filter, egy Akka actor, egy state machine, vagy bármi más
+- **Digitális, determinisztikus** — nem analóg, nem sztochasztikus
+- **Dinamikusan átprogramozható** futás közben — a core új CIL kódot tud betölteni
+
+Ez azt jelenti, hogy egy **ugyanolyan hardveres chip** a program választásától függően lehet:
+
+| Program | A chip mi lesz |
+|---------|----------------|
+| C# + Akka.NET actors | Natív hardveres actor cluster |
+| Leaky Integrate-and-Fire neurons | Spiking Neural Network szimulátor |
+| Izhikevich modell + STDP | Biologikusabb SNN kutatási platform |
+| Conway's Game of Life + komplex szabályok | Cellular automata szubsztrátum |
+| Dataflow pipeline (FIR, IIR, FFT) | DSP processing fabric |
+| Multi-agent AI / játék szimuláció | Swarm intelligencia platform |
+| Per-request web handler | Embedded web szerver |
+| IoT edge szenzor-fúzió | Event-driven IoT gateway |
+
+**Ez a „one hardware, many paradigms" megközelítés** az, ami a projekt történeti jelentőségét adhatja — ha sikerül.
 
 ## Tervezési alapelvek
 
@@ -11,9 +66,178 @@ Ez a dokumentum a CLI-CPU **mikroarchitektúráját** írja le magas szinten: a 
 3. **Harvard modell külső memóriával.** Külön QSPI kód-flash és külön QSPI PSRAM adatnak. A chip-en belüli SRAM kizárólag gyorsítótár.
 4. **Hibrid dekódolás.** Egyszerű opkódok (~75%) közvetlen hardverrel, 1 ciklus. Komplex opkódok (~25%) mikrokód ROM-on keresztül, több ciklus.
 5. **Managed memory safety a szilíciumban.** A GC write barrier, a stack bounds check, a branch target validation, a type check — mind hardveres mellékhatás, nem szoftveres runtime feladat.
-6. **IoT-first energia profil.** Agresszív clock-gating és power-gating. Minden fel nem használt egység hideg.
+6. **Shared-nothing multi-core.** Az F4 fázistól kezdve több core működik együtt egyetlen chipen, **megosztott memória nélkül**. Minden core saját lokális SRAM-mal, és kizárólag **mailbox-alapú üzenetekkel** kommunikál. Ez automatikusan megszünteti a cache koherencia, lock contention, memory ordering problémákat.
+7. **Event-driven, nem clock-driven.** A core alapértelmezésben alvó üzemmódban van, és **csak akkor ébred**, amikor mailbox üzenet érkezik (vagy timer kilő). Ez ultra-alacsony alapfogyasztást eredményez.
+8. **Agresszív power-gating.** Minden fel nem használt egység hideg — FPU, GC koprocesszor, metaadat walker, mailbox router mind külön power domain.
 
-## Blokk diagram (teljes CLI-CPU, F6 cél)
+## Multi-core blokk diagram (F4+ cognitive fabric)
+
+Az F4 fázisban a CLI-CPU először válik **valódi hálózattá**. A 4 core egymástól függetlenül futtat saját CIL programot, mindegyik saját lokális SRAM-mal, és kizárólag a mailbox interfészeken keresztül kommunikál. Nincs megosztott heap, nincs cache koherencia:
+
+```
+  ┌──────────────────────────────────────────────────────────────┐
+  │                    CLI-CPU Cognitive Fabric (F4)             │
+  │                                                              │
+  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+  │  │  Core 0      │  │  Core 1      │  │  Core 2      │  │  Core 3      │
+  │  │              │  │              │  │              │  │              │
+  │  │  CIL-T0      │  │  CIL-T0      │  │  CIL-T0      │  │  CIL-T0      │
+  │  │  Pipeline    │  │  Pipeline    │  │  Pipeline    │  │  Pipeline    │
+  │  │              │  │              │  │              │  │              │
+  │  │  ┌────────┐  │  │  ┌────────┐  │  │  ┌────────┐  │  │  ┌────────┐  │
+  │  │  │ SRAM   │  │  │  │ SRAM   │  │  │  │ SRAM   │  │  │  │ SRAM   │  │
+  │  │  │ 16 KB  │  │  │  │ 16 KB  │  │  │  │ 16 KB  │  │  │  │ 16 KB  │  │
+  │  │  │ privát │  │  │  │ privát │  │  │  │ privát │  │  │  │ privát │  │
+  │  │  └────────┘  │  │  └────────┘  │  │  └────────┘  │  │  └────────┘  │
+  │  │              │  │              │  │              │  │              │
+  │  │ inbox FIFO   │  │ inbox FIFO   │  │ inbox FIFO   │  │ inbox FIFO   │
+  │  │ outbox FIFO  │  │ outbox FIFO  │  │ outbox FIFO  │  │ outbox FIFO  │
+  │  │ Sleep/Wake   │  │ Sleep/Wake   │  │ Sleep/Wake   │  │ Sleep/Wake   │
+  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+  │         │                 │                 │                 │        │
+  │  ═══════╧═════════════════╧═════════════════╧═════════════════╧═══════ │
+  │                         Shared Bus (4-port arbiter)                    │
+  │                                   │                                    │
+  │              ┌────────────────────┼────────────────────┐               │
+  │              ▼                    ▼                    ▼               │
+  │    ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐      │
+  │    │ QSPI Flash ctrl │  │   UART / GPIO   │  │  Timer / IRQ    │      │
+  │    │   (kód, R/O)    │  │   (I/O interf.) │  │  (global clock) │      │
+  │    └─────────────────┘  └─────────────────┘  └─────────────────┘      │
+  └──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Kulcs megfigyelések:**
+
+- **Minden core ugyanaz**, mint az F3 Tiny Tapeout egymagos CIL-T0. A pipeline, dekóder, mikrokód, stack cache — **változatlan**. Csak 4 példányban van.
+- **Nincs megosztott adat SRAM.** Minden core-nak saját 16 KB SRAM-ja van, amelyben él a saját eval stack-je, lokális változói, frame-jei, és (F5-től) saját objektum heap-je.
+- **A shared bus csak „lassú" erőforrásokra** — a QSPI flash (kód betöltés, ritka), az UART, a timer. Ezek a core-ok számára nem kritikus útvonalon vannak.
+- **Az inter-core kommunikáció** a mailbox FIFO-kon keresztül megy, **a shared bus megkerülésével** — a router egy direkt kapcsolat a 4 core között (F4 szinten 4-portú keresztkötés, ami még nem „crossbar", csak egy egyszerű mux-köteg).
+- **Sleep/Wake logika:** ha egy core-ban a CIL program egy `WAIT` mikrokódot futtat (vagy üres inbox-on polling-ba kerül), a core elalszik és csak akkor ébred, amikor mailbox üzenet érkezik. Ez az F4 fázis **event-driven** működésmódja.
+
+### Skálázódás F6-ra (16–64 core)
+
+Az F4 4-core design **lineárisan skálázható** 16 core-ig anélkül, hogy a shared bus torlódna — a CIL programok többsége amúgy is privát SRAM-ban dolgozik, a bus csak ritka (flash fetch, I/O) eseményekre kell. **16 core felett** a bus topológiát át kell nevezni **mesh-re** (2D grid), ahol minden core a szomszédaival és egy lokális I/O csatornával beszél. Ez az F6 ChipIgnite tape-out fizikai szerkezete.
+
+## Heterogén multi-core: Nano + Rich
+
+Az F5 fázistól a CLI-CPU **heterogén multi-core** architektúrára vált, analóg módon az ARM **big.LITTLE**, Apple **P-core + E-core**, és Intel **Alder Lake P+E** megközelítéseihez, csak a CLI világra alkalmazva. Egyetlen chipen **kétféle core** él együtt:
+
+| | **Nano core** | **Rich core** |
+|-|---------------|---------------|
+| **ISA** | CIL-T0 subset (~48 opkód, integer-only, static calls) | Teljes ECMA-335 CIL (~220 opkód) |
+| **Méret** | ~10 000 std cell | ~80 000 std cell |
+| **Funkciók** | Integer ALU, stack cache, mailbox, mikrokód (mul/div/call/ret) | Nano + objektum modell + GC + metadata walker + vtable cache + FPU (R4/R8) + 64-bit + kivételkezelés + generikusok |
+| **Órajel** | ~50–200 MHz | ~50–150 MHz (több pipeline stage miatt kissé lassabb) |
+| **Tipikus szerep** | Worker / neuron / filter / egyszerű actor / state machine | Supervisor / orchestrator / komplex domain logika / hibakezelő |
+| **Per-core SRAM** | 16–64 KB | 64–256 KB (heap-pel együtt) |
+| **Tranzisztor arány** | ~8× több fér el ugyanakkora területre | ~8× kevesebb |
+
+### Miért működik ez — Apple big.LITTLE a CLI-re
+
+A kereskedelmi heterogén multi-core CPU-k (ARM big.LITTLE 2011 óta, Apple M1+ 2020 óta, Intel Alder Lake 2021 óta, AMD Zen 5c 2024 óta) **mind sikeresek**, mert a valós workload-ok **nem homogének**. A legtöbb feladat egyszerű, kevés feladat komplex. **Egy teljes Rich core-t „pazarlás" lenne egy LIF neuronra, és egy Nano core kevés egy orchestrátor-nak.**
+
+Egy valós alkalmazás munkamegosztása:
+
+| Feladat típus | Példa | Core típus |
+|--------------|-------|-----------|
+| Szenzor-értelmezés | ADC sample → threshold | **Nano** |
+| Neuron szimuláció (LIF, Izhikevich) | `potential += weight; if (potential>th) fire()` | **Nano** |
+| DSP filter (FIR, IIR) | Simple integer pipeline | **Nano** |
+| Filter-lánc | Stream processor egy core-on | **Nano** |
+| Akka.NET worker actor | `Receive(msg) { state = f(state, msg); }` | **Nano** (ha integer) |
+| Akka.NET supervisor | Exception handling, child restart | **Rich** |
+| Complex domain logic | `Order.Validate()`, `User.Authorize()` | **Rich** |
+| Orchestrator / coordinator | Több actor koordinálása, tranzakciós logika | **Rich** |
+| Dinamikus CIL betöltés | Futásidejű új kód load | **Rich** |
+| Hibakezelő / logger | Exception → log + alert | **Rich** |
+| FP / tudományos számítás | NN forward pass double precíziósan | **Rich** |
+| String / szövegfeldolgozás | `ldstr`, `string.Concat` | **Rich** |
+
+A **Nano**-k többségben vannak (a valós munka ott történik), a **Rich**-ek kis számban felügyelnek.
+
+### Tervezési ökonómia — miért nem költségvetés-növelés
+
+Ez a legfontosabb rész: a heterogén modellhez **nincs új alapvető hardveres tervezési munka**. Mindkét core típus **már szerepel a roadmap-ben**, csak eddig külön fázisokban voltunk rájuk:
+
+```
+F3 (Tiny Tapeout)  ─►  Nano core 1×  ──┐
+                                        │
+F4 (FPGA multi-core) ─►  Nano core 4×  ─┤
+                                        │
+F5 (FPGA Rich)     ─►  Rich core 1×  ──┤
+                                        │
+                                        ▼
+F6 (ChipIgnite MPW) ─►  Heterogén: Rich 2-4× + Nano 32-48×
+                        + floorplan + Roslyn [RunsOn] + bridge
+```
+
+Az **F6-hoz új tervezési munka ~1–2 mérnökhónap**: floorplan optimalizáció, a Roslyn source generator `[RunsOn]` attribútum támogatása, és az a néhány regiszter a message router-ben, ami a Nano/Rich közötti átjárást intézi. **Ez marginális** ahhoz képest, amit a Nano és a Rich core tervezése külön-külön igényel.
+
+### Programozási modell — C# attribútumok
+
+A .NET fordítói szint már most támogatja az ilyen jelölőket. A CLI-CPU-n egy **Roslyn source generator** figyeli a `[RunsOn]` attribútumot, és a metódust a megfelelő bináris fájlba fordítja (`.t0` Nano-ra, `.tr` Rich-re):
+
+```csharp
+[RunsOn(CoreType.Nano)]
+public class LifNeuron : CoreProgram {
+    int potential, threshold, lastTime;
+
+    public void OnSpike(int weight) {
+        potential += weight;
+        if (potential >= threshold) {
+            Fire();
+            potential = 0;
+        }
+    }
+}
+
+[RunsOn(CoreType.Rich)]
+public class NetworkSupervisor : Actor {
+    Dictionary<int, NeuronRef> neurons = new();
+
+    public void OnStartup() {
+        try {
+            LoadTopologyFromFlash();
+            InitializeNeurons();
+        } catch (Exception ex) {
+            Log.Error(ex);
+            Restart();
+        }
+    }
+}
+```
+
+A fordító ellenőrzi, hogy a `[RunsOn(CoreType.Nano)]` kódban **csak a CIL-T0 opkódok** fordulnak elő — ha egy Nano metódus `newobj`-ot próbálna használni, a fordítás **compile-time hibát** ad. Ez a CIL ECMA-335 `verifiable code` fogalmának szigorúbb változata.
+
+### Chip-arány javaslatok fázisonként
+
+| Fázis | Platform | Nano cores | Rich cores | Aggregált képesség |
+|-------|----------|-----------|-----------|--------------------|
+| F3 | Tiny Tapeout | **1** | 0 | Proof of life, első „hálózati csomópont" |
+| F4 | FPGA multi-core | **4** | 0 | Első shared-nothing fabric, pure Nano |
+| F5 | FPGA heterogén | **4** | **1** | **Első heterogén rendszer**, Rich core teszt |
+| F6 | ChipIgnite (Sky130 vagy IHP MPW) | **32–48** | **2–4** | Valódi heterogén szilícium |
+| F7 | Termék-chip (jövő) | **64+** | **4–8** | Kereskedelmi Cognitive Fabric |
+
+### Állapot-migráció Nano ↔ Rich
+
+Ha egy Nano core programja túlnő a saját képességén (pl. komplex exception, generikus struktúra, floating-point kell), **üzenetben kérheti** egy Rich core-t, hogy vegye át az állapotát. Ez nem „migráció" a klasszikus értelemben (memória másolás), hanem **egy actor-szerializált üzenet**, ami a shared-nothing modellünkbe természetesen illik.
+
+A Nano core lépései:
+1. Megszakítja a jelenlegi feladatot egy `STATE_OVERFLOW` trap-en
+2. Az aktuális lokális változók és argumentumok JSON-szerűen szerializálódnak (MessagePack ECMA-335-kompatibilis)
+3. Üzenet megy egy kijelölt Rich core-nak „vedd át" kéréssel + serializált állapottal
+4. A Rich core folytatja a feladatot natívan, teljes CIL-lel
+5. Ha kell, visszaküldi az eredményt a Nano core-nak vagy egy másik címnek
+
+**Ez ritka eset** — a fordítói típus-check a legtöbb esetet build-time elfogja. A runtime migráció csak olyan edge case-ekre, mint a dinamikus reflexió, ami amúgy sem tipikus a cognitive fabric használatban.
+
+### Miért nem 3 vagy több core típus
+
+Elméletileg lehetne „Micro" (még kisebb, csak 16 opkód) és „Mega" (Rich + több cache) is — de ez **bonyolítja a programozási modellt** és **a floorplan tervezést**. A kereskedelmi példák (Apple, ARM, Intel) **mind** pontosan 2 core típust használnak, és ez a sweet spot. A CLI-CPU is **2 core típusnál** marad: Nano és Rich.
+
+## Blokk diagram (egymagos CLI-CPU, F6 single-core cél)
 
 ```
                          ┌─────────────────────────────────────────┐
@@ -369,21 +593,84 @@ A CLI-CPU **négy power domain**-re osztott (F6 cél):
 
 Clock-gating minden domainben, power-gating a 2., 3., 4. domainben.
 
-## Biztonsági tulajdonságok
+## Silicon-grade security
 
-A CLI-CPU hardveresen kikényszeríti a következőket:
+Ez a szekció a CLI-CPU biztonsági architektúráját tárgyalja **az architektúra szemszögéből**. A teljes biztonsági modellt, threat model-t, támadás-immunitási táblázatot, formális verifikáció tervet és tanúsítási útvonalakat külön dokumentum tartalmazza: lásd [`docs/security.md`](security.md).
 
-1. **Stack overflow / underflow trap** — minden pop/push ellenőrzi a stack pointer határait.
-2. **Branch target validation** — minden branch cél a CODE régión belüli, és egy „legal branch target" bitmap (F5+) megmondja, hogy valódi opkód-kezdet-e.
-3. **Type safety** — `isinst`/`castclass` hardveres típusleíró-lánc járás, nincs tetszőleges pointer cast.
-4. **Array bounds check** — minden `ldelem`/`stelem` ellenőrzi az indexet a tömb hossza ellen.
-5. **Null check** — minden `ldfld`/`stfld`/`callvirt` hardveresen ellenőrzi, hogy a receiver nem null.
-6. **Write barrier** — minden reference-típusú `stfld`/`stelem.ref` hardveresen frissíti a GC kártyatáblát; nem lehet elfelejteni.
-7. **No raw pointer arithmetic** — a CIL-ben nincs `add` két reference-re. A HW letrap-eli, ha valaki ilyet próbál (`unverifiable code` → trap).
-8. **No self-modifying code** — a CODE régió QSPI flash-en van, csak olvasható hardveresen.
+### A CLI-CPU biztonsági alapelve
 
-Az **F0 CIL-T0** subset már ezek többségét megvalósítja, csak a reference/objektum-specifikus ellenőrzéseket nem (mert F0-ban nincs objektum).
+> **A memory safety, type safety és control flow integrity nem szoftveres absztrakció, hanem fizikai tulajdonság a szilíciumban.**
+
+Ez a megfogalmazás nem marketing, hanem **architektúra-tervezési következmény**. A jelenlegi mikroarchitektúra a biztonságot **nem extra rétegként** adja hozzá, hanem a tervezési alapelvekből **implicit** módon következik:
+
+1. **Stack-gép modell** → nincs ROP gadget, mert a visszatérési cím nem a user stack-en van, hanem a frame pointer hardveres szerkezetében
+2. **Változatlan kód a memóriában** → nincs JIT, nincs AOT patching, ezért nincs JIT spraying, nincs self-modifying code
+3. **Shared-nothing multi-core** → nincs cross-core side-channel, nincs false sharing covert channel, nincs cache coherency-n alapuló támadás
+4. **In-order pipeline, nincs spekuláció** → immunis a Spectre/Meltdown teljes családra
+5. **Harvard memória modell** → a CODE régió QSPI flash-en, fizikailag R/O — nem lehet shellcode-ot injektálni
+6. **CIL verified code szemantika** → a type safety és a memory safety az ISA szinten beépített
+
+### Hardveres ellenőrzések — a jelenlegi ISA már tartalmazza
+
+| Ellenőrzés | Hol | Trap | Fázis |
+|-----------|-----|------|-------|
+| Stack overflow/underflow | Minden push/pop | `STACK_OVERFLOW` / `STACK_UNDERFLOW` | **F3** |
+| Lokális/argumentum index bounds | `ldloc`, `stloc`, `ldarg`, `starg` | `INVALID_LOCAL` / `INVALID_ARG` | **F3** |
+| Branch target validation | `br*` | `INVALID_BRANCH_TARGET` | **F3** |
+| Call target validation | `call` | `INVALID_CALL_TARGET` | **F3** |
+| Division by zero | `div`, `rem` | `DIV_BY_ZERO` | **F3** |
+| Call depth limit | `call` | `CALL_DEPTH_EXCEEDED` | **F3** |
+| Invalid opcode | Dekóder | `INVALID_OPCODE` | **F3** |
+| Array bounds check | `ldelem`, `stelem` | `ARRAY_INDEX_OUT_OF_RANGE` | F5 |
+| Null reference check | `ldfld`, `stfld`, `callvirt` | `NULL_REFERENCE` | F5 |
+| Type check (isinst/castclass) | `isinst`, `castclass` | `INVALID_CAST` | F5 |
+| GC write barrier | Reference-type `stfld`/`stelem.ref` | — (mellékhatás) | F5 |
+
+**Fontos megjegyzés:** az F3 Tiny Tapeout chipen **már az alapvető biztonsági ellenőrzések többsége élesben van**. Ez azt jelenti, hogy a CLI-CPU első valódi szilíciuma **már olyan biztonsági tulajdonságokkal rendelkezik, amikkel egyetlen szabványos CPU sem**.
+
+### Támadás-osztályok, amelyekre immunis a CLI-CPU
+
+Rövid összefoglaló (a részletes táblázat a [`docs/security.md`](security.md) fájlban):
+
+| Támadás-család | Státus |
+|----------------|--------|
+| Buffer overflow (CWE-119, 120, 121, 122) | **Kizárva** (hardveres bounds check) |
+| Use-after-free (CWE-416) | **Kizárva** F5-től (GC hardveresen) |
+| Type confusion (CWE-843) | **Kizárva** F5-től (hardveres type check) |
+| Format string (CWE-134) | **Kizárva** (nincs C string) |
+| ROP / JOP | **Kizárva** (hardveres CFI) |
+| Shellcode injection (CWE-94) | **Kizárva** (CODE R/O) |
+| JIT spraying | **Kizárva** (nincs JIT) |
+| Spectre v1/v2/v4, Meltdown, L1TF, MDS | **Kizárva** (nincs spekuláció) |
+| Cross-core side-channel | **Kizárva** (shared-nothing) |
+| False sharing covert channel | **Kizárva** (nincs shared cache) |
+| GC race condition | **Kizárva** (per-core privát heap) |
+| Lock deadlock | **Kizárva** (nincs shared lock) |
+
+### Formális verifikáció lehetősége
+
+A CLI-CPU **Nano core** 48 opkódos ISA-ja **gyakorlatilag kisebb, mint a seL4 microkernel** (~10 000 sor C), amit a UNSW csapata 15+ év munka alatt **formálisan bizonyított** Coq + Isabelle eszközökkel.
+
+Ez azt jelenti, hogy a CLI-CPU **formális verifikációja megvalósítható** — nem egyszerű, nem olcsó, de **nem is lehetetlen**, és **sem az x86, sem az ARM, sem a RISC-V teljes extension-készletével nem megvalósítható**.
+
+A formális verifikáció részleteiért lásd a [`docs/security.md`](security.md) **„Formális verifikáció"** szekcióját.
+
+### Kapcsolódó projektek
+
+- **CHERI** (Cambridge) — legközelebbi rokon, capability-based security hardveresen; érdemes akadémiai partner lehet
+- **seL4** — formálisan verifikált microkernel, tanulandó precedens
+- **CompCert** — formálisan verifikált C fordító, a `cli-cpu-link` tool hosszú távú célja hasonló lehet
+- **Project Everest** (Microsoft Research) — formálisan verifikált HTTPS/TLS stack F\*-ban, Microsoft-támogatás lehetősége
+
+## Kétpályás pozicionálás
+
+A CLI-CPU biztonsági profilja a **Cognitive Fabric** (programozható kognitív szubsztrátum) narratíva **mellett** egy második piaci pályát is megnyit:
+
+- **Pálya 1 — „Cognitive Fabric"** — AI kutatóknak, actor rendszereknek, neurális háló szimulációnak, multi-agent rendszereknek. Hosszú távú vízió.
+- **Pálya 2 — „Trustworthy Silicon"** — regulated industries-nek: automotive (ISO 26262), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog chipek, confidential computing. Rövid-közép távú bevételi lehetőség, magas árréssel.
+
+**Ugyanaz a hardver, két különböző piaci szegmens.** Részletek és konkrét cél-piacok a [`docs/security.md`](security.md) **„Mit jelent ez a projekt gyakorlati célja szempontjából"** szekciójában.
 
 ## Következő lépés
 
-A `ISA-CIL-T0.md` dokumentum adja a konkrét CIL-T0 subset teljes opkód-specifikációját, kódolási táblákat, stack-effekteket, ciklusszámokat és trap feltételeket. **Ez az F1 C# szimulátor alapja** — minden ottani tesztnek közvetlenül hivatkoznia kell az ISA-CIL-T0 spec egy-egy pontjára.
+A `ISA-CIL-T0.md` dokumentum adja a konkrét CIL-T0 subset teljes opkód-specifikációját, kódolási táblákat, stack-effekteket, ciklusszámokat és trap feltételeket. **Ez az F1 C# szimulátor alapja** — minden ottani tesztnek közvetlenül hivatkoznia kell az ISA-CIL-T0 spec egy-egy pontjára, és a property-based tesztek már most megalapozzák a későbbi formális verifikációt.

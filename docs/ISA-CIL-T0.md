@@ -39,9 +39,108 @@ A CIL-T0-ra a `docs/architecture.md` memória modelljének **szűkített változ
 | **CODE** | `0x0000_0000` – `0x000F_FFFF` | CIL bytecode (.cil-t0 bináris formátum) | QSPI Flash | 1 MB |
 | **DATA** | `0x1000_0000` – `0x1003_FFFF` | `.data` szegmens (konstansok, statikus mezők) | QSPI Flash / PSRAM | 256 KB |
 | **STACK** | `0x2000_0000` – `0x2000_3FFF` | Eval stack + lokálisok + arg-ok + frame-ek | QSPI PSRAM | 16 KB |
-| **MMIO** | `0xF000_0000` – `0xFFFF_FFFF` | UART, GPIO, timer | On-chip | — |
+| **MMIO** | `0xF000_0000` – `0xFFFF_FFFF` | UART, **Mailbox**, GPIO, timer | On-chip | — |
 
 **Nincs HEAP** a CIL-T0-ban, mert nincs `newobj`/`newarr`.
+
+### MMIO régió részletes térképe
+
+A `0xF000_0000` kezdetű MMIO régió blokkokra van osztva. F3-ban csak az UART és a Mailbox van implementálva, a többi helyfoglalás a jövő fázisokra:
+
+| Cím | Méret | Blokk | Fázis |
+|-----|-------|-------|-------|
+| `0xF000_0000` – `0xF000_00FF` | 256 B | UART (TX/RX/status/control) | F3 |
+| `0xF000_0100` – `0xF000_01FF` | 256 B | **Mailbox (inbox + outbox)** | **F3** |
+| `0xF000_0200` – `0xF000_02FF` | 256 B | GPIO (reserved) | F4 |
+| `0xF000_0300` – `0xF000_03FF` | 256 B | Timer / clock (reserved) | F4 |
+| `0xF000_0400` – `0xFFFF_FFFF` | — | Reserved | F5+ |
+
+## Mailbox interface (F3)
+
+A CLI-CPU **már az F3 Tiny Tapeout chipen** tartalmaz egy **32-bites mailbox interfészt**, amely lehetővé teszi, hogy a chip **üzeneteket kapjon** a külvilágból és **üzeneteket küldjön** vissza, eseményvezérelt módon. Ez az első olyan interfész, ami a **cognitive fabric** pozicionálást megalapozza — F3 egymagos, de már a „hálózatba illeszthető csomópont" szerepét tölti be.
+
+### Tervezési elvek
+
+1. **Nincs új opkód.** A mailbox az MMIO régióban él, a meglévő `ldind.i4` (load indirect) és `stind.i4` (store indirect) opkódokkal érhető el. Ezzel a CIL-T0 opkód-készlet **48 opkódon marad**, és szigorúan ECMA-335 kompatibilis.
+2. **Szimmetrikus inbox és outbox.** Mindkét FIFO **8 mélységű**, 32-bit széles bejegyzésekkel. Ez 8 „spike" burst-öt tud buffer-elni mindkét irányban üzenetvesztés nélkül.
+3. **F3-ban külső bridge** (UART/FTDI) közvetíti az üzeneteket a host és a chip között. **F4-ben** ugyanezek a regiszterek a hardveres router-re csatlakoznak, és a `target` mező kap értelmet (cél core index).
+4. **Trap támogatás.** Ha a program megpróbál üres inbox-ról olvasni vagy tele outbox-ra írni, a hardver `STATUS` regiszter-en jelzi; opcionálisan **interrupt/wake-from-sleep** is generálható (F4+).
+
+### Regiszter térkép
+
+| Cím | Reg | R/W | Leírás |
+|-----|-----|-----|--------|
+| `0xF000_0100` | `MB_STATUS` | R | **Status**: bit 0 = inbox has message, bit 1 = inbox full, bit 2 = outbox empty, bit 3 = outbox full, bit 4 = inbox overflow sticky, bit 5 = outbox overflow sticky, bit 6–7 = reserved, bit 8–11 = inbox count (0–8), bit 12–15 = outbox count (0–8) |
+| `0xF000_0104` | `MB_DATA` | R/W | **Data**: olvasás → pop az inbox FIFO tetejéről; írás → push az outbox FIFO aljára |
+| `0xF000_0108` | `MB_TARGET` | R/W | **Target**: az **utolsó** outbox push célcímzettje. F3-ban: 0 = külső (UART bridge), minden más érték reserved. F4+: a cél core index (0–N–1) |
+| `0xF000_010C` | `MB_SOURCE` | R | **Source**: az **utolsó** inbox pop forrása. F3-ban mindig 0 (külső). F4+: a küldő core index |
+| `0xF000_0110` | `MB_CTRL` | R/W | **Control**: bit 0 = clear inbox overflow sticky, bit 1 = clear outbox overflow sticky, bit 2 = enable inbox-wake interrupt (F4+), bit 3 = flush outbox (resync F3 UART bridge), bit 4–31 = reserved |
+| `0xF000_0114` – `0xF000_01FF` | — | — | Reserved |
+
+### Használati példa CIL-T0-ban
+
+Ez a minta egy egyszerű „echo neuron": vár egy bejövő üzenetet, hozzáad 1-et, és visszaküldi.
+
+```
+; receive_add_send() — végtelen ciklus
+.method static void receive_add_send()
+{
+    .maxstack 3
+    .locals init (int32 V_msg)
+
+POLL:
+    ldc.i4      0xF0000100                 ; MB_STATUS cím
+    ldind.i4                                ; status érték a TOS-ra
+    ldc.i4.1                                ; bit 0 maszk (inbox has message)
+    and
+    brfalse.s   POLL                        ; ha nincs üzenet, vár
+
+    ; --- üzenet olvasás ---
+    ldc.i4      0xF0000104                 ; MB_DATA cím
+    ldind.i4                                ; pop inbox → TOS
+    ldc.i4.1
+    add                                     ; +1
+    stloc.0                                 ; V_msg = beérkezett+1
+
+    ; --- target beállítás (F3: 0 = külső) ---
+    ldc.i4      0xF0000108                 ; MB_TARGET cím
+    ldc.i4.0
+    stind.i4
+
+    ; --- outbox push ---
+    ldc.i4      0xF0000104                 ; MB_DATA cím
+    ldloc.0
+    stind.i4                                ; push outbox
+
+    br.s        POLL
+}
+```
+
+Ez a néhány soros CIL-T0 **már F3 szilíciumon futtatható**, és **bemutatja a cognitive fabric koncepciót**: egy külső teszt-host UART-on üzenetet küld, a chip feldolgozza CIL programmal, és visszaküldi. Ez az első „kezedben tartható, hálózatba kapcsolt neuron" demó.
+
+### Trap-kiegészítés
+
+A jelenlegi trap-listához (lásd fentebb) F3-ban hozzáadódik egy opcionális trap:
+
+| Trap # | Név | Leírás |
+|--------|-----|--------|
+| 0x0C | `MAILBOX_OVERFLOW` | Akkor, ha a program írást próbál tele outbox-ra és a `MB_CTRL` nem engedélyezi a drop viselkedést (F4+ beállítható) |
+
+F3-ban alapértelmezésben **a túlcsordulás csak sticky bit-et állít**, nem trap-el — a mintakód ezt `MB_STATUS` polling-gal kezelheti.
+
+### Hardveres méret-becslés
+
+A mailbox blokk becsült mérete Sky130-on:
+
+| Komponens | Std cell |
+|-----------|----------|
+| 8 × 32-bit inbox FIFO | ~120 |
+| 8 × 32-bit outbox FIFO | ~120 |
+| Status/Ctrl regiszterek + dekódolás | ~80 |
+| UART bridge (F3) | ~50 (már meglévő UART-ból megosztva) |
+| **Mailbox összesen** | **~370** |
+
+Ez **~4% növekedés** a CIL-T0 ~8700 std cell budget-jén, és **elfér** a 4×2 Tiny Tapeout tile konfigurációban. **A teljes becsült F3 méret most ~9100 std cell.**
 
 ## Stack szemantika
 
