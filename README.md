@@ -71,6 +71,7 @@ Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
 - [docs/architecture.md](docs/architecture.md) — CLI-CPU mikroarchitektúra, Cognitive Fabric pozicionálás, prior art elemzés (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogén Nano + Rich multi-core
 - [docs/ISA-CIL-T0.md](docs/ISA-CIL-T0.md) — CIL-T0 subset specifikáció (48 opkód), mailbox MMIO interfész
 - [docs/security.md](docs/security.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
+- [docs/neuron-os.md](docs/neuron-os.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon"
 
 ## Gyártási útvonal
 

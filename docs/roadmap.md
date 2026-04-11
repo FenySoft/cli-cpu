@@ -218,32 +218,42 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 
 ---
 
-### F7 — Demonstrációs platform + Neuron OS csírái
+### F7 — Demonstrációs platform + Neuron OS fejlesztői SDK
 
-**Cél:** A Cognitive Fabric ne csak egy lapka legyen, hanem egy **demonstrálható, fejleszthető platform** több valós use-case-re. Itt kezd kialakulni az a runtime/OS réteg, ami a hardver fölött a programozhatóságot biztosítja — ezt nevezzük itt informálisan **„neuron OS"**-nek.
+**Cél:** A Cognitive Fabric + Neuron OS kombináció mint **demonstrálható, fejleszthető platform** több valós use-case-re. A `Neuron OS` itt lép ki kutatási státuszból valós fejlesztői platform szintre.
+
+**A Neuron OS teljes víziója egy külön dokumentumban**: [`docs/neuron-os.md`](neuron-os.md). Röviden: aktor-alapú operációs rendszer, amely az Erlang OTP víziót valósítja meg hardveres támogatással (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchia, capability-alapú biztonság, hot code loading, location transparency.
 
 **Kimenet:**
 - **Referencia PCB-k** több use-case-re:
   - IoT szenzor node (QSPI flash, PSRAM, LoRa/WiFi, néhány szenzor)
   - Akka.NET cluster demó dev kit (több chip hálózatban)
   - SNN inference board (MNIST/CIFAR szintű feladatra)
-- **„Neuron OS" minimum runtime**:
-  - Bootloader (F3 óta létezik, itt formalizálódik)
-  - Core allocation: melyik core melyik CIL kódot futtatja
-  - Message routing szoftveres kiegészítés (hardveres router felett)
-  - Topológia manager: virtuális aktor-kapcsolatok
-  - Lifecycle: actor létrehozás, szüneteltetés, megszüntetés
-  - Dinamikus CIL kód-betöltés core-ra futás közben
-  - Monitoring: spike rate, CPU használat, memória — debug/telemetria
-- **Fejlesztői eszközök:**
-  - `dotnet publish` target a CLI-CPU-ra
-  - Referencia C# példák (Akka.NET, LIF háló, dataflow pipeline, IoT gateway)
-  - Szimulátor/hardver bridge (VSCode debugger kapcsolat)
-- **Publikációs anyag:** cikk, előadás, demo video — az egész projektet bemutató narratíva
+- **Neuron OS fejlesztői SDK**:
+  - `NeuronOS.Core` — aktor alapkönyvtár (Actor<T>, Supervisor, Spawn, Send, Receive)
+  - `NeuronOS.Devices` — device aktor library (UART, GPIO, QSPI, timer)
+  - `NeuronOS.Distributed` — inter-chip aktor protokoll
+  - `dotnet publish` target Neuron OS-re
+  - VSCode / VS extension debugger aktor message replay-jel
+  - NuGet csomagok publikus feed-en
+- **Referencia C# demó alkalmazások:**
+  - Akka.NET-szerű actor cluster (supervisor hierarchia, hot code loading)
+  - LIF spiking neural network 32-48 Nano core-on
+  - IoT edge gateway (szenzor handlerek + LoRa protokoll)
+  - Multi-agent szimuláció (Boids, Conway's Game of Life kiterjesztése)
+- **Publikációs anyag:** cikk, előadás, demo video — az egész projektet bemutató narratíva, Linux Foundation projekt-státusz kérelem
 
-**Függőség:** F6 kész, chip a kézben.
+**Függőség:** F6 kész, chip a kézben, Neuron OS alfa (F5 óta) stabil.
 
-**Megjegyzés:** A „neuron OS" rétegei **organikusan épülnek fel** az F1-F6 munka mellett — minden fázis ad hozzá valamit (F1: boot + trap handler, F4: scheduler + router, F5: memory manager, F6: lifecycle). Az F7-ben csak **nevet és formalizálást** kapnak. **Nem tervezzük meg előre az egész OS-t**, mert az hónapokat venne el a hardver munkától.
+**Megjegyzés a Neuron OS fázisolásáról:** A Neuron OS **nem önálló fázis**, hanem **organikusan épül fel** az F1-F7 fázisok mentén:
+- **F1**: minimal `NeuronOS.Core` library a C# szimulátorban (Actor<T>, in-memory mailbox)
+- **F3**: egy-aktoros bootloader a Tiny Tapeout chipen (echo neuron demó)
+- **F4**: 4-aktoros rendszer scheduler + router kezdeti implementációval
+- **F5**: teljes supervision fa, per-core GC, capability-alapú isolation, Roslyn source generator a `[RunsOn]` attribútumra
+- **F6**: hot code loading, writable microcode, elosztott aktorok több chipen
+- **F7**: fejlesztői SDK, VSCode integráció, NuGet publikálás, valódi alkalmazás demók
+
+Részletek és fejlesztői API példák: [`docs/neuron-os.md`](neuron-os.md).
 
 ---
 
@@ -277,4 +287,4 @@ A korábbi „F5 — CIL Object Model + GC egymagos kiterjesztés" címet átnev
 
 ## Mai státusz
 
-**F0 folyamatban.** `roadmap.md`, `architecture.md`, `ISA-CIL-T0.md`, `README.md` mind frissítve a Cognitive Fabric iránnyal és a heterogén Nano+Rich modellel. A következő érdemi lépés az **F1 — C# referencia szimulátor** TDD-vel.
+**F0 koncepcionálisan készen van.** Hat dokumentum a `docs/` és a `README.md` alatt együtt ~2400+ sor, belsőleg konzisztens projekt-terv a Cognitive Fabric iránnyal, a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, és a Neuron OS vízióval. A következő érdemi lépés az **F1 — C# referencia szimulátor** TDD-vel, ami már a Neuron OS aktor absztrakciót is tartalmazza minimális szinten.
