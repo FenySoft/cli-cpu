@@ -8,6 +8,7 @@ A FAQ célja, hogy egy **új olvasó** (akár mérnök, akár befektető, akár 
 
 - [1. CLI vagy CIL — mi a helyes szóhasználat?](#1-cli-vagy-cil--mi-a-helyes-szóhasználat)
 - [2. A CLI-t meg lehet valósítani hardveren?](#2-a-cli-t-meg-lehet-valósítani-hardveren)
+- [3. Egy fizikai core több logikai aktort kiszolgálhat?](#3-egy-fizikai-core-több-logikai-aktort-kiszolgálhat)
 
 ---
 
@@ -192,7 +193,7 @@ Négy komoly kísérlet volt már „bytecode CPU hardveren":
 |---------|-----|-------------|-------------------------|
 | **Sun picoJava** | 1997 | Teljes JVM bájtkód hardveren | ❌ Egymagos sebességen próbált versenyezni a szoftveres JIT-tel. Elvesztette a Moore-törvény + JIT fejlődés miatt |
 | **ARM Jazelle** | 2001 | Hardveres JVM mód az ARM-on | ❌ Trap-elt a komplex opkódoknál, hibrid volt, de a szoftveres JIT rá is elhúzott. 2011-ben eltávolították |
-| **Azul Vega / Vega2** | 2005 | Custom Java processzor hardveres GC assist-tel | ✅ Siker — de drága, niche, csak high-frequency trading-nek |
+| **Azul Vega / Vega2** | 2005 | Custom Java processzor hardveres GC assist-tel | ✅ Siker — de drága, szűk piaci szegmens, csak high-frequency trading-nek |
 | **JOP** (kutatási) | 2002– | Valós idejű Java FPGA-n | ✅ Akadémiai siker, korlátozott produkció |
 
 **A CLI-CPU a Vega modelljét viszi tovább**, de **nyílt forrással** és **shared-nothing multi-core-ral**:
@@ -224,6 +225,158 @@ A `docs/architecture.md` „Stratégiai pozicionálás: Cognitive Fabric" szekci
 - **F4 Multi-core FPGA:** a shared-nothing modell → bizonyíték, hogy skálázódik
 - **F5 Rich core:** a teljes CLI → bizonyíték, hogy kivitelezhető
 - **F6 Tape-out:** a kereskedelmi bizonyíték
+
+---
+
+## 3. Egy fizikai core több logikai aktort kiszolgálhat?
+
+**Rövid válasz: igen, és ez nem opcionális optimalizáció, hanem a Neuron OS vízió alapvető része.** A fizikai core egy hardver erőforrás, a logikai aktor egy futtatási egység — a kettő aránya **dizájn-döntés**, nem fix 1:1 leképzés.
+
+### A projekt saját dokumentációja explicit támogatja
+
+A `docs/neuron-os.md` négy különböző helyen is rögzíti a „több aktor egy core-on" modellt:
+
+**Location transparency** (107. sor):
+> „Egy aktor referencia **nem árulja el**, hogy a target **lokális (ugyanezen a core-on)**, másik core-on, vagy másik chipen van."
+
+Ha az architektúra „1 core = 1 aktor" lenne, a lokális eset nem létezne.
+
+**Zero-copy ugyanazon a core-on** (365. sor):
+> „Ha egy aktor üzenetet küld egy másik aktoron belül **ugyanazon a core-on**, a runtime zero-copy módon továbbítja."
+
+A runtime aktívan **észleli és optimalizálja** az eset, amikor két aktor ugyanazon a core-on él.
+
+**Lokális üzenet mint latencia-kategória** (314. sor):
+> „Lokális (ugyanazon a core-on, ugyanazon az aktoron belüli belső üzenetek) — ~1–3 ciklus, zero copy"
+
+Ez egy konkrét performance-kategória a projekt üzenet-latencia modelljében.
+
+**Aktor-migráció** (110. sor):
+> „Az aktorok **futás közben áthelyezhetők** core-ok között (load balancing)"
+
+Ez implikálja, hogy a core kapacitása elég több aktor hordozására — különben nem lenne mit áthelyezni.
+
+### A kulcs: fizikai core ≠ logikai aktor
+
+Ezt tisztán kell tartani, mert könnyű összekeverni:
+
+| Fogalom | Mi az | Hány lehet |
+|---------|-------|------------|
+| **Fizikai core** | Hardveres végrehajtó egység (Nano vagy Rich) | F6-on: 32–48 Nano + 2–4 Rich |
+| **Logikai aktor** | Állapot + mailbox + viselkedés (CIL kód) | **Ezer vagy több** összesen |
+
+A **fizikai core** egy **hardver erőforrás**. A **logikai aktor** egy **futtatási egység**, amit a runtime a core-ra ütemez.
+
+### Hogyan működik a gyakorlatban
+
+Egy fizikai core `privát SRAM`-jában **runtime + több aktor állapota** fér el:
+
+```
+┌────────────────────────────────┐
+│      Physical Nano Core        │
+│                                │
+│  ┌──────────────────────────┐  │
+│  │  Pipeline + stack cache  │  │
+│  └──────────────────────────┘  │
+│                                │
+│  ┌──────────────────────────┐  │
+│  │  Privát SRAM: 16 KB      │  │
+│  │  ┌──────────────────┐    │  │
+│  │  │ Aktor runtime    │    │  │
+│  │  ├──────────────────┤    │  │
+│  │  │ Aktor A állapot  │    │  │
+│  │  │ Aktor B állapot  │    │  │
+│  │  │ Aktor C állapot  │    │  │
+│  │  │ ... (N aktor)    │    │  │
+│  │  └──────────────────┘    │  │
+│  └──────────────────────────┘  │
+│                                │
+│  ┌──────────────────────────┐  │
+│  │  Hardver mailbox FIFO    │  │
+│  │  (8 mély inbox/outbox)   │  │
+│  └──────────────────────────┘  │
+└────────────────────────────────┘
+```
+
+Az üzenet-feldolgozás lépései:
+
+1. **Hardver** → a mailbox FIFO-ba betölt egy üzenetet
+2. **Runtime** → kiolvassa, megnézi a címzett aktor ID-ját
+3. **Runtime** → megkeresi a helyi aktor táblában (privát SRAM-ban)
+4. **Runtime** → átkapcsol annak az aktornak az állapotára, végrehajtja az üzenet-kezelőt
+5. **Aktor** → visszatér, a runtime várja a következő üzenetet (akár másik aktornak)
+
+Ez pont olyan, mint az **Akka.NET / Erlang runtime**, csak **hardveres mailbox és privát SRAM** támogatással — **kooperatív multitasking**, ahol a scheduler nem szakítja félbe az üzenet-feldolgozást (`neuron-os.md` 278. sor).
+
+### Hány aktor fér egy core-on?
+
+A kemény korlát a privát SRAM mérete. A runtime maga ~2–3 KB (Nano) vagy ~10–20 KB (Rich), a maradék aktoroknak jut:
+
+**Nano core (16 KB privát SRAM):**
+- Nagyon kis aktor (~50–100 byte) → **~100–200 aktor**
+- Átlagos aktor (~500 byte) → **~25–30 aktor**
+- Nagy állapotú aktor (~2 KB) → **~6–7 aktor**
+
+**Rich core (64–256 KB privát SRAM + heap):**
+- Egyszerű aktor (~200–500 byte) → **~100–500 aktor**
+- Komplex aktor objektumokkal (~5–10 KB) → **~10–50 aktor**
+
+**F6 szilícium teljes kapacitás (32 Nano + 4 Rich):**
+- Átlagos workload: **~1500–5000 logikai aktor** egyidejűleg
+- Kis aktorokra optimalizálva: **akár 10 000+**
+
+### Mikor érdemes „1 core = 1 aktor" modellt használni?
+
+Van amikor szándékosan dedikált core-t kap egy aktor:
+
+- **Kritikus timing** — real-time vezérlés, forró hálózati útvonal, audio pipeline
+- **Isolation** — biztonsági domain (pl. kripto kulcs kezelés a Secure Element-ben)
+- **Performance worker** — SNN neuron, ahol a deterministikus time-step számít
+- **Fault isolation** — egy supervisor-fa levele, amelyet lehet restart-olni a többi befolyásolása nélkül
+
+### Mikor érdemes „1 core = sok aktor" modellt használni?
+
+- **Nagy aktor populáció** — ezer vagy több aktor (pl. webszerver: 1 kérés = 1 aktor, `neuron-os.md` 434. sor)
+- **Hot/cold workload** — sok aktor, de csak kevés aktív egyidejűleg (pl. session handler)
+- **Supervisor fa belső csomópontjai** — ritkán dolgoznak, dedikált core pazarló lenne
+- **Kernel aktorok együtt** — `root_supervisor` + `scheduler` + `router` osztoznak egy Rich core-on
+
+### A teljes kép — heterogén leképzés
+
+A Neuron OS **rugalmas N:M aktor-core leképzést** használ:
+
+```
+┌─── Rich core 0 ──────────────────┐
+│ • root_supervisor                │  ← több "kernel aktor"
+│ • scheduler                      │    egy core-on
+│ • router                         │
+└──────────────────────────────────┘
+
+┌─── Rich core 1 ──────────────────┐
+│ • http_server                    │  ← sok kis aktor
+│ • 1000 × session aktor           │    egy core-on
+└──────────────────────────────────┘
+
+┌─── Nano core 5 ──────────────────┐
+│ • network_packet_filter          │  ← egyetlen dedikált aktor
+└──────────────────────────────────┘    egy core-on (forró út)
+
+┌─── Nano core 12–43 ──────────────┐
+│ • neuron_0 ... neuron_31         │  ← egy-aktor-per-core
+└──────────────────────────────────┘    (SNN worker)
+```
+
+Ugyanaz a chip, különböző aktor/core arányok az igényeknek megfelelően.
+
+### F3 Tiny Tapeout — egy speciális eset
+
+Vigyázz egy potenciális ellentmondással: a `docs/roadmap.md` **F3 Tiny Tapeout** verziója egyetlen core-on **egyetlen CIL program**ot futtat. Ez **nem** azt jelenti, hogy a core csak 1 aktort tud hordozni — F3-ban egyszerűen a Tiny Tapeout tile SRAM annyira kicsi, hogy nem érdemes runtime-ot tenni rá.
+
+**A multi-aktor runtime F4-től jön be** (`neuron-os.md` 617–624. sor), amikor már a `scheduler` + `router` valódi szerepet játszik, és F5-től természetes a több aktor egy core-on.
+
+### A megkülönböztető pont más neuromorphic chipekkel szemben
+
+Ez pont az, ami **megkülönbözteti a CLI-CPU-t** a hagyományos neuromorphic chipektől (Intel Loihi, IBM TrueNorth, BrainChip Akida): **nem rögzített 1 neuron = 1 compute unit** topológia, hanem **rugalmas N aktor × M core** leképzés egy runtime-on keresztül. A hardver biztosítja az izoláció és üzenet-továbbítás alapjait, a runtime pedig a logikai aktorok flexibilis elhelyezését.
 
 ---
 
