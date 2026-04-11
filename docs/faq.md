@@ -9,6 +9,7 @@ A FAQ célja, hogy egy **új olvasó** (akár mérnök, akár befektető, akár 
 - [1. CLI vagy CIL — mi a helyes szóhasználat?](#1-cli-vagy-cil--mi-a-helyes-szóhasználat)
 - [2. A CLI-t meg lehet valósítani hardveren?](#2-a-cli-t-meg-lehet-valósítani-hardveren)
 - [3. Egy fizikai core több logikai aktort kiszolgálhat?](#3-egy-fizikai-core-több-logikai-aktort-kiszolgálhat)
+- [4. Miért fontosabb az F6-FPGA, mint az F6-Silicon?](#4-miért-fontosabb-az-f6-fpga-mint-az-f6-silicon)
 
 ---
 
@@ -377,6 +378,77 @@ Vigyázz egy potenciális ellentmondással: a `docs/roadmap.md` **F3 Tiny Tapeou
 ### A megkülönböztető pont más neuromorphic chipekkel szemben
 
 Ez pont az, ami **megkülönbözteti a CLI-CPU-t** a hagyományos neuromorphic chipektől (Intel Loihi, IBM TrueNorth, BrainChip Akida): **nem rögzített 1 neuron = 1 compute unit** topológia, hanem **rugalmas N aktor × M core** leképzés egy runtime-on keresztül. A hardver biztosítja az izoláció és üzenet-továbbítás alapjait, a runtime pedig a logikai aktorok flexibilis elhelyezését.
+
+---
+
+## 4. Miért fontosabb az F6-FPGA, mint az F6-Silicon?
+
+**Rövid válasz:** mert a **CLI-CPU nyílt forráskódú filozófiája** azt követeli, hogy a teljes architektúrát **először nyílt toolchain-en, reprodukálható módon bizonyítsuk**, és a **legnagyobb OpenXC7-támogatott Xilinx FPGA-k (Kintex-7 325T és 480T)** **pontosan elegendőek** a teljes Cognitive Fabric demonstrálására **silicon nélkül**, **30-100× olcsóbban**, **órás iterációs ciklussal**.
+
+A `docs/roadmap.md` 2026 áprilisi pivot-ja kettébontotta az F6-ot **F6-FPGA** (elsődleges) és **F6-Silicon** (opcionális, halasztható) variánsra. Ez a kérdés ezt a döntést magyarázza el új olvasóknak.
+
+### A pivot oka
+
+Az **OpenXC7** (a Project X-Ray + Yosys + nextpnr-xilinx köré épült nyílt FPGA toolchain) **érett állapotban** támogatja a Xilinx **7-series** családot, beleértve a **Kintex-7 XC7K325T** (~204k LUT) és **XC7K480T** (~298k LUT) chipeket. **Ez a technikai határa** a 2026-os nyílt FPGA toolchain-eknek Xilinx hardveren — UltraScale+ még nem támogatott, és valószínűleg évekig nem lesz az.
+
+A felismerés: **ez a határ pontosan elegendő** a CLI-CPU **teljes F6 heterogén Cognitive Fabric** (2–4 Rich + 32–48 Nano core) **demonstrálásához**. **Nem kell silicon ahhoz, hogy az architektúra bizonyítva legyen.**
+
+### Mit nyer az F6-FPGA megközelítés
+
+| Szempont | F6-Silicon (eredeti) | **F6-FPGA (új elsődleges)** |
+|----------|---------------------|----------------------------|
+| **Toolchain** | OpenLane2 (nyílt, érett) | OpenXC7 (nyílt, érett 7-series-en) |
+| **Költség** | ~$10 000 | **~$200-400** |
+| **Build idő** | 4–6 hónap | **órák** (rebuild) |
+| **Iterálhatóság** | Egyszeri tape-out | **Korlátlan** módosítás |
+| **Hibák költsége** | Egy bug → ~$10k + 6 hó | Egy bug → **azonnal javítható** |
+| **Reprodukálhatóság** | Egyedi MPW chip | **Bárki** újragyárthat ugyanazzal a hardverrel |
+| **Auditálhatóság** | OpenLane build chain | **OpenXC7 build chain** |
+| **Sweet spot keresés** | Csak egyszer kipróbálható | **Tucatnyi (Rich, Nano) konfiguráció** szisztematikusan |
+| **Filozófia-illeszkedés** | ⚠️ Vegyes (silicon = zárt foundry process) | ✅ **Tisztán nyílt end-to-end** |
+
+### Mit veszít
+
+- **Power efficiency mérés** — az FPGA fogyasztása ~10–20× rosszabb, mint Sky130 silicon. Az event-driven energia-spórolás csak silicon-on bizonyítható valós számokkal.
+- **Órajel maximum** — FPGA-n ~100–200 MHz, silicon-on ~300–600 MHz lehetséges ugyanarra az RTL-re.
+- **Fizikai chip** — „kézben tartható silicon" hatás. **De**: ez a roadmap szerint **F3 Tiny Tapeout-ban már megtörtént**, **nem F6 az első silicon**.
+- **F6.5 Secure Edition pálya** — a Crypto Actor, TRNG, PUF, tamper detection silicon-specifikus hardvert igényel, ezért az F6.5 továbbra is az **F6-Silicon**-ra épít, **nem** az F6-FPGA-ra.
+
+### Az F6-Silicon nem törlődik — csak halasztódik
+
+Az F6-Silicon **akkor indul**, ha **legalább egy** a következőkből igaz:
+
+1. A projekt **finanszírozást vagy ipari partnert** kapott a tape-out fedezésére
+2. A **kereskedelmi termék útvonal** (F6.5 Secure Edition, F7 demo hardver) **silicon-előfeltétel**
+3. A **valós energia hatékonyság** és **>500 MHz órajel** mérése **kritikus** a következő mérföldkőhöz
+4. Az **F6.5 Secure Edition tape-out** közeledik, és a Cognitive Fabric base **szilíciumon** kell legyen először
+
+**Addig** az F6-FPGA bőven elegendő ahhoz, hogy a projekt mérnökileg, demo szempontból, és publikációs szempontból **„kész"** legyen.
+
+### A hardver konkrétan
+
+- **Elsődleges F6-FPGA target:** **Kintex-7 XC7K480T** (pl. Inspur YPCB-00338-1P1, ex-data center, ~$60-200) — **298k LUT**, elég a 2 Rich + 32 Nano = 34 core F6 alsó silicon target FPGA megfelelőjéhez
+- **Másodlagos F6-FPGA target:** **Kintex-7 XC7K325T** (pl. SITLINV CERN-OHL-P-2.0 nyílt hardver dev board ~$220-265) — **204k LUT**, kisebb konfigurációkra (1-2 Rich + 16-24 Nano)
+- **Mindkettő:** OpenXC7 + yosys + nextpnr-xilinx, **Vivado licenc nem szükséges**
+
+### A multi-konfiguráció sweet spot keresés
+
+Az F6-FPGA fő hozzáadott értéke az **adatvezérelt sweet spot keresés**. A kész kritérium szerint **legalább 4 különböző (Rich, Nano) konfiguráció** szintetizálva és tesztelve:
+
+| FPGA | (Rich, Nano) | Cél |
+|------|--------------|-----|
+| K7-325T | (0, 30) | Tiszta Nano fabric (SNN max) |
+| K7-325T | (2, 16) | Heterogén közép |
+| K7-480T | **(2, 32)** | **F6 alsó silicon target megfelelője** |
+| K7-480T | (4, 12) | Apple-szerű big.LITTLE arány |
+
+A tényleges F6-Silicon tape-out (ha valaha indul) **az F6-FPGA-ban kiválasztott sweet spot** alapján mehet, **adatvezérelt döntéssel**, nem előre fix becsléssel.
+
+### Filozófiai következmény
+
+Ez a pivot **mélyebb**, mint csupán hardver-választás. Ez kimondja: **a CLI-CPU értéke nem csak a fizikai chipben van, hanem a tervezési módszertanban is** — a teljesen nyílt, reprodukálható, audálható, iterálható build chain-ben. Az F6-FPGA **nem alacsonyabb rendű mérföldkő**, mint az F6-Silicon — **más kategóriájú**, és a projekt nyílt forráskódú víziójához **közelebb** áll.
+
+**Részletek:** [`docs/roadmap.md`](roadmap.md) F6 szekció és „Három kulcs pivot" szakasz.
 
 ---
 

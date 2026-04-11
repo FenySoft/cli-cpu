@@ -87,7 +87,8 @@ Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
 | F3 | **Tiny Tapeout submission** — 1× Nano core + mailbox MMIO, első hálózatba illeszthető csomópont | Sky130, ~$150 |
 | F4 | **Cognitive Fabric pivot** — 4× Nano core FPGA, shared-nothing, event-driven | Artix-7 / ECP5, ~$250 |
 | F5 | **Rich core születése** — 4× Nano + 1× Rich (teljes CIL) FPGA, első heterogén rendszer | ugyanaz az FPGA |
-| F6 | **Cognitive Fabric real silicon** — 2–4× Rich + 32–48× Nano, heterogén multi-core MPW tape-out | Sky130 ChipIgnite vagy IHP MPW, ~$10k |
+| **F6-FPGA** | **Maximum demonstráció a 7-series csúcson** — 2–4× Rich + 32–48× Nano, OpenXC7 nyílt toolchain, multi-konfiguráció sweet spot keresés | Kintex-7 325T / 480T, ~$200-400 |
+| F6-Silicon | **Cognitive Fabric real silicon** *(opcionális, halasztható)* — az F6-FPGA-ban érlelt design valós szilíciumon | Sky130 ChipIgnite vagy IHP MPW, ~$10k |
 | F7 | Demonstrációs platform + Neuron OS csírái | PCB + szoftver |
 
 ## Licenc
