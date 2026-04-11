@@ -75,6 +75,7 @@ Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
 - [docs/security.md](docs/security.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
 - [docs/neuron-os.md](docs/neuron-os.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon"
 - [docs/secure-element.md](docs/secure-element.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv
+- [docs/faq.md](docs/faq.md) — Gyakori Kérdések: koncepcionális horgonyok új olvasóknak (CLI vs CIL, CLI hardveres implementálhatósága)
 
 ## Gyártási útvonal
 
