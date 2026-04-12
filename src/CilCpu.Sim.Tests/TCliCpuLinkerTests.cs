@@ -261,4 +261,193 @@ public class TCliCpuLinkerTests
 
         Assert.Contains("0x", ex.Message);
     }
+
+    // =====================================================================
+    // hu: FIZIKAI DLL TESZTEK — valódi `dotnet build` kimenettel.
+    //     A samples/PureMath/PureMath.csproj Release build-je a PureMath.dll
+    //     fájlt generálja, amit a linker és a szimulátor feldolgoz.
+    //     Ez a teljes fejlesztői workflow validációja.
+    // en: PHYSICAL DLL TESTS — with real `dotnet build` output.
+    //     The Release build of samples/PureMath/PureMath.csproj generates
+    //     the PureMath.dll file, which the linker and simulator process.
+    //     This validates the complete developer workflow.
+    // =====================================================================
+
+    /// <summary>
+    /// hu: A fizikai DLL elérési útjának meghatározása. A teszt a
+    /// repo gyökéréből indul, és a samples/PureMath/bin/Release/net10.0/
+    /// könyvtárban keresi a PureMath.dll-t.
+    /// <br />
+    /// en: Resolves the physical DLL path. The test starts from the repo
+    /// root and looks for PureMath.dll in samples/PureMath/bin/Release/net10.0/.
+    /// </summary>
+    private static byte[] LoadPureMathDll()
+    {
+        // hu: Keressük a repo gyökerét — a .sln fájl mellett.
+        // en: Find repo root — next to the .sln file.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "CLI-CPU.sln")))
+            dir = dir.Parent;
+
+        Assert.NotNull(dir);
+
+        var dllPath = Path.Combine(dir!.FullName, "samples", "PureMath", "bin", "Release", "net10.0", "PureMath.dll");
+
+        if (!File.Exists(dllPath))
+            throw new FileNotFoundException(
+                $"PureMath.dll not found. Run 'dotnet build samples/PureMath/PureMath.csproj -c Release' first.",
+                dllPath);
+
+        return File.ReadAllBytes(dllPath);
+    }
+
+    /// <summary>
+    /// hu: Fizikai DLL teszt — Add(2, 3) = 5. A PureMath.dll-t valódi
+    /// 'dotnet build -c Release' állította elő, NEM runtime Roslyn.
+    /// <br />
+    /// en: Physical DLL test — Add(2, 3) = 5. PureMath.dll was produced by
+    /// a real 'dotnet build -c Release', NOT runtime Roslyn compilation.
+    /// </summary>
+    [Fact]
+    public void PhysicalDll_Add_Returns5()
+    {
+        var dllBytes = LoadPureMathDll();
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Add");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [2, 3]);
+
+        Assert.Equal(5, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Fizikai DLL teszt — Fibonacci(20) = 6765. Ez az aranypélda
+    /// teszt a valódi 'dotnet build' kimeneten.
+    /// <br />
+    /// en: Physical DLL test — Fibonacci(20) = 6765. The golden test
+    /// on real 'dotnet build' output.
+    /// </summary>
+    [Fact]
+    public void PhysicalDll_Fibonacci20_Returns6765()
+    {
+        var dllBytes = LoadPureMathDll();
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Fibonacci");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [20]);
+
+        Assert.Equal(6765, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Fizikai DLL teszt — Factorial(10) = 3628800. Iteratív loop
+    /// lokális változókkal.
+    /// <br />
+    /// en: Physical DLL test — Factorial(10) = 3628800. Iterative loop
+    /// with local variables.
+    /// </summary>
+    [Fact]
+    public void PhysicalDll_Factorial10_Returns3628800()
+    {
+        var dllBytes = LoadPureMathDll();
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Factorial");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [10]);
+
+        Assert.Equal(3628800, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Fizikai DLL teszt — Gcd(48, 18) = 6. While loop lokális
+    /// változóval.
+    /// <br />
+    /// en: Physical DLL test — Gcd(48, 18) = 6. While loop with local
+    /// variable.
+    /// </summary>
+    [Fact]
+    public void PhysicalDll_Gcd48_18_Returns6()
+    {
+        var dllBytes = LoadPureMathDll();
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Gcd");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [48, 18]);
+
+        Assert.Equal(6, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Fizikai DLL teszt — SumOfSquares(3, 4) = 25. Cross-method call
+    /// (SumOfSquares → Square) valódi DLL-ből.
+    /// <br />
+    /// en: Physical DLL test — SumOfSquares(3, 4) = 25. Cross-method call
+    /// (SumOfSquares → Square) from a real DLL.
+    /// </summary>
+    [Fact]
+    public void PhysicalDll_SumOfSquares_Returns25()
+    {
+        var dllBytes = LoadPureMathDll();
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "SumOfSquares");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [3, 4]);
+
+        Assert.Equal(25, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Fizikai DLL teszt — IsPrime(17) = 1, IsPrime(18) = 0.
+    /// Komplex branch logika lokálissal, while loop-pal.
+    /// <br />
+    /// en: Physical DLL test — IsPrime(17) = 1, IsPrime(18) = 0.
+    /// Complex branch logic with locals and while loop.
+    /// </summary>
+    [Theory]
+    [InlineData(2, 1)]
+    [InlineData(3, 1)]
+    [InlineData(4, 0)]
+    [InlineData(17, 1)]
+    [InlineData(18, 0)]
+    [InlineData(97, 1)]
+    [InlineData(100, 0)]
+    public void PhysicalDll_IsPrime_ReturnsCorrectValue(int n, int expected)
+    {
+        var dllBytes = LoadPureMathDll();
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "IsPrime");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [n]);
+
+        Assert.Equal(expected, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Fizikai DLL teszt — Max(7, 12) = 12, Min(7, 12) = 7, Abs(-5) = 5.
+    /// Egyszerű ternary operátorok.
+    /// <br />
+    /// en: Physical DLL test — Max(7, 12) = 12, Min(7, 12) = 7, Abs(-5) = 5.
+    /// Simple ternary operators.
+    /// </summary>
+    [Fact]
+    public void PhysicalDll_MaxMinAbs_ReturnCorrectValues()
+    {
+        var dllBytes = LoadPureMathDll();
+
+        var cpuMax = new TCpu();
+        var t0Max = TCliCpuLinker.Link(dllBytes, "Math", "Max");
+        cpuMax.Execute(t0Max, 0, [7, 12]);
+        Assert.Equal(12, cpuMax.Peek(0));
+
+        var cpuMin = new TCpu();
+        var t0Min = TCliCpuLinker.Link(dllBytes, "Math", "Min");
+        cpuMin.Execute(t0Min, 0, [7, 12]);
+        Assert.Equal(7, cpuMin.Peek(0));
+
+        var cpuAbs = new TCpu();
+        var t0Abs = TCliCpuLinker.Link(dllBytes, "Math", "Abs");
+        cpuAbs.Execute(t0Abs, 0, [-5]);
+        Assert.Equal(5, cpuAbs.Peek(0));
+    }
 }
