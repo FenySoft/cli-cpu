@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>CilCpu.Sim.Runner</RootNamespace>
+    <AssemblyName>CilCpu.Sim.Runner</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CilCpu.Sim\CilCpu.Sim.csproj" />
+    <ProjectReference Include="..\CilCpu.Linker\CilCpu.Linker.csproj" />
+  </ItemGroup>
+
+</Project>

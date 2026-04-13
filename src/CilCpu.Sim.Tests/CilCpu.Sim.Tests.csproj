@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CilCpu.Sim\CilCpu.Sim.csproj" />
     <ProjectReference Include="..\CilCpu.Linker\CilCpu.Linker.csproj" />
+    <ProjectReference Include="..\CilCpu.Sim.Runner\CilCpu.Sim.Runner.csproj" />
   </ItemGroup>
 
 </Project>
