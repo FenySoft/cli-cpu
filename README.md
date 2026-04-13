@@ -57,13 +57,13 @@ Az F5 fázistól a CLI-CPU **heterogén multi-core** architektúrát használ, a
 | Méret | ~10k std cell | ~80k std cell |
 | Funkciók | Integer, stack cache, mailbox | Nano + objektum modell + GC + FPU + kivételek + generikusok |
 | Szerep | Worker / neuron / filter / egyszerű actor | Supervisor / orchestrator / komplex domain logika |
-| Tipikus arány F6-on | **32–48 db** (sok) | **2–4 db** (kevés) |
+| Tipikus arány F6-on | **~26 db** (sok, 3 board-on elosztva) | **2 db** (kevés) |
 
 A C# programok **`[RunsOn(CoreType.Nano)]`** vagy **`[RunsOn(CoreType.Rich)]`** attribútummal jelölik, hogy melyik osztály melyik core-ra fordul. A Roslyn source generator build-time ellenőrzi, hogy a Nano-jelölt kód **csak** CIL-T0 opkódokat használ.
 
 ## Státusz
 
-**F0 — Specifikáció fázis.** A dokumentumok készen vannak a Cognitive Fabric iránnyal, kód még nincs. A következő lépés az **F1 C# referencia szimulátor** TDD-vel.
+**F1.5 — KÉSZ.** A C# referencia szimulátor (48/48 CIL-T0 opkód, 267 zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
 
 Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
 
@@ -75,7 +75,8 @@ Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
 - [docs/security.md](docs/security.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
 - [docs/neuron-os.md](docs/neuron-os.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon"
 - [docs/secure-element.md](docs/secure-element.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv
-- [docs/faq.md](docs/faq.md) — Gyakori Kérdések: koncepcionális horgonyok új olvasóknak (CLI vs CIL, CLI hardveres implementálhatósága)
+- [docs/faq.md](docs/faq.md) — Gyakori Kérdések: koncepcionális horgonyok új olvasóknak (CLI vs CIL, CPU összehasonlítás, ütemezési költségek)
+- [docs/vision.md](docs/vision.md) — A shared-nothing jövő: OS, GUI, adatbázis, hálózat, programozási modell újragondolva
 
 ## Gyártási útvonal
 
@@ -85,10 +86,10 @@ Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
 | F1 | C# referencia szimulátor (TDD) | .NET |
 | F2 | RTL (Verilog/Amaranth) + cocotb, Nano core egymagos | szimuláció |
 | F3 | **Tiny Tapeout submission** — 1× Nano core + mailbox MMIO, első hálózatba illeszthető csomópont | Sky130, ~$150 |
-| F4 | **Cognitive Fabric pivot** — 4× Nano core FPGA, shared-nothing, event-driven | Artix-7 / ECP5, ~$250 |
-| F5 | **Rich core születése** — 4× Nano + 1× Rich (teljes CIL) FPGA, első heterogén rendszer | ugyanaz az FPGA |
-| **F6-FPGA** | **Maximum demonstráció a 7-series csúcson** — 2–4× Rich + 32–48× Nano, OpenXC7 nyílt toolchain, multi-konfiguráció sweet spot keresés | Kintex-7 325T / 480T, ~$200-400 |
-| F6-Silicon | **Cognitive Fabric real silicon** *(opcionális, halasztható)* — az F6-FPGA-ban érlelt design valós szilíciumon | Sky130 ChipIgnite vagy IHP MPW, ~$10k |
+| F4 | **Cognitive Fabric pivot** — 4× Nano core FPGA, shared-nothing, event-driven | A7-Lite 200T, ~€320 |
+| F5 | **Rich core születése** — 2× Rich + 8× Nano (teljes CIL) FPGA, első heterogén rendszer | ugyanaz az FPGA |
+| **F6-FPGA** | **FPGA-verifikált elosztott Cognitive Fabric** — 3× A7-Lite 200T multi-board Ethernet háló, 2R + ~26N, location transparency | 3× A7-Lite 200T, ~€960 |
+| F6-Silicon | **Cognitive Fabric real silicon** *(csak F6-FPGA verifikáció után)* — az FPGA-n verifikált design valós szilíciumon | Sky130 ChipIgnite vagy IHP MPW, ~$10k |
 | F7 | Demonstrációs platform + Neuron OS csírái | PCB + szoftver |
 
 ## Licenc

@@ -9,7 +9,10 @@ A FAQ célja, hogy egy **új olvasó** (akár mérnök, akár befektető, akár 
 - [1. CLI vagy CIL — mi a helyes szóhasználat?](#1-cli-vagy-cil--mi-a-helyes-szóhasználat)
 - [2. A CLI-t meg lehet valósítani hardveren?](#2-a-cli-t-meg-lehet-valósítani-hardveren)
 - [3. Egy fizikai core több logikai aktort kiszolgálhat?](#3-egy-fizikai-core-több-logikai-aktort-kiszolgálhat)
-- [4. Miért fontosabb az F6-FPGA, mint az F6-Silicon?](#4-miért-fontosabb-az-f6-fpga-mint-az-f6-silicon)
+- [4. Miért kötelező az F6-FPGA verifikáció a silicon tape-out előtt?](#4-miért-kötelező-az-f6-fpga-verifikáció-a-silicon-tape-out-előtt)
+- [5. Hogyan érik el a modern CPU-k a magas teljesítményt?](#5-hogyan-érik-el-a-modern-cpu-k-a-magas-teljesítményt)
+- [6. Mi a különbség a RISC-V, ARM, x86/x64 és CLI-CPU között?](#6-mi-a-különbség-a-risc-v-arm-x86x64-és-cli-cpu-között)
+- [7. Hogyan alakulnak a feladat-ütemezési költségek?](#7-hogyan-alakulnak-a-feladat-ütemezési-költségek)
 
 ---
 
@@ -225,7 +228,8 @@ A `docs/architecture.md` „Stratégiai pozicionálás: Cognitive Fabric" szekci
 - **F3 Tiny Tapeout:** a CIL-T0 48 opkód hardverben → bizonyíték, hogy működik
 - **F4 Multi-core FPGA:** a shared-nothing modell → bizonyíték, hogy skálázódik
 - **F5 Rich core:** a teljes CLI → bizonyíték, hogy kivitelezhető
-- **F6 Tape-out:** a kereskedelmi bizonyíték
+- **F6-FPGA:** FPGA-verifikált elosztott heterogén fabric (3× A7-Lite 200T) → bizonyíték, hogy production-ready
+- **F6-Silicon:** (csak FPGA-verifikáció után) valós szilícium → a kereskedelmi bizonyíték
 
 ---
 
@@ -263,7 +267,7 @@ Ezt tisztán kell tartani, mert könnyű összekeverni:
 
 | Fogalom | Mi az | Hány lehet |
 |---------|-------|------------|
-| **Fizikai core** | Hardveres végrehajtó egység (Nano vagy Rich) | F6-on: 32–48 Nano + 2–4 Rich |
+| **Fizikai core** | Hardveres végrehajtó egység (Nano vagy Rich) | F6-FPGA: ~26 Nano + 2 Rich (3× A7-200T) |
 | **Logikai aktor** | Állapot + mailbox + viselkedés (CIL kód) | **Ezer vagy több** összesen |
 
 A **fizikai core** egy **hardver erőforrás**. A **logikai aktor** egy **futtatási egység**, amit a runtime a core-ra ütemez.
@@ -322,7 +326,11 @@ A kemény korlát a privát SRAM mérete. A runtime maga ~2–3 KB (Nano) vagy ~
 - Egyszerű aktor (~200–500 byte) → **~100–500 aktor**
 - Komplex aktor objektumokkal (~5–10 KB) → **~10–50 aktor**
 
-**F6 szilícium teljes kapacitás (32 Nano + 4 Rich):**
+**F6-FPGA teljes kapacitás (~26 Nano + 2 Rich, 3× A7-200T multi-board):**
+- Átlagos workload: **~1200–4000 logikai aktor** egyidejűleg
+- Kis aktorokra optimalizálva: **akár 8000+**
+
+**F6-Silicon (opcionális felskálázás 32 Nano + 2 Rich):**
 - Átlagos workload: **~1500–5000 logikai aktor** egyidejűleg
 - Kis aktorokra optimalizálva: **akár 10 000+**
 
@@ -381,74 +389,538 @@ Ez pont az, ami **megkülönbözteti a CLI-CPU-t** a hagyományos neuromorphic c
 
 ---
 
-## 4. Miért fontosabb az F6-FPGA, mint az F6-Silicon?
+## 4. Miért kötelező az F6-FPGA verifikáció a silicon tape-out előtt?
 
-**Rövid válasz:** mert a **CLI-CPU nyílt forráskódú filozófiája** azt követeli, hogy a teljes architektúrát **először nyílt toolchain-en, reprodukálható módon bizonyítsuk**, és a **legnagyobb OpenXC7-támogatott Xilinx FPGA-k (Kintex-7 325T és 480T)** **pontosan elegendőek** a teljes Cognitive Fabric demonstrálására **silicon nélkül**, **30-100× olcsóbban**, **órás iterációs ciklussal**.
+**Rövid válasz:** mert **nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n**. 3 darab MicroPhase A7-Lite XC7A200T (134K LUT/db, Gigabit Ethernet hálóban, ~€960 összesen) elegendő a heterogén Cognitive Fabric (2 Rich + 26 Nano elosztva) teljes verifikálásához — és **reálisabb teszt**, mert a valódi Cognitive Fabric is multi-chip. Az F6-FPGA **kötelező előfeltétele** az F6-Silicon-nak.
 
-A `docs/roadmap.md` 2026 áprilisi pivot-ja kettébontotta az F6-ot **F6-FPGA** (elsődleges) és **F6-Silicon** (opcionális, halasztható) variánsra. Ez a kérdés ezt a döntést magyarázza el új olvasóknak.
+### Miért ez a sorrend
 
-### A pivot oka
+Egy silicon tape-out ~$10k és 4–6 hónap. Ha a design-ban bug van, az pénz és idő kidobva. Az FPGA-verifikáció **ugyanazt az RTL-t** futtatja valós hardveren, de:
 
-Az **OpenXC7** (a Project X-Ray + Yosys + nextpnr-xilinx köré épült nyílt FPGA toolchain) **érett állapotban** támogatja a Xilinx **7-series** családot, beleértve a **Kintex-7 XC7K325T** (~204k LUT) és **XC7K480T** (~298k LUT) chipeket. **Ez a technikai határa** a 2026-os nyílt FPGA toolchain-eknek Xilinx hardveren — UltraScale+ még nem támogatott, és valószínűleg évekig nem lesz az.
-
-A felismerés: **ez a határ pontosan elegendő** a CLI-CPU **teljes F6 heterogén Cognitive Fabric** (2–4 Rich + 32–48 Nano core) **demonstrálásához**. **Nem kell silicon ahhoz, hogy az architektúra bizonyítva legyen.**
-
-### Mit nyer az F6-FPGA megközelítés
-
-| Szempont | F6-Silicon (eredeti) | **F6-FPGA (új elsődleges)** |
-|----------|---------------------|----------------------------|
-| **Toolchain** | OpenLane2 (nyílt, érett) | OpenXC7 (nyílt, érett 7-series-en) |
-| **Költség** | ~$10 000 | **~$200-400** |
+| Szempont | F6-Silicon | **F6-FPGA (kötelező előtte)** |
+|----------|-----------|-------------------------------|
+| **Költség** | ~$10 000 | **~€960 (3 board)** |
 | **Build idő** | 4–6 hónap | **órák** (rebuild) |
-| **Iterálhatóság** | Egyszeri tape-out | **Korlátlan** módosítás |
 | **Hibák költsége** | Egy bug → ~$10k + 6 hó | Egy bug → **azonnal javítható** |
+| **Iterálhatóság** | Egyszeri tape-out | **Korlátlan** módosítás |
 | **Reprodukálhatóság** | Egyedi MPW chip | **Bárki** újragyárthat ugyanazzal a hardverrel |
-| **Auditálhatóság** | OpenLane build chain | **OpenXC7 build chain** |
-| **Sweet spot keresés** | Csak egyszer kipróbálható | **Tucatnyi (Rich, Nano) konfiguráció** szisztematikusan |
-| **Filozófia-illeszkedés** | ⚠️ Vegyes (silicon = zárt foundry process) | ✅ **Tisztán nyílt end-to-end** |
+| **Sweet spot keresés** | Csak egyszer kipróbálható | **Többféle (Rich, Nano) konfiguráció** szisztematikusan |
+| **Toolchain** | OpenLane2 (nyílt, érett) | OpenXC7 (nyílt, érett 7-series-en) |
 
-### Mit veszít
+### A platform: 3 × A7-Lite 200T multi-board háló
+
+A fejlesztés **3 × MicroPhase A7-Lite XC7A200T** board-okkal történik (134K LUT/db, 512 MB DDR3, Gigabit Ethernet, ~€320/db). Vivado WebPACK **ingyenesen** támogatja az Artix-7 családot.
+
+**Egyetlen board** (134K LUT, cél ≤85%):
+
+| (Rich, Nano) | Becsült LUT | Kihasználás | Cél |
+|--------------|-------------|-------------|-----|
+| (0, 20) | ~115K | 86% | Tiszta Nano fabric (SNN max) |
+| (1, 14) | ~105K | 78% | „1 supervisor + sok worker" |
+| **(2, 8)** | **~105K** | **78%** | **Heterogén sweet spot** |
+| (2, 10) | ~115K | 86% | Heterogén max |
+
+**3 board Ethernet hálóban** (3 × 134K = 402K LUT aggregált):
+
+| Konfiguráció | Összesen | Cél |
+|-------------|---------|-----|
+| (2,6) + (0,10) + (0,10) | **2R + 26N** | **F6 elosztott Cognitive Fabric** |
+| (1,8) + (1,8) + (0,10) | 2R + 26N | Szimmetrikus supervisor |
+
+A multi-board konfiguráció **reálisabb teszt**, mert a valódi Cognitive Fabric is multi-chip — a location transparency és az inter-chip mailbox bridge **csak így tesztelhető**. Opcionálisan Kintex-7 K325T, ha megfelelő board elérhetővé válik.
+
+### A hardver konkrétan
+
+- **F4–F6 platform:** 3 × MicroPhase A7-Lite XC7A200T (~€320/db) — Gigabit Ethernet hálóban
+- **Összesen: ~€960** (~$1030) a teljes F4–F6 FPGA hardver — az F4–F5 board-ok újrahasznosítva
+
+### Mit nem ad az FPGA
 
 - **Power efficiency mérés** — az FPGA fogyasztása ~10–20× rosszabb, mint Sky130 silicon. Az event-driven energia-spórolás csak silicon-on bizonyítható valós számokkal.
 - **Órajel maximum** — FPGA-n ~100–200 MHz, silicon-on ~300–600 MHz lehetséges ugyanarra az RTL-re.
-- **Fizikai chip** — „kézben tartható silicon" hatás. **De**: ez a roadmap szerint **F3 Tiny Tapeout-ban már megtörtént**, **nem F6 az első silicon**.
-- **F6.5 Secure Edition pálya** — a Crypto Actor, TRNG, PUF, tamper detection silicon-specifikus hardvert igényel, ezért az F6.5 továbbra is az **F6-Silicon**-ra épít, **nem** az F6-FPGA-ra.
+- **F6.5 Secure Edition** — a Crypto Actor, TRNG, PUF, tamper detection silicon-specifikus hardvert igényel, ezért az F6.5 az **F6-Silicon**-ra épít.
 
-### Az F6-Silicon nem törlődik — csak halasztódik
+### Az F6-Silicon — csak FPGA-verifikáció után
 
-Az F6-Silicon **akkor indul**, ha **legalább egy** a következőkből igaz:
+Az F6-Silicon **kizárólag akkor indulhat**, ha az F6-FPGA **minden kész kritériuma teljesül**, és legalább egy a következőkből igaz:
 
 1. A projekt **finanszírozást vagy ipari partnert** kapott a tape-out fedezésére
 2. A **kereskedelmi termék útvonal** (F6.5 Secure Edition, F7 demo hardver) **silicon-előfeltétel**
 3. A **valós energia hatékonyság** és **>500 MHz órajel** mérése **kritikus** a következő mérföldkőhöz
-4. Az **F6.5 Secure Edition tape-out** közeledik, és a Cognitive Fabric base **szilíciumon** kell legyen először
 
-**Addig** az F6-FPGA bőven elegendő ahhoz, hogy a projekt mérnökileg, demo szempontból, és publikációs szempontból **„kész"** legyen.
-
-### A hardver konkrétan
-
-- **Elsődleges F6-FPGA target:** **Kintex-7 XC7K480T** (pl. Inspur YPCB-00338-1P1, ex-data center, ~$60-200) — **298k LUT**, elég a 2 Rich + 32 Nano = 34 core F6 alsó silicon target FPGA megfelelőjéhez
-- **Másodlagos F6-FPGA target:** **Kintex-7 XC7K325T** (pl. SITLINV CERN-OHL-P-2.0 nyílt hardver dev board ~$220-265) — **204k LUT**, kisebb konfigurációkra (1-2 Rich + 16-24 Nano)
-- **Mindkettő:** OpenXC7 + yosys + nextpnr-xilinx, **Vivado licenc nem szükséges**
-
-### A multi-konfiguráció sweet spot keresés
-
-Az F6-FPGA fő hozzáadott értéke az **adatvezérelt sweet spot keresés**. A kész kritérium szerint **legalább 4 különböző (Rich, Nano) konfiguráció** szintetizálva és tesztelve:
-
-| FPGA | (Rich, Nano) | Cél |
-|------|--------------|-----|
-| K7-325T | (0, 30) | Tiszta Nano fabric (SNN max) |
-| K7-325T | (2, 16) | Heterogén közép |
-| K7-480T | **(2, 32)** | **F6 alsó silicon target megfelelője** |
-| K7-480T | (4, 12) | Apple-szerű big.LITTLE arány |
-
-A tényleges F6-Silicon tape-out (ha valaha indul) **az F6-FPGA-ban kiválasztott sweet spot** alapján mehet, **adatvezérelt döntéssel**, nem előre fix becsléssel.
-
-### Filozófiai következmény
-
-Ez a pivot **mélyebb**, mint csupán hardver-választás. Ez kimondja: **a CLI-CPU értéke nem csak a fizikai chipben van, hanem a tervezési módszertanban is** — a teljesen nyílt, reprodukálható, audálható, iterálható build chain-ben. Az F6-FPGA **nem alacsonyabb rendű mérföldkő**, mint az F6-Silicon — **más kategóriájú**, és a projekt nyílt forráskódú víziójához **közelebb** áll.
+A silicon target az FPGA multi-board hálón verifikált konfigurációra épül (2R + 26N elosztva 3 chipen → egyetlen silicon chipre). Az ASIC-on a core-ok kisebbek (std cell vs FPGA LUT), így a multi-board-on verifikált konfiguráció **egyetlen chipre elfér**, és opcionálisan felskálázható — de csak a verifikált router topológia egyenes kiterjesztéseként.
 
 **Részletek:** [`docs/roadmap.md`](roadmap.md) F6 szekció és „Három kulcs pivot" szakasz.
+
+---
+
+## 5. Hogyan érik el a modern CPU-k a magas teljesítményt?
+
+**Rövid válasz:** Három egymásra épülő technikával: **pipeline** (átlapolás), **szuperszkaláris végrehajtás** (több pipeline párhuzamosan), és **out-of-order végrehajtás** (sorrenden kívüli feldolgozás). A CLI-CPU tudatosan egyiket sem használja — más úton keres teljesítményt.
+
+### 5.1 Pipeline — az alap (1985, MIPS R2000)
+
+Egyetlen utasítás végrehajtása 5 lépésből áll. A trükk: **nem egy utasítást gyorsítunk**, hanem **5 utasítást lapolunk át**:
+
+```
+Órajel:    1     2     3     4     5     6     7     8
+         ┌─────┬─────┬─────┬─────┬─────┐
+Instr 1: │ IF  │ ID  │ EX  │ MEM │ WB  │
+         └─────┼─────┼─────┼─────┼─────┼─────┐
+Instr 2:       │ IF  │ ID  │ EX  │ MEM │ WB  │
+               └─────┼─────┼─────┼─────┼─────┼─────┐
+Instr 3:             │ IF  │ ID  │ EX  │ MEM │ WB  │
+                     └─────┴─────┴─────┴─────┴─────┘
+```
+
+| Fokozat | Mit csinál |
+|---------|-----------|
+| **IF** (Fetch) | Utasítás betöltése a memóriából |
+| **ID** (Decode) | Dekódolás + regiszter olvasás |
+| **EX** (Execute) | ALU művelet vagy cím számítás |
+| **MEM** (Memory) | Load/store memória hozzáférés |
+| **WB** (Write Back) | Eredmény visszaírása regiszterbe |
+
+Egy utasítás **5 ciklust** vesz igénybe, de mivel 5 van egyszerre a csőben, a **throughput** mégis 1 utasítás/órajel.
+
+**Miért működik ez RISC-nél?**
+1. **Fix hosszúságú utasítás** (32 bit) → az IF pontosan tudja, hol a következő
+2. **Load/Store architektúra** → csak `ld`/`st` nyúl memóriához, aritmetika regiszter-regiszter
+3. **Egyszerű címzési módok** → nincs komplex `[base + index*scale + disp]`
+4. **Sok regiszter** (32 db) → kevesebb memory spill
+
+**Pipeline hazard-ok** (amikor nem 1 utasítás/órajel):
+- **Data hazard** — egy utasítás a korábbi eredményére vár → **forwarding** (EX kimenet visszavezetése)
+- **Control hazard** — branch utasítás: nem tudjuk hová ugrik → **branch prediction** (99%+ pontosság)
+- **Structural hazard** — két fokozat ugyanazt az erőforrást akarja → **Harvard architektúra** (külön I/D memória)
+
+### 5.2 Szuperszkaláris — több pipeline (1993, Pentium)
+
+Miért csak 1 pipeline? Tegyünk be többet, és **egyszerre több utasítást** hajtsunk végre:
+
+```
+1-wide (klasszikus RISC, 1985):    1 utasítás / órajel
+
+  ═══[IF]═══[ID]═══[EX]═══[MEM]═══[WB]═══
+
+4-wide (szuperszkaláris, 2006):    4 utasítás / órajel
+
+  ═══[IF]═══[ID]═══[EX]═══[MEM]═══[WB]═══
+  ═══[IF]═══[ID]═══[EX]═══[MEM]═══[WB]═══
+  ═══[IF]═══[ID]═══[EX]═══[MEM]═══[WB]═══
+  ═══[IF]═══[ID]═══[EX]═══[MEM]═══[WB]═══
+
+8-wide (Apple M4 P-core, 2024):   8 utasítás / órajel
+
+  ═══[IF]═══[ID]═══[EX]═══[MEM]═══[WB]═══  × 8 + OoO
+```
+
+### 5.3 Out-of-Order (OoO) — sorrend felrúgása (1995, Pentium Pro)
+
+A CPU **nem sorban** hajtja végre az utasításokat, hanem **amint az operandusok készen állnak**:
+
+```asm
+LDR  x1, [x0]        ; lassú memória olvasás (~100 clk)
+ADD  x2, x3, x4      ; x1-re NEM vár → ALU-n MOST futhat!
+MUL  x5, x1, x2      ; x1-re VÁR, de x2 már kész
+SUB  x6, x7, x8      ; független → megelőzheti a MUL-t
+```
+
+A **Reorder Buffer (ROB)** biztosítja, hogy az eredmények mégis **program-sorrendben** legyenek commit-olva (architektúrális konzisztencia).
+
+### 5.4 A három technika együtt — modern CPU profil
+
+| | Klasszikus RISC (1985) | Apple M4 P-core (2024) | CLI-CPU Nano |
+|---|---|---|---|
+| Pipeline | 5-stage, in-order | 14+ stage, OoO | **3-stage, in-order** |
+| Decode szélesség | 1-wide | 8-10-wide | **1-wide** |
+| ROB | — | ~700+ entry | **—** |
+| Végrehajtó egységek | 1 | ~15 | **1** |
+| IPC (elmélet) | 1 | 8-10 | **~0.3-0.5** |
+| IPC (valós) | ~0.8 | ~5-6 | **~0.3-0.5** |
+| Tranzisztor / core | ~25K | ~300M | **~20-50K** |
+
+**A CLI-CPU miért nem használja ezeket?**
+1. **Terület** — OoO és szuperszkaláris ~1000× több tranzisztort igényel. Abból inkább ~1000 Nano core-t csinálunk.
+2. **Determinizmus** — OoO és spekuláció Spectre-szerű oldalcsatornákat nyit. Event-driven és security workload-oknak determinisztikus végrehajtás kell.
+3. **Energia** — OoO ROB és rename logika a fogyasztás ~30-40%-a. Alvó core-ok 0W-ot fogyasztanak.
+4. **Filozófia** — a CLI-CPU nem az egymagos IPC-ben versenyez, hanem a **sok egyszerű mag közötti üzenetküldésben**.
+
+### 5.5 Az x86/x64 speciális helyzete — CISC kívül, RISC belül
+
+Az x86 egy 1978-as (8086) örökség: változó hosszúságú utasítások (1-15 byte), komplex címzési módok. A modern x86 CPU-k **belül RISC-re fordítják** az utasításokat:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    x86 FRONTEND                         │
+│                                                         │
+│  Fetch → Pre-decode → Decode → µop fordítás → µop Queue │
+│          (hossz         (x86 utasítást RISC-szerű       │
+│          megállapítás)   µop-okra bontja)               │
+│                                                         │
+│  ADD [RBX+RCX*4+0x10], RAX                              │
+│    → µop₁: LEA  tmp, [addr]      (cím számítás)         │
+│    → µop₂: LOAD tmp2, [tmp]      (memória olvasás)      │
+│    → µop₃: ADD  tmp2, RAX        (összeadás)            │
+│    → µop₄: STORE [tmp], tmp2     (memória visszaírás)   │
+└─────────────────────────────────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────────┐
+│                    RISC BACKEND                         │
+│  (pont ugyanaz, mint az ARM: OoO, szuperszkaláris)      │
+│  Rename → ROB → Scheduler → Execute → Retire            │
+└─────────────────────────────────────────────────────────┘
+```
+
+Az x86 lényegében egy **hardveres fordító** (frontend) + egy **RISC végrehajtó** (backend).
+
+A **változó utasításhossz** drága: a pre-decode-nak ki kell találnia, hol kezdődik a következő utasítás, mielőtt dekódolná. Megoldás: **µop cache** (~4000-6000 entry) — forró ciklusokon a frontend költsége eltűnik.
+
+| | ARM (AArch64) | x86/x64 |
+|---|---|---|
+| Utasítás hossz | Fix 4 byte | Változó 1-15 byte |
+| Pre-decode | Nem kell (mindig PC+4) | Szükséges (drága!) |
+| Decode | ARM → belső op (~1:1) | x86 → µop fordítás (komplex) |
+| µop cache | Nem kell | ~4000-6000 entry |
+| Backend | RISC OoO | RISC OoO (lényegében ugyanaz) |
+| Frontend ára | Alacsony | ~15-20% extra tranzisztor és energia |
+
+**Az x86 teljesítménye megközelíti az ARM-ot** (IPC ~5-6 mindkettőnél), de **magasabb órajelen és fogyasztáson** éri el. Az extra tranzisztorokat és energiát a frontend fordító eszi meg.
+
+---
+
+## 6. Mi a különbség a RISC-V, ARM, x86/x64 és CLI-CPU között?
+
+**Rövid válasz:** Mindegyik más problémát old meg, és más kompromisszumot köt. Az x86 a kompatibilitásért, az ARM az energia-hatékonyságért, a RISC-V a nyíltságért, a CLI-CPU a **sok mag közötti üzenetküldés hatékonyságáért** optimalizál.
+
+### Architekturális profil
+
+| | x86/x64 | ARM (AArch64) | RISC-V | CLI-CPU Nano | CLI-CPU Rich |
+|---|---|---|---|---|---|
+| **Születés** | 1978 (8086) | 1985 (ARM1) | 2010 (Berkeley) | 2025 | 2025 (F5 cél) |
+| **Filozófia** | CISC → belül RISC | RISC, pragmatikus | RISC, minimalista | Stack gép, actor fabric | Stack gép, teljes CIL |
+| **Licenc** | Intel/AMD zárt | ARM Ltd. ~$1-5M | Nyílt (BSD) | Nyílt (MIT/Apache) | Nyílt (MIT/Apache) |
+| **Utasítás hossz** | 1-15 byte | Fix 4 byte | 2 vagy 4 byte | 1-5 byte | 1-5 byte |
+| **Regiszterek** | 16 GP + 32 SIMD | 31 GP + 32 NEON | 31 GP + 32 FP | **0** (stack) | **0** (stack + TOS cache) |
+| **Operandus** | Regiszter + memória | Regiszter-regiszter | Regiszter-regiszter | **Stack (implicit)** | **Stack (implicit)** |
+| **Pipeline** | 19+ stage, OoO | 11-14+ stage, OoO | 5-8 stage, in-order/OoO | **3 stage, in-order** | **5 stage, in-order** |
+| **Std cell / core** | ~500M tr. | ~50-300M tr. | ~1-2M tr. | **~10K** | **~80K** |
+
+### Ugyanaz a művelet (`c = a + b`) — négy ISA-n
+
+```asm
+x86/x64:                      ARM (AArch64):
+  MOV  EAX, [a]                 LDR  W0, [X1]
+  ADD  EAX, [b]   ← memóriából LDR  W2, [X3]    ← CSAK load/store
+  MOV  [c], EAX     is tud!    ADD  W4, W0, W2     nyúl memóriához
+                               STR  W4, [X5]
+
+RISC-V:                        CLI-CPU (CIL-T0):
+  LW   a0, 0(a1)                ldind.i4        ← stack[TOS] címről olvas
+  LW   a2, 0(a3)                ldind.i4
+  ADD  a4, a0, a2               add             ← pop 2, push(a+b)
+  SW   a4, 0(a5)                stind.i4
+```
+
+**Regiszter gép** (x86, ARM, RISC-V): az utasítás **megmondja** melyik regisztert használja → hosszabb utasítások, de a fordító optimalizálhat.
+
+**Stack gép** (CLI-CPU): az utasítás **mindig a stack tetejéről** dolgozik → rövidebb utasítások (1 byte!), de több utasítás kell.
+
+### Utasítás kódolás összehasonlítás
+
+```
+x86/x64 — változó, komplex (történelmi rétegek):
+┌────────┬────────┬────────┬─────────┬────────┬──────────┐
+│ Prefix │  REX   │ Opcode │ ModR/M  │  SIB   │ Imm/Disp │
+│ 0-4 B  │ 0-1 B  │ 1-3 B  │ 0-1 B   │ 0-1 B  │ 0-8 B    │  1-15 byte
+└────────┴────────┴────────┴─────────┴────────┴──────────┘
+
+ARM — fix, szabályos:
+┌──────────┬───────┬───────┬───────┬───────────┐
+│  Opcode  │  Rd   │  Rn   │  Rm   │  Imm      │  mindig 4 byte
+└──────────┴───────┴───────┴───────┴───────────┘
+
+RISC-V — fix, minimális:
+┌──────────┬───────┬───────┬───────┬───────────┐
+│  Opcode  │  rd   │  rs1  │  rs2  │  funct    │  4 byte (vagy 2B C ext.)
+└──────────┴───────┴───────┴───────┴───────────┘
+
+CLI-CPU — változó, de egyszerű:
+┌──────────┬──────────────┐
+│  Opcode  │  Operand     │
+│  1-2 B   │  0-4 B       │  1-5 byte — nincs regiszter mező!
+└──────────┴──────────────┘
+```
+
+### Kódsűrűség — Fibonacci(n)
+
+| ISA | Utasítás szám | Kód méret (byte) |
+|-----|--------------|-------------------|
+| x86/x64 | ~12 | ~35 |
+| ARM AArch64 | ~14 | 56 (fix 4B) |
+| RISC-V (RV32I) | ~14 | 56 (fix 4B) |
+| RISC-V (RV32IC) | ~14 | ~32 (compressed) |
+| CIL-T0 | ~18 | ~22 |
+
+A CIL-T0 **több utasítást** igényel, de **kevesebb byte-ot** — mert nincs regiszter mező az utasításokban.
+
+### Multi-core modell — az igazi különbség
+
+| | x86/ARM/RISC-V | CLI-CPU |
+|---|---|---|
+| **Kommunikáció** | Shared memory + cache koherencia | **Mailbox FIFO (shared-nothing)** |
+| **Koherencia protokoll** | MOESI/MESIF (komplex, drága) | **Nincs (nem kell!)** |
+| **Szinkronizáció** | Mutex, atomic CAS, memory barrier | **Üzenet küldés (lock-free)** |
+| **Skálázás korlátja** | ~8-16 core után romlik (contention) | **1000+ core lineáris** |
+| **Heterogén** | P+E core (Apple, Intel, ARM) | **Nano + Rich core** |
+
+```
+Hagyományos shared-memory:         CLI-CPU shared-nothing:
+
+┌──────┬──────┬──────┬────┐       ┌────┐ ┌────┐ ┌────┐ ┌────┐
+│Core 0│Core 1│Core 2│Core│       │Nano│→│Nano│→│Nano│→│Nano│
+│ L1/L2│ L1/L2│ L1/L2│L1/2│       └──┬─┘ └──┬─┘ └──┬─┘ └──┬─┘
+├──────┴──────┴──────┴────┤          │      │      │      │
+│    Shared L3 Cache      │       ┌──┴──────┴──────┴──────┴──┐
+│  (koherencia protokoll) │       │     Mailbox Router       │
+└─────────────────────────┘       │  (nincs shared state!)   │
+                                  └──────────────────────────┘
+Bármelyik core bármelyik         Minden core CSAK üzenetet
+memóriát látja → koherencia       küld → nincs koherencia
+protokoll kell → DRÁGA            → OLCSÓ, lineárisan skálázik
+```
+
+### Mire jó melyik?
+
+| Felhasználás | Legjobb | Miért |
+|---|---|---|
+| Desktop / laptop | x86, Apple M-series ARM | Magas IPC, ökoszisztéma |
+| Szerver (felhő) | x86, ARM (Graviton) | Virtualizáció, kompatibilitás |
+| Mobil | ARM | Energia-hatékonyság |
+| Beágyazott (MCU) | RISC-V, ARM Cortex-M | Kis terület, olcsó |
+| **Event-driven (IoT, routing)** | **CLI-CPU Nano** | Mailbox, sleep/wake, 0 overhead |
+| **Actor rendszerek (Akka, Erlang)** | **CLI-CPU** | Hardveres natív üzenetküldés |
+| **Spiking neural network** | **CLI-CPU Nano** | 1 core = 1 neuron |
+| **Heterogén C# workload** | **CLI-CPU Rich + Nano** | Supervisor (Rich) + workerek (Nano) |
+
+### Egy mondatban
+
+- **x86** — 45 év kompatibilitás: mindent tud, de drágán (CISC kívül, RISC belül)
+- **ARM** — pragmatikus RISC: jó IPC/watt, de licensz kell
+- **RISC-V** — nyílt RISC: minimalista, ingyenes, de fiatal ökoszisztéma
+- **CLI-CPU** — más dimenzió: nem egymagos sebességben versenyez, hanem a **sok egyszerű mag közötti üzenetküldésben**
+
+---
+
+## 7. Hogyan alakulnak a feladat-ütemezési költségek?
+
+**Rövid válasz:** A kontextusváltás a CLI-CPU-n **3-4 nagyságrenddel** (1,000-20,000×) kevesebb órajelciklust igényel, mint a hagyományos architektúrákon — és ez **az architektúra tulajdonsága**, nem a gyártási technológiáé. Az összehasonlítás órajelciklusban történik, hogy a technológia-különbség ne torzítson.
+
+### Fontos: a CLI-CPU-n VAN kontextusváltás
+
+Az előző FAQ-kérdés (3. kérdés) rögzíti: a CLI-CPU **N:M aktor-core leképzést** használ, nem fix 1:1-et. Amikor több aktor osztozik egy core-on, kooperatív aktor-váltás történik üzenet-feldolgozási határokon. Három üzemód létezik:
+
+| Mód | Mikor | Kontextusváltás költsége |
+|---|---|---|
+| **1:1** (dedikált) | SNN neuronok, real-time, latency-kritikus | 0 ciklus (nincs váltás) |
+| **N:M** (kooperatív) | Webszerver, sok session, kernel aktorok | ~10-60 ciklus |
+| **Migráció** (core→core) | Load balancing, Nano→Rich upgrade | ~100-500 ciklus |
+
+### Kontextusváltás költsége — órajelciklusban (technológia-független)
+
+| Költség-komponens | x86/x64 | Apple M4 P | Apple M4 E | ARM A720 | RISC-V U74 | CLI-CPU Nano | CLI-CPU Rich |
+|---|---|---|---|---|---|---|---|
+| Regiszter mentés/töltés | ~300-500 | ~150-250 | ~100-170 | ~100-200 | ~30-60 | **~1-2** | **~5-10** |
+| TLB flush + refill | ~20K-180K | ~7K-55K | ~3K-22K | ~7K-40K | ~5K-15K | **0** | **~4-8** |
+| Cache kihűlés | ~10K-110K | ~5K-70K | ~1.5K-14K | ~7K-50K | ~1.5K-15K | **0** | **0** |
+| Pipeline refill | ~19-25 | ~14-18 | ~8-12 | ~11-15 | ~8-10 | **~3** | **~5** |
+| Scheduler döntés | ~3K-11K | ~1.5K-5K | ~1K-3K | ~2K-7K | ~300-750 | **~2-5** | **~2-5** |
+| **ÖSSZESEN** | **~33K-300K** | **~14K-130K** | **~5.5K-39K** | **~16K-97K** | **~7K-31K** | **~10-15** | **~30-60** |
+
+### Miért ekkora a különbség?
+
+A hagyományos architektúrák **általános célú** tervezése megköveteli az alábbi infrastruktúrát, amelyek mindegyike kontextusváltásnál büntetést jelent:
+
+| Infrastruktúra | Hagyományos | CLI-CPU | Hatás |
+|---|---|---|---|
+| **Regiszter file** (16-31 × 64 bit + SIMD) | Menteni/tölteni kell | **Nincs** (stack gép) | ~300 clk megtakarítás |
+| **Virtuális memória** (TLB + MMU) | TLB flush + page walk | **Nincs MMU**, fizikai cím | ~20K-180K clk megtakarítás |
+| **Shared cache** (L1/L2/L3 hierarchia) | Cache kihűlés | **Privát SRAM**, soha nem hűl ki | ~10K-110K clk megtakarítás |
+| **OS kernel scheduler** | Komplex algoritmus (CFS/XNU) | **HW FIFO poll** (~2-5 clk) | ~3K-11K clk megtakarítás |
+| **Mély pipeline** (14-19+ stage) | Teljes pipeline flush | **3-5 stage** flush | ~15 clk megtakarítás |
+
+A CLI-CPU ezeket az infrastruktúrákat **nem építi be**, mert a shared-nothing actor modell nem igényli. Ez nem hiányosság, hanem **tudatos design döntés**: az általános célú flexibilitást elcseréli az ütemezési hatékonyságra.
+
+### Mi történik kontextusváltásnál — lépésről lépésre
+
+**x86/x64 (OS scheduler, preemptív):**
+```
+1. Timer interrupt → kernel mode switch            ~5-10 clk
+2. Scheduler döntés (CFS red-black tree walk)      ~3K-11K clk
+3. XSAVE: 16 GP + 32 ZMM regiszter mentés → RAM   ~300-500 clk
+4. CR3 write (page table váltás)                   ~20-30 clk
+5. TLB flush (PCID partial flush)                  ~10-20 clk
+   └→ Utána: ~200-800 TLB miss × ~100-200 clk     ~20K-160K clk
+6. XRSTOR: új task regiszterei visszatöltés        ~300-500 clk
+7. Pipeline refill (19+ stage)                     ~19-25 clk
+8. L1/L2 cache kihűlés (cold miss-ek)             ~10K-100K clk
+────────────────────────────────────────
+ÖSSZESEN:                                          ~33K-300K clk
+```
+
+**Apple M4 P-core (OS scheduler, preemptív):**
+```
+1. Timer interrupt → EL1 switch                    ~3-5 clk
+2. Scheduler döntés (XNU)                          ~1.5K-5K clk
+3. 31 GP + 32 NEON regiszter mentés                ~150-250 clk
+4. TTBR0 write (page table váltás)                 ~10-15 clk
+5. TLB: ASID-alapú szelektív flush                 ~5-10 clk
+   └→ Utána: ~100-400 TLB miss × ~60-130 clk      ~6K-52K clk
+6. Regiszterek visszatöltés                        ~150-250 clk
+7. Pipeline refill (14+ stage)                     ~14-18 clk
+8. L1 cache kihűlés (128 KB L1D)                   ~5K-70K clk
+────────────────────────────────────────
+ÖSSZESEN:                                          ~14K-130K clk
+```
+
+**CLI-CPU Nano (kooperatív aktor váltás):**
+```
+1. Aktor A: ret (üzenet feldolgozás kész)          ~1 clk
+2. Scheduler: inbox FIFO poll (hardveres)          ~2-5 clk
+3. PC + SP mentés → SRAM (8 byte)                  ~1-2 clk
+4. Új aktor PC + SP töltés ← SRAM                  ~1-2 clk
+5. Pipeline refill (3 stage)                       ~3 clk
+6. TLB flush: nincs MMU                            ~0
+7. Cache kihűlés: nincs (privát SRAM)              ~0
+────────────────────────────────────────
+ÖSSZESEN:                                          ~10-15 clk
+```
+
+**CLI-CPU Rich (kooperatív aktor váltás):**
+```
+1. Aktor A: ret (üzenet feldolgozás kész)          ~1 clk
+2. Scheduler: inbox FIFO poll (hardveres)          ~2-5 clk
+3. PC + SP + TOS cache (8×32b) mentés              ~5-10 clk
+4. Shadow register file mentés                     ~2-4 clk
+5. GC state pointer váltás                         ~1 clk
+6. Metadata TLB flush (vtable cache)               ~4-8 clk
+7. Új aktor state töltés                           ~5-10 clk
+8. Pipeline refill (5 stage)                       ~5 clk
+9. Metadata TLB warmup (első callvirt)             ~10-20 clk
+────────────────────────────────────────
+ÖSSZESEN:                                          ~30-60 clk
+```
+
+### Multi-core szinkronizáció (ciklusban)
+
+| Művelet | x86/x64 | M4 P | M4 E | ARM A720 | RISC-V | Nano | Rich |
+|---|---|---|---|---|---|---|---|
+| Mutex lock/unlock | ~200-1000 | ~100-500 | ~60-300 | ~150-700 | ~50-250 | **N/A** | **N/A** |
+| Atomic CAS | ~50-300 | ~40-150 | ~25-100 | ~50-200 | ~20-70 | **N/A** | **N/A** |
+| Cache line bounce | ~200-500 | ~100-250 | ~60-150 | ~150-300 | ~50-100 | **N/A** | **N/A** |
+| **Üzenet küldés** | ~1K-3K (SW) | ~700-2K | ~500-1.5K | ~700-2K | ~200-500 | **~2-10** | **~2-10** |
+| Lock contention (8+ core) | ~5K-60K | ~2K-25K | ~2K-15K | ~4K-40K | ~1K-10K | **0** | **0** |
+
+A CLI-CPU-n **nincs mutex, nincs atomic, nincs cache bounce** — az üzenetküldés a hardveres mailbox FIFO-n keresztül megy, ~2-10 ciklus.
+
+### Igazságos összehasonlítás: azonos gyártási technológián
+
+Az eddigi összehasonlítás ciklusokban volt, ami technológia-független. De mi történne, ha a CLI-CPU-t **ugyanarra a csomópontra** vinnénk, mint a mai csúcs CPU-kat?
+
+| Technológia | x86 órajel | M4 P órajel | Nano órajel (becsült) | Rich órajel (becsült) |
+|---|---|---|---|---|
+| Sky130 (130 nm) — F3 cél | — | — | 50-200 MHz | 50-150 MHz |
+| TSMC 28nm | ~2-3 GHz | — | 500-1,000 MHz | 400-800 MHz |
+| TSMC 7nm | ~4-5 GHz | — | 1.0-2.0 GHz | 0.8-1.5 GHz |
+| **TSMC 3nm** | **5.7 GHz** | **4.5 GHz** | **2.0-4.0 GHz** | **1.5-3.0 GHz** |
+
+A Nano core (3-stage in-order, ~10K std cell) **jól skálázik** órajelben, mert egyszerű. Egy komplex OoO core (19-stage, ~500M tranzisztor) nehezebben emeli a frekvenciát.
+
+### Területre normalizált összehasonlítás — TSMC 3nm, azonos 12 mm²
+
+| Core típus | Terület (3nm, becsült) | Hány fér 12 mm²-be |
+|---|---|---|
+| x86 Zen 5 core | ~8-12 mm² | ~1 |
+| Apple M4 P-core | ~12 mm² | 1 (referencia) |
+| Apple M4 E-core | ~2-3 mm² | ~4-6 |
+| ARM Cortex-A720 | ~3-5 mm² | ~2-4 |
+| RISC-V U74 | ~0.5-1 mm² | ~12-24 |
+| **CLI-CPU Rich** | **~0.02-0.08 mm²** | **~150-600** |
+| **CLI-CPU Nano** | **~0.002-0.01 mm²** | **~1,200-6,000** |
+
+### Aggregált throughput — actor workload, azonos terület és technológia
+
+10,000 független actor feladat: üzenet fogadás → ~100 utasítás feldolgozás → válasz.
+
+| Architektúra | Core szám (12 mm²) | Órajel (3nm) | Ctx switch (clk) | **Throughput** |
+|---|---|---|---|---|
+| x86 Zen 5 | 1 | 5.7 GHz | ~166K | ~34K msg/s |
+| M4 P-core | 1 | 4.5 GHz | ~72K | ~62K msg/s |
+| M4 E-core | 5 | 2.8 GHz | ~22K | ~632K msg/s |
+| ARM A720 | 3 | 3.3 GHz | ~56K | ~177K msg/s |
+| RISC-V U74 | 18 | 1.5 GHz | ~19K | ~1.4M msg/s |
+| **CLI-CPU Rich** | **300** | **2.0 GHz** | **~45** | **~41M msg/s** |
+| **CLI-CPU Nano** | **3,000** | **3.0 GHz** | **~12** | **~80M msg/s** |
+
+```
+Aggregált actor throughput — log skála (azonos 12 mm², TSMC 3nm):
+
+                   10K      100K       1M        10M       100M
+                    │         │         │          │          │
+  x86 (1 core):    ███                                          34K
+  M4 P (1 core):   ████                                        62K
+  ARM A720 (3):    ██████                                      177K
+  M4 E (5 core):   █████████                                   632K
+  RISC-V (18):     ███████████▌                                1.4M
+  Rich (300):      ██████████████████████████████▌               41M
+  Nano (3,000):    ████████████████████████████████▌             80M
+                    │         │         │          │          │
+                   10K      100K       1M        10M       100M
+
+  Log skála: minden █ ≈ 2× szorzó. A Nano ~2,350× az x86 felett.
+```
+
+A CLI-CPU **~1,000-2,000× magasabb throughput-ot** ad azonos szilícium területen, actor workload-on.
+
+### Energia-hatékonyság
+
+| | Fogyasztás/core (3nm) | Msg throughput/watt |
+|---|---|---|
+| x86 Zen 5 | ~10-15 W | ~3K msg/s/W |
+| M4 P-core | ~5-8 W | ~8K msg/s/W |
+| M4 E-core | ~0.5-1 W | ~130K msg/s/W |
+| RISC-V U74 | ~0.1-0.3 W | ~500K msg/s/W |
+| **CLI-CPU Rich** | **~0.01-0.05 W** | **~2-8M msg/s/W** |
+| **CLI-CPU Nano** | **~0.001-0.005 W** | **~5-20M msg/s/W** |
+
+A sleep/wake modell miatt az idle Nano core **~0 W** — hagyományos CPU-n az idle core is fogyaszt (leakage, clock distribution).
+
+### Single-thread: ahol a CLI-CPU veszít
+
+| | Single-thread IPC × GHz (3nm) |
+|---|---|
+| x86 Zen 5 | 5.5 × 5.7 = **31.4 GIPS** |
+| M4 P-core | 5.5 × 4.5 = **24.8 GIPS** |
+| M4 E-core | 2.5 × 2.8 = **7.0 GIPS** |
+| ARM A720 | 4.0 × 3.3 = **13.2 GIPS** |
+| RISC-V U74 | 2.0 × 1.5 = **3.0 GIPS** |
+| **CLI-CPU Rich** | 0.7 × 2.0 = **1.4 GIPS** |
+| **CLI-CPU Nano** | 0.4 × 3.0 = **1.2 GIPS** |
+
+Single-thread-ben a CLI-CPU **~20× lassabb** — de ez nem a versenyterep, amire tervezték.
+
+### Összefoglalás — igazságos összevetés
+
+| Metrika | Hagyományos nyerő | CLI-CPU nyerő | Arány |
+|---|---|---|---|
+| Single-thread sebesség | M4 P / x86 | — | ~20× hagyományos előny |
+| Ctx switch (ciklusban) | — | Nano / Rich | **~1,000-20,000×** CLI-CPU |
+| Throughput / mm² (actor) | — | Nano | **~1,000-2,000×** CLI-CPU |
+| Throughput / watt (actor) | — | Nano | **~1,000-4,000×** CLI-CPU |
+| Skálázhatóság | ~8-16 core-ig lineáris | 1,000+ core lineáris | CLI-CPU nem romlik |
+| Determinizmus | Nincs (OoO, spekuláció) | Teljes (in-order) | CLI-CPU garantált |
+
+**A lényeg:** nem az órajel a fontos, hanem hogy mit csinálsz vele. Egy 3 GHz-es Nano core actor workload-on **~12 ciklust** igényel egy aktorváltásnál, amihez egy 5.7 GHz-es Zen 5-nek **~166,000 ciklus** kell. Az órajel-hátrány (~2×) eltörpül az architekturális előny (~10,000×) mellett.
 
 ---
 

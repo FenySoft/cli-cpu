@@ -633,12 +633,20 @@ Ez **4 aktoros rendszer**, ahol már a scheduler + router valódi szerepet játs
 
 Ez **az első felhasználható Neuron OS**, amely képes valós C# programokat futtatni aktor-orientált módon.
 
-### F6 — Hot code loading, writable microcode, distributed
-**Kimenet:** ChipIgnite real silicon:
+### F6-FPGA — Hot code loading, distributed multi-board
+**Kimenet:** 3× A7-Lite 200T multi-board Ethernet hálón:
 - Hot code loading aktorok szintjén
-- Writable microcode SRAM
-- Több chip közötti elosztott aktor rendszer (network device)
+- Több chip közötti elosztott aktor rendszer (Ethernet bridge)
+- Location transparency valódi tesztje — cross-chip aktor kommunikáció
 - Teljes capability registry aláírással
+
+Ez az **FPGA-verifikált, elosztott** Neuron OS — a valódi multi-chip Cognitive Fabric első demonstrációja.
+
+### F6-Silicon — Writable microcode, szilícium verifikáció
+**Kimenet:** ChipIgnite real silicon (csak F6-FPGA verifikáció után):
+- Az F6-FPGA-n verifikált elosztott OS egyetlen chipre integrálva
+- Writable microcode SRAM (silicon-specifikus)
+- Energia hatékonyság és órajel mérés
 
 Ez a **szilíciumra érett** Neuron OS.
 

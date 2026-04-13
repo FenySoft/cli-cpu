@@ -674,10 +674,11 @@ A CLI-CPU Secure Edition **nem egy gyors projekt**. A Tropic Square tanulsága: 
 | **2026-2027** | F1 | C# referencia szimulátor |
 | **2027** | F2 | RTL, Nano core egymagos |
 | **2027-2028** | F3 | Tiny Tapeout (Nano core + mailbox) — első szilícium |
-| **2028** | F4 | FPGA 4× Nano multi-core |
-| **2028-2029** | F5 | Rich core + heterogén FPGA |
-| **2029-2030** | F6 | ChipIgnite Cognitive Fabric tape-out |
-| **2030** | **F6.5** | **Secure Edition parallel tape-out** |
+| **2028** | F4 | FPGA 4× Nano multi-core (A7-Lite 200T) |
+| **2028-2029** | F5 | Rich core + heterogén FPGA (A7-Lite 200T) |
+| **2029-2030** | F6-FPGA | Heterogén Cognitive Fabric FPGA-verifikáció (3× A7-Lite 200T multi-board) |
+| **2030** | F6-Silicon | ChipIgnite tape-out (csak F6-FPGA verifikáció után) |
+| **2030-2031** | **F6.5** | **Secure Edition parallel tape-out** |
 | **2030-2031** | — | Bring-up, belső tesztelés |
 | **2031** | — | Common Criteria evaluation kezdete |
 | **2032-2033** | — | **EAL-5+ tanúsítvány megszerzése** |

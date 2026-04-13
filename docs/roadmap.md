@@ -34,8 +34,6 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 **Kimenet:**
 - `src/CilCpu.Sim/` — szimulátor könyvtár (fetch, decode, execute) — **kész**
 - `src/CilCpu.Sim.Tests/` — xUnit teszt projekt — **kész, 218 zöld teszt**
-- `src/CilCpu.Sim.Runner/` — CLI futtató, ami egy CIL-T0 bináris formátumot tud olvasni és futtatni — F1.5-re halasztva
-- `samples/` — néhány egyszerű C# program (Fibonacci, integer sum, GCD), `ilasm`-mal vagy Roslyn-nal CIL-T0-ba fordítva — F1.5-re halasztva
 
 **Kész kritérium — teljesítve:**
 - ✅ 100% opkód lefedettség tesztekkel — mind a 48 CIL-T0 opkód külön teszttel
@@ -45,6 +43,40 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 - ✅ Devil's Advocate review minden iteráció után, finalizálás QR pass-szal
 
 **Függőség:** F0 kész.
+
+---
+
+### F1.5 — Linker, Runner, Samples — **KÉSZ**
+
+**Cél:** Az F1 szimulátor köré épített eszközlánc, amely lehetővé teszi a teljes fejlesztői workflow-t: natív C# forrás → Roslyn → .dll → CIL-T0 linkelés → szimulátor futtatás. Az F1-ből halasztott deliverable-ök teljesítése.
+
+**Platform:** .NET 10, C# 13, xUnit.
+
+**Kimenet:**
+- `src/CilCpu.Linker/` — Roslyn .dll → CIL-T0 bináris linker (tranzitív call-target discovery, token→RVA feloldás, opkód-kompatibilitás ellenőrzés) — **kész**
+- `src/CilCpu.Sim.Runner/` — CLI futtatóeszköz (`run` és `link` parancsok, trap kezelés, TRunResult) — **kész**
+- `samples/PureMath/` — C# példaprogram (Add, Fibonacci, Factorial, GCD, IsPrime, stb.) — **kész**
+- `src/CilCpu.Sim.Tests/` — kibővítve linker + runner tesztekkel — **kész, 267 zöld teszt**
+
+**CLI használat:**
+```bash
+# .t0 bináris futtatása
+dotnet run --project src/CilCpu.Sim.Runner -- run program.t0 --args 2,3
+
+# .dll linkelése .t0-ra
+dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --method Add -o output.t0
+```
+
+**Kész kritérium — teljesítve:**
+- ✅ A linker tranzitívan felfedezi a hívott metódusokat és feloldja a call tokeneket
+- ✅ CIL-T0 inkompatibilis opkódok (ldsfld, ldstr, newarr, stb.) link-time hibát adnak
+- ✅ A Runner `.t0` fájlokat olvas és futtat, trap-eket kezeli
+- ✅ A Runner `.dll` fájlokat linkel `.t0`-ra a CLI-n keresztül
+- ✅ A teljes pipeline (C# → Roslyn → linker → szimulátor) end-to-end tesztelve
+- ✅ Fibonacci(20) = 6765 a teljes Roslyn-natív pipeline-on át
+- ✅ TDD-vel fejlesztve, Devil's Advocate review minden iteráció után
+
+**Függőség:** F1 kész.
 
 ---
 
@@ -119,7 +151,7 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 - Wake-from-sleep interrupt vonal
 - Globális clock broadcast hálózat
 
-**Platform:** Xilinx Artix-7 (Digilent Arty A7-100T, ~$250) vagy Lattice ECP5 (OrangeCrab, ~$130). FPGA-n még 100% megvalósítható.
+**Platform:** MicroPhase A7-Lite XC7A200T (~€320) — **elsődleges referencia platform F4–F5-höz**. Tiszta Artix-7 FPGA, 215K logic cell, 134K LUT, 740 DSP, 13.1 Mbit Block RAM, **512 MB DDR3**, Gigabit Ethernet, HDMI, beépített USB-JTAG, 2×50-pin GPIO header, 80×56 mm kompakt form factor. Vivado WebPACK **ingyenesen** támogatja. Alternatíva: Digilent Arty A7-100T (~$332, 101K logic cell, DDR3 nélkül) vagy Lattice ECP5 (OrangeCrab, ~$130, kisebb kapacitás). FPGA-n még 100% megvalósítható.
 
 **Kész kritérium:**
 - 4 core egyszerre futtat különböző CIL programokat, üzenetekkel kommunikálnak
@@ -161,7 +193,7 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 - A generator ellenőrzi build-time, hogy a Nano-jelölt metódusok csak CIL-T0 opkódokat használnak (verifikáció)
 - Két külön bináris kimenet: `.t0` (Nano) és `.tr` (Rich)
 
-**Platform:** Ugyanaz az FPGA, mint F4 — de most 4 Nano core + 1 Rich core együtt. A Rich core **~8x nagyobb**, mint egy Nano, úgyhogy az FPGA-n több LUT-ot használ. Egy Artix-7 100T még elférnek benne kényelmesen.
+**Platform:** Ugyanaz az A7-Lite XC7A200T, mint F4. A 134K LUT és 13.1 Mbit Block RAM kényelmesen elég 1 Rich + 4 Nano core-hoz (~60K LUT, ~45%), sőt akár **2 Rich + 8 Nano** (~105K LUT, ~78%) is megvalósítható. A 512 MB DDR3 a Rich core GC/heap számára kritikus előny a DDR3 nélküli board-okkal szemben. Alternatíva: Arty A7-100T (63K LUT — 1 Rich + 4 Nano szorosan elfér, de 2 Rich már nem).
 
 **Kész kritérium:**
 - Minden ECMA-335 opkódra van teszt a C# referencia szimulátoron és az RTL-en
@@ -174,90 +206,110 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 
 ---
 
-### F6 — Cognitive Fabric Maximum Demonstration (heterogén Nano + Rich)
+### F6 — Cognitive Fabric FPGA-verifikált demonstráció (heterogén Nano + Rich)
 
-Az F6 mérföldkő **két párhuzamos variánsban** valósul meg. **Az F6-FPGA az elsődleges, ajánlott út**, mert a CLI-CPU nyílt forráskódú filozófiájához tisztán illeszkedik — **100% nyílt toolchain end-to-end**, **reprodukálható**, **iterálható órák alatt**, és **nagyságrendekkel olcsóbb**, mint a silicon tape-out. **Az F6-Silicon opcionális, halasztható**, és csak akkor indul, ha az F6-FPGA-ban érlelt design valós szilíciumon is bizonyíthatóvá kell válnia (kereskedelmi termék, energia mérés, F6.5 Secure Edition előfeltétel).
+**Cél:** A Cognitive Fabric architektúra **teljes, FPGA-verifikált demonstrálása**. **Nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n.** Az F6-FPGA az elsődleges és kötelező mérföldkő; az F6-Silicon csak akkor indulhat, ha az F6-FPGA minden teszten zöld.
 
-**Közös arány az F6-ra:** **2–4 Rich core** (supervisor) **+ 32–48 Nano core** (worker), mesh router-rel összekötve. A Rich core-ok kevés számban felügyelnek, a Nano core-ok nagy tömegben végzik a konkrét munkát. Ez pontosan a `docs/architecture.md`-ben tárgyalt heterogén modell.
+**Architektúra:** Heterogén Rich + Nano multi-core fabric. Egyetlen A7-Lite 200T board-on **2 Rich + 8–10 Nano** (~105–115K / 134K LUT). Több board Ethernet-tel összekötve a Cognitive Fabric **elosztott multi-chip** változatát demonstrálja — ez a Neuron OS location transparency első valódi próbája.
 
-#### F6-FPGA — Maximum heterogén demonstráció a 7-series csúcson (elsődleges)
+#### F6-FPGA — Heterogén demonstráció A7-Lite 200T multi-board hálón (elsődleges, kötelező)
 
-**Cél:** A teljes Cognitive Fabric architektúra **maximális demonstrálása** a legnagyobb OpenXC7-támogatott Xilinx FPGA-kon, **silicon nélkül**, **nyílt toolchain end-to-end**. Az F6-FPGA **bizonyítja, hogy az architektúra működik a tape-out méretben**, mielőtt bárki ~$10k-t kockáztatna egy MPW shuttle-re.
+**Cél:** A Cognitive Fabric architektúra **verifikálása** MicroPhase A7-Lite XC7A200T board-okon, **egyetlen chipen és multi-chip Ethernet hálóban egyaránt**. Az F6-FPGA **bizonyítja, hogy az architektúra működik**, mielőtt bárki ~$10k-t kockáztatna egy MPW shuttle-re.
 
-**Stratégiai indoklás:** Az **OpenXC7** a Xilinx 7-series családot támogatja érdemben (Artix-7, Kintex-7), és ezen belül a **Kintex-7 XC7K325T** és **XC7K480T** a legnagyobb chipek. Ezeket „kimaxolva" különböző (Rich, Nano) kombinációkkal a CLI-CPU **adatvezérelt sweet spot keresést** végez **a tényleges silicon tape-out előtt**, **nyílt build chain-en**, **teljesen reprodukálható módon**.
+**Stratégiai indoklás:** A **MicroPhase A7-Lite XC7A200T** (134K LUT, 512 MB DDR3, Gigabit Ethernet, ~€320) az F4–F5 referencia platform, és **3 darab board Ethernet hálóban összekötve** 3 × 134K = **402K LUT aggregált kapacitást** ad — **kétszer annyi, mint egy Kintex-7 K325T** (204K LUT). Ráadásul a multi-board konfiguráció **reálisabb teszt**, mert a valódi Cognitive Fabric is multi-chip lesz. A Vivado WebPACK **ingyenesen** támogatja az Artix-7 családot.
+
+**Miért nem Kintex-7 K325T?** Jelenleg nem érhető el megfelelő konfigurációjú K7-325T fejlesztői board. Ha a jövőben elérhetővé válik, az F6 konfigurációs sweep kiterjeszthető rá — de az F6 **nem függ tőle**.
 
 **Új munka az F4+F5-höz képest:**
 - **Adaptív top-level instanciálás** — paraméterezhető (`#NUM_RICH`, `#NUM_NANO`) az ugyanazon RTL-re
 - **Mesh router** skálázhatóság — 4 core-nál nagyobb rendszerhez 2D grid topológia (~1 mérnökhónap)
+- **Inter-chip Ethernet bridge** — a board-ok közötti mailbox üzenetek Gigabit Ethernet-en, a Neuron OS location transparency valódi tesztje (~1 mérnökhónap)
 - **Heterogén verification** és többkonfigurációs test harness (~1 mérnökhónap)
 - **Configuration sweep script** — automatikus szintézis és P&R több (Rich, Nano) párra, LUT/timing/throughput riport
-- **Összesen: ~2-3 mérnökhónap**, **csak instanciálás és test harness**, **nincs új RTL komponens**
+- **Összesen: ~3-4 mérnökhónap**
 
-**Platform:**
-- **Elsődleges:** **Kintex-7 XC7K480T** (pl. Inspur YPCB-00338-1P1 / YZCA-00338, ex-data center, ~$60-200) — **298k LUT**, elég az F6 alsó-közép célra (2-3 Rich + 32-40 Nano)
-- **Másodlagos:** **Kintex-7 XC7K325T** (pl. SITLINV CERN-OHL-P-2.0 nyílt hardver dev board ~$220-265, vagy QMTECH ~$127) — **204k LUT**, kisebb konfigurációkra (1-2 Rich + 16-24 Nano), **nyílt hardver licenc**
-- **Mindkettő OpenXC7 + yosys + nextpnr-xilinx** kompatibilis, **Vivado licenc nem szükséges**
+**Platform:** **3 × MicroPhase A7-Lite XC7A200T** (~€320/db) — per-board: 134K LUT, 740 DSP, 13.1 Mbit Block RAM, 512 MB DDR3, Gigabit Ethernet, HDMI, beépített USB-JTAG, 2×50-pin GPIO header. Vivado WebPACK **ingyenesen** támogatja. Opcionálisan **Kintex-7 XC7K325T** (204K LUT), ha megfelelő konfigurációjú board elérhetővé válik.
+
+**Board-ok szerepe:**
+
+| Board | Szerep | Konfiguráció |
+|-------|--------|-------------|
+| **#1** | Fejlesztés, F4–F5, elsődleges single-chip teszt | 2 Rich + 8–10 Nano |
+| **#2** | Inter-chip teszt, elosztott fabric | 0–2 Rich + 8–10 Nano |
+| **#3** | 3-csomópontos háló, tartalék | 0–2 Rich + 8–10 Nano |
+
+**Multi-board példa konfiguráció (3 board Ethernet hálóban):**
+- Board A: 2 Rich (supervisor) + 6 Nano — a „vezérlő csomópont"
+- Board B: 0 Rich + 10 Nano — worker farm
+- Board C: 0 Rich + 10 Nano — worker farm
+- **Összesen: 2 Rich + 26 Nano**, elosztva 3 fizikai chipen, Ethernet bridge-dzsel
 
 **Kimenet:**
 - `rtl/top_f6_fpga/` — paraméterezhető top-level (Nano és Rich core szám konfigurációs paraméter)
-- `rtl/test_harness/` — multi-core stress teszt szcenáriók
+- `rtl/eth_bridge/` — inter-chip Ethernet mailbox bridge
+- `rtl/test_harness/` — single-chip és multi-chip stress teszt szcenáriók
 - `bring-up/f6_fpga_results.md` — multi-konfiguráció riport (LUT, timing, throughput, power becslés)
 - `bring-up/f6_fpga_sweet_spot.md` — javaslat az F6-Silicon (Rich, Nano) konfigurációra
 
-**Konfigurációs sweep — kimaxolt 7-series kombinációk:**
+**Konfigurációs sweep — A7-200T kombinációk (134K LUT per board, cél ≤85% kihasználás):**
 
-A K7-325T és K7-480T-n szisztematikusan próbáljuk ki a legalább következő (Rich, Nano) párokat:
+*Single-board:*
 
-| FPGA | (Rich, Nano) | Becsült LUT | Cél |
-|------|--------------|-------------|-----|
-| K7-325T | (0, 30) | ~180k | Tiszta Nano fabric (SNN) |
-| K7-325T | (1, 24) | ~176k | „1 supervisor + sok worker" |
-| K7-325T | (2, 16) | ~184k | Heterogén közép |
-| K7-325T | (3, 6) | ~186k | Rich-domináns |
-| K7-480T | (2, 32) | ~232k | **F6 alsó silicon target megfelelője** |
-| K7-480T | (3, 24) | ~234k | Heterogén közép-nagy |
-| K7-480T | (4, 12) | ~248k | Apple-szerű big.LITTLE arány |
-| K7-480T | (1, 38) | ~232k | Nano-domináns |
-| K7-480T | (0, 45) | ~270k | Tiszta SNN max |
+| (Rich, Nano) | Becsült LUT | Kihasználás | Cél |
+|--------------|-------------|-------------|-----|
+| (0, 20) | ~115K | 86% | Tiszta Nano fabric (SNN max) |
+| (1, 14) | ~105K | 78% | „1 supervisor + sok worker" |
+| (2, 8) | ~105K | 78% | **Heterogén sweet spot** |
+| (2, 10) | ~115K | 86% | Heterogén max |
+
+*Multi-board (2–3 board, Ethernet hálóban):*
+
+| Konfiguráció | Összesen | Cél |
+|-------------|---------|-----|
+| 2 board: (2,6) + (0,10) | 2R + 16N | F5+ heterogén elosztott |
+| 3 board: (2,6) + (0,10) + (0,10) | **2R + 26N** | **F6 elosztott Cognitive Fabric** |
+| 3 board: (1,8) + (1,8) + (0,10) | 2R + 26N | Szimmetrikus supervisor |
 
 **Kész kritérium:**
-- **Legalább 4 különböző (Rich, Nano) konfiguráció** szintetizálva és futtatva K7-480T-n vagy K7-325T-n
-- **A 2 Rich + 32 Nano konfiguráció (F6 alsó silicon target FPGA megfelelője)** stabilan fut a K7-480T-n
-- **Mesh router stress teszt** 32+ core-on, 1 perc, deadlock nélkül
-- **A négy F4 demó** (ping-pong, echo-chain, ping-network, SNN) **fut a teljes 32+ magon**
-- **Rich core demó:** C# webhandler fut a Rich core-on (tömbök, stringek, kivételek)
+- **Legalább 4 különböző (Rich, Nano) konfiguráció** szintetizálva és futtatva single-board-on
+- **A 2 Rich + 8 Nano konfiguráció** stabilan fut single-board-on, minden teszt zöld
+- **Multi-board Ethernet bridge** működik: üzenetek átmennek board-ok között, latency mérve
+- **Elosztott demó:** 2–3 board hálóban, aktorok cross-chip kommunikálnak, a küldő nem tudja, hogy a target másik chipen van (location transparency)
+- **A négy F4 demó** (ping-pong, echo-chain, ping-network, SNN) **fut single-board-on és multi-board-on is**
+- **Rich core demó:** C# kód fut a Rich core-on (tömbök, stringek, kivételek)
 - **Heterogén demó:** Rich core supervisor koordinál Nano core-okon futó neurális hálót
-- **Nagyobb SNN demó:** MNIST klasszifikátor 32+ Nano core-on, 1-2 Rich coordinator-ral
-- **Akka.NET cluster demó:** valós C# kódból fordított actor rendszer hardveresen futva
-- **Aggregate throughput** mérés (üzenet/sec a teljes mesh-en)
+- **SNN demó:** LIF/Izhikevich hálózat 16+ Nano core-on elosztva, 1-2 Rich coordinator-ral
+- **Akka.NET cluster demó:** valós C# kódból fordított actor rendszer hardveresen futva, multi-chip-en
+- **Aggregate throughput** mérés (üzenet/sec — single-chip és cross-chip külön)
 - **Power becslés** (FPGA fogyasztás × empirikus FPGA→silicon konverziós faktor)
 - **Multi-konfiguráció riport** publikálva (LUT, timing, throughput összehasonlítás)
 
-**Függőség:** F5 kész, FPGA stabil (mind Nano, mind Rich core-ral), minden teszt zöld, OpenXC7 működik a kiválasztott Kintex-7 hardveren.
+**Függőség:** F5 kész, FPGA stabil (mind Nano, mind Rich core-ral), minden teszt zöld.
 
-**Költség-nagyságrend:** ~$60-200 (K7-480T) **vagy** ~$220-265 (SITLINV K7-325T) **vagy** mindkettő ~$280-465. **JTAG kábel** ~$25 (csak ha nem beépített). **Vivado licenc: $0** (OpenXC7 nyílt toolchain). **Mérnöki munka:** 2-3 mérnökhónap.
+**Költség-nagyságrend:** 3 × ~€320 = **~€960** (~$1030) — az F4–F5 board-ok újrahasznosítva az F6-ban. **Vivado WebPACK: $0**. **Mérnöki munka:** 3-4 mérnökhónap.
 
-#### F6-Silicon — MPW tape-out (opcionális, halasztható)
+#### F6-Silicon — MPW tape-out (csak F6-FPGA verifikáció után)
 
-**Cél:** Az F6-FPGA-ban érlelt és sweet spot-ra optimalizált design **valós szilíciumon**, eFabless Caravel harness-en (vagy IHP SG13G2 MPW, ha az ingyenes shuttle elérhető F6-Silicon időzítéskor), full MPW shuttle-n.
+**Cél:** Az F6-FPGA-ban (A7-Lite 200T multi-board hálón) **verifikált és sweet spot-ra optimalizált** design **valós szilíciumon**. **Előfeltétel: az F6-FPGA minden kész kritériuma teljesül** — nem indulhat silicon tape-out FPGA-verifikáció nélkül.
 
-**Mikor indul:** **Csak az F6-FPGA után**, és csak akkor, ha legalább egy a következőkből igaz:
+**Mikor indul:** **Csak az F6-FPGA összes kész kritériumának teljesülése után**, és csak akkor, ha legalább egy a következőkből igaz:
 - A projekt **finanszírozást vagy ipari partnert** kapott a tape-out fedezésére
 - A **kereskedelmi termék útvonalra** ([F6.5 Secure Edition](#f65--secure-edition-parallel-tape-out-opcionális), F7 demó hardver) **silicon-előfeltétel** van
 - A **valós energia hatékonyság** és **>500 MHz órajel** mérése **kritikus** a következő mérföldkőhöz
-- Az **F6.5 Secure Edition tape-out** közeledik, és a Cognitive Fabric base **szilíciumon** kell legyen először
+
+**A silicon target az FPGA-n verifikált konfigurációra épül:** az F6-FPGA multi-board sweep-ből kiválasztott (Rich, Nano) sweet spot — várhatóan **2 Rich + 16–26 Nano** (ahogy a multi-board hálóban verifikáltuk) — kerül tape-out-ra egyetlen chipre. **ASIC-on a core-ok kisebbek** (std cell vs FPGA LUT), így a multi-board-on elosztva verifikált konfiguráció **egyetlen silicon chipre elfér**, és opcionálisan **felskálázható**, de csak a verifikált router és mesh topológia egyenes kiterjesztéseként.
 
 **Platform-döntés (F6-Silicon indulása előtt):**
 - **Sky130 @ Caravel (eFabless ChipIgnite)** — ismert, megbízható, ~$10k, ismert toolchain
 - **IHP SG13G2 MPW** — európai, potenciálisan ingyenes/olcsóbb shuttle, hasonló digitális teljesítmény
-- **Pragmatic FlexIC** — nem valószínű, túl korlátos tranzisztor-budget, megfigyelés alatt
 
-**Új funkciók a F6-FPGA-hoz képest (silicon-specifikus):**
+**Új funkciók az F6-FPGA-hoz képest (silicon-specifikus):**
 - **Floorplan optimalizáció** — a Rich core-ok központi helyen, a Nano core-ok köré csoportosítva
 - **Writable microcode** SRAM — firmware-ből frissíthető opkód viselkedés (FPGA-n BRAM-mal szimulálva, silicon-on dedikált SRAM)
 - **Gated store buffer** (GC write barrier batch, Transmeta-inspiráció)
 - **Agresszív power-gating** — a nem használt core-ok teljesen hideg állapotban (FPGA-n nem reális)
 - **Core-típusok közötti bridge** — Nano ↔ Rich üzenetek és állapot-migráció hardveres optimalizációval
+- **Opcionális felskálázás** — ha a silicon budget engedi, az FPGA-verifikált 2R+16N felskálázása 2R+32N-re (a router topológia lineáris kiterjesztése, nem új design)
 
 **Új tervezési munka F6-Silicon-hoz (az F6-FPGA-n felül):**
 - Floorplan: **~2–4 mérnökhét**
@@ -273,14 +325,10 @@ A K7-325T és K7-480T-n szisztematikusan próbáljuk ki a legalább következő 
 
 **Kész kritérium:**
 - Heterogén lapka legyártva és a kezedben
-- A négy F4 demó valós szilíciumon a Nano core-okon
-- Rich core demó: teljes C# webhandler (tömbök, stringek, kivételek) silicon-on
-- Heterogén demó: Rich supervisor + Nano neurális háló silicon-on
-- **Nagyobb SNN demó:** MNIST klasszifikátor 32-48 Nano core-on, 1-2 Rich coordinator-ral, valós szilíciumon
-- **Akka.NET cluster demó** valós szilíciumon
+- **Az F6-FPGA-n verifikált összes demó** megismételve valós szilíciumon
 - **Energia / teljesítmény mérés** ARM Cortex-M4 / RISC-V RV32 ellen, event-driven workload-okon — **az F6-FPGA power becslés validálása**
 
-**Függőség:** **F6-FPGA kész**, sweet spot kiválasztva, multi-konfiguráció riport elérhető, a kiválasztott (Rich, Nano) konfiguráció minden teszten zöld.
+**Függőség:** **F6-FPGA kész** (minden kész kritérium teljesül), sweet spot kiválasztva, multi-konfiguráció riport elérhető.
 
 **Költség-nagyságrend:** ~$9,750 (eFabless ChipIgnite, 100 db bring-up chip-pel), vagy ~€0–3k (IHP MPW, ha ingyenes shuttle nyílik), vagy $0 (Open MPW free shuttle, ha elérhető).
 
@@ -343,7 +391,7 @@ A K7-325T és K7-480T-n szisztematikusan próbáljuk ki a legalább következő 
   - NuGet csomagok publikus feed-en
 - **Referencia C# demó alkalmazások:**
   - Akka.NET-szerű actor cluster (supervisor hierarchia, hot code loading)
-  - LIF spiking neural network 32-48 Nano core-on
+  - LIF spiking neural network 16+ Nano core-on
   - IoT edge gateway (szenzor handlerek + LoRa protokoll)
   - Multi-agent szimuláció (Boids, Conway's Game of Life kiterjesztése)
 - **Publikációs anyag:** cikk, előadás, demo video — az egész projektet bemutató narratíva, Linux Foundation projekt-státusz kérelem
@@ -368,18 +416,18 @@ Részletek és fejlesztői API példák: [`docs/neuron-os.md`](neuron-os.md).
                           ┌── Nano core út ──┐         ┌── Rich core út ──┐
                           │                  │         │                  │
 F0 ──► F1 ──► F2 ──► F3 ──┘──► F4 ──►────────┘─► F5 ──┴──► F6-FPGA ──► F7
-  spec   sim    RTL    TT       multi-         heterogén   maximum     demo
-              │         1×      Nano          (Rich+Nano) demonstration + Neuron
-              │         +        4×            FPGA       (K7-325T /     OS SDK
-              │        mbox     FPGA                       K7-480T,      ▲
-              │              ▲                             OpenXC7)      │
+  spec   sim    RTL    TT       multi-         heterogén   verifikált   demo
+              │         1×      Nano          (Rich+Nano) demonstráció + Neuron
+              │         +        4×            FPGA       (3× A7-Lite    OS SDK
+              │        mbox     FPGA         (A7-Lite     200T multi-   ▲
+              │              ▲                200T)       board háló)   │
               └──── FPGA ────┘                                │          │
                  (opcionális                                  │          │
                   korai F2 után)                              │          │
                                                               ▼          │
                                                        F6-Silicon ───────┘
-                                                       (opcionális,
-                                                        halasztható,
+                                                       (csak F6-FPGA
+                                                        verifikáció után!
                                                         Sky130 / IHP MPW
                                                         ~$10k)
                                                               │
@@ -411,14 +459,16 @@ A **korábbi** F4 a „CIL object model + GC FPGA-n" volt, a mostani **új** F4 
 
 A korábbi „F5 — CIL Object Model + GC egymagos kiterjesztés" címet átneveztük **„F5 — Rich core (teljes CIL) FPGA-n, első heterogén rendszer"** címre. Technikailag a tartalom majdnem ugyanaz (teljes CIL kiterjesztés), de most már explicite úgy fogalmazzuk, hogy itt **születik meg a Rich core** mint a Nano core „nagy testvére". Az F6 ezek után egy **heterogén Nano+Rich multi-core chip**, analóg módon az ARM big.LITTLE, Apple P/E-core, Intel Alder Lake modellekhez. Lásd `docs/architecture.md` „Heterogén multi-core: Nano + Rich" szekciót.
 
-**3. pivot — F6: F6-FPGA mint elsődleges, F6-Silicon mint opcionális**
+**3. pivot — F6: FPGA-verifikáció kötelező a silicon előtt, A7-Lite 200T multi-board**
 
-A **korábbi** F6 egyetlen célt definiált: **eFabless ChipIgnite vagy IHP SG13G2 silicon tape-out** ~$10k költséggel. A **mostani új** F6 **két párhuzamos variánst** ad: **F6-FPGA** (elsődleges, ajánlott) és **F6-Silicon** (opcionális, halasztható). Az F6-FPGA a legnagyobb OpenXC7-támogatott Xilinx FPGA-kat (Kintex-7 325T és 480T) **maxolja ki** különböző (Rich, Nano) kombinációkkal — **100% nyílt toolchain end-to-end**, **~$200-400 költség**, **órák alatti rebuild ciklus**, **adatvezérelt sweet spot keresés** a tényleges silicon tape-out előtt. **A pivot oka**: az OpenXC7 jelenlegi technikai határa (Kintex-7) **pontosan elég** a Cognitive Fabric architektúra teljes demonstrálásához, és a CLI-CPU **nyílt forráskódú filozófiájához** tisztábban illeszkedik a 100% reprodukálható, audálható FPGA build, mint egy zárt foundry processzre épülő silicon tape-out. **Az F6-Silicon nem törlődik**, csak **opcionálissá és halasztottá** válik — csak akkor indul, ha kereskedelmi termék, F6.5 Secure Edition, vagy valós energia mérés silicon-előfeltétel jelentkezik.
+A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mostani** F6 a **reálisan elérhető és kézben lévő platformra** épít: **3 × MicroPhase A7-Lite XC7A200T** (3 × 134K = 402K LUT aggregált kapacitás, Gigabit Ethernet hálóban). Ez **reálisabb teszt**, mert a valódi Cognitive Fabric is multi-chip lesz — a location transparency és az inter-chip mailbox bridge **csak multi-board-on** tesztelhető. A Kintex-7 K325T opcionális kiegészítés, ha megfelelő konfigurációjú board elérhetővé válik. **Az F6-Silicon csak az F6-FPGA teljes verifikációja után indulhat** — nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n.
 
 ## Mai státusz
 
 **F0 koncepcionálisan készen van.** Hét dokumentum a `docs/` és a `README.md` alatt együtt ~3500+ sor, belsőleg konzisztens projekt-terv a **hárompályás pozicionálással** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, a Neuron OS vízióval, és a Secure Element stratégiai tervvel (F6.5 parallel tape-out).
 
-**F1 — C# referencia szimulátor lezárva.** Az `src/CilCpu.Sim` és `src/CilCpu.Sim.Tests` projektek **218 zöld xUnit teszttel**, **0 warning, 0 error** állapotban. Minden a CIL-T0 spec által rögzített **48 opkód** implementálva van (`nop`, konstansok, lokális/argumentum hozzáférés, stack manipuláció, aritmetika, összehasonlítás, rövid branch-ek, `call`/`ret`, `ldind.i4`/`stind.i4` ECMA-335 byte-értékekkel, `break`), és minden hardveres trap (stack over/underflow, invalid opcode, invalid local/arg, invalid branch/call target, div-by-zero, overflow, call depth exceeded, debug break, **invalid memory access**) trigger-elhető és tesztelt. Az **F1 aranypélda**: `Fibonacci(20) = 6765` zöld a header-vezérelt `Execute` overload-on, ahogy a faktoriális (n=10 → 3628800) és iteratív GCD is. A fejlesztés **4 iterációban** zajlott szigorú TDD-vel, minden iterációhoz Devil's Advocate review, a fázis lezárását egy Finalizer QR pass adta, amely a critical fix-eket és a CLAUDE.md compliance-t ellenőrizte.
+**F1 — C# referencia szimulátor lezárva.** Az `src/CilCpu.Sim` és `src/CilCpu.Sim.Tests` projektek minden CIL-T0 spec által rögzített **48 opkódot** implementálják, minden hardveres trap tesztelt. Az **F1 aranypélda**: `Fibonacci(20) = 6765` zöld. A fejlesztés **4 iterációban** zajlott szigorú TDD-vel, minden iterációhoz Devil's Advocate review.
 
-**Következő érdemi lépés:** **F1.5** — `CilCpu.Sim.Runner` CLI futtató és egy `samples/` mappa Roslyn-nal CIL-T0-ba fordított példa programokkal, majd **F2 — RTL** kezdete (Verilog vagy Amaranth HDL döntés, cocotb testbench infrastruktúra).
+**F1.5 — Linker, Runner, Samples lezárva.** A `CilCpu.Linker` Roslyn .dll → CIL-T0 pipeline, a `CilCpu.Sim.Runner` CLI futtatóeszköz (`run` / `link` parancsok), és a `samples/PureMath` példaprogram kész. **267 zöld xUnit teszt**, **0 warning, 0 error**. A teljes pipeline (C# → Roslyn → linker → szimulátor) end-to-end tesztelve, TDD-vel fejlesztve, Devil's Advocate review-val.
+
+**Következő érdemi lépés:** **F2 — RTL** kezdete (Verilog vagy Amaranth HDL döntés, cocotb testbench infrastruktúra).

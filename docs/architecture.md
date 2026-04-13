@@ -168,8 +168,8 @@ F4 (FPGA multi-core) ─►  Nano core 4×  ─┤
 F5 (FPGA Rich)     ─►  Rich core 1×  ──┤
                                         │
                                         ▼
-F6 (ChipIgnite MPW) ─►  Heterogén: Rich 2-4× + Nano 32-48×
-                        + floorplan + Roslyn [RunsOn] + bridge
+F6-FPGA (3×A7-200T) ─►  Heterogén: Rich 2× + Nano ~26× elosztva (multi-board)
+F6-Silicon (MPW)    ─►  FPGA-verifikált design egyetlen chipre, opcionálisan felskálázva
 ```
 
 Az **F6-hoz új tervezési munka ~1–2 mérnökhónap**: floorplan optimalizáció, a Roslyn source generator `[RunsOn]` attribútum támogatása, és az a néhány regiszter a message router-ben, ami a Nano/Rich közötti átjárást intézi. **Ez marginális** ahhoz képest, amit a Nano és a Rich core tervezése külön-külön igényel.
@@ -217,7 +217,8 @@ A fordító ellenőrzi, hogy a `[RunsOn(CoreType.Nano)]` kódban **csak a CIL-T0
 | F3 | Tiny Tapeout | **1** | 0 | Proof of life, első „hálózati csomópont" |
 | F4 | FPGA multi-core | **4** | 0 | Első shared-nothing fabric, pure Nano |
 | F5 | FPGA heterogén | **4** | **1** | **Első heterogén rendszer**, Rich core teszt |
-| F6 | ChipIgnite (Sky130 vagy IHP MPW) | **32–48** | **2–4** | Valódi heterogén szilícium |
+| F6-FPGA | 3× A7-Lite 200T multi-board (3×134K LUT, Ethernet háló) | **8–10/board, ~26 összesen** | **2** | FPGA-verifikált elosztott Cognitive Fabric |
+| F6-Silicon | ChipIgnite (Sky130 vagy IHP MPW) | **16–32** | **2** | Valódi heterogén szilícium (FPGA-verifikált design) |
 | F7 | Termék-chip (jövő) | **64+** | **4–8** | Kereskedelmi Cognitive Fabric |
 
 ### Állapot-migráció Nano ↔ Rich
