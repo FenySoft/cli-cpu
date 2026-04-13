@@ -151,7 +151,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - Wake-from-sleep interrupt vonal
 - Globális clock broadcast hálózat
 
-**Platform:** MicroPhase A7-Lite XC7A200T (~€320) — **elsődleges referencia platform F4–F5-höz**. Tiszta Artix-7 FPGA, 215K logic cell, 134K LUT, 740 DSP, 13.1 Mbit Block RAM, **512 MB DDR3**, Gigabit Ethernet, HDMI, beépített USB-JTAG, 2×50-pin GPIO header, 80×56 mm kompakt form factor. Vivado WebPACK **ingyenesen** támogatja. Alternatíva: Digilent Arty A7-100T (~$332, 101K logic cell, DDR3 nélkül) vagy Lattice ECP5 (OrangeCrab, ~$130, kisebb kapacitás). FPGA-n még 100% megvalósítható.
+**Platform:** MicroPhase A7-Lite XC7A200T (~€320) — **elsődleges referencia platform F4–F5-höz**. Tiszta Artix-7 FPGA, 215K logic cell, 134K LUT, 740 DSP, 13.1 Mbit Block RAM, **512 MB DDR3**, Gigabit Ethernet, HDMI, beépített USB-JTAG, 2×50-pin GPIO header, 80×56 mm kompakt form factor. Vivado ML Standard (WebPACK) **ingyenesen** támogatja. Alternatíva: Digilent Arty A7-100T (~$332, 101K logic cell, DDR3 nélkül) vagy Lattice ECP5 (OrangeCrab, ~$130, kisebb kapacitás). FPGA-n még 100% megvalósítható.
 
 **Kész kritérium:**
 - 4 core egyszerre futtat különböző CIL programokat, üzenetekkel kommunikálnak
@@ -216,7 +216,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Cél:** A Cognitive Fabric architektúra **verifikálása** MicroPhase A7-Lite XC7A200T board-okon, **egyetlen chipen és multi-chip Ethernet hálóban egyaránt**. Az F6-FPGA **bizonyítja, hogy az architektúra működik**, mielőtt bárki ~$10k-t kockáztatna egy MPW shuttle-re.
 
-**Stratégiai indoklás:** A **MicroPhase A7-Lite XC7A200T** (134K LUT, 512 MB DDR3, Gigabit Ethernet, ~€320) az F4–F5 referencia platform, és **3 darab board Ethernet hálóban összekötve** 3 × 134K = **402K LUT aggregált kapacitást** ad — **kétszer annyi, mint egy Kintex-7 K325T** (204K LUT). Ráadásul a multi-board konfiguráció **reálisabb teszt**, mert a valódi Cognitive Fabric is multi-chip lesz. A Vivado WebPACK **ingyenesen** támogatja az Artix-7 családot.
+**Stratégiai indoklás:** A **MicroPhase A7-Lite XC7A200T** (134K LUT, 512 MB DDR3, Gigabit Ethernet, ~€320) az F4–F5 referencia platform, és **3 darab board Ethernet hálóban összekötve** 3 × 134K = **402K LUT aggregált kapacitást** ad — **kétszer annyi, mint egy Kintex-7 K325T** (204K LUT). Ráadásul a multi-board konfiguráció **reálisabb teszt**, mert a valódi Cognitive Fabric is multi-chip lesz. A Vivado ML Standard (WebPACK) **ingyenesen** támogatja az Artix-7 családot (XC7A200T-ig). Alternatívaként az **OpenXC7** nyílt toolchain is használható.
 
 **Miért nem Kintex-7 K325T?** Jelenleg nem érhető el megfelelő konfigurációjú K7-325T fejlesztői board. Ha a jövőben elérhetővé válik, az F6 konfigurációs sweep kiterjeszthető rá — de az F6 **nem függ tőle**.
 
@@ -228,7 +228,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - **Configuration sweep script** — automatikus szintézis és P&R több (Rich, Nano) párra, LUT/timing/throughput riport
 - **Összesen: ~3-4 mérnökhónap**
 
-**Platform:** **3 × MicroPhase A7-Lite XC7A200T** (~€320/db) — per-board: 134K LUT, 740 DSP, 13.1 Mbit Block RAM, 512 MB DDR3, Gigabit Ethernet, HDMI, beépített USB-JTAG, 2×50-pin GPIO header. Vivado WebPACK **ingyenesen** támogatja. Opcionálisan **Kintex-7 XC7K325T** (204K LUT), ha megfelelő konfigurációjú board elérhetővé válik.
+**Platform:** **3 × MicroPhase A7-Lite XC7A200T** (~€320/db) — per-board: 134K LUT, 740 DSP, 13.1 Mbit Block RAM, 512 MB DDR3, Gigabit Ethernet, HDMI, beépített USB-JTAG, 2×50-pin GPIO header. Vivado ML Standard (WebPACK) **ingyenesen** támogatja. Opcionálisan **Kintex-7 XC7K325T** (204K LUT), ha megfelelő konfigurációjú board elérhetővé válik.
 
 **Board-ok szerepe:**
 
@@ -286,7 +286,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Függőség:** F5 kész, FPGA stabil (mind Nano, mind Rich core-ral), minden teszt zöld.
 
-**Költség-nagyságrend:** 3 × ~€320 = **~€960** (~$1030) — az F4–F5 board-ok újrahasznosítva az F6-ban. **Vivado WebPACK: $0**. **Mérnöki munka:** 3-4 mérnökhónap.
+**Költség-nagyságrend:** 3 × ~€320 = **~€960** (~$1030) — az F4–F5 board-ok újrahasznosítva az F6-ban. **Vivado ML Standard (WebPACK): $0**. **Mérnöki munka:** 3-4 mérnökhónap.
 
 #### F6-Silicon Zero — „Cognitive Fabric Zero" (IHP 3 mm², első heterogén szilícium)
 
