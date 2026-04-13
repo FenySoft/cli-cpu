@@ -24,7 +24,7 @@ A program választásától függően ugyanaz a hardver lehet:
 
 A Sun **picoJava** (1997) és az ARM **Jazelle** (2001) pontosan azt próbálta, amit a CLI-CPU is akarhatna naivan: egy hagyományos, egymagos bytecode-natív processzort a szoftveres JIT alternatíváiként. **Mindkettő megbukott**, mert a szoftveres JIT + általános célú CPU évek alatt olcsóbb és gyorsabb lett, mint a dedikált hardver.
 
-**A CLI-CPU nem ismétli ezt a hibát.** Nem egymagos sebességben akar versenyezni a modern OoO CPU-kkal — az lehetetlen. Ehelyett **más dimenzióban** pozicionál: sok kis independens core, event-driven működés, shared-nothing izoláció, és olyan programozási modell, ami **természetesen illik a modern multi-threaded .NET alkalmazásokhoz** (Task, async/await, Akka.NET, Orleans, Channel).
+**A CLI-CPU nem ismétli ezt a hibát.** Nem egymagos sebességben akar versenyezni a modern OoO CPU-kkal — az lehetetlen. Ehelyett **más dimenzióban** pozicionál: sok kis independens core, event-driven működés, shared-nothing izoláció, és olyan programozási modell, ami **természetesen illik a modern .NET alkalmazásokhoz** (Task, async/await, Akka.NET, Orleans, Channel). A CLI-CPU **nem C#-t futtat — CIL-t futtat**: minden .NET nyelv (C#, F#, VB.NET, IronPython, PowerShell) natívan fut a hardveren, ~8 millió fejlesztő meglévő kódbázisával. Ez az **első hardver platform, ami egy teljes szoftveres ökoszisztéma natív szilíciumát adja**.
 
 Részletek a `docs/architecture.md` **„Stratégiai pozicionálás: Cognitive Fabric"** szekciójában.
 
