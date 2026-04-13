@@ -49,10 +49,10 @@ C# forráskód → dotnet build → .dll (Roslyn IL)
 
 | Projekt | Szerep |
 |---------|--------|
-| `CilCpu.Sim` | Referencia szimulátor: TCpu, TDecoder, TExecutor, TEvaluationStack, TCallStack, TFrame, TMethodHeader |
+| `CilCpu.Sim` | Referencia szimulátor: TCpu (SRAM-alapú), TDecoder, TExecutor, TMethodHeader, TOpcode, TTrapException |
 | `CilCpu.Linker` | Roslyn .dll → CIL-T0 bináris konverzió (System.Reflection.Metadata) |
 | `CilCpu.Sim.Runner` | CLI futtatóeszköz: `run` (`.t0` bináris futtatás) és `link` (`.dll` → `.t0` konverzió) |
-| `CilCpu.Sim.Tests` | xUnit tesztek (267+), minden projekthez |
+| `CilCpu.Sim.Tests` | xUnit tesztek (259+), minden projekthez |
 | `samples/PureMath` | Példa: tiszta int-only statikus C# függvények, CIL-T0 kompatibilis |
 
 ### Végrehajtási pipeline kulcs osztályok
