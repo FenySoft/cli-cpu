@@ -8,7 +8,7 @@ A CIL-T0 az ECMA-335 CIL **szigorú, bitről-bitre kompatibilis részhalmaza**. 
 
 ### Célkitűzések
 
-1. **Minimális** — elférjen egy Tiny Tapeout 8×2 tile budget-ben (~15-20k standard cell).
+1. **Minimális** — elférjen egy Tiny Tapeout 12–16 tile budget-ben (~12K–16K gate, ~1K gate/tile).
 2. **Teljes** az integer-only, statikus-hívás programokra — egy Fibonacci, egy GCD, egy integer bubble-sort futtatható legyen.
 3. **Szigorúan szabványos** — nincsenek saját opkódok, minden ECMA-335-ből származik.
 4. **Hardveres biztonság F0-ban is** — stack overflow/underflow, branch target, lokális index bounds mind hardveres trap.
@@ -140,7 +140,7 @@ A mailbox blokk becsült mérete Sky130-on:
 | UART bridge (F3) | ~50 (már meglévő UART-ból megosztva) |
 | **Mailbox összesen** | **~370** |
 
-Ez **~4% növekedés** a CIL-T0 ~8700 std cell budget-jén, és **elfér** a 4×2 Tiny Tapeout tile konfigurációban. **A teljes becsült F3 méret most ~9100 std cell.**
+Ez **~4% növekedés** a CIL-T0 ~8700 std cell budget-jén, és **elfér** a 12–16 Tiny Tapeout tile konfigurációban. **A teljes becsült F3 méret most ~9100 std cell.**
 
 ## Stack szemantika
 
@@ -589,7 +589,7 @@ A `TCpu.Peek(int)` egy debug/teszt API, amely a CPU jelenlegi top-frame eval sta
 | Glue, clock, reset | 500 |
 | **Összesen** | **~8700 std cell** |
 
-Ez **4×2 Tiny Tapeout tile**-ba komfortosan belefér (budget ~10k cell), és hagy tartalékot a verifikációs logikának.
+Ez **12–16 Tiny Tapeout tile**-ba komfortosan belefér (~1K gate/tile, ~12K–16K gate budget), és hagy tartalékot a routing overhead-re és verifikációs logikának.
 
 ## F1 szimulátor teszt-kötelezettségek
 
