@@ -108,5 +108,16 @@ public enum TTrapReason : byte
     /// CPU has no data memory configured. In the F2 RTL this corresponds
     /// to a hardware memory controller fault.
     /// </summary>
-    InvalidMemoryAccess = 0x0C
+    InvalidMemoryAccess = 0x0C,
+
+    /// <summary>
+    /// hu: A stack SRAM régiója megtelt — a <c>call</c> opkód nem tud
+    /// új frame-et allokálni, mert az SP + frame méret meghaladná
+    /// a per-core SRAM határát (Nano: 16 KB, Rich: 64-256 KB).
+    /// <br />
+    /// en: The stack SRAM region is full — the <c>call</c> opcode cannot
+    /// allocate a new frame because SP + frame size would exceed the
+    /// per-core SRAM limit (Nano: 16 KB, Rich: 64-256 KB).
+    /// </summary>
+    SramOverflow = 0x0D
 }

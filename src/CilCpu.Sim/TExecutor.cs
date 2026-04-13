@@ -47,8 +47,6 @@ internal static class TExecutor
     public static void Execute(TCpu ACpu, byte[] AProgram, TDecodedOpcode ADecoded)
     {
         var pc = ACpu.Pc;
-        var stack = ACpu.EvalStack;
-        var frame = ACpu.CurrentFrame;
 
         switch (ADecoded.Opcode)
         {
@@ -58,188 +56,200 @@ internal static class TExecutor
 
             // ----- argumentum load -----
             case TOpcode.Ldarg0:
-                LoadArg(ACpu, frame, 0);
+                LoadArg(ACpu, 0);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Ldarg1:
-                LoadArg(ACpu, frame, 1);
+                LoadArg(ACpu, 1);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Ldarg2:
-                LoadArg(ACpu, frame, 2);
+                LoadArg(ACpu, 2);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Ldarg3:
-                LoadArg(ACpu, frame, 3);
+                LoadArg(ACpu, 3);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdargS:
-                LoadArg(ACpu, frame, ADecoded.Operand);
+                LoadArg(ACpu, ADecoded.Operand);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.StargS:
-                StoreArg(ACpu, frame, ADecoded.Operand);
+                StoreArg(ACpu, ADecoded.Operand);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             // ----- lokális load -----
             case TOpcode.Ldloc0:
-                LoadLocal(ACpu, frame, 0);
+                LoadLocal(ACpu, 0);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Ldloc1:
-                LoadLocal(ACpu, frame, 1);
+                LoadLocal(ACpu, 1);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Ldloc2:
-                LoadLocal(ACpu, frame, 2);
+                LoadLocal(ACpu, 2);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Ldloc3:
-                LoadLocal(ACpu, frame, 3);
+                LoadLocal(ACpu, 3);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdlocS:
-                LoadLocal(ACpu, frame, ADecoded.Operand);
+                LoadLocal(ACpu, ADecoded.Operand);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             // ----- lokális store -----
             case TOpcode.Stloc0:
-                StoreLocal(ACpu, frame, 0);
+                StoreLocal(ACpu, 0);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Stloc1:
-                StoreLocal(ACpu, frame, 1);
+                StoreLocal(ACpu, 1);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Stloc2:
-                StoreLocal(ACpu, frame, 2);
+                StoreLocal(ACpu, 2);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.Stloc3:
-                StoreLocal(ACpu, frame, 3);
+                StoreLocal(ACpu, 3);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.StlocS:
-                StoreLocal(ACpu, frame, ADecoded.Operand);
+                StoreLocal(ACpu, ADecoded.Operand);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             // ----- konstansok -----
             case TOpcode.Ldnull:
             case TOpcode.LdcI40:
-                stack.Push(0, pc);
+                ACpu.EvalPush(0, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI4M1:
-                stack.Push(-1, pc);
+                ACpu.EvalPush(-1, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI41:
-                stack.Push(1, pc);
+                ACpu.EvalPush(1, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI42:
-                stack.Push(2, pc);
+                ACpu.EvalPush(2, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI43:
-                stack.Push(3, pc);
+                ACpu.EvalPush(3, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI44:
-                stack.Push(4, pc);
+                ACpu.EvalPush(4, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI45:
-                stack.Push(5, pc);
+                ACpu.EvalPush(5, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI46:
-                stack.Push(6, pc);
+                ACpu.EvalPush(6, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI47:
-                stack.Push(7, pc);
+                ACpu.EvalPush(7, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI48:
-                stack.Push(8, pc);
+                ACpu.EvalPush(8, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             case TOpcode.LdcI4S:
             case TOpcode.LdcI4:
-                stack.Push(ADecoded.Operand, pc);
+                ACpu.EvalPush(ADecoded.Operand, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             // ----- stack manipuláció -----
             case TOpcode.Dup:
-                stack.Dup(pc);
+            {
+                // hu: Dup: először underflow check (EvalPeek dob ha üres),
+                //     aztán overflow check (EvalPush dob ha tele).
+                // en: Dup: underflow check first (EvalPeek throws if empty),
+                //     then overflow check (EvalPush throws if full).
+                if (ACpu.EvalDepth <= 0)
+                    throw new TTrapException(TTrapReason.StackUnderflow, pc);
+
+                if (ACpu.EvalDepth >= TCpu.MaxStackDepth)
+                    throw new TTrapException(TTrapReason.StackOverflow, pc);
+
+                ACpu.EvalPush(ACpu.EvalPeek(0), pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
+            }
 
             case TOpcode.Pop:
-                stack.Pop(pc);
+                ACpu.EvalPop(pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
 
             // ----- aritmetika (binary) -----
             case TOpcode.Add:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(unchecked(a + b), pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(unchecked(a + b), pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Sub:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(unchecked(a - b), pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(unchecked(a - b), pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Mul:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(unchecked(a * b), pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(unchecked(a * b), pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Div:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
 
                 if (b == 0)
                     throw new TTrapException(TTrapReason.DivByZero, pc,
@@ -249,15 +259,15 @@ internal static class TExecutor
                     throw new TTrapException(TTrapReason.Overflow, pc,
                         $"div INT_MIN / -1 at PC=0x{pc:X4}");
 
-                stack.Push(a / b, pc);
+                ACpu.EvalPush(a / b, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Rem:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
 
                 if (b == 0)
                     throw new TTrapException(TTrapReason.DivByZero, pc,
@@ -266,62 +276,62 @@ internal static class TExecutor
                 // hu: INT_MIN % -1 → 0 (nem overflow a spec szerint).
                 // en: INT_MIN % -1 → 0 (no overflow per spec).
                 var result = (a == int.MinValue && b == -1) ? 0 : a % b;
-                stack.Push(result, pc);
+                ACpu.EvalPush(result, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.And:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(a & b, pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(a & b, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Or:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(a | b, pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(a | b, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Xor:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(a ^ b, pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(a ^ b, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Shl:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(a << (b & 31), pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(a << (b & 31), pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Shr:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(a >> (b & 31), pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(a >> (b & 31), pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.ShrUn:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
                 var logical = (int)((uint)a >> (b & 31));
-                stack.Push(logical, pc);
+                ACpu.EvalPush(logical, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
@@ -329,16 +339,16 @@ internal static class TExecutor
             // ----- aritmetika (unary) -----
             case TOpcode.Neg:
             {
-                var a = stack.Pop(pc);
-                stack.Push(unchecked(-a), pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(unchecked(-a), pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Not:
             {
-                var a = stack.Pop(pc);
-                stack.Push(~a, pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(~a, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
@@ -346,45 +356,45 @@ internal static class TExecutor
             // ----- összehasonlítások -----
             case TOpcode.Ceq:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(a == b ? 1 : 0, pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(a == b ? 1 : 0, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Cgt:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(a > b ? 1 : 0, pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(a > b ? 1 : 0, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.CgtUn:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push((uint)a > (uint)b ? 1 : 0, pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush((uint)a > (uint)b ? 1 : 0, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.Clt:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push(a < b ? 1 : 0, pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush(a < b ? 1 : 0, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
 
             case TOpcode.CltUn:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
-                stack.Push((uint)a < (uint)b ? 1 : 0, pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
+                ACpu.EvalPush((uint)a < (uint)b ? 1 : 0, pc);
                 ACpu.Pc = pc + ADecoded.LengthInBytes;
                 return;
             }
@@ -396,7 +406,7 @@ internal static class TExecutor
 
             case TOpcode.BrfalseS:
             {
-                var v = stack.Pop(pc);
+                var v = ACpu.EvalPop(pc);
 
                 if (v == 0)
                     ACpu.Pc = ComputeBranchTarget(AProgram, pc, ADecoded.LengthInBytes, ADecoded.Operand);
@@ -408,7 +418,7 @@ internal static class TExecutor
 
             case TOpcode.BrtrueS:
             {
-                var v = stack.Pop(pc);
+                var v = ACpu.EvalPop(pc);
 
                 if (v != 0)
                     ACpu.Pc = ComputeBranchTarget(AProgram, pc, ADecoded.LengthInBytes, ADecoded.Operand);
@@ -420,8 +430,8 @@ internal static class TExecutor
 
             case TOpcode.BeqS:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
 
                 if (a == b)
                     ACpu.Pc = ComputeBranchTarget(AProgram, pc, ADecoded.LengthInBytes, ADecoded.Operand);
@@ -433,8 +443,8 @@ internal static class TExecutor
 
             case TOpcode.BgeS:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
 
                 if (a >= b)
                     ACpu.Pc = ComputeBranchTarget(AProgram, pc, ADecoded.LengthInBytes, ADecoded.Operand);
@@ -446,8 +456,8 @@ internal static class TExecutor
 
             case TOpcode.BgtS:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
 
                 if (a > b)
                     ACpu.Pc = ComputeBranchTarget(AProgram, pc, ADecoded.LengthInBytes, ADecoded.Operand);
@@ -459,8 +469,8 @@ internal static class TExecutor
 
             case TOpcode.BleS:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
 
                 if (a <= b)
                     ACpu.Pc = ComputeBranchTarget(AProgram, pc, ADecoded.LengthInBytes, ADecoded.Operand);
@@ -472,8 +482,8 @@ internal static class TExecutor
 
             case TOpcode.BltS:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
 
                 if (a < b)
                     ACpu.Pc = ComputeBranchTarget(AProgram, pc, ADecoded.LengthInBytes, ADecoded.Operand);
@@ -485,8 +495,8 @@ internal static class TExecutor
 
             case TOpcode.BneUnS:
             {
-                var b = stack.Pop(pc);
-                var a = stack.Pop(pc);
+                var b = ACpu.EvalPop(pc);
+                var a = ACpu.EvalPop(pc);
 
                 if (a != b)
                     ACpu.Pc = ComputeBranchTarget(AProgram, pc, ADecoded.LengthInBytes, ADecoded.Operand);
@@ -531,17 +541,14 @@ internal static class TExecutor
     /// a hívási mélységet ellenőrizzük, létrehozzuk az új frame-et a header
     /// arg/local count-jával, majd a callee argumentumait pop-oljuk a
     /// caller eval stack-jéből (jobbról balra: TOS = utolsó arg) és
-    /// belerakjuk a callee Args tömbjébe. A return PC = a call utáni opkód
-    /// offszetje. Végül push-oljuk a frame-et és beállítjuk a PC-t a
-    /// callee body-jának első byte-jára (header után).
+    /// push-oljuk az új SRAM frame-be. A return PC = a call utáni opkód
+    /// offszetje.
     /// <br />
     /// en: Executes the <c>call</c> opcode. The 4-byte operand is the RVA
-    /// of the callee method header. After reading the header we check call
-    /// depth, create a new frame using header arg/local counts, then pop
-    /// callee arguments from the caller's eval stack (right to left: TOS =
-    /// last arg) into the callee's Args. Return PC = offset of the opcode
-    /// after the call. Finally push the frame and set PC to the first byte
-    /// of the callee body (after the header).
+    /// of the callee method header. After reading the header we pop callee
+    /// arguments from the caller's eval stack (right to left: TOS = last
+    /// arg) and push a new SRAM frame. Return PC = offset of the opcode
+    /// after the call.
     /// </summary>
     private static void ExecuteCall(TCpu ACpu, byte[] AProgram, TDecodedOpcode ADecoded, int APc)
     {
@@ -559,7 +566,7 @@ internal static class TExecutor
         var localCount = AProgram[targetRva + 2];
         var codeSize = (ushort)(AProgram[targetRva + 4] | (AProgram[targetRva + 5] << 8));
 
-        if (argCount > TFrame.MaxArgs || localCount > TFrame.MaxLocals)
+        if (argCount > TCpu.MaxArgs || localCount > TCpu.MaxLocals)
             throw new TTrapException(TTrapReason.InvalidCallTarget, APc,
                 $"call target RVA=0x{targetRva:X4} has invalid arg/local count at PC=0x{APc:X4}.");
 
@@ -567,70 +574,56 @@ internal static class TExecutor
             throw new TTrapException(TTrapReason.InvalidCallTarget, APc,
                 $"call target RVA=0x{targetRva:X4} code extends past program end at PC=0x{APc:X4}.");
 
-        var callerStack = ACpu.EvalStack;
-
         // hu: Pop az argumentumokat fordítva (TOS = utolsó arg).
         // en: Pop arguments in reverse (TOS = last arg).
         var args = new int[argCount];
 
         for (var i = argCount - 1; i >= 0; i--)
-            args[i] = callerStack.Pop(APc);
+            args[i] = ACpu.EvalPop(APc);
 
-        var calleeFrame = new TFrame(argCount, localCount, args)
-        {
-            ReturnPc = APc + ADecoded.LengthInBytes
-        };
-
-        ACpu.CallStack.Push(calleeFrame, APc);
+        // hu: Push a callee frame-et az SRAM-ba.
+        // en: Push the callee frame onto SRAM.
+        var returnPc = APc + ADecoded.LengthInBytes;
+        ACpu.PushCallFrame(returnPc, argCount, localCount, args, APc);
         ACpu.Pc = targetRva + TMethodHeader.HeaderSize;
     }
 
     /// <summary>
     /// hu: A <c>ret</c> opkód végrehajtása. Ha a callee eval stackjén
-    /// pontosan egy érték van, az lesz a return value. Pop-oljuk a frame-et;
-    /// ha üres lett a call stack (root frame ret), megállítjuk a CPU-t és
-    /// a return value-t (ha volt) a frame eval stackjén HAGYJUK — a Peek
-    /// API ezt fogja látni a teszt felé. Egyébként a return value-t a
-    /// caller eval stack-jére push-oljuk, és a PC-t visszaállítjuk a
-    /// callee return PC-jére.
+    /// legalább egy érték van, az lesz a return value. Root frame esetén
+    /// megállítjuk a CPU-t; egyébként a return value-t a caller eval
+    /// stack-jére push-oljuk.
     /// <br />
     /// en: Executes the <c>ret</c> opcode. If the callee's eval stack
-    /// holds exactly one value it becomes the return value. Pop the frame;
-    /// if the call stack is empty afterwards (root frame ret), halt the
-    /// CPU and LEAVE the return value (if any) on the popped frame's eval
-    /// stack — the Peek API will see it. Otherwise push the return value
-    /// onto the caller's eval stack and restore PC to the callee's
-    /// return PC.
+    /// holds at least one value it becomes the return value. For the root
+    /// frame we halt the CPU; otherwise the return value is pushed onto
+    /// the caller's eval stack.
     /// </summary>
     private static void ExecuteRet(TCpu ACpu, int APc)
     {
-        var callee = ACpu.CurrentFrame;
-        var calleeStack = callee.EvalStack;
-        var hasReturnValue = calleeStack.Depth >= 1;
-        var returnValue = hasReturnValue ? calleeStack.Pop(APc) : 0;
+        var hasReturnValue = ACpu.EvalDepth >= 1;
+        var returnValue = hasReturnValue ? ACpu.EvalPop(APc) : 0;
 
         // hu: Root frame esetén nem pop-olunk, hanem leállítjuk a CPU-t és
         //     a return value-t a frame stackjére visszahelyezzük, hogy a
         //     teszt Peek-kel láthassa.
         // en: For the root frame we don't pop; we halt the CPU and put the
         //     return value back on the frame stack so tests can Peek it.
-        if (ACpu.CallStack.Depth == 1)
+        if (ACpu.CallDepth == 1)
         {
             if (hasReturnValue)
-                calleeStack.Push(returnValue, APc);
+                ACpu.EvalPush(returnValue, APc);
 
             ACpu.Halt();
             return;
         }
 
-        ACpu.CallStack.Pop();
-
-        var caller = ACpu.CurrentFrame;
+        var returnPc = ACpu.PopCallFrame();
 
         if (hasReturnValue)
-            caller.EvalStack.Push(returnValue, APc);
+            ACpu.EvalPush(returnValue, APc);
 
-        ACpu.Pc = callee.ReturnPc;
+        ACpu.Pc = returnPc;
     }
 
     /// <summary>
@@ -654,7 +647,7 @@ internal static class TExecutor
             throw new TTrapException(TTrapReason.InvalidMemoryAccess, APc,
                 $"ldind.i4 with no data memory at PC=0x{APc:X4}.");
 
-        var addr = ACpu.EvalStack.Pop(APc);
+        var addr = ACpu.EvalPop(APc);
 
         if (addr < 0 || (long)addr + 4 > data.Length)
             throw new TTrapException(TTrapReason.InvalidMemoryAccess, APc,
@@ -665,7 +658,7 @@ internal static class TExecutor
             | (data[addr + 2] << 16)
             | (data[addr + 3] << 24);
 
-        ACpu.EvalStack.Push(value, APc);
+        ACpu.EvalPush(value, APc);
         ACpu.Pc = APc + 1;
     }
 
@@ -686,9 +679,8 @@ internal static class TExecutor
             throw new TTrapException(TTrapReason.InvalidMemoryAccess, APc,
                 $"stind.i4 with no data memory at PC=0x{APc:X4}.");
 
-        var stack = ACpu.EvalStack;
-        var value = stack.Pop(APc);
-        var addr = stack.Pop(APc);
+        var value = ACpu.EvalPop(APc);
+        var addr = ACpu.EvalPop(APc);
 
         if (addr < 0 || (long)addr + 4 > data.Length)
             throw new TTrapException(TTrapReason.InvalidMemoryAccess, APc,
@@ -734,13 +726,14 @@ internal static class TExecutor
     /// en: Pushes a local variable onto the stack. Invalid index raises
     /// <see cref="TTrapReason.InvalidLocal"/>.
     /// </summary>
-    private static void LoadLocal(TCpu ACpu, TFrame AFrame, int AIndex)
+    private static void LoadLocal(TCpu ACpu, int AIndex)
     {
-        if (AIndex < 0 || AIndex >= TFrame.MaxLocals || AIndex >= AFrame.LocalCount)
+        if (AIndex < 0 || AIndex >= TCpu.MaxLocals || AIndex >= ACpu.LocalCount)
             throw new TTrapException(TTrapReason.InvalidLocal, ACpu.Pc,
                 $"Invalid local index {AIndex} at PC=0x{ACpu.Pc:X4}");
 
-        ACpu.EvalStack.Push(AFrame.Locals[AIndex], ACpu.Pc);
+        var value = ACpu.LoadLocal(AIndex, ACpu.Pc);
+        ACpu.EvalPush(value, ACpu.Pc);
     }
 
     /// <summary>
@@ -754,14 +747,16 @@ internal static class TExecutor
     /// (<see cref="TTrapReason.StackUnderflow"/>). An invalid index always
     /// takes precedence over stack underflow — see <c>docs/ISA-CIL-T0.md</c>.
     /// </summary>
-    private static void StoreLocal(TCpu ACpu, TFrame AFrame, int AIndex)
+    private static void StoreLocal(TCpu ACpu, int AIndex)
     {
-        if (AIndex < 0 || AIndex >= TFrame.MaxLocals || AIndex >= AFrame.LocalCount)
+        // hu: Index check BEFORE pop (ISA spec trap sorrend)
+        // en: Index check BEFORE pop (ISA spec trap ordering)
+        if (AIndex < 0 || AIndex >= TCpu.MaxLocals || AIndex >= ACpu.LocalCount)
             throw new TTrapException(TTrapReason.InvalidLocal, ACpu.Pc,
                 $"Invalid local index {AIndex} at PC=0x{ACpu.Pc:X4}");
 
-        var value = ACpu.EvalStack.Pop(ACpu.Pc);
-        AFrame.Locals[AIndex] = value;
+        var value = ACpu.EvalPop(ACpu.Pc);
+        ACpu.StoreLocal(AIndex, value, ACpu.Pc);
     }
 
     /// <summary>
@@ -771,13 +766,14 @@ internal static class TExecutor
     /// en: Pushes an argument onto the stack. Invalid index raises
     /// <see cref="TTrapReason.InvalidArg"/>.
     /// </summary>
-    private static void LoadArg(TCpu ACpu, TFrame AFrame, int AIndex)
+    private static void LoadArg(TCpu ACpu, int AIndex)
     {
-        if (AIndex < 0 || AIndex >= TFrame.MaxArgs || AIndex >= AFrame.ArgCount)
+        if (AIndex < 0 || AIndex >= TCpu.MaxArgs || AIndex >= ACpu.ArgCount)
             throw new TTrapException(TTrapReason.InvalidArg, ACpu.Pc,
                 $"Invalid arg index {AIndex} at PC=0x{ACpu.Pc:X4}");
 
-        ACpu.EvalStack.Push(AFrame.Args[AIndex], ACpu.Pc);
+        var value = ACpu.LoadArg(AIndex, ACpu.Pc);
+        ACpu.EvalPush(value, ACpu.Pc);
     }
 
     /// <summary>
@@ -787,13 +783,15 @@ internal static class TExecutor
     /// en: Pops TOS into an argument. <b>Trap ordering:</b> index check first
     /// (<see cref="TTrapReason.InvalidArg"/>), then pop.
     /// </summary>
-    private static void StoreArg(TCpu ACpu, TFrame AFrame, int AIndex)
+    private static void StoreArg(TCpu ACpu, int AIndex)
     {
-        if (AIndex < 0 || AIndex >= TFrame.MaxArgs || AIndex >= AFrame.ArgCount)
+        // hu: Index check BEFORE pop (ISA spec trap sorrend)
+        // en: Index check BEFORE pop (ISA spec trap ordering)
+        if (AIndex < 0 || AIndex >= TCpu.MaxArgs || AIndex >= ACpu.ArgCount)
             throw new TTrapException(TTrapReason.InvalidArg, ACpu.Pc,
                 $"Invalid arg index {AIndex} at PC=0x{ACpu.Pc:X4}");
 
-        var value = ACpu.EvalStack.Pop(ACpu.Pc);
-        AFrame.Args[AIndex] = value;
+        var value = ACpu.EvalPop(ACpu.Pc);
+        ACpu.StoreArg(AIndex, value, ACpu.Pc);
     }
 }

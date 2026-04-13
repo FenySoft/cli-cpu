@@ -513,53 +513,105 @@ A TOS cache felé és felülről spillt automatikusan a hardver intéz. A progra
 
 ### Frame felépítés
 
-A CLI-CPU frame modellje **nem a hagyományos C/x86 stack frame** (frame pointer chain + shared stack), hanem az **ECMA-335 logikai modellje**: minden hívási keret egy önálló egység, saját args, locals és eval stack területtel. A call stack egy **tömb** (nem láncolt lista), és nincs saved frame pointer / saved stack pointer — a hardver a call stack indexszel navigál.
+A CLI-CPU-n a CIL **a gépi kód** — nincs JIT, nincs interpreter, nincs köztes fordítás. Amit a Roslyn generál (method header + opkódok), azt a hardver **közvetlenül végrehajtja**. Ezért a frame struktúrát nem a hardver tervező dönti el szabadon, hanem **a Roslyn kimenete rögzíti**:
+
+- A **method header** (`arg_count`, `local_count`, `max_stack`) meghatározza a frame méretét
+- Az **opkódok** (`ldarg.N`, `ldloc.N`, `stloc.N`) indexelik a slotokat
+- A hardver feladata: a header-ből **kiszámítani a fizikai SRAM címeket**
+
+Ez különbözik a hagyományos .NET-től, ahol a JIT szabadon dönthet (regiszterbe teszi a lokálist, átrendezi a frame-et, inline-ol). A CLI-CPU-n ilyen szabadság nincs.
+
+### Hardveres frame layout (F2+ RTL cél)
+
+A `call` mikrokód a method header-ből kiszámítja a frame méretét, és az SP-t tolja:
 
 ```
- Call Stack (tömb, max 512 mélység):
- ┌──────────────────────────────────────────────────────────────┐
- │ [0] root frame                                               │
- │ [1] callee frame                                             │
- │ [2] callee-of-callee frame   ← aktuális (Top)               │
- │ ...                                                          │
- └──────────────────────────────────────────────────────────────┘
+ Stack SRAM (közös, 16 KB Nano / 64-256 KB Rich):
 
- Egy frame tartalma:
- ┌───────────────────────┐
- │   return PC           │   ← PC + len(call utasítás), a ret visszatér ide
- ├───────────────────────┤
- │   arg 0               │   ← a caller eval stack-jéről pop-olva
- │   arg 1               │      (jobbról balra: TOS = utolsó arg)
- │   ...                 │      max 16, fix tömb
- ├───────────────────────┤
- │   local 0             │   ← zero-inicializálva (.locals init)
- │   local 1             │      max 16, fix tömb
- │   ...                 │
- ├───────────────────────┤
- │   eval stack          │   ← SAJÁT eval stack (nem shared!)
- │   (max 64 mélység)    │      a TOS cache a felső 4-8 elemet
- │                       │      regiszterekben tartja,
- │                       │      a többi SRAM-ba spillel
- └───────────────────────┘
+                          A frame méret a header-ből:
+                          frame_size = 4 + arg_count×4 + local_count×4 + max_stack×4
 
- Nincs saved frame pointer — a call stack tömb-index alapú.
- Nincs saved stack pointer — minden frame saját eval stack-et kap.
+ ┌─────────────────────────────────────────────────────┐
+ │                                                     │
+ │  Frame 0 (root):  Add(a, b) — 2 arg, 0 local, 2 stack  │
+ │  ┌──────────────────────────────────────┐           │
+ │  │ [SP₀+0]   return PC                 │  4 byte   │
+ │  │ [SP₀+4]   arg[0]                    │  4 byte   │
+ │  │ [SP₀+8]   arg[1]                    │  4 byte   │
+ │  │ [SP₀+12]  eval[0]  ─┐               │           │
+ │  │ [SP₀+16]  eval[1]   │ TOS cache-ből │  8 byte   │
+ │  └──────────────────────┘ spillelve     │           │
+ │  Frame méret: 4 + 2×4 + 0×4 + 2×4 = 20 byte        │
+ │                                                     │
+ │  Frame 1 (callee):  Gcd(a, b) — 2 arg, 1 local, 3 stack │
+ │  ┌──────────────────────────────────────┐           │
+ │  │ [SP₁+0]   return PC                 │  4 byte   │
+ │  │ [SP₁+4]   arg[0]                    │  4 byte   │
+ │  │ [SP₁+8]   arg[1]                    │  4 byte   │
+ │  │ [SP₁+12]  local[0]                  │  4 byte   │
+ │  │ [SP₁+16]  eval[0]  ─┐               │           │
+ │  │ [SP₁+20]  eval[1]   │ TOS cache-ből │ 12 byte   │
+ │  │ [SP₁+24]  eval[2]  ─┘ spillelve     │           │
+ │  └──────────────────────────────────────┘           │
+ │  Frame méret: 4 + 2×4 + 1×4 + 3×4 = 28 byte        │
+ │                                                     │
+ │  [szabad SRAM]                                      │
+ │                                                     │
+ └─────────────────────────────────────────────────────┘
+ SP ──► felfelé nő
 ```
+
+A cím számítás a `call` mikrokódban:
+
+```
+ ldarg.N   →  SRAM olvasás [frame_base + 4 + N×4]
+ starg.N   →  SRAM írás    [frame_base + 4 + N×4]
+ ldloc.N   →  SRAM olvasás [frame_base + 4 + arg_count×4 + N×4]
+ stloc.N   →  SRAM írás    [frame_base + 4 + arg_count×4 + N×4]
+```
+
+A `frame_base` és az `arg_count` a `call` mikrokódban beállított regiszterek — az opkód végrehajtáskor már rendelkezésre állnak, nincs futásidejű header-olvasás.
+
+### Kapacitás
+
+```
+ Fibonacci(20) rekurzív: 21 frame × ~16 byte = ~336 byte
+ Gcd iteratív:           1 frame × ~28 byte  = ~28 byte
+ Worst case (16 arg, 16 local, 64 stack): 1 frame = 388 byte
+
+ 16 KB Nano SRAM-ban:
+   - Tipikus frame (~20 byte): ~800 frame mélység ← bőven elég
+   - Worst case frame (388 byte): ~41 frame mélység ← szűkös, de ritka
+```
+
+### Szimulátor vs hardver modell
+
+| | Szimulátor (F1, golden model) | Hardver (F2+ RTL) |
+|---|---|---|
+| `ldarg.1` | `frame.Args[1]` — C# tömb index | `SRAM[frame_base + 4 + 1×4]` |
+| Frame méret | Fix 388 byte (16+16+64 slot) | **Header-ből számított** (változó) |
+| Allokáció | `new TFrame()` — C# heap | SP növelés frame mérettel |
+| Felszabadítás | C# GC | SP csökkentés |
+| Call stack | `TFrame?[]` tömb, index-alapú | SP-alapú, a SRAM-ban egymásra pakolva |
+
+A szimulátor **viselkedésben** helyes (a `ldloc.2` a 2. lokálist adja vissza) — az F2 RTL cocotb tesztjei ezt a kimenetet hasonlítják. A belső reprezentáció eltérhet, a **logikai eredmény** nem.
 
 **A `call` mikrokód szekvenciája:**
-1. Header olvasás a target RVA-ról (arg count, local count, code size validáció)
-2. Argumentumok pop-olása a **caller** eval stack-jéről (fordított sorrendben)
-3. Új frame létrehozása (args, locals zeroed, return PC beállítva)
-4. Frame push a call stack-re
-5. PC beállítása a callee body első byte-jára (header után)
+1. Header olvasás a target RVA-ról (arg_count, local_count, max_stack, code_size validáció)
+2. Frame méret számítás: `4 + arg_count×4 + local_count×4 + max_stack×4`
+3. SP növelése a frame mérettel
+4. Return PC írása `[new_SP + 0]`-ra
+5. Argumentumok pop-olása a **caller** eval stack-jéről → `[new_SP + 4 + i×4]`
+6. Locals nullázása → `[new_SP + 4 + arg_count×4 + i×4]`
+7. `frame_base` és `arg_count` regiszterek beállítása (a ldarg/ldloc címszámításhoz)
+8. PC beállítása a callee body első byte-jára (header után)
 
 **A `ret` mikrokód szekvenciája:**
-1. Return value pop-olása a **callee** eval stack-jéről (ha van)
-2. Frame pop a call stack-ról
-3. Return value push-olása a **caller** eval stack-jére
-4. PC visszaállítása a frame return PC-jére
-
-**Megjegyzés az ECMA-335 konformitásról:** Az ECMA-335 (III.1.7.1) **nem ír elő** konkrét memória layout-ot a frame-re — csak a logikai tartalmat (incoming args, locals, eval stack, control flow info). A CLI-CPU implementáció ezt a logikai modellt követi fix-méretű tömbökkel, ami a hardveres megvalósítást egyszerűsíti (nincs dinamikus allokáció, nincs pointer követés).
+1. Return value pop-olása a callee eval stack-jéről (TOS cache-ből, ha van)
+2. SP visszaállítása a frame_base-re (a teljes frame felszabadul)
+3. `frame_base` és `arg_count` visszaállítása a caller értékeire
+4. Return value push-olása a **caller** eval stack-jére
+5. PC visszaállítása a mentett return PC-re
 
 ## Dekódolási stratégia
 

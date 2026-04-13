@@ -116,19 +116,19 @@ public readonly record struct TMethodHeader(
         var maxStack = AProgram[AHeaderRva + 3];
         var codeSize = (ushort)(AProgram[AHeaderRva + 4] | (AProgram[AHeaderRva + 5] << 8));
 
-        if (argCount > TFrame.MaxArgs)
+        if (argCount > TCpu.MaxArgs)
             throw new ArgumentException(
-                $"Method header arg_count {argCount} exceeds CIL-T0 maximum {TFrame.MaxArgs} at offset 0x{AHeaderRva:X4}.",
+                $"Method header arg_count {argCount} exceeds CIL-T0 maximum {TCpu.MaxArgs} at offset 0x{AHeaderRva:X4}.",
                 nameof(AProgram));
 
-        if (localCount > TFrame.MaxLocals)
+        if (localCount > TCpu.MaxLocals)
             throw new ArgumentException(
-                $"Method header local_count {localCount} exceeds CIL-T0 maximum {TFrame.MaxLocals} at offset 0x{AHeaderRva:X4}.",
+                $"Method header local_count {localCount} exceeds CIL-T0 maximum {TCpu.MaxLocals} at offset 0x{AHeaderRva:X4}.",
                 nameof(AProgram));
 
-        if (maxStack > TEvaluationStack.MaxDepth)
+        if (maxStack > TCpu.MaxStackDepth)
             throw new ArgumentException(
-                $"Method header max_stack {maxStack} exceeds CIL-T0 maximum {TEvaluationStack.MaxDepth} at offset 0x{AHeaderRva:X4}.",
+                $"Method header max_stack {maxStack} exceeds CIL-T0 maximum {TCpu.MaxStackDepth} at offset 0x{AHeaderRva:X4}.",
                 nameof(AProgram));
 
         return new TMethodHeader(magic, argCount, localCount, maxStack, codeSize);
