@@ -431,7 +431,7 @@ When any detector fires, it triggers **immediate key zeroization**: all sensitiv
 | **DPA countermeasures** (overhead on crypto) | ~8k |
 | **Total for the Secure Edition** | **~264k std cell** |
 
-This is **~32% larger** than the standard F6 Cognitive Fabric chip (~200k). It **fits** within a ChipIgnite MPW (~10 mm2 user area), or an IHP SG13G2 MPW (~15 mm2).
+This is **~32% larger** than the standard F6 Cognitive Fabric chip (~200k). It **fits** within a ChipIgnite OpenFrame MPW (~15 mm2 user area), or an IHP SG13G2 MPW (~15 mm2).
 
 ## Certification Path <a name="certification-path"></a>
 

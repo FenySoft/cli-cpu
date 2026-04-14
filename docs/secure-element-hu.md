@@ -431,7 +431,7 @@ A **Differential Power Analysis (DPA)** támadás méri a chip fogyasztását kr
 | **DPA countermeasures** (overhead a crypto-n) | ~8k |
 | **Összesen a Secure Edition-nek** | **~264k std cell** |
 
-Ez **~32%-kal nagyobb**, mint a standard F6 Cognitive Fabric chip (~200k). **Belefér** egy ChipIgnite MPW-ba (~10 mm² user area), vagy egy IHP SG13G2 MPW-ba (~15 mm²).
+Ez **~32%-kal nagyobb**, mint a standard F6 Cognitive Fabric chip (~200k). **Belefér** egy ChipIgnite OpenFrame MPW-ba (~15 mm² user area), vagy egy IHP SG13G2 MPW-ba (~15 mm²).
 
 ## Tanúsítási útvonal <a name="tanusitasi-utvonal"></a>
 

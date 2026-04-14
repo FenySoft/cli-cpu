@@ -79,13 +79,13 @@ Az F5 fázistól a CLI-CPU **heterogén multi-core** architektúrát használ, a
 | Méret | ~10k std cell | ~80k std cell |
 | Funkciók | Integer, stack cache, mailbox | Nano + objektum modell + GC + FPU + kivételek + generikusok |
 | Szerep | Worker / neuron / filter / egyszerű actor | Supervisor / orchestrator / komplex domain logika |
-| Tipikus arány F6-on | **~26 db** (sok, 3 board-on elosztva) | **2 db** (kevés) |
+| Tipikus arány F6-on | **16 db** (worker-ek) | **6 db** (supervisor-ok) + **1 Secure Core** |
 
 A C# programok **`[RunsOn(CoreType.Nano)]`** vagy **`[RunsOn(CoreType.Rich)]`** attribútummal jelölik, hogy melyik osztály melyik core-ra fordul. A Roslyn source generator build-time ellenőrzi, hogy a Nano-jelölt kód **csak** CIL-T0 opkódokat használ.
 
 ## Státusz
 
-**F1.5 — KÉSZ.** A C# referencia szimulátor (48/48 CIL-T0 opkód, 267 zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
+**F1.5 — KÉSZ.** A C# referencia szimulátor (48/48 CIL-T0 opkód, 250+ zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
 
 Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 

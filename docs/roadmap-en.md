@@ -60,7 +60,7 @@ The CLI-CPU project is built in **seven phases**, from the specification documen
 - `src/CilCpu.Linker/` — Roslyn .dll -> CIL-T0 binary linker (transitive call-target discovery, token-to-RVA resolution, opcode compatibility checking) — **done**
 - `src/CilCpu.Sim.Runner/` — CLI runner tool (`run` and `link` commands, trap handling, TRunResult) — **done**
 - `samples/PureMath/` — C# sample program (Add, Fibonacci, Factorial, GCD, IsPrime, etc.) — **done**
-- `src/CilCpu.Sim.Tests/` — extended with linker + runner tests — **done, 267 green tests**
+- `src/CilCpu.Sim.Tests/` — extended with linker + runner tests — **done, 259 green tests**
 
 **CLI usage:**
 ```bash
@@ -294,12 +294,12 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 #### F6-Silicon Zero — "Cognitive Fabric Zero" (IHP 3 mm², first heterogeneous silicon)
 
-**Goal:** The first **heterogeneous Cognitive Fabric silicon** — **1 Rich + 8 Nano cores, 48 KB on-chip SRAM, 3 mm² IHP SG13G2**. This is the stepping stone between the F3 single-core Tiny Tapeout and the full "Cognitive Fabric One" (10 mm²). **Potentially achievable at EUR0 cost** via the IHP FMD-QNC free research MPW program.
+**Goal:** The first **heterogeneous Cognitive Fabric silicon** — **1 Rich + 8 Nano cores, 48 KB on-chip SRAM, 3 mm² IHP SG13G2**. This is the stepping stone between the F3 single-core Tiny Tapeout and the full "Cognitive Fabric One" (15 mm²). **Potentially achievable at EUR0 cost** via the IHP FMD-QNC free research MPW program.
 
 **Why a standalone milestone:**
 - **F3** (TT, 1 Nano) proves the core works in silicon
 - **Cognitive Fabric Zero** (IHP, 1R+8N) proves that **heterogeneous multi-core works in silicon** — supervisor + worker, mailbox mesh, sleep/wake, Neuron OS foundations
-- **Cognitive Fabric One** (ChipIgnite, 6R+17N+1S) proves at full scale — with benchmarks and publication
+- **Cognitive Fabric One** (ChipIgnite, 6R+16N+1S) proves at full scale — with benchmarks and publication
 
 **Configuration (3 mm² IHP SG13G2):**
 
@@ -329,17 +329,17 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 #### F6-Silicon One — "Cognitive Fabric One" MPW tape-out (the full demonstration)
 
-**Goal:** The **"Cognitive Fabric One"** — the heterogeneous design verified in F6-FPGA (on A7-Lite 200T multi-board mesh) and optimized to the sweet spot, **on real silicon**: **6 Rich + 17 Nano + 1 Secure core, 152 KB on-chip SRAM, 10 mm² Sky130**. This chip proves that on the same silicon, the Cognitive Fabric paradigm **performs 5–23x more useful work** on actor-based workloads than a traditional multi-core CPU — while being deterministic, hardware-isolated, and linearly scalable. Detailed chip vision and benchmark comparison: [`docs/architecture-en.md`](architecture-en.md) "Cognitive Fabric One" section. **Prerequisite: all F6-FPGA done criteria are met** — silicon tape-out cannot begin without FPGA verification.
+**Goal:** The **"Cognitive Fabric One"** — the heterogeneous design verified in F6-FPGA (on A7-Lite 200T multi-board mesh) and optimized to the sweet spot, **on real silicon**: **6 Rich + 16 Nano + 1 Secure core, 160 KB on-chip SRAM, 15 mm² Sky130 (OpenFrame)**. This chip proves that on the same silicon, the Cognitive Fabric paradigm **performs 5–22x more useful work** on actor-based workloads than a traditional multi-core CPU — while being deterministic, hardware-isolated, and linearly scalable. Detailed chip vision and benchmark comparison: [`docs/architecture-en.md`](architecture-en.md) "Cognitive Fabric One" section. **Prerequisite: all F6-FPGA done criteria are met** — silicon tape-out cannot begin without FPGA verification.
 
 **When it starts:** **Only after all F6-FPGA done criteria are met**, and only when at least one of the following is true:
 - The project has **secured funding or an industry partner** to cover the tape-out
 - A **commercial product roadmap** ([F6.5 Secure Edition](#f65--secure-edition-parallel-tape-out-optional), F7 demo hardware) has a **silicon prerequisite**
 - Measuring **real power efficiency** and **>500 MHz clock** is **critical** for the next milestone
 
-**The silicon target builds on the FPGA-verified configuration:** the (Rich, Nano) sweet spot selected from the F6-FPGA multi-board sweep — expected to be **6 Rich + 17 Nano + 1 Secure** (as verified in the multi-board mesh) — goes to tape-out on a single chip. **On ASIC, cores are smaller** (std cell vs FPGA LUT), so the configuration verified across multiple boards **fits on a single silicon chip**, and can optionally **scale up**, but only as a straightforward extension of the verified router and mesh topology.
+**The silicon target builds on the FPGA-verified configuration:** the (Rich, Nano) sweet spot selected from the F6-FPGA multi-board sweep — expected to be **6 Rich + 16 Nano + 1 Secure** (as verified in the multi-board mesh) — goes to tape-out on a single chip. **On ASIC, cores are smaller** (std cell vs FPGA LUT), so the configuration verified across multiple boards **fits on a single silicon chip**, and can optionally **scale up**, but only as a straightforward extension of the verified router and mesh topology.
 
 **Platform decision (before F6-Silicon starts):**
-- **Sky130 @ Caravel (eFabless ChipIgnite)** — 10 mm² user area, 38 GPIO, ~$14,950 (2026 price), 100 QFN chips + eval board, ~5-month turnaround. The **OpenFrame** variant offers 15 mm² with 44 GPIOs.
+- **Sky130 @ eFabless ChipIgnite** — the **Caravel** harness offers 10 mm² user area, 38 GPIO; the **OpenFrame** harness offers **15 mm²**, 44 GPIO. ~$14,950 (2026 price), 100 QFN chips + eval board, ~5-month turnaround. **The reference configuration (6R+16N+1S) targets OpenFrame.**
 - **IHP SG13G2 MPW** — European, ~EUR1,500/mm² (standard) or **EUR0** (FMD-QNC free research program, for open-source designs). EUR4,500 for 3 mm²; schedule: 2026 March, October, November.
 - **Google Open MPW** — free shuttle (when available), Sky130, Caravel harness. Not regular, but CLI-CPU's open-source status makes it a strong candidate.
 - **Funding:** NLnet NGI Zero Commons Fund (EUR5K–EUR50K, next deadline: June 1, 2026), community crowdfunding, industry partner.
@@ -371,11 +371,11 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - **SNN benchmark** — LIF/Izhikevich network, linear scaling demonstrated
 - **Power/performance measurement** — on event-driven workloads, idle power measurement (sleeping cores), compared against ARM Cortex-M4 / RISC-V RV32
 - **Fault tolerance demo** — worker crash -> supervisor restart, the system does not halt
-- **Publication material** — benchmark report, the "Cognitive Fabric One" narrative: *"5–23x more useful work on the same silicon for actor-based workloads"*
+- **Publication material** — benchmark report, the "Cognitive Fabric One" narrative: *"5–22x more useful work on the same silicon for actor-based workloads"*
 
 **Dependency:** **F6-FPGA done** (all done criteria met), sweet spot selected, multi-configuration report available.
 
-**Cost estimate:** ~$14,950 (eFabless ChipIgnite, 10 mm², 100 QFN chips + eval board), or ~EUR4,500 (IHP SG13G2 3 mm², smaller configuration: 1R+8N), or **EUR0** (IHP free research MPW / Google Open MPW, if available). **NLnet NGI Zero Commons Fund** grant could cover the entire F6-Silicon (EUR5K–EUR50K).
+**Cost estimate:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chips + eval board), or ~EUR4,500 (IHP SG13G2 3 mm², smaller configuration: 1R+8N), or **EUR0** (IHP free research MPW / Google Open MPW, if available). **NLnet NGI Zero Commons Fund** grant could cover the entire F6-Silicon (EUR5K–EUR50K).
 
 ---
 
@@ -398,7 +398,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Estimated additional design effort:** ~30-50 engineer-months (relative to F6), for a 3-5 person team ~1-1.5 years.
 
-**Estimated additional area:** ~64k std cells on Sky130 (~32% increase over F6's ~200k). **Fits** in a ChipIgnite MPW (~10 mm²) or an IHP SG13G2 MPW (~15 mm²).
+**Estimated additional area:** ~64k std cells on Sky130 (~32% increase over F6's ~200k). **Fits** in a ChipIgnite OpenFrame MPW (~15 mm²) or an IHP SG13G2 MPW (~15 mm²).
 
 **Done criteria:**
 - F6.5 tape-out successfully completed
@@ -481,7 +481,7 @@ F0 ──► F1 ──► F2 ──► F3 ──┘──► F4 ──►──�
                                                         "Cognitive
                                                          Fabric One"
                                                         (ChipIgnite 10mm²,
-                                                         6R+17N+1S, ~$15K)
+                                                         6R+16N+1S, ~$15K)
                                                                │
                                                                ▼
                                                           F6.5 ──► Secure Edition
@@ -521,7 +521,7 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 
 **F1 — C# reference simulator closed.** The `src/CilCpu.Sim` and `src/CilCpu.Sim.Tests` projects implement all **48 opcodes** specified by the CIL-T0 spec, with every hardware trap tested. The **F1 golden reference**: `Fibonacci(20) = 6765` green. Development took place across **4 iterations** with strict TDD, each iteration followed by a Devil's Advocate review.
 
-**F1.5 — Linker, Runner, Samples closed.** The `CilCpu.Linker` Roslyn .dll -> CIL-T0 pipeline, the `CilCpu.Sim.Runner` CLI runner tool (`run` / `link` commands), and the `samples/PureMath` sample program are done. **267 green xUnit tests**, **0 warnings, 0 errors**. The full pipeline (C# -> Roslyn -> linker -> simulator) is end-to-end tested, developed via TDD, with Devil's Advocate review.
+**F1.5 — Linker, Runner, Samples closed.** The `CilCpu.Linker` Roslyn .dll -> CIL-T0 pipeline, the `CilCpu.Sim.Runner` CLI runner tool (`run` / `link` commands), and the `samples/PureMath` sample program are done. **259 green xUnit tests**, **0 warnings, 0 errors**. The full pipeline (C# -> Roslyn -> linker -> simulator) is end-to-end tested, developed via TDD, with Devil's Advocate review.
 
 **Next substantive step:** **F2 — RTL** kickoff (Verilog or Amaranth HDL decision, cocotb testbench infrastructure).
 
@@ -552,7 +552,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 |----------|--------|--------|
 | **A: Out of pocket** | ~EUR2,400 | 3x A7-Lite 200T (F4–F6 FPGA) + 1x TT 16 tiles (F3) + bring-up |
 | **B: NLnet EUR15K** | ~EUR15K | Scenario A + IHP "Cognitive Fabric Zero" (1R+8N, 3 mm²) + engineering tools |
-| **C: NLnet EUR30K** | ~EUR30K | Scenario B + ChipIgnite "Cognitive Fabric One" (6R+17N+1S, 10 mm²) |
+| **C: NLnet EUR30K** | ~EUR30K | Scenario B + ChipIgnite "Cognitive Fabric One" (6R+16N+1S, 15 mm²) |
 | **D: NLnet EUR50K** | ~EUR50K | Scenario C + 2nd tape-out iteration + conference/publication + subcontracted engineering work |
 
 ### Schedule

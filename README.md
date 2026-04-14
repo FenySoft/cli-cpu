@@ -79,13 +79,13 @@ Starting from phase F5, CLI-CPU employs a **heterogeneous multi-core** architect
 | Size | ~10k std cells | ~80k std cells |
 | Features | Integer, stack cache, mailbox | Nano + object model + GC + FPU + exceptions + generics |
 | Role | Worker / neuron / filter / simple actor | Supervisor / orchestrator / complex domain logic |
-| Typical count on F6 | **~26** (many, distributed across 3 boards) | **2** (few) |
+| Typical count on F6 | **16** (workers) | **6** (supervisors) + **1 Secure Core** |
 
 C# programs use **`[RunsOn(CoreType.Nano)]`** or **`[RunsOn(CoreType.Rich)]`** attributes to indicate which class targets which core type. A Roslyn source generator verifies at build time that Nano-targeted code uses **only** CIL-T0 opcodes.
 
 ## Status
 
-**F1.5 -- DONE.** The C# reference simulator (48/48 CIL-T0 opcodes, 267 green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
+**F1.5 -- DONE.** The C# reference simulator (48/48 CIL-T0 opcodes, 250+ green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
 
 See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 

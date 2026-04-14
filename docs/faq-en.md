@@ -292,7 +292,7 @@ A physical core's `private SRAM` holds **runtime + multiple actor states**:
 |  +--------------------------+  |
 |                                |
 |  +--------------------------+  |
-|  |  Private SRAM: 16 KB     |  |
+|  |  Private SRAM: 4 KB      |  |
 |  |  +------------------+    |  |
 |  |  | Actor runtime    |    |  |
 |  |  +------------------+    |  |
@@ -324,10 +324,10 @@ This is exactly like an **Akka.NET / Erlang runtime**, but with **hardware mailb
 
 The hard constraint is the private SRAM size. The runtime itself uses ~2-3 KB (Nano) or ~10-20 KB (Rich), with the remainder available for actors:
 
-**Nano core (16 KB private SRAM):**
-- Very small actor (~50-100 bytes) --> **~100-200 actors**
-- Average actor (~500 bytes) --> **~25-30 actors**
-- Large-state actor (~2 KB) --> **~6-7 actors**
+**Nano core (4 KB private SRAM):**
+- Very small actor (~50-100 bytes) --> **~10-20 actors**
+- Average actor (~500 bytes) --> **~2-3 actors**
+- Large-state actor (~2 KB) --> **~1 actor**
 
 **Rich core (64-256 KB private SRAM + heap):**
 - Simple actor (~200-500 bytes) --> **~100-500 actors**

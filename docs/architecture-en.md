@@ -6,7 +6,7 @@
 
 This document describes the CLI-CPU **microarchitecture** at a high level: the stack machine model, the pipeline, the memory map, the decoding strategy, hardware support for GC and exception handling, and the techniques adopted from predecessor projects (picoJava, Jazelle, Transmeta).
 
-> **Note:** This architecture is built incrementally across phases F0–F7. The full feature set described here will be completed in the **F6-Silicon "Cognitive Fabric One"** chip (ChipIgnite or IHP MPW, 6R+16N+1S, 10 mm²). **Tiny Tapeout (F3)** implements only the single-core CIL-T0 subset, described in a separate document (`ISA-CIL-T0.md`). The "Cognitive Fabric One" section records the concrete reference chip vision and comparison with conventional multi-core CPUs.
+> **Note:** This architecture is built incrementally across phases F0–F7. The full feature set described here will be completed in the **F6-Silicon "Cognitive Fabric One"** chip (ChipIgnite or IHP MPW, 6R+16N+1S, 15 mm²). **Tiny Tapeout (F3)** implements only the single-core CIL-T0 subset, described in a separate document (`ISA-CIL-T0.md`). The "Cognitive Fabric One" section records the concrete reference chip vision and comparison with conventional multi-core CPUs.
 
 ## Strategic positioning: Cognitive Fabric
 
@@ -148,7 +148,7 @@ RISC-V has **two bad options** for .NET code: interpreter (10-50x slower) or AOT
 
 1. **CIL is the native ISA.** The CPU's fetch unit reads the CIL bytes emitted by Roslyn/ilasm directly. There is no JIT, no AOT, no interpreter layer. The CIL bytes in memory **remain unchanged**.
 2. **Stack machine with Top-of-Stack Caching.** Externally a pure ECMA-335 evaluation stack; internally, the top 4-8 stack elements live in physical registers, the rest spills to RAM. This is the lesson from picoJava and HotSpot.
-3. **Harvard model with external memory.** Separate QSPI code flash and separate QSPI PSRAM for data. On-chip SRAM is used exclusively as cache.
+3. **Harvard model with external memory.** Separate code flash and separate PSRAM for data (F3–F5: QSPI, CF One: shared OPI bus). On-chip SRAM is used exclusively as cache.
 4. **Hybrid decoding.** Simple opcodes (~75%) through direct hardware, 1 cycle. Complex opcodes (~25%) through microcode ROM, multiple cycles.
 5. **Managed memory safety in silicon.** The GC write barrier, stack bounds check, branch target validation, type check — all are hardware side-effects, not software runtime tasks.
 6. **Shared-nothing multi-core.** From phase F4 onward, multiple cores operate together on a single chip, **without shared memory**. Each core has its own local SRAM and communicates exclusively through **mailbox-based messages**. This automatically eliminates cache coherence, lock contention, and memory ordering problems.
@@ -310,7 +310,7 @@ The compiler verifies that `[RunsOn(CoreType.Nano)]` code contains **only CIL-T0
 | F5 | FPGA heterogeneous | **4** | **1** | **First heterogeneous system**, Rich core test |
 | F6-FPGA | 3x A7-Lite 200T multi-board (3x134K LUT, Ethernet mesh) | **8-10/board, ~26 total** | **2** | FPGA-verified distributed Cognitive Fabric |
 | F6-Silicon Zero | IHP SG13G2 MPW (3 mm², EUR 0-EUR 4,500) | **8** | **1** | **"Cognitive Fabric Zero"** — first heterogeneous silicon |
-| F6-Silicon One | ChipIgnite Sky130 (10 mm², ~$15K) | **23** | **2** | **"Cognitive Fabric One"** — full demonstration, benchmark |
+| F6-Silicon One | ChipIgnite Sky130 (15 mm², ~$15K) | **23** | **2** | **"Cognitive Fabric One"** — full demonstration, benchmark |
 | F7 | Product chip (future) | **64+** | **4-8** | Commercial Cognitive Fabric |
 
 ### State migration Nano <-> Rich
@@ -413,7 +413,7 @@ We choose OpenFrame because:
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │             CLI-CPU "Cognitive Fabric One"                   │
-│                    10 mm² Sky130                             │
+│                    15 mm² Sky130 (OpenFrame)                 │
 │                                                              │
 │ ┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐ │
 │ │Rich #0 ││Rich #1 ││Rich #2 ││Rich #3 ││Rich #4 ││Rich #5 │ │
@@ -481,7 +481,7 @@ The chip design decisions are based on the physical parameters of the Sky130 PDK
 | Peripherals (OPI ctrl, USB, timer, GPIO) | — | — | 0.2 mm² |
 | Routing overhead (~25%) | — | — | 1.95 mm² |
 | **Total** | **23 cores + 1 Secure** | **160 KB** | **~9.73 mm²** |
-| **Remaining** | | | **~0.27 mm²** (reserve for routing/timing closure) |
+| **Remaining** | | | **~5.27 mm²** (reserve for extra SRAM, routing/timing closure, or future expansion) |
 
 ### External memory interface
 
@@ -570,12 +570,12 @@ The configuration is chosen **before synthesis** (not at runtime). The FPGA conf
 
 ### Why 6R+16N+1S as the reference
 
-**SRAM is the area-dominant element, not logic.** The logic for all 6 Rich + 16 Nano + 1 Secure cores totals ~2.06 mm² (6x0.25 + 16x0.031 + 0.06) — only ~21% of the 10 mm² chip. The remaining ~79% is SRAM and routing. This means:
+**SRAM is the area-dominant element, not logic.** The logic for all 6 Rich + 16 Nano + 1 Secure cores totals ~2.06 mm² (6x0.25 + 16x0.031 + 0.06) — only ~14% of the 15 mm² chip. The remaining ~79% is SRAM and routing. This means:
 - Cores are **cheap** (a Nano core's logic is ~0.031 mm²)
 - Memory is **expensive** (16 KB SRAM is ~0.5 mm²)
-- The **sweet spot** is 4 KB/Nano + 16 KB/Rich — enough to keep the TOS cache, local variables, and frames on-chip, with large data coming from QSPI PSRAM
+- The **sweet spot** is 4 KB/Nano + 16 KB/Rich — enough to keep the TOS cache, local variables, and frames on-chip, with large data coming from OPI PSRAM (shared OPI bus)
 
-Usage of the remaining ~0.9 mm² (F6-Silicon decision):
+Usage of the remaining ~5.3 mm² (F6-Silicon decision):
 - **Writable microcode SRAM** — firmware-updatable opcode semantics
 - **Gated store buffer** (GC write barrier batch)
 - **Reserve** for routing and timing closure
@@ -607,7 +607,7 @@ The same 10 mm² Sky130 area. RISC-V **requires cache coherency** when using sha
 | **Parallel actors** | **23** (hw mailbox) | 4 (sw queue + lock) | 8 (sw queue + lock) |
 | **Context switch** | **5-8 cycles** | 500-2000 cycles | 500-2000 cycles |
 
-**The key number:** RISC-V **spends 10-20% of the chip area on cache coherency**. On CLI-CPU, all that area **goes to extra cores**, because the shared-nothing architecture means the coherence problem **does not exist**. This is why 23 cores fit on 10 mm², while RISC-V stops at 4-8. RAM quantities are similar (~150 KB), but CLI-CPU's is **private** (no coherency traffic), while RISC-V's is **shared** (coherency slows it down).
+**The key number:** RISC-V **spends 10-20% of the chip area on cache coherency**. On CLI-CPU, all that area **goes to extra cores**, because the shared-nothing architecture means the coherence problem **does not exist**. This is why 23 cores fit on 15 mm², while RISC-V stops at 4-8 on 10 mm². RAM quantities are similar (~150 KB), but CLI-CPU's is **private** (no coherency traffic), while RISC-V's is **shared** (coherency slows it down).
 
 ### Performance comparison on actor-based workloads
 
@@ -651,7 +651,7 @@ The GUI is also actor-based: every widget is an actor, every input event is a me
 
 The chip's purpose is not "yet another CPU" but rather **proof of a new category**:
 
-> *"The Cognitive Fabric One is the world's first open-source, heterogeneous, actor-native processor. With its 23 cores + 1 Secure core, without cache coherency, on the same 10 mm² Sky130 silicon it handles 22x more actor messages per second than a conventional 4-core RISC-V — while remaining deterministic, hardware-isolated, and linearly scalable. This is not a faster CPU — this is a new paradigm."*
+> *"The Cognitive Fabric One is the world's first open-source, heterogeneous, actor-native processor. With its 23 cores (6 Rich + 16 Nano + 1 Secure), without cache coherency, on 15 mm² Sky130 silicon it handles 22x more actor messages per second than a conventional 4-core RISC-V — while remaining deterministic, hardware-isolated, and linearly scalable. This is not a faster CPU — this is a new paradigm."*
 
 ## Block diagram (single-core CLI-CPU, F6 single-core target)
 
