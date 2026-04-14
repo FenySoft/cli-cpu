@@ -21,6 +21,9 @@ Thumbs.db
 *.ghw
 build/
 sim-build/
+sim_build/
+__pycache__/
+results.xml
 work/
 transcript
 
