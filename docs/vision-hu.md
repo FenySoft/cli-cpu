@@ -1,5 +1,7 @@
 # CLI-CPU — Vízió: A Shared-Nothing Jövő
 
+> English version: [vision-en.md](vision-en.md)
+
 Ez a dokumentum azt vizsgálja, mi történik, ha a CLI-CPU hardvermodelljéhez **az egész szoftver stack-et újratervezzük** — operációs rendszer, GUI, adatbázis, hálózat, programozási modell. Nem a mai szoftverrel mérjük a hardvert, hanem a hardverhez tervezzük a szoftvert.
 
 > **Joe Armstrong, az Erlang atyja, 2014-ben:**
@@ -32,18 +34,18 @@ A mai szoftver-architektúra nem természeti törvény — egy adott hardver kor
 ```
 ┌─────────────────────────────────────┐
 │           User Space                │
-│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐  │
-│  │App 1│ │App 2│ │App 3│ │App 4│  │
-│  └──┬──┘ └──┬──┘ └──┬──┘ └──┬──┘  │
-│─────┼───────┼───────┼───────┼──────│ ← syscall határ (drága!)
-│     ▼       ▼       ▼       ▼      │
-│  ┌─────────────────────────────┐   │
-│  │          KERNEL              │   │
-│  │  scheduler, VFS, TCP/IP,    │   │
-│  │  memory manager, driver...  │   │
-│  │  EGYETLEN HATALMAS PROGRAM  │   │
-│  │  AMI MINDENT KOORDINÁL      │   │
-│  └─────────────────────────────┘   │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐    │
+│  │App 1│ │App 2│ │App 3│ │App 4│    │
+│  └──┬──┘ └──┬──┘ └──┬──┘ └──┬──┘    │
+│─────┼───────┼───────┼───────┼───────│ ← syscall határ (drága!)
+│     ▼       ▼       ▼       ▼       │
+│  ┌─────────────────────────────┐    │
+│  │          KERNEL             │    │
+│  │  scheduler, VFS, TCP/IP,    │    │
+│  │  memory manager, driver...  │    │
+│  │  EGYETLEN HATALMAS PROGRAM  │    │
+│  │  AMI MINDENT KOORDINÁL      │    │
+│  └─────────────────────────────┘    │
 │           Kernel Space              │
 └─────────────────────────────────────┘
 
@@ -103,12 +105,12 @@ Minden GUI framework (WPF, SwiftUI, Flutter, Qt, Avalonia) egyetlen fő thread-r
   │  • Animáció tick             │
   │  • Rendering parancsok       │
   │                              │
-  │  Ha BÁRMI lassú → az EGÉSZ  │
-  │  UI akadozik (16ms budget!) │
+  │  Ha BÁRMI lassú → az EGÉSZ   │
+  │  UI akadozik (16ms budget!)  │
   └──────────┬───────────────────┘
              ▼
   ┌──────────────────────────────┐
-  │          GPU                  │
+  │          GPU                 │
   │  Raszterizálás, kompozíció   │
   └──────────────────────────────┘
 ```
@@ -130,8 +132,8 @@ Minden GUI framework (WPF, SwiftUI, Flutter, Qt, Avalonia) egyetlen fő thread-r
       └─────┬─────┴─────┬─────┘           │
             ▼           ▼                 ▼
   ┌──────────────────────────────────────────┐
-  │         Compositor aktor                  │
-  │  (összeilleszti a régiókat, ~1 core)      │
+  │         Compositor aktor                 │
+  │  (összeilleszti a régiókat, ~1 core)     │
   └──────────────────────────────────────────┘
 
 Nincs UI thread bottleneck. Minden widget PÁRHUZAMOSAN
@@ -174,15 +176,15 @@ Ez nem azt jelenti, hogy a GPU felesleges — textúrázás, 3D, ML inferencia a
 
 ```
 ┌─────────────────────────────────┐
-│         Shared Buffer Pool       │  ← MINDEN tranzakció ide ír
-│  ┌─────┐ ┌─────┐ ┌─────┐       │
+│        Shared Buffer Pool       │  ← MINDEN tranzakció ide ír
+│  ┌─────┐ ┌─────┐ ┌─────┐        │
 │  │Page1│ │Page2│ │Page3│ ...    │  B-tree lapok, közös memóriában
-│  └──┬──┘ └──┬──┘ └──┬──┘       │
-│     │ LOCK  │ LOCK  │ LOCK     │  ← MVCC / 2PL / mutex
-│  ┌──┴───────┴───────┴──┐       │
-│  │   WAL (Write Ahead   │       │
-│  │   Log) — szekvenciális│       │
-│  │   írás egyetlen fájlba│       │
+│  └──┬──┘ └──┬──┘ └──┬──┘        │
+│     │ LOCK  │ LOCK  │ LOCK      │  ← MVCC / 2PL / mutex
+│  ┌──┴───────┴───────┴───┐       │
+│  │  WAL (Write Ahead    │       │
+│  │  Log) — szekvenciális│       │
+│  │  írás egyetlen fájlba│       │
 │  └──────────────────────┘       │
 └─────────────────────────────────┘
 
@@ -335,23 +337,23 @@ Mai világ (7 réteg):                 CLI-CPU világ (1 réteg):
 
 ┌─────────────────────┐             ┌─────────────────────┐
 │ App (C#/Java/Go)    │             │                     │
-│ async/await          │             │  Aktorok (C#)       │
-├─────────────────────┤             │  szinkron üzenetek   │
+│ async/await         │             │  Aktorok (C#)       │
+├─────────────────────┤             │  szinkron üzenetek  │
 │ Framework (ASP.NET) │             │                     │
-│ thread pool          │             │  ← nincs határ      │
-├─────────────────────┤             │  minden aktor        │
-│ OS kernel (Linux)   │             │  egyenrangú          │
+│ thread pool         │             │  ← nincs határ      │
+├─────────────────────┤             │  minden aktor       │
+│ OS kernel (Linux)   │             │  egyenrangú         │
 │ syscall, scheduler  │             │                     │
-├─────────────────────┤             │  nincs kernel        │
-│ TCP/IP stack        │             │  nincs syscall       │
-│ socket API          │             │  nincs scheduler     │
-├─────────────────────┤             │  (HW FIFO poll)      │
+├─────────────────────┤             │  nincs kernel       │
+│ TCP/IP stack        │             │  nincs syscall      │
+│ socket API          │             │  nincs scheduler    │
+├─────────────────────┤             │  (HW FIFO poll)     │
 │ Filesystem (ext4)   │             │                     │
-│ B-tree, WAL, lock   │             │  nincs lock          │
-├─────────────────────┤             │  nincs B-tree        │
-│ Hardver (x86)       │             │  nincs WAL           │
-│ shared memory       │             │  nincs cache koher.  │
-│ cache koherencia    │             │  nincs VMM           │
+│ B-tree, WAL, lock   │             │  nincs lock         │
+├─────────────────────┤             │  nincs B-tree       │
+│ Hardver (x86)       │             │  nincs WAL          │
+│ shared memory       │             │  nincs cache koher. │
+│ cache koherencia    │             │  nincs VMM          │
 │ MMU, TLB            │             │                     │
 └─────────────────────┘             └─────────────────────┘
 

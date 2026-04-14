@@ -1,6 +1,6 @@
 # CLI-CPU — Security Model and Threat Analysis
 
-> English version: not yet available
+> English version: [security-en.md](security-en.md)
 
 > Version: 1.0
 

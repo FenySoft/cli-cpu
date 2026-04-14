@@ -2,7 +2,7 @@
 
 > **Stratégiai pozicionálási dokumentum.** Ez a harmadik piaci pálya a Cognitive Fabric és a Trustworthy Silicon mellé. Egy külön chip-család tervét írja le, amely ugyanarra az alap architektúrára épül, kiegészítve a Secure Element specifikus hardveres komponensekkel, és a JavaCard / TEE / Secure Element piacot célozza.
 
-> English version: not yet available
+> English version: [secure-element-en.md](secure-element-en.md)
 
 > Version: 1.0
 

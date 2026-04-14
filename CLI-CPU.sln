@@ -14,6 +14,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionFolder", "SolutionF
 		README.md = README.md
 		BuildNumberV2.txt = BuildNumberV2.txt
 		README-hu.md = README-hu.md
+		CONTRIBUTING.md = CONTRIBUTING.md
+		CONTRIBUTING-hu.md = CONTRIBUTING-hu.md
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CilCpu.Linker", "src\CilCpu.Linker\CilCpu.Linker.csproj", "{FAB11DB8-A19B-421F-B4C9-C59D52FBB024}"

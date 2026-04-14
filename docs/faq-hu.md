@@ -1,6 +1,6 @@
 # CLI-CPU — Gyakori Kérdések (FAQ)
 
-> English version: not yet available
+> English version: [faq-en.md](faq-en.md)
 
 > Version: 1.0
 

@@ -8,7 +8,7 @@
 
 > English version: [nlnet-application-draft-en.md](nlnet-application-draft-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 ---
 
@@ -28,7 +28,7 @@ https://github.com/FenySoft/cli-cpu
 
 ## Kivonat
 
-A projekt referencia implementációs fázisa (F1.5) **kész és tesztelve van**: a C# szimulátor lefedi mind a 48 CIL-T0 opkódot (**267 zöld xUnit teszt**), a Roslyn-alapú CIL-T0 linker működik (C# forráskód → .dll → CIL-T0 bináris), és a CLI futtatóeszköz (`run` / `link` parancsok) kész. Minden TDD módszertannal fejlesztve, Devil's Advocate review-val. **Ez a pályázat a bizonyított szoftveres szimulációból a fizikai hardverbe való átmenetet finanszírozza.**
+A projekt referencia implementációs fázisa (F1.5) **kész és tesztelve van**: a C# szimulátor lefedi mind a 48 CIL-T0 opkódot (**250+ zöld xUnit teszt**), a Roslyn-alapú CIL-T0 linker működik (C# forráskód → .dll → CIL-T0 bináris), és a CLI futtatóeszköz (`run` / `link` parancsok) kész. Minden TDD módszertannal fejlesztve, Devil's Advocate review-val. **Ez a pályázat a bizonyított szoftveres szimulációból a fizikai hardverbe való átmenetet finanszírozza.**
 
 A CLI-CPU egy nyílt forráskódú processzor-architektúra, amely a .NET Common Intermediate Language (CIL) bájtkódot **natívan, hardveresen hajtja végre** — JIT fordítás, AOT transzláció vagy interpreter nélkül. Ahelyett, hogy egymagos sebességben versenyezne (ezt a picoJava és a Jazelle már megpróbálta és megbukott), a CLI-CPU **sok kis, független CIL-natív core-t** helyez egyetlen chipre, amelyek kizárólag **hardveres mailbox FIFO-kon** kommunikálnak, shared-nothing modellben. Ez a „Cognitive Fabric" architektúra **teljesen kiküszöböli a cache koherencia overhead-et**, és a teljesítmény lineárisan skálázódik a core-számmal.
 
@@ -43,21 +43,30 @@ A CLI-CPU egy nyílt forráskódú processzor-architektúra, amely a .NET Common
 **Miért releváns az NGI ökoszisztéma számára:**
 
 - **Libre silicon end-to-end:** Sky130 PDK + OpenLane2 (ASIC) és OpenXC7/Yosys (FPGA) — teljesen reprodukálható, auditálható, nyílt toolchain.
-- **8 millió fejlesztő kódja natívan fut:** Minden .NET nyelv (C#, F#, VB.NET) CIL-re fordul. A CLI-CPU az első hardver, amely ezt az ökoszisztémát közvetlenül futtatja — runtime overhead és zárt toolchain-függőség nélkül.
-- **Actor-natív biztonság:** A per-core memória-izoláció a szilícium fizikai tulajdonsága (privát SRAM, nincs shared memory), nem szoftveres absztrakció. Architektúrálisan immunis a Spectre/Meltdown típusú támadásokra. Determinisztikus végrehajtás, ami lehetővé teszi az ISA formális verifikációját.
+- **8 millió .NET fejlesztő célozhatja meg ezt a hardvert ismerős eszközökkel:** Minden .NET nyelv (C#, F#, VB.NET) CIL-re fordul. A Nano core a CIL-T0 integer subset-et futtatja natívan; a Rich core (F5+) kiterjeszti a teljes CIL-re objektumokkal, GC-vel és FPU-val. Nincs JIT, nincs interpreter, nincs runtime réteg.
+- **Actor-natív biztonság:** A per-core memória-izoláció a szilícium fizikai tulajdonsága (privát SRAM, nincs shared memory), nem szoftveres absztrakció. A shared-nothing architektúra tervezésénél fogva kiküszöböli a cross-core oldal-csatornás támadási felületet (nincs shared cache, nincs spekulatív végrehajtás, nincs branch predictor). Determinisztikus végrehajtás, ami lehetővé teszi az ISA formális verifikációját.
 - **Európai szuverenitás:** Teljesen nyílt processzor-design, amelyet bármely európai entitás gyárthat, auditálhat és tanúsíthat — függetlenül US/ázsiai IP licenszeléstől (ellentétben az ARM, RISC-V kereskedelmi core-ok vagy x86 esetével).
+- **Konkrét felhasználási eset:** Biztonságos IoT edge csomópont, amely Akka.NET aktor workload-okat futtat per-core hardveres izolációval — kiküszöbölve a hagyományos TEE/TrustZone komplexitást, erősebb garanciákkal.
+
+- **A hardver-szintű biztonság növekvő relevanciája:** Ahogy a személyes adatszivárgások, infrastruktúra-támadások és AI-vezérelt fenyegetések eszkalálódnak, a kizárólag szoftveres biztonsági megoldások egyre kevésbé elegendőek. A CLI-CPU hardveresen kikényszerített memória-biztonsága, típus-biztonsága és vezérlési folyamat integritása semmilyen szoftveres exploit-tal nem kerülhető meg — ami egyre relevánsabbá teszi a jelenlegi és jövőbeli biztonsági kihívások szempontjából, legyen szó személyes eszközökről, kritikus infrastruktúráról vagy IoT-ről.
+
+**Miért most?** A nyílt PDK-k (Sky130, IHP SG13G2), az érett aktor-modell keretrendszerek (Akka.NET, Orleans), a Dennard skálázás végének sok-magos architektúrák felé tolása, a szilícium demokratizálódása (Tiny Tapeout, eFabless), és a **hardver-szintű biztonság növekvő sürgőssége** az eszkalálódó kiberfenyegetésekkel szemben együttesen teszik életképessé és szükségessé a sok-magos bytecode-natív megközelítést 2026-ban — ott, ahol az egymagos picoJava 1997-ben megbukott.
 
 ---
 
 ## Volt-e korábbi tapasztalatod releváns projektekkel vagy szervezetekkel?
 
-A pályázó széleskörű tapasztalattal rendelkezik:
+A pályázó 35+ év professzionális szoftver- és hardvertapasztalattal rendelkezik:
 
-- **.NET ökoszisztéma:** 20+ év professzionális C#/.NET fejlesztés, beleértve Akka.NET aktor rendszereket, Avalonia UI cross-platform alkalmazásokat, és Android/iOS telepítést.
-- **QuantumAE/JokerQ:** Egy éles, production Akka.NET aktor-alapú rendszer (55+ aktor, NAV-I adóhatósági integráció, NFC smart card kommunikáció, offline-first persistencia) — ez a rendszer szolgál a CLI-CPU aktor-natív architektúrájának valós validációs céljaként.
-- **Hardver-közeli:** FPGA fejlesztési workflow-k ismerete, nyílt forráskódú EDA eszközök, és a Sky130/IHP nyílt szilícium ökoszisztéma.
+- **Hardver alapok (1980-as évek):** Z80 számítógép tervezés és assembly programozás (hobbi/főiskolai szinten), később 8086/80286 assembly + Pascal projektek, majd C/C++ Windows-on. Ez a korai hardveres tapasztalat közvetlenül befolyásolja a CLI-CPU mikroarchitektúra tervezését.
+- **Országos szintű éles rendszerek (1990-es évek–2026):** 3 fős csapatban fejlesztett „Atlasz" — vasúti menetirányító rendszer a MÁV számára, amelyet az **országos forgalomirányításban 2026-ig használtak**. Szintén fejlesztette a Visual Restaurant, Visual Hotel & Restaurant szoftvert (Delphi, később .NET) — vendéglátóipari szoftvercsomag, amelyet a Com-Passz Kft. forgalmaz, széles körben használt a magyar étterem- és szállodaiparban — beleértve egy .NET-ben fejlesztett mobil pincér terminált (beágyazott .NET + hardver integráció).
+- **.NET ökoszisztéma (20+ év):** Professzionális C#/.NET fejlesztés, beleértve kötelező hatósági adatszolgáltatási integrációkat (NAV adóhatóság, NTAK turizmus), piaci API integrációkat (Wolt, Fooddora, falatozz.hu, D-EDGE, iBar), Akka.NET aktor rendszereket, Avalonia UI cross-platform alkalmazásokat, és Android/iOS telepítést.
+- **Magyar Adóügyi Ellenőrző Egység:** Hardverfejlesztési tapasztalat az eredeti Adóügyi Ellenőrző Egység ([48/2013 NGM](https://njt.hu/jogszabaly/2013-48-20-2X)) projektből — **a szoftvert egyedül fejlesztettem**. A jelenlegi **QCassa/JokerQ** ennek korszerűbb, PQC-biztosított utódja (55+ Akka.NET aktor), szintén **egyedül fejlesztett** .NET szoftver + hardver illesztési projekt a [8/2025 NGM rendelet](https://njt.hu/jogszabaly/2025-8-20-2X) szerint. Ez a projekt mélyreható, gyakorlati tapasztalatot ad az aktor-modell architektúrában és a .NET hardver-integrációban, ami közvetlenül befolyásolja a CLI-CPU tervezési döntéseit.
+- **CLI-CPU RTL:** Előzetes Verilog RTL fejlesztés már folyamatban — ALU modul teljes cocotb testbench-csel (41/41 zöld teszt). Nyílt forráskódú EDA eszközök (Yosys, Verilator, cocotb) és a Sky130/IHP nyílt szilícium ökoszisztéma ismerete.
 
 A CLI-CPU projekt önmagában 7 architektúra dokumentumot (~4000+ sor), egy teljesen tesztelt referencia szimulátort, egy CIL-T0 linkert és egy CLI futtatóeszközt hozott létre — mindezt szigorú TDD módszertannal.
+
+A projekt 2026 április eleje óta fókuszált fejlesztés alatt áll, szilárd technikai alapot építve a nyilvános bejelentés előtt. Az NLnet támogatás az első teljesen nyilvános fázist finanszírozná, beleértve a közösségi outreach-et és konferencia előadásokat.
 
 ---
 
@@ -69,12 +78,12 @@ A CLI-CPU projekt önmagában 7 architektúra dokumentumot (~4000+ sor), egy tel
 
 | Mérföldkő | Leírás | Összeg | Időkeret |
 |-----------|--------|--------|----------|
-| **M1: RTL (F2)** | Verilog/Amaranth HDL implementáció: egyetlen Nano core. Verilator + cocotb testbench, ami megfelel mind a 267 C# szimulátor tesztnek. Yosys szintézis Sky130-ra. | €8,000 | 1-4. hónap |
-| **M2: Tiny Tapeout (F3)** | 16 tile-os Tiny Tapeout submission: Nano core + mailbox + UART. Bring-up PCB tervezés (KiCad). Post-silicon verifikáció. | €7,000 | 4-7. hónap |
-| **M3: FPGA multi-core (F4)** | 3× MicroPhase A7-Lite XC7A200T board (~€960). 4-core Cognitive Fabric FPGA-n: shared-nothing, mailbox mesh, sleep/wake, event-driven. Ping-pong és echo-chain demók. | €8,000 | 6-10. hónap |
-| **M4: Rich core RTL (F5 kezdet)** | Rich core (teljes CIL) RTL tervezés kezdete: objektum modell, GC assist, kivételkezelés, FPU. Heterogén Nano+Rich FPGA demó. | €7,000 | 8-12. hónap |
+| **M1: RTL (F2)** | Verilog/Amaranth HDL implementáció: egyetlen Nano core. Verilator + cocotb testbench, ami megfelel az összes C# szimulátor tesztnek (250+). Yosys szintézis Sky130-ra. | €8,000 | 1-6. hónap |
+| **M2: Tiny Tapeout (F3)** | 16 tile-os Tiny Tapeout submission: Nano core + mailbox + UART. Bring-up PCB tervezés (KiCad). Post-silicon verifikáció. | €7,000 | 5-10. hónap |
+| **M3: FPGA multi-core (F4)** | 3× MicroPhase A7-Lite XC7A200T board (~€960). 4-core Cognitive Fabric FPGA-n: shared-nothing, mailbox mesh, sleep/wake, event-driven. Ping-pong és echo-chain demók. | €8,000 | 8-14. hónap |
+| **M4: Rich core RTL (F5 kezdet)** | Rich core (teljes CIL) RTL tervezés kezdete: objektum modell, GC assist, kivételkezelés, FPU. Heterogén Nano+Rich FPGA demó. | €7,000 | 12-18. hónap |
 | **M5: Dokumentáció és közösség** | Angol nyelvű architektúra dokumentáció, contribution guide, CI/CD pipeline, közösségi outreach (blogposztok, konferencia lightning talk). | €5,000 | Folyamatos |
-| **Összesen** | | **€35,000** | 12 hónap |
+| **Összesen** | | **€35,000** | 18 hónap |
 
 **Hardver költségek a mérföldkövekben:**
 - 3× A7-Lite XC7A200T FPGA board: ~€960
@@ -82,6 +91,8 @@ A CLI-CPU projekt önmagában 7 architektúra dokumentumot (~4000+ sor), egy tel
 - Bring-up PCB + alkatrészek: ~€80
 - Szállítás, kábelek, adapterek: ~€200
 - **Hardver összesen: ~€2,440**
+
+Személyi költség: ~18 hónap részmunkaidő (~900 óra), €32,560 / 900ó ≈ €36/óra. Hardver: €2,440.
 
 ---
 
@@ -92,6 +103,8 @@ A projekt jelenleg a pályázó saját finanszírozásából működik. Nem érk
 Tervezett kiegészítő finanszírozás (nem átfedő ezzel a pályázattal):
 - **IHP SG13G2 ingyenes MPW:** A 2026 októberi shuttle-re tervezett pályázat (F6 heterogén szilícium — túlmutat ezen pályázat hatáskörén).
 - **Közösségi finanszírozás:** GitHub Sponsors / Open Collective a projekt során kerül felállításra (folyamatos karbantartásra, nem ezen pályázat által fedezve).
+
+**Fenntarthatósági terv:** (1) Következő NLnet pályázat az F5-F6-ra (Rich core + silicon tape-out). (2) IHP SG13G2 ingyenes MPW pályázat kutatási szilíciumra. (3) Hosszú távon: dual licensing modell (CERN-OHL-S a nyílt verzióra, kereskedelmi licensz a tanúsított termékekre). (4) GitHub Sponsors / Open Collective a folyamatos közösségi karbantartásra.
 
 ---
 
@@ -114,7 +127,7 @@ Tervezett kiegészítő finanszírozás (nem átfedő ezzel a pályázattal):
 
 1. **CIL-RTL hűség:** A referencia C# szimulátor definiálja a „golden" viselkedést mind a 48 CIL-T0 opkódra. Az RTL-nek bitről-bitre meg kell egyeznie. Kihívás: a CIL stack-gép szemantika (változó hosszúságú utasítások, implicit operandus verem) gondos pipeline tervezést igényel. Mitigáció: cocotb golden-vector tesztelés minden meglévő szimulátor teszt ellen.
 
-2. **Tiny Tapeout terület-budget:** A Nano core (~9,100 std cell) + mailbox + UART-nak el kell férnie 12-16 tile-ban (~12K-16K kapu). Kihívás: a routing overhead a Sky130-on a tile terület 30-40%-át is felemésztheti. Mitigáció: iteratív szintézis terület-optimalizációval, Yosys becslésekkel kezdve a submission előtt.
+2. **Tiny Tapeout terület-budget:** A Nano core (~9,100 std cell) + mailbox + UART-nak el kell férnie 12-16 tile-ban (~12K-16K kapu). Kihívás: a routing overhead a Sky130-on a tile terület 30-40%-át is felemésztheti. Mitigáció: iteratív szintézis terület-optimalizációval, Yosys becslésekkel kezdve a submission előtt. B terv: Ha a design a routing után nem fér el 16 tile-ban, a Nano core + UART-ra redukáljuk (mailbox nélkül), a mailbox verifikációját FPGA-n (M3) végezzük.
 
 3. **Multi-core mailbox routing:** A 4-core FPGA fabric fair, deadlock-mentes üzenet-routert igényel. Kihívás: éheztetés elkerülése, ha több core egyszerre küld. Mitigáció: round-robin arbiter per-core FIFO pufferekkel (jól ismert tervezési minta).
 
@@ -140,6 +153,8 @@ Tervezett kiegészítő finanszírozás (nem átfedő ezzel a pályázattal):
 - **Nyílt hardver közösség:** A projekt egy újszerű CIL-natív core designt ad a libre silicon ökoszisztémához, CERN-OHL-S-2.0 licensz alatt.
 - **Európai digitális szuverenitás:** Teljesen nyílt, auditálható processzor-design, amely európai foundry-knál gyártható (IHP SG13G2, GlobalFoundries Dresden) nem-EU IP függőség nélkül.
 
+**Megjegyzés a .NET függetlenségről:** A CIL specifikáció (ECMA-335) egy ISO/IEC által ratifikált nemzetközi szabvány, nem Microsoft tulajdon. A CLI-CPU a bájtkód formátumot célozza, nem a Microsoft runtime-ot. Alternatív CIL fordítók léteznek (Mono, különböző Roslyn-független front-end-ek). A hardver design az ISA szintjén működik, és független bármely upstream runtime változástól.
+
 **Közösségépítési terv:**
 - GitHub repository CI/CD-vel (minden commit-nál minden teszt zöld)
 - Angol nyelvű dokumentáció és contribution guide
@@ -156,7 +171,7 @@ A pályázathoz csatolandó PDF:
 2. ISA-CIL-T0 specifikáció összefoglaló
 3. Roadmap vizualizáció (F0–F7 diagram)
 4. Cognitive Fabric One chip vízió (benchmark összehasonlítás RISC-V-vel)
-5. Jelenlegi státusz: 267 teszt, szimulátor, linker, runner screenshotok
+5. Jelenlegi státusz: 250+ teszt, szimulátor, linker, runner screenshotok
 
 ---
 
@@ -164,19 +179,19 @@ A pályázathoz csatolandó PDF:
 
 ### Miért €35K és nem €50K?
 - Az első pályázat max €50K, de a reálisabb, kisebb kérés **jobb elfogadási esélyű**
-- A €35K fedezi az F2-F4 + F5 kezdetét — ez **mérhető, demonstrálható eredmény** 12 hónap alatt
+- A €35K fedezi az F2-F4 + F5 kezdetét — ez **mérhető, demonstrálható eredmény** 18 hónap alatt
 - Ha sikeres, a második pályázat (€50K-€150K) fedezheti az F5-F6-ot és a silicon tape-out-ot
 
 ### Miért nem probléma, hogy F2-nél tartunk?
 - Az NLnet **R&D-t finanszíroz, nem kész terméket** — „Research and development as their primary objective"
 - A legtöbb NLnet pályázó **kevesebbet tud felmutatni**: nincs kódjuk, nincs tesztjük, csak ötletük van
-- Mi **267 zöld tesztet, működő szimulátort, linkert, CLI runner-t** tudunk mutatni — ez **ritka** és **erős**
+- Mi **250+ zöld tesztet, működő szimulátort, linkert, CLI runner-t** tudunk mutatni — ez **ritka** és **erős**
 - Az F1.5 kész státusz demonstrálja, hogy **képesek vagyunk végrehajtani** — nem csak ígérni
 
 ### Értékelési kritériumok illeszkedése
 | Kritérium (súly) | CLI-CPU erőssége |
 |-------------------|-----------------|
-| **Technical excellence (30%)** | 267 zöld teszt, TDD, 48 opkód, működő szimulátor+linker — nem ígéret, hanem kész munka |
+| **Technical excellence (30%)** | 250+ zöld teszt, TDD, 48 opkód, működő szimulátor+linker — nem ígéret, hanem kész munka |
 | **Relevance/Impact (40%)** | Libre silicon, .NET ökoszisztéma (8M dev), EU szuverenitás, actor-natív biztonság |
 | **Cost effectiveness (30%)** | €35K-ból first silicon + FPGA multi-core — összehasonlítva: egyetlen ChipIgnite tape-out $15K |
 
@@ -185,7 +200,7 @@ A pályázathoz csatolandó PDF:
 |----------|-------------|-----------|
 | RTL nem fér el a TT tile-ban | Közepes | Korai szintézis becslés, iteratív optimalizáció |
 | FPGA board szállítási késés | Alacsony | 3 board rendelés az elején |
-| Rich core túl komplex 12 hónap alatt | Közepes | M4 csak „start" — a teljes Rich core a második pályázatban |
+| Rich core túl komplex 18 hónap alatt | Közepes | M4 csak „start" — a teljes Rich core a második pályázatban |
 | Tiny Tapeout shuttle csúszás | Közepes | Több shuttle-re is beadható (TTSKY26a, TTSKY27a) |
 
 ### Következő lépések
@@ -201,4 +216,5 @@ A pályázathoz csatolandó PDF:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-04-14 | 18 hónapos timeline, €35K mind az 5 mérföldkővel, óradíj bontás, teszt szám 250+, RTL tapasztalat, sustainability plan, Why now, ECMA-335 függetlenség, konkrét use case, Plan B TT-hoz |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
