@@ -21,9 +21,9 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 **Cél:** Olyan dokumentumok, amelyekből a teljes projekt megépíthető anélkül, hogy menet közben tervezési döntéseket kellene hozni.
 
 **Kimenet:**
-- `docs/roadmap.md` — ez a dokumentum
-- `docs/architecture.md` — CLI-CPU architektúra: stack-gép, pipeline, memória modell, prior art
-- `docs/ISA-CIL-T0.md` — CIL-T0 subset teljes specifikáció (~40 opkód)
+- `docs/roadmap-hu.md` — ez a dokumentum
+- `docs/architecture-hu.md` — CLI-CPU architektúra: stack-gép, pipeline, memória modell, prior art
+- `docs/ISA-CIL-T0-hu.md` — CIL-T0 subset teljes specifikáció (~40 opkód)
 
 **Kész kritérium:** A három dokumentum elolvasása után egy kívülálló mérnök meg tudja mondani, hogy *pontosan* melyik CIL opkód mit csinál a CLI-CPU-n, és hogyan illeszkedik a mikroarchitektúrába.
 
@@ -60,7 +60,7 @@ A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első 
 - `src/CilCpu.Linker/` — Roslyn .dll → CIL-T0 bináris linker (tranzitív call-target discovery, token→RVA feloldás, opkód-kompatibilitás ellenőrzés) — **kész**
 - `src/CilCpu.Sim.Runner/` — CLI futtatóeszköz (`run` és `link` parancsok, trap kezelés, TRunResult) — **kész**
 - `samples/PureMath/` — C# példaprogram (Add, Fibonacci, Factorial, GCD, IsPrime, stb.) — **kész**
-- `src/CilCpu.Sim.Tests/` — kibővítve linker + runner tesztekkel — **kész, 267 zöld teszt**
+- `src/CilCpu.Sim.Tests/` — kibővítve linker + runner tesztekkel — **kész, 259 zöld teszt**
 
 **CLI használat:**
 ```bash
@@ -120,7 +120,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - `hw/bringup/` — bring-up board tervei (KiCad): QSPI flash socket, QSPI PSRAM socket, FTDI USB-UART (a mailbox külső bridge-éhez), power, debug LEDek, PMOD csatlakozók
 
 **Új F3 komponens a spec szerint:**
-- **Mailbox MMIO blokk** — 8 mélységű inbox + outbox FIFO, `0xF000_0100` címen, részletek a `docs/ISA-CIL-T0.md`-ben. Lehetővé teszi, hogy egy host számítógép UART-on keresztül üzeneteket küldjön a chipnek, amit a chip CIL programmal dolgoz fel és válaszol vissza.
+- **Mailbox MMIO blokk** — 8 mélységű inbox + outbox FIFO, `0xF000_0100` címen, részletek a `docs/ISA-CIL-T0-hu.md`-ben. Lehetővé teszi, hogy egy host számítógép UART-on keresztül üzeneteket küldjön a chipnek, amit a chip CIL programmal dolgoz fel és válaszol vissza.
 
 **Kész kritérium:**
 - GDS elfogadva a Tiny Tapeout shuttle-re
@@ -139,7 +139,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Cél:** **A stratégiai pivot pillanata.** A CLI-CPU először válik valódi hálózattá — 4 egymagos CIL-T0 core dolgozik együtt egyetlen FPGA chipen, **shared-nothing modellben**, kizárólag mailbox üzenetekkel kommunikálva, eseményvezérelt (event-driven) működéssel.
 
-**Miért itt van a fő pivot:** Ez a fázis megkülönbözteti a CLI-CPU-t a történelmi Jazelle/picoJava „bytecode CPU" bukásoktól. A `docs/architecture.md` „Stratégiai pozicionálás: Cognitive Fabric" szekciója részletesen érvel amellett, hogy miért itt van a projekt valódi értéke, és miért nem az egymagos sebesség-verseny.
+**Miért itt van a fő pivot:** Ez a fázis megkülönbözteti a CLI-CPU-t a történelmi Jazelle/picoJava „bytecode CPU" bukásoktól. A `docs/architecture-hu.md` „Stratégiai pozicionálás: Cognitive Fabric" szekciója részletesen érvel amellett, hogy miért itt van a projekt valódi értéke, és miért nem az egymagos sebesség-verseny.
 
 **Új funkciók:**
 - **4 darab CIL-T0 core** egy FPGA-n (az F3 RTL 4 példányban instanciálva)
@@ -172,7 +172,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Cél:** **A Rich core születése.** Ez az a fázis, amikor a CIL-T0 szűk subset mellé **megszületik a „nagy testvér"** — egy teljes ECMA-335 CIL core objektum-modellel, GC-vel, virtuális hívásokkal, kivételekkel, FPU-val, 64-bit integer-rel, generikusokkal. A fázis végén **először futtatunk egy heterogén multi-core rendszert**: 4 Nano core (F4-ből) **mellett** 1 Rich core, közös mailbox hálózaton.
 
-**Miért „Rich core" és nem csak „teljes CIL"?** A `docs/architecture.md` **„Heterogén multi-core: Nano + Rich"** szekciója részletezi: a CLI-CPU heterogén (big.LITTLE-szerű) architektúrát fog használni az F6-tól, **kétféle core típussal**. A Nano (CIL-T0) F3-ban született meg, a Rich (teljes CIL) itt, F5-ben. Ez a terminológia-egységesítés csak átnevezés — a technikai tartalom az, ami eddig is „teljes CIL" volt a roadmap-ben.
+**Miért „Rich core" és nem csak „teljes CIL"?** A `docs/architecture-hu.md` **„Heterogén multi-core: Nano + Rich"** szekciója részletezi: a CLI-CPU heterogén (big.LITTLE-szerű) architektúrát fog használni az F6-tól, **kétféle core típussal**. A Nano (CIL-T0) F3-ban született meg, a Rich (teljes CIL) itt, F5-ben. Ez a terminológia-egységesítés csak átnevezés — a technikai tartalom az, ami eddig is „teljes CIL" volt a roadmap-ben.
 
 **Új opkódok a Rich core-on (a Nano 48 opkódon felül):**
 - Objektum modell: `newobj`, `newarr`, `ldfld`, `stfld`, `ldelem.*`, `stelem.*`, `ldlen`, `initobj`
@@ -329,7 +329,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 #### F6-Silicon One — „Cognitive Fabric One" MPW tape-out (a teljes demonstráció)
 
-**Cél:** A **„Cognitive Fabric One"** — az F6-FPGA-ban (A7-Lite 200T multi-board hálón) verifikált és sweet spot-ra optimalizált heterogén design **valós szilíciumon**: **2 Rich + 24 Nano core, 128 KB on-chip SRAM, 10 mm² Sky130**. Ez a chip bizonyítja, hogy ugyanazon a szilíciumon a Cognitive Fabric paradigma **5–25× több hasznos munkát végez** actor-alapú workload-okon, mint egy hagyományos multi-core CPU — miközben determinisztikus, hardveresen izolált, és lineárisan skálázódik. Részletes chip-vízió és benchmark-összehasonlítás: [`docs/architecture.md`](architecture.md) „Cognitive Fabric One" szekció. **Előfeltétel: az F6-FPGA minden kész kritériuma teljesül** — nem indulhat silicon tape-out FPGA-verifikáció nélkül.
+**Cél:** A **„Cognitive Fabric One"** — az F6-FPGA-ban (A7-Lite 200T multi-board hálón) verifikált és sweet spot-ra optimalizált heterogén design **valós szilíciumon**: **2 Rich + 24 Nano core, 128 KB on-chip SRAM, 10 mm² Sky130**. Ez a chip bizonyítja, hogy ugyanazon a szilíciumon a Cognitive Fabric paradigma **5–25× több hasznos munkát végez** actor-alapú workload-okon, mint egy hagyományos multi-core CPU — miközben determinisztikus, hardveresen izolált, és lineárisan skálázódik. Részletes chip-vízió és benchmark-összehasonlítás: [`docs/architecture-hu.md`](architecture-hu.md) „Cognitive Fabric One" szekció. **Előfeltétel: az F6-FPGA minden kész kritériuma teljesül** — nem indulhat silicon tape-out FPGA-verifikáció nélkül.
 
 **Mikor indul:** **Csak az F6-FPGA összes kész kritériumának teljesülése után**, és csak akkor, ha legalább egy a következőkből igaz:
 - A projekt **finanszírozást vagy ipari partnert** kapott a tape-out fedezésére
@@ -383,7 +383,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Cél:** A CLI-CPU Secure Edition parallel tape-out változata, amely a Secure Element / TEE / JavaCard piacot célozza. Ugyanaz az alap architektúra (Nano + Rich core), **plusz** Secure Element-specifikus hardveres komponensek: Crypto Actor (SPECT-ihletett), TRNG, PUF, secure boot + attestation, tamper detection, DPA countermeasures, OTP kulcstárolás.
 
-**Részletes dokumentum:** [`docs/secure-element.md`](secure-element.md) — ez rögzíti a teljes Secure Element pozicionálást, a TROPIC01 (Tropic Square első nyílt kereskedelmi SE) részletes elemzését, a megkülönböztető architektúrális előnyöket (multi-core, több független security domain egyetlen chipen), a tanúsítási útvonalat (EAL-5+), és a konkrét termékcsaládot (open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X, open medical SE).
+**Részletes dokumentum:** [`docs/secure-element-hu.md`](secure-element-hu.md) — ez rögzíti a teljes Secure Element pozicionálást, a TROPIC01 (Tropic Square első nyílt kereskedelmi SE) részletes elemzését, a megkülönböztető architektúrális előnyöket (multi-core, több független security domain egyetlen chipen), a tanúsítási útvonalat (EAL-5+), és a konkrét termékcsaládot (open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X, open medical SE).
 
 **Miért „F6.5" és nem „F6"?** Mert ez **egy parallel tape-out variáns**, nem egy önálló fázis. Ugyanaz a F5 RTL alap, csak kiegészítve a Secure Element hardveres komponensekkel. Az F6-Silicon Cognitive Fabric tape-out után **~6 hónappal** készíthető el — a Secure Edition silicon-előfeltétel, ezért az F6.5 az F6-Silicon variánsra épít, **nem** az F6-FPGA-ra.
 
@@ -420,7 +420,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Cél:** A Cognitive Fabric + Neuron OS kombináció mint **demonstrálható, fejleszthető platform** több valós use-case-re. A `Neuron OS` itt lép ki kutatási státuszból valós fejlesztői platform szintre.
 
-**A Neuron OS teljes víziója egy külön dokumentumban**: [`docs/neuron-os.md`](neuron-os.md). Röviden: aktor-alapú operációs rendszer, amely az Erlang OTP víziót valósítja meg hardveres támogatással (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchia, capability-alapú biztonság, hot code loading, location transparency.
+**A Neuron OS teljes víziója egy külön dokumentumban**: [`docs/neuron-os-hu.md`](neuron-os-hu.md). Röviden: aktor-alapú operációs rendszer, amely az Erlang OTP víziót valósítja meg hardveres támogatással (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchia, capability-alapú biztonság, hot code loading, location transparency.
 
 **Kimenet:**
 - **Referencia PCB-k** több use-case-re:
@@ -451,7 +451,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - **F6**: hot code loading, writable microcode, elosztott aktorok több chipen
 - **F7**: fejlesztői SDK, VSCode integráció, NuGet publikálás, valódi alkalmazás demók
 
-Részletek és fejlesztői API példák: [`docs/neuron-os.md`](neuron-os.md).
+Részletek és fejlesztői API példák: [`docs/neuron-os-hu.md`](neuron-os-hu.md).
 
 ---
 
@@ -511,7 +511,7 @@ A **korábbi** F4 a „CIL object model + GC FPGA-n" volt, a mostani **új** F4 
 
 **2. pivot — F5: Heterogén Nano + Rich terminológia**
 
-A korábbi „F5 — CIL Object Model + GC egymagos kiterjesztés" címet átneveztük **„F5 — Rich core (teljes CIL) FPGA-n, első heterogén rendszer"** címre. Technikailag a tartalom majdnem ugyanaz (teljes CIL kiterjesztés), de most már explicite úgy fogalmazzuk, hogy itt **születik meg a Rich core** mint a Nano core „nagy testvére". Az F6 ezek után egy **heterogén Nano+Rich multi-core chip**, analóg módon az ARM big.LITTLE, Apple P/E-core, Intel Alder Lake modellekhez. Lásd `docs/architecture.md` „Heterogén multi-core: Nano + Rich" szekciót.
+A korábbi „F5 — CIL Object Model + GC egymagos kiterjesztés" címet átneveztük **„F5 — Rich core (teljes CIL) FPGA-n, első heterogén rendszer"** címre. Technikailag a tartalom majdnem ugyanaz (teljes CIL kiterjesztés), de most már explicite úgy fogalmazzuk, hogy itt **születik meg a Rich core** mint a Nano core „nagy testvére". Az F6 ezek után egy **heterogén Nano+Rich multi-core chip**, analóg módon az ARM big.LITTLE, Apple P/E-core, Intel Alder Lake modellekhez. Lásd `docs/architecture-hu.md` „Heterogén multi-core: Nano + Rich" szekciót.
 
 **3. pivot — F6: FPGA-verifikáció kötelező a silicon előtt, A7-Lite 200T multi-board**
 
@@ -523,7 +523,7 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **F1 — C# referencia szimulátor lezárva.** Az `src/CilCpu.Sim` és `src/CilCpu.Sim.Tests` projektek minden CIL-T0 spec által rögzített **48 opkódot** implementálják, minden hardveres trap tesztelt. Az **F1 aranypélda**: `Fibonacci(20) = 6765` zöld. A fejlesztés **4 iterációban** zajlott szigorú TDD-vel, minden iterációhoz Devil's Advocate review.
 
-**F1.5 — Linker, Runner, Samples lezárva.** A `CilCpu.Linker` Roslyn .dll → CIL-T0 pipeline, a `CilCpu.Sim.Runner` CLI futtatóeszköz (`run` / `link` parancsok), és a `samples/PureMath` példaprogram kész. **267 zöld xUnit teszt**, **0 warning, 0 error**. A teljes pipeline (C# → Roslyn → linker → szimulátor) end-to-end tesztelve, TDD-vel fejlesztve, Devil's Advocate review-val.
+**F1.5 — Linker, Runner, Samples lezárva.** A `CilCpu.Linker` Roslyn .dll → CIL-T0 pipeline, a `CilCpu.Sim.Runner` CLI futtatóeszköz (`run` / `link` parancsok), és a `samples/PureMath` példaprogram kész. **259 zöld xUnit teszt**, **0 warning, 0 error**. A teljes pipeline (C# → Roslyn → linker → szimulátor) end-to-end tesztelve, TDD-vel fejlesztve, Devil's Advocate review-val.
 
 **Következő érdemi lépés:** **F2 — RTL** kezdete (Verilog vagy Amaranth HDL döntés, cocotb testbench infrastruktúra).
 

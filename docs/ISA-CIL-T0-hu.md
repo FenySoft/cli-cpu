@@ -36,7 +36,7 @@ A CIL-T0 az ECMA-335 CIL **szigorú, bitről-bitre kompatibilis részhalmaza**. 
 
 ## Memória modell
 
-A CIL-T0-ra a `docs/architecture.md` memória modelljének **szűkített változata** érvényes:
+A CIL-T0-ra a `docs/architecture-hu.md` memória modelljének **szűkített változata** érvényes:
 
 | Régió | Cím tartomány | Tartalom | Backing | Méret (F3) |
 |-------|---------------|----------|---------|------------|
@@ -611,8 +611,8 @@ A tesztek neve formátuma: `[ClassName]_[Opcode]_[Scenario]`, pl. `Executor_Add_
 ## Hivatkozások
 
 - **ECMA-335** — Common Language Infrastructure spec, 6. kiadás.
-- **`docs/architecture.md`** — teljes CLI-CPU architektúra
-- **`docs/roadmap.md`** — fázisok és függőségek
+- **`docs/architecture-hu.md`** — teljes CLI-CPU architektúra
+- **`docs/roadmap-hu.md`** — fázisok és függőségek
 - **Sky130 PDK** — https://skywater-pdk.readthedocs.io/
 - **Tiny Tapeout** — https://tinytapeout.com/
 

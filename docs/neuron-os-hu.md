@@ -961,7 +961,7 @@ A Neuron OS fejlesztése **nem önálló fázis** a roadmap-ben, hanem **az F1-F
 
 3. **F4 multi-core FPGA demónál**: az első **valódi** Neuron OS alfa — 4 aktor, scheduler, router, minimal supervisor. Ez a *project első mérföldköve*, ahol „OS"-ről beszélhetünk.
 
-4. **Dokumentum frissítések**: ahogy a valós munka halad, ez a `neuron-os.md` dokumentum **frissül**, és a nyitott kérdések **eldőlnek**.
+4. **Dokumentum frissítések**: ahogy a valós munka halad, ez a `neuron-os-hu.md` dokumentum **frissül**, és a nyitott kérdések **eldőlnek**.
 
 ## Záró gondolat — egy új paradigma születése
 

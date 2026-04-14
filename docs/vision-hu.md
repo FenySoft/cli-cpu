@@ -83,7 +83,7 @@ Az izoláció nem szoftveres (MMU + page table) → HARDVERES.
 
 **A Linux kernel 30 millió sora azért létezik, mert a shared memory-t szoftveresen kell védeni.** Ha a hardver garantálja az izolációt, a kernel **feladata eltűnik**.
 
-Részletek: [`docs/neuron-os.md`](neuron-os.md).
+Részletek: [`docs/neuron-os-hu.md`](neuron-os-hu.md).
 
 ---
 
@@ -398,7 +398,7 @@ Ez a három elem együtt **nem létezett eddig** — és a vízió azon áll, ho
 
 ## 9. Az út
 
-A vízió nem egyszerre valósul meg. A fejlesztési fázisok (`docs/roadmap.md`) fokozatosan építik fel:
+A vízió nem egyszerre valósul meg. A fejlesztési fázisok (`docs/roadmap-hu.md`) fokozatosan építik fel:
 
 | Fázis | Szoftver vízió elem | Állapot |
 |---|---|---|
@@ -418,9 +418,9 @@ A cél nem az, hogy lecseréljük a Linuxot vagy a PostgreSQL-t — hanem hogy e
 
 ## Hivatkozások
 
-- [`docs/architecture.md`](architecture.md) — mikroarchitektúra, pipeline, memória modell, heterogén Nano+Rich design
-- [`docs/neuron-os.md`](neuron-os.md) — a Neuron OS részletes víziója, aktor API, supervisor fa, scheduler, hot code reload
-- [`docs/roadmap.md`](roadmap.md) — F0-F7 fázisterv
-- [`docs/faq.md`](faq.md) — FAQ 5-7: CPU összehasonlítás, ütemezési költségek, igazságos összevetés
-- [`docs/security.md`](security.md) — biztonsági modell, formális verifikáció terv
-- [`docs/secure-element.md`](secure-element.md) — Secure Edition, multi-domain hardware isolation
+- [`docs/architecture-hu.md`](architecture-hu.md) — mikroarchitektúra, pipeline, memória modell, heterogén Nano+Rich design
+- [`docs/neuron-os-hu.md`](neuron-os-hu.md) — a Neuron OS részletes víziója, aktor API, supervisor fa, scheduler, hot code reload
+- [`docs/roadmap-hu.md`](roadmap-hu.md) — F0-F7 fázisterv
+- [`docs/faq-hu.md`](faq-hu.md) — FAQ 5-7: CPU összehasonlítás, ütemezési költségek, igazságos összevetés
+- [`docs/security-hu.md`](security-hu.md) — biztonsági modell, formális verifikáció terv
+- [`docs/secure-element-hu.md`](secure-element-hu.md) — Secure Edition, multi-domain hardware isolation

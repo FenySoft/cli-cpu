@@ -6,7 +6,7 @@
 
 Ez a dokumentum a CLI-CPU **mikroarchitektúráját** írja le magas szinten: a stack-gép modellt, a pipeline-t, a memória térképet, a dekódolási stratégiát, a GC és kivételkezelés hardveres támogatását, valamint az elődprojektek (picoJava, Jazelle, Transmeta) közül átvett technikákat.
 
-> **Megjegyzés:** Ez az architektúra fokozatosan épül fel az F0–F7 fázisokban. Az itt leírt teljes funkciókészlet az **F6-Silicon „Cognitive Fabric One"** chipben készül el (ChipIgnite vagy IHP MPW, 2R+24N, 10 mm²). A **Tiny Tapeout (F3)** csak az egymagos CIL-T0 subset-et valósítja meg, amit egy külön dokumentum (`ISA-CIL-T0.md`) ír le. A „Cognitive Fabric One" szekció rögzíti a konkrét referencia chip víziót és az összehasonlítást a hagyományos multi-core CPU-kkal.
+> **Megjegyzés:** Ez az architektúra fokozatosan épül fel az F0–F7 fázisokban. Az itt leírt teljes funkciókészlet az **F6-Silicon „Cognitive Fabric One"** chipben készül el (ChipIgnite vagy IHP MPW, 2R+24N, 10 mm²). A **Tiny Tapeout (F3)** csak az egymagos CIL-T0 subset-et valósítja meg, amit egy külön dokumentum (`ISA-CIL-T0-hu.md`) ír le. A „Cognitive Fabric One" szekció rögzíti a konkrét referencia chip víziót és az összehasonlítást a hagyományos multi-core CPU-kkal.
 
 ## Stratégiai pozicionálás: Cognitive Fabric
 
@@ -335,19 +335,19 @@ Ez a szekció a CLI-CPU **első valódi heterogén szilícium chipjének** konkr
 │              CLI-CPU "Cognitive Fabric One"                  │
 │                     10 mm² Sky130                            │
 │                                                              │
-│   ┌─────────┐  ┌─────────┐                                   │
-│   │ Rich #0 │──│ Rich #1 │        ← 2 supervisor core        │
-│   │ 16KB    │  │ 16KB    │          Neuron OS kernel +       │
-│   └────┬────┘  └────┬────┘          device driver aktorok    │
+│   ┌─────────┐   ┌─────────┐                                  │
+│   │ Rich #0 │───│ Rich #1 │        ← 2 supervisor core       │
+│   │ 16KB    │   │ 16KB    │          Neuron OS kernel +      │
+│   └────┬────┘   └────┬────┘          device driver aktorok   │
 │        │    Mesh     │                                       │
 │        │   Router    │           2D grid topológia           │
-│   ┌────┴────┬───┬────┴────┐                                  │
+│   ┌────┴───┬───┬─────┴──┬───┬───┐                            │
 │   │N0  4KB │N1 │N2  4KB │N3 │N4 │                            │
 │   │N5  4KB │N6 │N7  4KB │N8 │N9 │  ← 24 Nano worker core     │
 │   │N10 4KB │N11│N12 4KB │N13│N14│    Minden core:            │
 │   │N15 4KB │N16│N17 4KB │N18│N19│    - Saját 4 KB SRAM       │
 │   │N20 4KB │N21│N22 4KB │N23│   │    - Mailbox FIFO (inbox   │
-│   └────────┴───┴────────┴───┘      + outbox)                 │
+│   └────────┴───┴────────┴───┴───┘      + outbox)             │
 │                                    - Sleep/Wake interrupt    │
 │   QSPI Flash ── QSPI PSRAM ── UART ── Timer ── GPIO          │
 └──────────────────────────────────────────────────────────────┘
@@ -365,8 +365,8 @@ A chip tervezési döntései a Sky130 PDK (130nm, SkyWater) fizikai paraméterei
 | **SRAM 4 KB blokk** | ~0.12–0.15 mm² | OpenRAM Sky130 |
 | **SRAM 16 KB blokk** | ~0.45–0.55 mm² | OpenRAM Sky130 |
 | **SRAM 64 KB blokk** | ~1.7–2.0 mm² | OpenRAM Sky130 |
-| **Nano core logika** (~9,100 std cell) | ~0.028–0.031 mm² | ISA-CIL-T0.md becslés |
-| **Rich core logika** (~80,000 std cell) | ~0.25 mm² | architecture.md becslés |
+| **Nano core logika** (~9,100 std cell) | ~0.028–0.031 mm² | ISA-CIL-T0-hu.md becslés |
+| **Rich core logika** (~80,000 std cell) | ~0.25 mm² | architecture-hu.md becslés |
 | **Routing overhead** | ~25–35% | Általános Sky130 tapasztalat |
 
 **Kulcs felismerés:** Az **SRAM a terület-domináns elem**, nem a logika. A 26 core logikája összesen ~1.24 mm² (a chip 12%-a). A maradék 88% SRAM és routing. Ezért a core-szám és az SRAM-méret közötti trade-off a legfontosabb tervezési döntés.
@@ -628,35 +628,35 @@ A `call` mikrokód a method header-ből kiszámítja a frame méretét, és az S
 
  ┌──────────────────────────────────────────────────────────┐
  │                                                          │
- │  Frame 0 (root):  Add(a, b) — 2 arg, 0 local            │
+ │  Frame 0 (root):  Add(a, b) — 2 arg, 0 local             │
  │  ┌────────────────────────────────────────────────────┐  │
- │  │ [FP₀+0]   ReturnPC = -1 (root)         │  4 byte  │  │
- │  │ [FP₀+4]   PrevFrameBase = -1 (root)    │  4 byte  │  │
- │  │ [FP₀+8]   ArgCount=2, LocalCount=0     │  4 byte  │  │
- │  │ ─ ─ ─ ─ header vége (12 byte) ─ ─ ─ ─  │          │  │
- │  │ [FP₀+12]  arg[0] = 2                   │  4 byte  │  │
- │  │ [FP₀+16]  arg[1] = 3                   │  4 byte  │  │
- │  │ ─ ─ ─ ─ args vége ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
- │  │ [FP₀+20]  eval[0] (a+b eredmény)       │  4 byte  │  │
+ │  │ [FP₀+0]   ReturnPC = -1 (root)          │  4 byte  │  │
+ │  │ [FP₀+4]   PrevFrameBase = -1 (root)     │  4 byte  │  │
+ │  │ [FP₀+8]   ArgCount=2, LocalCount=0      │  4 byte  │  │
+ │  │ ─ ─ ─ ─ header vége (12 byte) ─ ─ ─ ─ ─ │          │  │
+ │  │ [FP₀+12]  arg[0] = 2                    │  4 byte  │  │
+ │  │ [FP₀+16]  arg[1] = 3                    │  4 byte  │  │
+ │  │ ─ ─ ─ ─ args vége ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
+ │  │ [FP₀+20]  eval[0] (a+b eredmény)        │  4 byte  │  │
  │  └────────────────────────────────────────────────────┘  │
- │  Frame méret: 12 + 2×4 + 0×4 = 20 byte (+ eval stack)  │
+ │  Frame méret: 12 + 2×4 + 0×4 = 20 byte (+ eval stack)    │
  │                                                          │
- │  Frame 1 (callee):  Gcd(a, b) — 2 arg, 1 local          │
+ │  Frame 1 (callee):  Gcd(a, b) — 2 arg, 1 local           │
  │  ┌────────────────────────────────────────────────────┐  │
- │  │ [FP₁+0]   ReturnPC = (call utáni opkód)│  4 byte  │  │
- │  │ [FP₁+4]   PrevFrameBase = FP₀          │  4 byte  │  │
- │  │ [FP₁+8]   ArgCount=2, LocalCount=1     │  4 byte  │  │
- │  │ ─ ─ ─ ─ header vége (12 byte) ─ ─ ─ ─  │          │  │
- │  │ [FP₁+12]  arg[0] = 48                  │  4 byte  │  │
- │  │ [FP₁+16]  arg[1] = 18                  │  4 byte  │  │
- │  │ ─ ─ ─ ─ args vége ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
- │  │ [FP₁+20]  local[0] = 0                 │  4 byte  │  │
- │  │ ─ ─ ─ ─ locals vége ─ ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
- │  │ [FP₁+24]  eval[0]                      │          │  │
- │  │ [FP₁+28]  eval[1]                      │          │  │
- │  │ [FP₁+32]  eval[2]                      │          │  │
+ │  │ [FP₁+0]   ReturnPC = (call utáni opkód) │  4 byte  │  │
+ │  │ [FP₁+4]   PrevFrameBase = FP₀           │  4 byte  │  │
+ │  │ [FP₁+8]   ArgCount=2, LocalCount=1      │  4 byte  │  │
+ │  │ ─ ─ ─ ─ header vége (12 byte) ─ ─ ─ ─ ─ │          │  │
+ │  │ [FP₁+12]  arg[0] = 48                   │  4 byte  │  │
+ │  │ [FP₁+16]  arg[1] = 18                   │  4 byte  │  │
+ │  │ ─ ─ ─ ─ args vége ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
+ │  │ [FP₁+20]  local[0] = 0                  │  4 byte  │  │
+ │  │ ─ ─ ─ ─ locals vége ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
+ │  │ [FP₁+24]  eval[0]                       │          │  │
+ │  │ [FP₁+28]  eval[1]                       │          │  │
+ │  │ [FP₁+32]  eval[2]                       │          │  │
  │  └────────────────────────────────────────────────────┘  │
- │  Frame méret: 12 + 2×4 + 1×4 = 24 byte (+ eval stack)  │
+ │  Frame méret: 12 + 2×4 + 1×4 = 24 byte (+ eval stack)    │
  │                                                          │
  │  [szabad SRAM]                                           │
  │                                                          │
@@ -729,7 +729,7 @@ Az F2 RTL cocotb tesztjei a szimulátor `SramSnapshot()` kimenetét **byte-ról 
 
 ## Dekódolási stratégia
 
-Részletesen lásd `ISA-CIL-T0.md`, de a stratégia magja:
+Részletesen lásd `ISA-CIL-T0-hu.md`, de a stratégia magja:
 
 ### Hossz-dekóder
 
@@ -796,7 +796,7 @@ A CLI-CPU belső mikro-utasítás formátuma (F2-ben véglegesítendő, előzete
 
 Egy CIL `add` = 1 μop (`OP=TOS_ADD, DST=TOS-1, SRC1=TOS-1, SRC2=TOS, FLAGS=pop1 | last`).
 
-Egy CIL `callvirt` = ~8-10 μop (lásd `ISA-CIL-T0.md` részletes trace).
+Egy CIL `callvirt` = ~8-10 μop (lásd `ISA-CIL-T0-hu.md` részletes trace).
 
 ## Kivételkezelés
 
@@ -922,7 +922,7 @@ Clock-gating minden domainben, power-gating a 2., 3., 4. domainben.
 
 ## Silicon-grade security
 
-Ez a szekció a CLI-CPU biztonsági architektúráját tárgyalja **az architektúra szemszögéből**. A teljes biztonsági modellt, threat model-t, támadás-immunitási táblázatot, formális verifikáció tervet és tanúsítási útvonalakat külön dokumentum tartalmazza: lásd [`docs/security.md`](security.md).
+Ez a szekció a CLI-CPU biztonsági architektúráját tárgyalja **az architektúra szemszögéből**. A teljes biztonsági modellt, threat model-t, támadás-immunitási táblázatot, formális verifikáció tervet és tanúsítási útvonalakat külön dokumentum tartalmazza: lásd [`docs/security-hu.md`](security-hu.md).
 
 ### A CLI-CPU biztonsági alapelve
 
@@ -957,7 +957,7 @@ Ez a megfogalmazás nem marketing, hanem **architektúra-tervezési következmé
 
 ### Támadás-osztályok, amelyekre immunis a CLI-CPU
 
-Rövid összefoglaló (a részletes táblázat a [`docs/security.md`](security.md) fájlban):
+Rövid összefoglaló (a részletes táblázat a [`docs/security-hu.md`](security-hu.md) fájlban):
 
 | Támadás-család | Státus |
 |----------------|--------|
@@ -980,7 +980,7 @@ A CLI-CPU **Nano core** 48 opkódos ISA-ja **gyakorlatilag kisebb, mint a seL4 m
 
 Ez azt jelenti, hogy a CLI-CPU **formális verifikációja megvalósítható** — nem egyszerű, nem olcsó, de **nem is lehetetlen**, és **sem az x86, sem az ARM, sem a RISC-V teljes extension-készletével nem megvalósítható**.
 
-A formális verifikáció részleteiért lásd a [`docs/security.md`](security.md) **„Formális verifikáció"** szekcióját.
+A formális verifikáció részleteiért lásd a [`docs/security-hu.md`](security-hu.md) **„Formális verifikáció"** szekcióját.
 
 ### Kapcsolódó projektek
 
@@ -996,11 +996,11 @@ A CLI-CPU biztonsági profilja a **Cognitive Fabric** (programozható kognitív 
 - **Pálya 1 — „Cognitive Fabric"** — AI kutatóknak, actor rendszereknek, neurális háló szimulációnak, multi-agent rendszereknek. Hosszú távú vízió.
 - **Pálya 2 — „Trustworthy Silicon"** — regulated industries-nek: automotive (ISO 26262), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog chipek, confidential computing. Rövid-közép távú bevételi lehetőség, magas árréssel.
 
-**Ugyanaz a hardver, két különböző piaci szegmens.** Részletek és konkrét cél-piacok a [`docs/security.md`](security.md) **„Mit jelent ez a projekt gyakorlati célja szempontjából"** szekciójában.
+**Ugyanaz a hardver, két különböző piaci szegmens.** Részletek és konkrét cél-piacok a [`docs/security-hu.md`](security-hu.md) **„Mit jelent ez a projekt gyakorlati célja szempontjából"** szekciójában.
 
 ## Következő lépés
 
-A `ISA-CIL-T0.md` dokumentum adja a konkrét CIL-T0 subset teljes opkód-specifikációját, kódolási táblákat, stack-effekteket, ciklusszámokat és trap feltételeket. **Ez az F1 C# szimulátor alapja** — minden ottani tesztnek közvetlenül hivatkoznia kell az ISA-CIL-T0 spec egy-egy pontjára, és a property-based tesztek már most megalapozzák a későbbi formális verifikációt.
+A `ISA-CIL-T0-hu.md` dokumentum adja a konkrét CIL-T0 subset teljes opkód-specifikációját, kódolási táblákat, stack-effekteket, ciklusszámokat és trap feltételeket. **Ez az F1 C# szimulátor alapja** — minden ottani tesztnek közvetlenül hivatkoznia kell az ISA-CIL-T0 spec egy-egy pontjára, és a property-based tesztek már most megalapozzák a későbbi formális verifikációt.
 
 ---
 

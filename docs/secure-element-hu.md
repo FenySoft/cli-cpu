@@ -24,7 +24,7 @@
 
 ## Miért egy harmadik pálya <a name="miert-egy-harmadik-palya"></a>
 
-Az eddigi `docs/architecture.md`, `docs/security.md` és `docs/neuron-os.md` dokumentumok **két piaci pályát** rögzítettek:
+Az eddigi `docs/architecture-hu.md`, `docs/security-hu.md` és `docs/neuron-os-hu.md` dokumentumok **két piaci pályát** rögzítettek:
 
 1. **Cognitive Fabric** — programozható kognitív szubsztrátum, AI/SNN/actor cluster (hosszú távú vízió)
 2. **Trustworthy Silicon** — regulated industries (automotive, aviation, medical, critical infra), rövid-közép távú bevétel
@@ -273,7 +273,7 @@ Egy modern okostelefon igényel:
 
 ### Amit a jelenlegi CLI-CPU terv **már tartalmaz**
 
-A `docs/architecture.md`, `docs/security.md` és `docs/ISA-CIL-T0.md` már most megadja azokat az alapokat, amelyekre a Secure Edition épülhet, **minimális újratervezéssel**:
+A `docs/architecture-hu.md`, `docs/security-hu.md` és `docs/ISA-CIL-T0-hu.md` már most megadja azokat az alapokat, amelyekre a Secure Edition épülhet, **minimális újratervezéssel**:
 
 | Secure Element követelmény | CLI-CPU status | Fázis |
 |---------------------------|----------------|-------|
@@ -717,10 +717,10 @@ A Secure Edition **nem sürget** semmit az F1-F4 fázisokban, mert a Cognitive F
 
 ## Kapcsolat a többi dokumentummal
 
-- [`docs/security.md`](security.md) — A hardveres biztonsági tulajdonságok itt vannak dokumentálva; a Secure Edition ezekre épül.
-- [`docs/architecture.md`](architecture.md) — A heterogén Nano + Rich multi-core architektúra a Secure Edition alapja is.
-- [`docs/roadmap.md`](roadmap.md) — Az F6.5 fázis itt kerül rögzítésre.
-- [`docs/neuron-os.md`](neuron-os.md) — A Neuron OS aktor-alapú modellje **természetesen** támogatja a multi-SE hardveres isolation-t.
+- [`docs/security-hu.md`](security-hu.md) — A hardveres biztonsági tulajdonságok itt vannak dokumentálva; a Secure Edition ezekre épül.
+- [`docs/architecture-hu.md`](architecture-hu.md) — A heterogén Nano + Rich multi-core architektúra a Secure Edition alapja is.
+- [`docs/roadmap-hu.md`](roadmap-hu.md) — Az F6.5 fázis itt kerül rögzítésre.
+- [`docs/neuron-os-hu.md`](neuron-os-hu.md) — A Neuron OS aktor-alapú modellje **természetesen** támogatja a multi-SE hardveres isolation-t.
 
 ## Záró gondolat
 
