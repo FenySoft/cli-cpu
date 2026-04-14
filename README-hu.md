@@ -9,6 +9,24 @@
 
 🌐 [clicpu.org](https://clicpu.org) *(hamarosan)*
 
+## Gyors indulás
+
+```bash
+git clone https://github.com/FenySoft/cli-cpu.git
+cd cli-cpu
+dotnet build CLI-CPU.sln -c Debug
+dotnet test
+
+# A .dll-ben lévő CIL opkódok UGYANAZOK, amiket a CPU natívan futtat.
+# A linker csak átcsomagolja őket a PE/COFF konténerből (.dll) egy lapos
+# binárisba (.t0), amit a hardver közvetlenül betölthet — nincs fordítás.
+# (A Rich core az F5+-ban közvetlenül tölti be a .dll-t metadata walker-rel,
+#  kötelező PQC aláírás-ellenőrzés után.)
+
+dotnet run --project src/CilCpu.Sim.Runner -- link samples/PureMath/bin/Release/net10.0/PureMath.dll --class Math --method Fibonacci -o fibonacci.t0
+dotnet run --project src/CilCpu.Sim.Runner -- run fibonacci.t0 --args 20
+```
+
 ## Mi ez?
 
 A CLI-CPU egy nyílt forráskódú processzor-projekt, amely **a .NET CIL bájtkódot natívan, hardveresen futtatja**, fordítási lépés nélkül — és **sok kis egyszerű core-t** helyez egyetlen chipre, amelyek **üzenet-alapú hálózatként** működnek együtt. Minden core egy teljes CIL programot futtat saját lokális állapottal, és a core-ok kizárólag **mailbox FIFO-kon** keresztül beszélnek egymással — nincs shared memory, nincs cache koherencia, nincs lock contention.

@@ -190,7 +190,7 @@ In .NET, AppDomains provide software-based isolation. CLI-CPU has **none** -- in
 In .NET, new DLLs can be loaded at runtime. On CLI-CPU, this **differs by core type**:
 
 - **Nano core (CIL-T0):** **Not possible** -- binaries are **statically linked** `.t0` files, loaded once by the boot-loader. **This is a prerequisite for formal verification**: once the static image has been verified, nobody can modify it at runtime.
-- **Rich core (F5+):** **Yes** -- writable microcode SRAM and the Neuron OS hot code loading feature enable actor-level code replacement at runtime, **without downtime** (Erlang OTP-inspired). Use cases: firmware updates, plugin loading, actor migration Nano → Rich, zero-downtime security patches.
+- **Rich core (F5+):** **Yes** -- writable microcode SRAM and the Neuron OS hot code loading feature enable actor-level code replacement at runtime, **without downtime** (Erlang OTP-inspired). All dynamically loaded code must pass **mandatory PQC signature verification** before execution. Use cases: firmware updates, plugin loading, actor migration Nano → Rich, zero-downtime security patches.
 
 #### Thread, async/await runtime
 

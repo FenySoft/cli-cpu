@@ -6,7 +6,7 @@
 
 Ez a dokumentum a CLI-CPU **mikroarchitektúráját** írja le magas szinten: a stack-gép modellt, a pipeline-t, a memória térképet, a dekódolási stratégiát, a GC és kivételkezelés hardveres támogatását, valamint az elődprojektek (picoJava, Jazelle, Transmeta) közül átvett technikákat.
 
-> **Megjegyzés:** Ez az architektúra fokozatosan épül fel az F0–F7 fázisokban. Az itt leírt teljes funkciókészlet az **F6-Silicon „Cognitive Fabric One"** chipben készül el (ChipIgnite vagy IHP MPW, 2R+24N, 10 mm²). A **Tiny Tapeout (F3)** csak az egymagos CIL-T0 subset-et valósítja meg, amit egy külön dokumentum (`ISA-CIL-T0-hu.md`) ír le. A „Cognitive Fabric One" szekció rögzíti a konkrét referencia chip víziót és az összehasonlítást a hagyományos multi-core CPU-kkal.
+> **Megjegyzés:** Ez az architektúra fokozatosan épül fel az F0–F7 fázisokban. Az itt leírt teljes funkciókészlet az **F6-Silicon „Cognitive Fabric One"** chipben készül el (ChipIgnite vagy IHP MPW, 6R+17N+1S, 10 mm²). A **Tiny Tapeout (F3)** csak az egymagos CIL-T0 subset-et valósítja meg, amit egy külön dokumentum (`ISA-CIL-T0-hu.md`) ír le. A „Cognitive Fabric One" szekció rögzíti a konkrét referencia chip víziót és az összehasonlítást a hagyományos multi-core CPU-kkal.
 
 ## Stratégiai pozicionálás: Cognitive Fabric
 
@@ -206,7 +206,13 @@ Az F4 4-core design **lineárisan skálázható** 16 core-ig anélkül, hogy a s
 
 ## Heterogén multi-core: Nano + Rich
 
-Az F5 fázistól a CLI-CPU **heterogén multi-core** architektúrára vált, analóg módon az ARM **big.LITTLE**, Apple **P-core + E-core**, és Intel **Alder Lake P+E** megközelítéseihez, csak a CLI világra alkalmazva. Egyetlen chipen **kétféle core** él együtt:
+Az F5 fázistól a CLI-CPU **heterogén multi-core** architektúrára vált, három bevált ipari koncepciót egyesítve egyetlen chipben:
+
+- **ARM big.LITTLE (2011):** Kétféle CPU core egy chipen — „big" (gyors, energiaéhes) és „LITTLE" (lassú, takarékos). A telefon a könnyű feladatokat a LITTLE-ön futtatja, a nehezeket a big-en. **Nálunk: Rich = big, Nano = LITTLE.**
+- **Apple Secure Enclave (2013):** Külön, izolált chip-a-chipben az iPhone-ban, amelynek egyetlen feladata a biztonsági műveletek (Face ID, ujjlenyomat, fizetés). Még ha feltörik a telefont, a Secure Enclave-ben tárolt kulcsok biztonságban maradnak. **Nálunk: Secure Core = Secure Enclave.**
+- **Intel Alder Lake (2021):** P-core (Performance) + E-core (Efficiency) heterogén keverék, az OS ütemezőre bízva a feladatkiosztást. **Nálunk: a Neuron OS supervisor osztja ki a feladatokat Rich és Nano core-ok között.**
+
+Egyetlen chipen **háromféle elem** él együtt — kettő számítási, egy biztonsági:
 
 | | **Nano core** | **Rich core** |
 |-|---------------|---------------|
@@ -320,37 +326,130 @@ A Nano core lépései:
 
 **Ez ritka eset** — a fordítói típus-check a legtöbb esetet build-time elfogja. A runtime migráció csak olyan edge case-ekre, mint a dinamikus reflexió, ami amúgy sem tipikus a cognitive fabric használatban.
 
-### Miért nem 3 vagy több core típus
+### Secure Core — dedikált kód-ellenőrző trust anchor
 
-Elméletileg lehetne „Micro" (még kisebb, csak 16 opkód) és „Mega" (Rich + több cache) is — de ez **bonyolítja a programozási modellt** és **a floorplan tervezést**. A kereskedelmi példák (Apple, ARM, Intel) **mind** pontosan 2 core típust használnak, és ez a sweet spot. A CLI-CPU is **2 core típusnál** marad: Nano és Rich.
+A Nano és Rich mellett a CLI-CPU egy **harmadik, infrastruktúra jellegű core típust** tartalmaz: a **Secure Core**-t. Ez **nem számítási core** (nem fut rajta felhasználói kód), hanem a rendszer **trust anchor-ja** — minden betöltendő kód rajta keresztül megy.
+
+**Feladata:**
+1. **SHA-256 hash** számítás a betöltendő kódra
+2. **PQC digitális aláírás ellenőrzés** (Dilithium / XMSS) a hash-re
+3. **CIL opkód validáció** (CIL-T0 kompatibilitás ellenőrzés Nano core-ra töltés esetén)
+4. **Eredmény:** PASS → a kód betöltődik az operatív memóriába; FAIL → elutasítás, trap
+
+```
+   QSPI Flash / Ethernet / UART
+              │
+              ▼
+   ┌──────────────────────┐
+   │    Secure Core       │  ← dedikált, egyetlen feladata
+   │                      │
+   │  1. SHA-256 hash     │
+   │  2. PQC aláírás      │
+   │     ellenőrzés       │
+   │  3. CIL opkód        │
+   │     validáció        │
+   │                      │
+   │  ✅ PASS → betöltés  │
+   │  ❌ FAIL → elutasítás│
+   └──────────┬───────────┘
+              │ csak PASS után
+              ▼
+   ┌──────────────────────┐
+   │  Operatív memória    │
+   │  Nano / Rich core-ok │
+   │  futtathatják        │
+   └──────────────────────┘
+```
+
+**Miért dedikált core, nem a Rich core végzi?**
+
+| | Rich core-on | **Dedikált Secure Core** |
+|--|-------------|------------------------|
+| Feladata | Minden: supervision + GC + crypto + logika | **Egyetlen**: kód ellenőrzés |
+| Támadási felület | Nagy (teljes CIL, komplex) | **Minimális** (csak hash + verify) |
+| Formálisan verifikálható | Nehéz (túl komplex) | **Igen** (kis, fókuszált kódbázis) |
+| Megbízhatóság | Egy Rich core bug → crypto is sérülhet | **Izolált** — más core bugja nem érinti |
+
+**Becsült méret:** ~20-30K std cell — nagyobb mint a Nano (~10K), kisebb mint a Rich (~80K).
+
+**Fázisonként:**
+
+| Fázis | Secure Core |
+|-------|------------|
+| F3-F4 | Nincs — a host gép ellenőriz build-time |
+| **F5** | Bevezetés — SHA-256 + egyszerű aláírás ellenőrzés |
+| **F6** | PQC aláírás (Dilithium / XMSS) |
+| **F6.5** | Teljes Crypto Actor (Secure Core + TRNG + PUF + tamper detection) |
+
+**A „2 compute core típus" szabály megmarad:** a Nano és Rich a számítási core-ok (big.LITTLE analógia). A Secure Core **infrastruktúra elem** (mint az ARM CryptoCell vagy az Apple Secure Enclave) — nem fut rajta felhasználói kód, kizárólag a rendszer integritását biztosítja.
+
+### Miért nem vezetünk be további core típusokat?
+
+Egy core típust az **ISA-ja** definiál (milyen opkódokat tud végrehajtani), nem a cache vagy SRAM mérete — az csak konfiguráció. Elméletileg lehetne „Micro" (még kisebb ISA, csak 16 opkód) is, de ez **bonyolítja a programozási modellt**: a fejlesztőnek három különböző opkód-készletre kellene figyelnie. A kereskedelmi példák (Apple, ARM, Intel) **mind** pontosan 2 számítási core típust használnak, és ez a sweet spot. A CLI-CPU is **2 számítási core-nál** marad (Nano és Rich), kiegészítve a Secure Core infrastruktúra elemmel.
 
 ## Cognitive Fabric One — a referencia silicon target (F6-Silicon)
 
 Ez a szekció a CLI-CPU **első valódi heterogén szilícium chipjének** konkrét vízióját rögzíti: mit tartalmaz, miért éppen ezt a konfigurációt célozzuk, és miért „ütős" — azaz miért demonstrálja, hogy a Cognitive Fabric paradigma **jobb alternatíva** a hagyományos multi-threaded CPU-knál **ugyanazon a szilícium lapkán**.
 
+### Silicon platform: ChipIgnite OpenFrame
+
+A chip az eFabless **ChipIgnite OpenFrame** harness-en készül (~$14,950), amely a Caravel alternatívája:
+
+| | Caravel | **OpenFrame** |
+|--|---------|-------------|
+| User area | 10 mm² | **~15 mm²** (+50%) |
+| User GPIO | 38 | **44** (minden pin szabad) |
+| Beépített SoC | RISC-V mgmt core, SPI, UART, DLL | **Nincs** — csak padframe + POR + ID ROM |
+| Ár | ~$14,950 | **~$14,950** (azonos) |
+
+Az OpenFrame-et választjuk, mert:
+- **15 mm²** területen a 6R+16N+1S konfiguráció **kényelmesen elfér** (~9.73 mm²), és ~5 mm² marad extra SRAM-ra vagy jövőbeli bővítésre
+- **44 GPIO** — 6 pinnel több mint a Caravel 38-ja, ami kényelmesebb pin-kiosztást ad
+- **Nincs felesleges RISC-V management core** — a CLI-CPU-nak saját Rich core-jai vannak, nem kell külső CPU
+- Ugyanaz az ár ($14,950), több terület és flexibilitás
+
 ### A chip specifikációja
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│              CLI-CPU "Cognitive Fabric One"                  │
-│                     10 mm² Sky130                            │
+│             CLI-CPU "Cognitive Fabric One"                   │
+│                    10 mm² Sky130                             │
 │                                                              │
-│   ┌─────────┐   ┌─────────┐                                  │
-│   │ Rich #0 │───│ Rich #1 │        ← 2 supervisor core       │
-│   │ 16KB    │   │ 16KB    │          Neuron OS kernel +      │
-│   └────┬────┘   └────┬────┘          device driver aktorok   │
-│        │    Mesh     │                                       │
-│        │   Router    │           2D grid topológia           │
-│   ┌────┴───┬───┬─────┴──┬───┬───┐                            │
-│   │N0  4KB │N1 │N2  4KB │N3 │N4 │                            │
-│   │N5  4KB │N6 │N7  4KB │N8 │N9 │  ← 24 Nano worker core     │
-│   │N10 4KB │N11│N12 4KB │N13│N14│    Minden core:            │
-│   │N15 4KB │N16│N17 4KB │N18│N19│    - Saját 4 KB SRAM       │
-│   │N20 4KB │N21│N22 4KB │N23│   │    - Mailbox FIFO (inbox   │
-│   └────────┴───┴────────┴───┴───┘      + outbox)             │
-│                                    - Sleep/Wake interrupt    │
-│   QSPI Flash ── QSPI PSRAM ── UART ── Timer ── GPIO          │
+│ ┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐ │
+│ │Rich #0 ││Rich #1 ││Rich #2 ││Rich #3 ││Rich #4 ││Rich #5 │ │
+│ │ 16KB   ││ 16KB   ││ 16KB   ││ 16KB   ││ 16KB   ││ 16KB   │ │
+│ │Kernel  ││Device  ││App Sup ││Domain  ││Crypto  ││Standby │ │
+│ └───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘└───┬────┘ │
+│     │    Mesh Router (2D grid)    │         │         │      │
+│     │         │         │         │         │         │      │
+│ ┌───┴────┬────┴───┬─────┴───┬─────┴──┬──────┴──┬──────┘      │
+│ │N0  4KB │N1  4KB │N2   4KB │N3  4KB │N4  4KB  │             │
+│ │N5  4KB │N6  4KB │N7   4KB │N8  4KB │N9  4KB  │ ← 16 Nano   │
+│ │N10 4KB │N11 4KB │N12  4KB │N13 4KB │N14 4KB  │   worker    │
+│ │N15 4KB │        │         │        │         │   core      │
+│ └────────┴────────┴─────────┴────────┴─────────┘             │
+│ Minden Nano: saját 4 KB SRAM + Mailbox FIFO + Sleep/Wake     │
+│                                                              │
+│ ┌──────────────┐                                             │
+│ │ Secure Core  │  ← trust anchor (SHA-256 + PQC verify)      │
+│ └──────────────┘                                             │
+│                                                              │
+│ Megosztott OPI busz (8 data + CLK, 2-to-4 CS mux):           │
+│ ┌─────────┐ ┌──────────┐ ┌─────────┐ ┌──────────┐            │
+│ │OPI Flash│ │OPI PSRAM │ │OPI FRAM │ │(tartalék)│            │
+│ │ kód, RO │ │ adat, RW │ │ tartós  │ │          │            │
+│ └─────────┘ └──────────┘ └─────────┘ └──────────┘            │
+│                                                              │
+│ USB 1.1 FS ── Timer ── GPIO                                  │
 └──────────────────────────────────────────────────────────────┘
+
+Rich core szerepek:
+  #0: Neuron OS kernel — root supervisor, scheduler
+  #1: Device drivers — OPI, USB, GPIO (crash → restart)
+  #2: Alkalmazás supervisor — app lifecycle, hot code loading
+  #3: Komplex domain logika — orchestrátor, string/FP
+  #4: Crypto / PQC dedikált számítások
+  #5: Hot standby / redundancia
 ```
 
 ### Sky130 területbecslési referencia
@@ -369,63 +468,159 @@ A chip tervezési döntései a Sky130 PDK (130nm, SkyWater) fizikai paraméterei
 | **Rich core logika** (~80,000 std cell) | ~0.25 mm² | architecture-hu.md becslés |
 | **Routing overhead** | ~25–35% | Általános Sky130 tapasztalat |
 
-**Kulcs felismerés:** Az **SRAM a terület-domináns elem**, nem a logika. A 26 core logikája összesen ~1.24 mm² (a chip 12%-a). A maradék 88% SRAM és routing. Ezért a core-szám és az SRAM-méret közötti trade-off a legfontosabb tervezési döntés.
+**Kulcs felismerés:** Az **SRAM a terület-domináns elem**, nem a logika. Ezért a core-szám és az SRAM-méret közötti trade-off a legfontosabb tervezési döntés.
 
 ### Chip terület-bontás
 
 | Elem | Darab | Per-core SRAM | Terület (Sky130) |
 |------|-------|-------------|-----------------|
-| Rich core + mailbox | 2 | 16 KB | 2 × 0.75 mm² = 1.5 mm² |
-| Nano core + mailbox | 24 | 4 KB | 24 × 0.18 mm² = 4.3 mm² |
+| Rich core + mailbox | 6 | 16 KB | 6 × 0.75 mm² = 4.5 mm² |
+| Nano core + mailbox | 16 | 4 KB | 16 × 0.18 mm² = 2.88 mm² |
+| Secure Core | 1 | — | ~0.18 mm² |
 | Mesh router (2D grid) | 1 | — | 0.02 mm² |
-| Perifériák (QSPI, UART, timer, GPIO) | — | — | 0.1 mm² |
-| Routing overhead (~25%) | — | — | 1.5 mm² |
-| **Összesen** | **26 core** | **128 KB** | **~7.4 mm²** |
-| **Maradék** | | | **~2.6 mm²** (writable microcode SRAM, extra cache, tartalék) |
+| Perifériák (OPI ctrl, USB, timer, GPIO) | — | — | 0.2 mm² |
+| Routing overhead (~25%) | — | — | 1.95 mm² |
+| **Összesen** | **23 core + 1 Secure** | **160 KB** | **~9.73 mm²** |
+| **Maradék** | | | **~0.27 mm²** (tartalék routing/timing closure-hoz) |
 
-### Miért éppen ez a konfiguráció
+### Külső memória interfész
 
-**Az SRAM a terület-domináns elem, nem a logika.** A 26 core logikája összesen ~1.24 mm² — a 10 mm²-es chipnek ez csak 12%-a. A maradék 88% SRAM és routing. Ez azt jelenti:
+A 152 KB on-chip SRAM a core-ok lokális cache-ének elég, de a program kód és a nagyobb adatstruktúrák **külső memóriáról** jönnek. A Sky130 I/O cellák ~50-100 MHz SDR-re képesek — ez meghatározza az interfész választást:
+
+| Interfész | Latency @50MHz | Sávszélesség | Pin | Sky130 kompatibilis? |
+|-----------|---------------|-------------|-----|---------------------|
+| ~~QSPI~~ | 14-20 ciklus | 25 MB/s | 6 | Igen, de lassú |
+| **OPI (Octal SPI)** | **6-10 ciklus** | **50 MB/s** | **11** | **Igen (SDR)** |
+| ~~HyperRAM~~ | 6-13 ciklus | 200 MB/s | 12 | Nem (DDR signaling kell) |
+| ~~DDR3~~ | 5-15 ciklus | 1-2 GB/s | ~40+ | Nem (túl gyors I/O) |
+
+Az **OPI (Octal SPI)** a legjobb illeszkedés a Sky130 ~50 MHz-es I/O-jához: **fele latency** és **dupla sávszélesség** a QSPI-hez képest, de **nem igényel DDR signaling-ot**. A controller egyszerű (a QSPI kiterjesztése 8 adatvonalra), a terület-költsége minimális (~0.08 mm²).
+
+Az OPI Flash, OPI PSRAM és OPI FRAM **egy megosztott buszra** kapcsolódik, **multiplexált chip select-tel** (2 pin → 2-to-4 on-chip dekóder → 4 eszköz):
+
+```
+                   Megosztott OPI busz (8 data + CLK)
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+     ┌────┴────┐              │                   │
+     │ 2-to-4  │              │                   │
+     │ dekóder │              │                   │
+     │(on-chip)│              │                   │
+     └─┬──┬──┬──┬─┘           │                   │
+      CS0 CS1 CS2 CS3         │                   │
+       │   │   │   │          │                   │
+   ┌───┘   │   │   └───┐     │                   │
+   ▼       ▼   ▼       ▼     │                   │
+┌──────┐┌──────┐┌──────┐┌──────┐                  │
+│ OPI  ││ OPI  ││ OPI  ││(jövő)│                  │
+│Flash ││PSRAM ││FRAM  ││      │                  │
+│kód,RO││adat, ││tartós││      │                  │
+│      ││RW    ││      ││      │                  │
+└──────┘└──────┘└──────┘└──────┘
+```
+
+A multiplexált CS 2 pin-nel **4 eszközt** kezel (1 tartalék a jövőre). A busz-ütközést a core-ok **prefetch buffer-rel** (64 byte kód előretöltés) minimalizálják — a kód fetch szekvenciális és előrejelezhető, így a busz legtöbbször szabad az adat hozzáférésekhez.
+
+**Háromszintű tartós tárolás:**
+
+| Szint | Memória | Tartós? | Írás latency | Endurance | Típikus tartalom |
+|-------|---------|---------|-------------|-----------|-----------------|
+| **1. FRAM** | OPI FRAM (256 KB – 4 MB) | **Igen** | **6-10 ciklus** (mint olvasás) | **10^12+ ciklus** | Actor state, journal, kulcsok, konfiguráció |
+| **2. Flash partíció** | OPI Flash szabad része | **Igen** | ~1-100 ms (erase+program) | ~100K ciklus | Firmware backup, offline adatok, log archívum |
+| **3. Host tárolás** | USB-n át | **Igen** | ~ms (hálózat-függő) | Korlátlan | Adatbázis, backup, szinkronizáció |
+
+### Host kommunikáció: USB 1.1 FS
+
+Az UART helyett **USB 1.1 Full Speed** (12 Mbps) — a Sky130 @50 MHz-en megvalósítható:
+
+| | UART | **USB 1.1 FS** |
+|--|------|---------------|
+| Sávszélesség | 115.2 Kbps | **12 Mbps** (~100×) |
+| Pin szám | 2 (TX, RX) | **2** (D+, D−) |
+| Sky130 kompatibilis | Igen | **Igen** (FS PHY egyszerű) |
+| Controller terület | ~0.01 mm² | ~0.1-0.2 mm² |
+| Host oldal | USB-UART adapter kell | **Natív USB** — bármely PC/tablet |
+| Tápellátás | Külön kell | **5V a kábelen** (opcionális) |
+| Használat | Mailbox bridge, debug, firmware upload, host tárolás | Ugyanaz, de **100× gyorsabb** |
+
+**Pin kiosztás** (ChipIgnite OpenFrame, 44 GPIO):
+
+| Interfész | Pin szám |
+|-----------|----------|
+| Megosztott OPI busz (8 data + CLK) | 9 |
+| CS multiplex (2-to-4 dekóder) | 2 |
+| USB 1.1 FS (D+, D−) | 2 |
+| Mailbox bridge (inter-chip) | 4 |
+| GPIO / debug | 27 |
+| **Összesen** | **44** |
+
+### A core-ok száma konfigurálható
+
+A **6R+17N+1S** a referencia konfiguráció, de az RTL **paraméterezhető** (`#NUM_RICH`, `#NUM_NANO`). Ugyanaz a design különböző arányokkal instanciálható a célpiac szerint:
+
+| Konfiguráció | Rich | Nano | Secure | Összesen | Célpiac |
+|-------------|------|------|--------|---------|---------|
+| 2R + 34N + 1S | 2 | 34 | 1 | 37 | SNN kutatás, IoT szenzor farm |
+| 4R + 26N + 1S | 4 | 26 | 1 | 31 | Neuron OS + worker mix |
+| **6R + 17N + 1S** | **6** | **17** | **1** | **24** | **Referencia — alkalmazás + demó egyensúly** |
+| 8R + 9N + 1S | 8 | 9 | 1 | 18 | Általános .NET alkalmazás (JokerQ-szerű) |
+
+A konfigurációt **a szintézis előtt** kell megválasztani (nem futásidőben). Az FPGA-n a konfigurációs sweep (F6-FPGA) során szisztematikusan teszteljük a különböző arányokat.
+
+### Miért éppen a 6R+17N+1S a referencia
+
+**Az SRAM a terület-domináns elem, nem a logika.** A 6 Rich + 17 Nano + 1 Secure core logikája összesen ~2.1 mm² (6×0.25 + 17×0.031 + 0.06) — a 10 mm²-es chipnek ez csak ~21%-a. A maradék ~79% SRAM és routing. Ez azt jelenti:
 - A core-ok **olcsók** (egy Nano core logikája ~0.031 mm²)
 - A memória **drága** (16 KB SRAM ~0.5 mm²)
 - A **sweet spot** a 4 KB/Nano + 16 KB/Rich — elég a TOS cache, lokális változók és frame-ek on-chip tartásához, a nagy adat QSPI PSRAM-ról jön
 
-A maradék ~2.6 mm² felhasználása (F6-Silicon döntés):
+A maradék ~0.9 mm² felhasználása (F6-Silicon döntés):
 - **Writable microcode SRAM** — firmware-frissíthető opkód-szemantika
-- **Extra Nano core-ok** (akár +8, ha SRAM nélkül, QSPI-re támaszkodva)
 - **Gated store buffer** (GC write barrier batch)
 - **Tartalék** routing és timing closure-hoz
 
 ### Miért „ütős" — összehasonlítás hagyományos multi-core CPU-val
 
-Ugyanaz a 10 mm² Sky130 terület, de hagyományos megközelítéssel (pl. 4-core RISC-V shared memory-val):
+Ugyanaz a 10 mm² Sky130 terület. A RISC-V-nek **cache coherency kell** ha shared memory-t használ (Linux, .NET runtime):
 
-| Komponens | Hagyományos 4-core RISC-V | **CLI-CPU Cognitive Fabric One** |
-|-----------|--------------------------|--------------------------------|
-| Core logika | 4 × ~0.15 mm² = 0.6 mm² | 2R + 24N = 1.24 mm² |
-| L1 cache (per-core) | 4 × 0.3 mm² = 1.2 mm² | **Privát SRAM** (nincs cache miss coherency) |
-| **Cache coherency** (snoop, MESI) | **~1.0–1.5 mm²** | **0 mm²** (nincs shared memory → nincs koherencia) |
-| **Shared L2 cache** | **~1.0 mm²** | **0 mm²** (nincs shared semmi) |
-| Memory controller | 0.3 mm² | 0.1 mm² (QSPI, egyszerűbb) |
-| Routing | ~1.5 mm² | ~1.5 mm² |
-| **Hasznos core-ok** | **4** | **26** |
-| **On-chip SRAM** | ~48 KB (L1) + 32 KB (L2) = ~80 KB | **128 KB** (privát, koherencia nélkül) |
-| **Szabad terület** | ~4 mm² (de több core → több coherency) | **2.6 mm²** |
+**RISC-V konfigurációk 10 mm²-en (Sky130):**
 
-**A kulcs:** a hagyományos CPU ~2.0–2.5 mm²-t (a chip 20–25%-át!) a cache coherency infrastruktúrára költ — snoop filter, MESI/MOESI protokoll, shared L2 tag RAM, bus arbiter. A CLI-CPU-n ez a terület **mind extra core-nak megy**, mert az architektúra shared-nothing — a koherencia probléma **nem létezik**.
+| RISC-V konfig | Core terület | Coherency | L2 + periféria | Routing | Összesen | Maradék → extra RAM | Összes RAM |
+|--------------|-------------|-----------|---------------|---------|----------|-------------------|-----------|
+| **4 core** | 1.80 mm² | 0.75 mm² | 1.40 mm² | 0.99 mm² | 4.94 mm² | 5.06 mm² → ~150 KB | **~214 KB** |
+| **6 core** | 2.70 mm² | 1.10 mm² | 1.40 mm² | 1.30 mm² | 6.50 mm² | 3.50 mm² → ~105 KB | **~169 KB** |
+| **8 core** | 3.60 mm² | 1.50 mm² | 1.40 mm² | 1.63 mm² | 8.13 mm² | 1.87 mm² → ~56 KB | **~152 KB** |
+| **12 core** | 5.40 mm² | 2.50 mm² | 1.40 mm² | 2.33 mm² | 11.63 mm² | **Nem fér el!** | — |
+
+(Egy RV32IMC core ~0.15 mm² logika + 4KB L1 I-cache + 4KB L1 D-cache = ~0.45 mm²/core. A cache coherency a core-számmal szuperlineárisan nő.)
+
+**Összehasonlítás a CLI-CPU Cognitive Fabric One-nal:**
+
+| | **CLI-CPU 6R+17N+1S** | **RISC-V 4 core** | **RISC-V 8 core** |
+|--|----------------------|------------------|------------------|
+| **Core-ok** | **24** (6 Rich + 17 Nano + 1 Secure) | **4** | **8** |
+| **On-chip RAM** | **152 KB** (privát, koherencia nélkül) | **~214 KB** (L1+L2+extra) | **~152 KB** (L1+L2+extra) |
+| **Cache coherency területe** | **0 mm²** | **0.75 mm²** (a chip 7.5%-a) | **1.5 mm²** (a chip 15%-a) |
+| **Core-okra fordított terület** | 7.3 mm² (73%) | 1.8 mm² (18%) | 3.6 mm² (36%) |
+| **.NET futtatás** | **Natív CIL** | Interpreter (10-50× lassabb) vagy AOT (20-50MB bináris) | Ugyanaz |
+| **Párhuzamos aktorok** | **24** (hw mailbox) | 4 (sw queue + lock) | 8 (sw queue + lock) |
+| **Context switch** | **5-8 ciklus** | 500-2000 ciklus | 500-2000 ciklus |
+
+**A kulcs szám:** a RISC-V **a chip területének 10-20%-át a cache coherency-re költi**. A CLI-CPU-n ez a terület **extra core-nak megy**, mert a shared-nothing architektúrában a koherencia probléma **nem létezik**. Ezért fér el 24 core 10 mm²-en, míg a RISC-V 4-8 core-nál megáll. A RAM mennyiségben hasonlóak (~150 KB), de a CLI-CPU-é **privát** (nincs coherency traffic), a RISC-V-é **megosztott** (coherency lassítja).
 
 ### Teljesítmény-összehasonlítás actor-alapú workload-okon
 
-| Metrika | CLI-CPU (2R+24N @50MHz) | RISC-V 4-core (@50MHz, same die) | CLI-CPU előny |
+| Metrika | CLI-CPU (6R+17N @50MHz) | RISC-V 4-core (@50MHz, same die) | CLI-CPU előny |
 |---------|------------------------|----------------------------------|---------------|
-| **Actor üzenet/sec** | ~50M (24 core × ~2M/core, hardveres mailbox) | ~2M (szoftveres queue + lock + context switch) | **~25×** |
+| **Actor üzenet/sec** | ~46M (23 core × ~2M/core, hardveres mailbox) | ~2M (szoftveres queue + lock + context switch) | **~23×** |
 | **Üzenet latency** | ~10–20 ciklus (hardveres FIFO) | ~500–2000 ciklus (lock acquire + context switch) | **~50–100×** |
 | **Context switch** | ~5–8 ciklus (TOS cache + PC) | ~500–2000 ciklus (register save/restore + TLB flush) | **~100×** |
-| **Párhuzamos neuronok (SNN)** | 24 (1/core, determinisztikus) | 4 (thread, nem-determinisztikus) | **6×** |
+| **Párhuzamos neuronok (SNN)** | 17 (1/Nano core, determinisztikus) | 4 (thread, nem-determinisztikus) | **4×** |
 | **Skálázódás +1 core** | Lineáris | Szub-lineáris (Amdahl + coherency overhead) | **Fundamentális** |
 | **Energia (event-driven)** | ~nJ/event (alvó core-ok, wake-on-mailbox) | ~μJ/event (aktív polling, cache traffic) | **~100–1000×** |
 | **Determinizmus** | Garantált (nincs OoO, nincs preemption) | Nem garantált (cache timing, preemption) | **Abszolút** |
-| **Izolálás** | Hardveres (privát SRAM, capability) | Szoftveres (MMU, de Spectre/Meltdown) | **Erősebb** |
+| **Izolálás** | Hardveres (privát SRAM, Secure Core) | Szoftveres (MMU, de Spectre/Meltdown) | **Erősebb** |
 
 **Fontos:** az egy-core IPC-ben a RISC-V (különösen OoO változatban) gyorsabb. A CLI-CPU **nem az egy-core versenyben** nyer, hanem abban, hogy **ugyanazon a szilíciumon sokkal több hasznos, párhuzamos munkát végez** actor-alapú workload-okon, miközben determinisztikus és biztonságos marad.
 
@@ -436,7 +631,7 @@ Ugyanaz a 10 mm² Sky130 terület, de hagyományos megközelítéssel (pl. 4-cor
 | **Neuron OS kernel** | Rich core #0 | Root supervisor, scheduler, capability registry, hot code loader |
 | **Device driver aktorok** | Rich core #1 | UART, QSPI, GPIO, timer — crash → supervisor restart, nem kernel panic |
 | **Alkalmazás supervisor** | Rich core #0 vagy #1 | App lifecycle, actor spawn/kill, supervision stratégiák |
-| **Worker aktorok** (24 db) | Nano core-ok | SNN neuronok, IoT handlerek, filter pipeline, state machine-ek, bármi |
+| **Worker aktorok** (17 db) | Nano core-ok | SNN neuronok, IoT handlerek, filter pipeline, state machine-ek, bármi |
 | **GUI aktorok** (jövő) | Rich + Nano mix | Framebuffer aktor (Rich), widget aktorok (Nano) — minden aktor, nincs „UI thread" |
 
 A GUI is aktor-alapú: minden widget egy aktor, minden input event egy üzenet, a rendering egy pipeline aktor-lánc. Nincs globális állapot, nincs race condition. Ha egy widget crash-el, a supervisor újraindítja — a többi widget nem érzi.
@@ -445,10 +640,10 @@ A GUI is aktor-alapú: minden widget egy aktor, minden input event egy üzenet, 
 
 | Demó | Core használat | Mit bizonyít |
 |------|---------------|-------------|
-| **Actor ping-pong throughput** | 24 Nano pár | Üzenet/sec benchmark — összehasonlítható RISC-V-vel |
-| **SNN (Spiking Neural Network)** | 24 Nano (LIF/Izhikevich neuron) + 1 Rich coordinator | Lineáris skálázódás, determinizmus, event-driven energia |
-| **IoT edge gateway** | 2 Rich (supervisor + protocol) + 24 Nano (handler) | Valós use-case, latency mérés, fault tolerance demó |
-| **Akka.NET actor cluster** | 2 Rich (supervisor) + 24 Nano (worker) | C# kódból fordított actor rendszer, hardveresen futva |
+| **Actor ping-pong throughput** | 17 Nano pár | Üzenet/sec benchmark — összehasonlítható RISC-V-vel |
+| **SNN (Spiking Neural Network)** | 17 Nano (LIF/Izhikevich neuron) + 1 Rich coordinator | Lineáris skálázódás, determinizmus, event-driven energia |
+| **IoT edge gateway** | 6 Rich (supervisor + protocol) + 17 Nano (handler) | Valós use-case, latency mérés, fault tolerance demó |
+| **Akka.NET actor cluster** | 6 Rich (supervisor) + 17 Nano (worker) | C# kódból fordított actor rendszer, hardveresen futva |
 | **Hot code loading** | Rich core-on aktor frissítés | Zero-downtime update, Erlang-stílusú |
 | **Fault tolerance** | Worker crash → supervisor restart | „Let it crash" — a chip nem áll le, csak az aktor indul újra |
 
@@ -456,7 +651,7 @@ A GUI is aktor-alapú: minden widget egy aktor, minden input event egy üzenet, 
 
 A chip célja nem „még egy CPU", hanem **egy új kategória bizonyítéka**:
 
-> *„A Cognitive Fabric One a világ első nyílt forráskódú, heterogén, actor-natív processzora. 26 core-jával, cache coherency nélkül, ugyanazon a 10 mm² Sky130 szilíciumon 25× több actor üzenetet kezel másodpercenként, mint egy hagyományos 4-core RISC-V — miközben determinisztikus, hardveresen izolált, és lineárisan skálázódik. Ez nem gyorsabb CPU — ez egy új paradigma."*
+> *„A Cognitive Fabric One a világ első nyílt forráskódú, heterogén, actor-natív processzora. 24 core-jával + 1 Secure core-ral, cache coherency nélkül, ugyanazon a 10 mm² Sky130 szilíciumon 23× több actor üzenetet kezel másodpercenként, mint egy hagyományos 4-core RISC-V — miközben determinisztikus, hardveresen izolált, és lineárisan skálázódik. Ez nem gyorsabb CPU — ez egy új paradigma."*
 
 ## Blokk diagram (egymagos CLI-CPU, F6 single-core cél)
 

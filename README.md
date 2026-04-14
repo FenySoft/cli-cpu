@@ -9,6 +9,24 @@
 
 [clicpu.org](https://clicpu.org) *(coming soon)*
 
+## Quick Start
+
+```bash
+git clone https://github.com/FenySoft/cli-cpu.git
+cd cli-cpu
+dotnet build CLI-CPU.sln -c Debug
+dotnet test
+
+# The CIL opcodes in the .dll are the SAME ones the CPU executes natively.
+# The linker only repackages them from the PE/COFF container (.dll) into
+# a flat binary (.t0) that the hardware can boot from — no translation.
+# (The Rich core in F5+ will load .dll files directly via metadata walker,
+#  after mandatory PQC signature verification.)
+
+dotnet run --project src/CilCpu.Sim.Runner -- link samples/PureMath/bin/Release/net10.0/PureMath.dll --class Math --method Fibonacci -o fibonacci.t0
+dotnet run --project src/CilCpu.Sim.Runner -- run fibonacci.t0 --args 20
+```
+
 ## What is this?
 
 CLI-CPU is an open-source processor project that **executes .NET CIL bytecode natively in hardware**, without any compilation step -- and places **many small, simple cores** on a single chip that operate together as a **message-based network**. Each core runs a complete CIL program with its own local state, and cores communicate exclusively through **mailbox FIFOs** -- no shared memory, no cache coherence, no lock contention.
