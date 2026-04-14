@@ -89,6 +89,10 @@ A C# programok **`[RunsOn(CoreType.Nano)]`** vagy **`[RunsOn(CoreType.Rich)]`** 
 
 Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 
+## Blog
+
+- [Miért építek CPU-t ami natívan futtatja a .NET-et](https://medium.com/@hj_84657/why-im-building-a-cpu-that-runs-net-natively-5242e4b9da1f) — a [clicpu.org](https://clicpu.org/en/blog/why-cli-cpu.html)-on is
+
 ## Dokumentumok
 
 - [docs/roadmap-hu.md](docs/roadmap-hu.md) — Hétfázisú ütemterv F0-tól F7-ig, a Cognitive Fabric pivottal F4-ben, F6.5 Secure Edition variánssal

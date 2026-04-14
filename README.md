@@ -89,6 +89,10 @@ C# programs use **`[RunsOn(CoreType.Nano)]`** or **`[RunsOn(CoreType.Rich)]`** a
 
 See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 
+## Blog
+
+- [Why I'm Building a CPU That Runs .NET Natively](https://medium.com/@hj_84657/why-im-building-a-cpu-that-runs-net-natively-5242e4b9da1f) -- also on [clicpu.org](https://clicpu.org/en/blog/why-cli-cpu.html)
+
 ## Documents
 
 - [docs/roadmap-en.md](docs/roadmap-en.md) -- Seven-phase roadmap from F0 to F7, with the Cognitive Fabric pivot at F4 and the F6.5 Secure Edition variant
