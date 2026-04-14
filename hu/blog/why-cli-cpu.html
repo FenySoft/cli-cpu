@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Miért építek olyan CPU-t, ami natívan futtatja a .NET-et — CLI-CPU Blog</title>
+  <meta name="description" content="A picoJava elbukott. A Jazelle elbukott. Íme, miért nem fog a CLI-CPU. Más architektúra, más korszakra.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .nav {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      line-height: 1.25;
+    }
+
+    header .subtitle {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    header .meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 16px;
+      font-family: var(--mono);
+    }
+
+    article {
+      flex: 1;
+      padding: 48px 0;
+    }
+
+    article h2 {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: #f0f6fc;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    article h2:first-child { margin-top: 0; }
+
+    article p {
+      margin-bottom: 16px;
+      font-size: 1.02rem;
+    }
+
+    article blockquote {
+      border-left: 3px solid var(--green);
+      padding: 12px 20px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    article ul, article ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+
+    article li {
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+
+    article strong { color: #f0f6fc; }
+
+    article code {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: #f0f6fc;
+    }
+
+    .comparison-table td { color: var(--text-dim); }
+
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 28px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta h3 {
+      font-family: var(--mono);
+      color: var(--green);
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      header { padding: 32px 0 24px; }
+      article h2 { font-size: 1.1rem; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">Magyar</span>
+  <a href="../../en/blog/why-cli-cpu.html" style="color:var(--text-dim);padding:4px 12px;margin-left:4px;">English</a>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>Miért építek olyan CPU-t, ami natívan futtatja a .NET-et</h1>
+    <div class="subtitle">A picoJava elbukott. A Jazelle elbukott. Íme, miért nem fog a CLI-CPU.</div>
+    <div class="meta">2026. &aacute;prilis 15. &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <h2>A kérdés</h2>
+
+    <p>
+      Mi lenne, ha a C# kódod közvetlenül a szilíciumon futna, JIT nélkül, interpreter nélkül, futtatókörnyezet nélkül? Mi lenne, ha maga a CPU értené a .NET bytecode-ot — minden <code>ldc.i4</code>-et, minden <code>call</code>-t, minden <code>stloc</code>-ot — natív utasításkészletként?
+    </p>
+
+    <p>
+      Ez nem gondolatkísérlet. Pontosan ezt építem az elmúlt hónapokban, és a referencia-implementáció már kész: 48 opkód, 259+ sikeres teszt, működő linker, CLI futtatóeszköz, és egy Verilog ALU modul 41 zöld cocotb teszttel. A projekt neve <strong>CLI-CPU</strong>, és teljes egészében nyílt forráskódú, CERN-OHL-S v2 licenc alatt.
+    </p>
+
+    <p>
+      De mielőtt elmagyaráznám, mi a CLI-CPU, hadd meséljek arról, miért bukott el minden korábbi próbálkozás — és miért más ez most.
+    </p>
+
+    <h2>A bytecode-hardver kísértetei</h2>
+
+    <p>
+      1997-ben a Sun Microsystems kiadta a <strong>picoJava</strong>-t — egy processzort, ami képes volt Java bytecode-ot közvetlenül hardverben végrehajtani. Az ötlet meggyőző volt: hagyjuk ki az interpretálás és a JIT-fordítás többletköltségét, futtassuk a Java-t natív sebességgel. A Sun két iterációt épített (picoJava-I és picoJava-II), licencelte a dizájnt, és várta, hogy a világ átvegye.
+    </p>
+
+    <p>
+      A világ nem vette át. 2001-re a HotSpot JIT-fordítója már a legtöbb terheléstípuson túlteljesítette a picoJava-t. A hardveres bytecode-végrehajtás nem tudott lépést tartani egy szoftveres JIT-tel, ami képes volt specializálni, inline-olni és a program tényleges futási viselkedésére optimalizálni. A Sun csendben kivezette az architektúrát.
+    </p>
+
+    <p>
+      Az ARM más megközelítést próbált a <strong>Jazelle DBX</strong>-szel (2001): egy dedikált bytecode-CPU helyett egy speciális végrehajtási módot adott a meglévő ARM magokhoz, ami hardveres gyorsítással tudott Java bytecode-ot értelmezni. A Jazelle okos volt — összetett opkódoknál visszaesett szoftverre, és csak a gyakoriakat gyorsította hardverből. Több százmillió ARM9-es és ARM11-es chipben szállították.
+    </p>
+
+    <p>
+      És mégis, a Jazelle is elbukott. Amikor az ARM bevezette a Thumb-2-t, majd később az egyre kifinomultabb soron-kívüli (out-of-order) pipeline-nal rendelkező Cortex-A sorozatot, a JIT-megközelítés (Dalvik, majd ART az Androidon) egyértelműen nyert. A Jazelle-t elavultnak nyilvánították, majd gyakorlatilag elhagyták. Az utolsó ARM architektúra, ami tartalmazta, az ARMv7 volt. Az ARMv8 (AArch64) teljes egészében elhagyta.
+    </p>
+
+    <p>
+      A tanulság egyértelműnek tűnt: <strong>az általános célú hardveren futó szoftveres JIT mindig legyőzi a dedikált bytecode-hardvert</strong>. A JIT alkalmazkodik; a szilícium nem. Ügy lezárva.
+    </p>
+
+    <p>
+      Csakhogy ez a tanulság téves. Pontosabban: hiányos. A picoJava és a Jazelle nem azért bukott el, mert a bytecode-hardver rossz ötlet — hanem azért, mert <strong>rossz tengely mentén versenyeztek</strong>.
+    </p>
+
+    <h2>Rossz verseny</h2>
+
+    <p>
+      Mind a picoJava, mind a Jazelle az általános célú CPU-kat próbálta legyőzni <strong>egymagos teljesítményben</strong>. Ez mindig vesztes csata volt. Egy modern, soron-kívüli végrehajtású CPU kifinomult JIT-fordítóval képes kódútvonalakat specializálni, hívásokat devirtualizálni, holt kódot eliminálni, és több ezer mikroarchitekturális trükköt alkalmazni, amivel egy egyszerű bytecode-pipeline nem veheti fel a versenyt. A JIT látja a futásidejű viselkedést; a hardver csak a statikus utasításokat.
+    </p>
+
+    <p>
+      De az egymagos teljesítmény már évek óta nem a legfontosabb mérőszám. <strong>A Dennard-skálázás 2006 körül véget ért.</strong> Az órajelek beálltak. Felütötte a fejét a teljesítmény-fal. Az egész ipar a többmagos irányba fordult, és azóta is küzd a következményekkel.
+    </p>
+
+    <p>
+      A probléma az, hogy a hagyományos értelemben vett többmagos feldolgozás — osztott memória, gyorsítótár-koherencia, mutex-zárak — nem skálázódik. Magok hozzáadása egy osztott memóriájú rendszerhez legjobb esetben Amdahl-törvényt követ, legrosszabb esetben katasztrofális versengéshez vezet. A MESI protokoll (és leszármazottai), ami a magok közötti gyorsítótár-koherenciát biztosítja, egyre abszurdabb hányadát emészti fel a chipterületnek, az energiabudgetnek és a tervezési komplexitásnak, ahogy nő a magok száma. Az Intel mesh összekötése szerver chipeken, az AMD Infinity Fabric, az Apple rendszerszintű gyorsítótára — ezek mind hősi mérnöki erőfeszítések egy alapvető architekturális hiba elfedésére: <strong>az osztott, módosítható állapot nem skálázódik</strong>.
+    </p>
+
+    <p>
+      Itt lép be a CLI-CPU — nem gyorsabb egymagos bytecode-processzorként, hanem <strong>alapvetően más architektúraként</strong>.
+    </p>
+
+    <h2>Shared-nothing: az egyetlen út előre</h2>
+
+    <p>
+      A CLI-CPU-ban nincs osztott memória. Pont. Minden mag saját privát SRAM-mal rendelkezik — kód, adat és verem — és <strong>semmilyen más mag nem férhet hozzá</strong>. Ez nem szoftveres konvenció; ez a szilícium fizikai tulajdonsága. Nincsenek buszvonalak, amelyek az egyik mag memóriáját a másikéhoz kötnék.
+    </p>
+
+    <p>
+      A magok kizárólag <strong>hardveres mailbox FIFO-kon</strong> keresztül kommunikálnak. Egy mag egy 32 bites üzenetet ír a kimenő mailbox-ába; a hardver kézbesíti a célmag bejövő mailbox-ába. A küldő mag nem blokkolódik. A fogadó mag felébredl alvásból, amikor üzenet érkezik, feldolgozza, és visszaalszik. Ez az <strong>actor modell szilíciumban</strong>.
+    </p>
+
+    <blockquote>
+      „A jelenlegi szoftverrendszerek alapvetően hibás modellekre épülnek. Olyan hardver kell, ahol minden mag egy actor."
+      <br>— Joe Armstrong, az Erlang megalkotója, 2014
+    </blockquote>
+
+    <p>
+      Ennek a tervezési döntésnek mélyreható következményei vannak:
+    </p>
+
+    <ul>
+      <li><strong>Nincs gyorsítótár-koherencia protokoll.</strong> Nulla. Semmi. Nincs MESI, nincs MOESI, nincs könyvtáralapú koherencia. Már ez önmagában hatalmas chipterületet és energiát takarít meg.</li>
+      <li><strong>Nincs zár, nincs mutex, nincs atomi művelet.</strong> Nincs osztott állapot, amit védeni kellene. Az adatverseny fizikailag lehetetlen.</li>
+      <li><strong>Lineáris skálázás.</strong> Több mag hozzáadása arányosan több számítási kapacitást ad. Nincs Amdahl-szűk keresztmetszet, mert nincs soros szakasz — minden mag független.</li>
+      <li><strong>Determinisztikus végrehajtás.</strong> Minden mag viselkedése kizárólag a kódjától és a bejövő üzeneteitől függ. Nincsenek időzítésfüggő hibák, nincsenek heisenbugok, nincsenek memória-rendezési meglepetések.</li>
+      <li><strong>Eseményvezérelt energiaprofil.</strong> A magok alapértelmezetten alszanak. Mailbox-megszakításra ébrednek, feldolgozzák az üzenetet, és visszaalszanak. Az üresjárati fogyasztás közelít a nullához.</li>
+    </ul>
+
+    <p>
+      Ez szoftverben nem új ötlet. Az Erlang 1986 óta csinálja. Az Akka (2009) és az Akka.NET (2014) elhozta a JVM-re és a .NET ökoszisztémába. Az Orleans (2015) a mainstream C# fejlesztők számára is elérhetővé tette. Az actor modell éles környezetben, hatalmas léptékben bizonyított — WhatsApp (Erlang), Discord (Elixir), Microsoft Azure (Orleans), és számtalan más rendszer.
+    </p>
+
+    <p>
+      De mindezek <strong>hagyományos, osztott memóriájú hardveren</strong> futnak, ami azt jelenti, hogy a futtatókörnyezetnek szoftveres absztrakciókkal kell szimulálnia az üzenet-izolációt — szálkészletek, mailbox-sorok, GC-terhelés, ütemező-költség. A CLI-CPU ezt az egész réteget eltávolítja. <strong>A hardver maga a futtatókörnyezet.</strong>
+    </p>
+
+    <h2>Miért most?</h2>
+
+    <p>
+      A picoJava 1997-ben egyetlen feltétellel sem rendelkezett, ami ehhez a megközelítéshez szükséges. 2026-ban mindegyik adott:
+    </p>
+
+    <ul>
+      <li><strong>Nyílt PDK-k.</strong> A Google és a SkyWater 2020-ban kiadta a Sky130 process design kit-et. Az IHP követte az SG13G2-vel. A történelemben először bárki tervezhet és gyárthat chipet milliós licencdíjak nélkül. A CLI-CPU teljes szilícium-útvonala nyílt eszközöket használ: Yosys szintézishez, OpenLane2 elhelyezéshez és huzalozáshoz, Magic DRC/LVS-hez.</li>
+      <li><strong>Tiny Tapeout.</strong> Matt Venn Tiny Tapeout projektje demokratizálta a chipgyártást. Körülbelül 150 dollárért egy kis dizájn valódi Sky130 szilíciumra kerülhet. A CLI-CPU első fizikai chipje (egyetlen Nano core + hardveres mailbox) ezen a programon keresztül kerül gyártásra.</li>
+      <li><strong>Megfizethető FPGA-k.</strong> A MicroPhase A7-Lite kártya Xilinx XC7A200T-vel — 200 000 logikai cella — körülbelül 320 dollárba kerül. Három ilyen kártya Etherneten összekötve egy több kártyás Cognitive Fabric hálózatot alkothat, 1000 dollár alatt. Ez egy évtizeddel ezelőtt elképzelhetetlen volt.</li>
+      <li><strong>Az actor modell mainstreamé vált.</strong> Akka.NET, Orleans, Dapr, Proto.Actor — a .NET ökoszisztéma befogadta az üzenetküldésen alapuló párhuzamosságot. Nyolcmillió .NET fejlesztő már olyan kódot ír, ami természetesen illeszkedik a CLI-CPU végrehajtási modelljéhez. Nem kell új nyelvet vagy paradigmát tanulniuk; csak olyan hardver kell, ami natívan futtatja.</li>
+      <li><strong>A Dennard-skálázás halott.</strong> Az órajelek 20 éve stagnálnak. A nagyobb teljesítményhez vezető egyetlen út a több mag. De az osztott memóriájú többmagos rendszerek csökkenő hozadékot mutatnak. A shared-nothing sokmagos feldolgozás a logikus következő lépés, és a CLI-CPU az alapoktól erre tervezve készült.</li>
+    </ul>
+
+    <h2>Mit építettünk eddig</h2>
+
+    <p>
+      A CLI-CPU nem whitepaper. Nem „vízió dokumentum" a jövőbeli lehetőségekről szóló kézlegyintéssel. Működő kód, tesztelt kód, és — egyre inkább — működő hardver leírás.
+    </p>
+
+    <p>
+      <strong>Az F1.5 fázis kész.</strong> Ez magában foglalja:
+    </p>
+
+    <ul>
+      <li>Egy <strong>referencia szimulátort</strong> (<code>TCpu</code>), ami mind a 48 CIL-T0 opkódot implementálja — az ECMA-335 CIL egész szám részhalmazát, plusz mailbox MMIO kiterjesztéseket. A szimulátor a teljes memóriatérképet modellezi: CODE, DATA, STACK és MMIO régiókat.</li>
+      <li>Egy <strong>CIL-T0 linkert</strong> (<code>TCliCpuLinker</code>), ami egy szabványos .NET assembly-t (.dll, Roslyn fordítás) átalakít lapos bináris formátumba (.t0), amiből a hardver bootolhat. Nincs transzláció — a .dll-ben lévő CIL opkódok ugyanazok, amiket a CPU végrehajt.</li>
+      <li>Egy <strong>CLI futtatóeszközt</strong> <code>run</code> és <code>link</code> parancsokkal.</li>
+      <li><strong>259+ xUnit tesztet</strong>, ami lefedi az összes opkódot, minden trap-feltételt, minden szélsőséges esetet. Szigorú TDD — minden teszt az implementáció előtt készült.</li>
+      <li>Egy <strong>Verilog ALU modult</strong> teljes cocotb tesztpaddal (41/41 teszt zöld). Ez az RTL fázis (F2) kezdete.</li>
+    </ul>
+
+    <p>
+      A teljes kódbázis — szimulátor, linker, futtatóeszköz, tesztek, Verilog, cocotb, dokumentáció — <a href="https://github.com/FenySoft/cli-cpu">nyílt forráskódú a GitHubon</a>.
+    </p>
+
+    <h2>A Cognitive Fabric One vízió</h2>
+
+    <p>
+      A célchip — <strong>Cognitive Fabric One</strong> — a Sky130 technológiára tervezett, hozzávetőleg 15 mm&sup2; területen:
+    </p>
+
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Cognitive Fabric One</th>
+          <th>Tipikus RISC-V SoC</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Magok</strong></td>
+          <td>6 Rich + 16 Nano + 1 Secure</td>
+          <td>4-8 homogén</td>
+        </tr>
+        <tr>
+          <td><strong>Memória modell</strong></td>
+          <td>Privát SRAM magonként, nincs osztott memória</td>
+          <td>Osztott L1/L2 gyorsítótár-hierarchia</td>
+        </tr>
+        <tr>
+          <td><strong>Magok közti komm.</strong></td>
+          <td>Hardveres mailbox FIFO-k (OPI busz)</td>
+          <td>Osztott memória + gyorsítótár-koherencia</td>
+        </tr>
+        <tr>
+          <td><strong>Koherencia-költség</strong></td>
+          <td>Nulla</td>
+          <td>Jelentős (MESI/könyvtáralapú)</td>
+        </tr>
+        <tr>
+          <td><strong>Skálázási viselkedés</strong></td>
+          <td>Lineáris a magszámmal</td>
+          <td>Szublineáris (Amdahl-törvény)</td>
+        </tr>
+        <tr>
+          <td><strong>Üresjárati fogyasztás</strong></td>
+          <td>Közel nulla (alvás mailbox-ig)</td>
+          <td>Jelentős (gyorsítótár, koherencia-logika)</td>
+        </tr>
+        <tr>
+          <td><strong>Biztonsági izoláció</strong></td>
+          <td>Fizikai (nincs osztott memória)</td>
+          <td>Szoftveres (TrustZone, TEE)</td>
+        </tr>
+        <tr>
+          <td><strong>ISA</strong></td>
+          <td>CIL (verem, kompakt)</td>
+          <td>RISC-V (regiszter, szélesebb kódolás)</td>
+        </tr>
+        <tr>
+          <td><strong>I/O</strong></td>
+          <td>USB 1.1 FS, UART, SPI, GPIO</td>
+          <td>Változó</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      A <strong>Rich core-ok</strong> a felügyeleti logikát, összetett domain kódot, GC-kezelt objektumokat, lebegőpontos műveleteket és kivételkezelést végzik — a teljes ECMA-335 CIL utasításkészlettel (~220 opkód). A <strong>Nano core-ok</strong> apróak (~10k standard cella egyenként) és a CIL-T0 egész szám részhalmazát futtatják — ideálisak dolgozókhoz, neuronokhoz, szűrőkhöz, egyszerű aktorokhoz. A <strong>Secure Core</strong> egy megerősített Rich core kriptográfiai gyorsítással, TRNG-vel és PUF-fal — az egész fabric bizalmi horgonypontja.
+    </p>
+
+    <p>
+      Ez a heterogén kialakítás hasonló az ARM big.LITTLE-höz vagy az Apple P-core + E-core megoldásához, de a .NET világra alkalmazva. Egy C# fejlesztő <code>[RunsOn(CoreType.Nano)]</code> vagy <code>[RunsOn(CoreType.Rich)]</code> attribútummal jelöli az osztályait, és egy Roslyn forrásgenerátor fordítási időben ellenőrzi, hogy a Nano-ra célzott kód a CIL-T0 részhalmazon belül marad.
+    </p>
+
+    <h2>Biztonság: dizájn szintjén immunis</h2>
+
+    <p>
+      Az elmúlt évtized minden jelentős CPU-sebezhetősége — Spectre, Meltdown, L1 Terminal Fault, Rowhammer, Retbleed, Inception — három dolog egyikét használja ki: <strong>spekulatív végrehajtás</strong>, <strong>osztott gyorsítótár</strong> vagy <strong>osztott memória</strong>. A CLI-CPU-ban ezek egyike sincs.
+    </p>
+
+    <ul>
+      <li><strong>Nincs spekulatív végrehajtás.</strong> A CLI-CPU magok egyszerűek, sorrendben végrehajtók, determinisztikusak. Nincs elágazás-előrejelző, amit mérgezni lehetne, nincs spekulatív betöltés, ami oldalsó csatornán szivárogtathatna adatot.</li>
+      <li><strong>Nincs osztott gyorsítótár.</strong> Minden mag saját privát SRAM-mal rendelkezik. Nincs L2, nincs L3, nincs rendszerszintű gyorsítótár. Nincs Flush+Reload, nincs Prime+Probe, nincsenek gyorsítótár-időzítési támadások.</li>
+      <li><strong>Nincs osztott memória.</strong> A magok közötti információáramlás kizárólag explicit mailbox-üzenetekre korlátozódik. Egy kompromittált mag nem tudja kiolvasni egy másik mag állapotát — se szoftveren keresztül, se mikroarchitekturális oldalsó csatornákon, se bármi máson, ami a fizikai dekapsulációnál kisebb beavatkozást igényel.</li>
+    </ul>
+
+    <p>
+      Ezen felül a CIL végrehajtási modell <strong>hardveresen kényszerített típusbiztonságot és vezérlésfolyam-integritást</strong> biztosít. Minden memória-hozzáférés hardverben határellenőrzött. Minden metódushívás a deklarált szignatúra alapján verifikált. A verem-túlcsordulás és -alulcsordulás hardveres trap-et generál. ROP és JOP támadások lehetetlenek, mert a hardver kikényszeríti, hogy a végrehajtás csak érvényes metódus-belépési pontokra ugorhat.
+    </p>
+
+    <p>
+      Ez nem utólag rácsapott biztonság. Ez a biztonság mint <strong>a szilícium fizikai tulajdonsága</strong>. Nem lehet körbefoltozni, és nem lehet körbe kihasználni.
+    </p>
+
+    <h2>Mi jön ezután</h2>
+
+    <p>
+      A következő mérföldkövek az ütemtervben:
+    </p>
+
+    <ul>
+      <li><strong>F2 — RTL:</strong> Egyetlen Nano core teljes Verilog/Amaranth HDL implementációja. Minden opkód verifikálása a C# szimulátorral, cocotb golden-vector teszteléssel. Szintézis Sky130-ra Yosys-szal.</li>
+      <li><strong>F3 — Első szilícium:</strong> Nano core + hardveres mailbox tape-out a Tiny Tapeout-on. Fibonacci(20) és egy „echo neuron" demó futtatása valódi szilíciumon. Ez lesz a történelem első fizikai CIL-natív processzora.</li>
+      <li><strong>F4 — Cognitive Fabric fordulópont:</strong> 4 Nano core demonstrálása FPGA-n, hardveres mailbox-okon keresztüli kommunikációval, shared-nothing eseményvezérelt fabric-ban. Az architektúra skálázhatóságának bizonyítása.</li>
+      <li><strong>F5 — Rich Core:</strong> A teljes CIL utasításkészlet hozzáadása — objektumok, GC-támogatás, kivételkezelés, FPU. Heterogén Nano + Rich működés demonstrálása.</li>
+      <li><strong>F6 — Cognitive Fabric One:</strong> A célchip. Először FPGA-n (több kártyás hálózat), majd valódi szilíciumon ChipIgnite vagy IHP MPW programon keresztül.</li>
+      <li><strong>F7 — Neuron OS:</strong> Egy actor-alapú operációs rendszer, ami az alapoktól shared-nothing hardverre tervezve készül. Nincs kernel. Nincsenek rendszerhívások. Nincs virtuális memória. Csak aktorok, üzeneteken keresztül kommunikálva.</li>
+    </ul>
+
+    <p>
+      Pályáztunk az <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/nlnet-application-draft-en.md">NLnet NGI Zero Commons Fund</a> támogatásra az F2-től F5-ig terjedő fázisok finanszírozásához. A teljes projekt — hardver, szoftver, dokumentáció — nyílt forráskódú marad CERN-OHL-S v2 licenc alatt.
+    </p>
+
+    <div class="cta">
+      <h3>// csatlakozz az úthoz</h3>
+      <p>
+        A CLI-CPU nyílt forráskódú. A szimulátor ma is fut. A szilícium-útvonal finanszírozott és megtervezett. Ha hiszel benne, hogy a számítástechnika jövője sok kis mag, amelyek üzeneteken keresztül kommunikálnak — nem kevesebb nagy mag, amelyek az osztott memórián marakodnak — akkor ez a projekt neked szól.
+      </p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/cli-cpu">Csillagozd a GitHubon</a>
+        <a href="https://github.com/FenySoft/cli-cpu/blob/main/CONTRIBUTING.md">Közreműködés</a>
+        <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/architecture-en.md">Architektúra dokumentáció</a>
+      </div>
+    </div>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <span>CERN-OHL-S v2</span>
+      <a href="https://github.com/FenySoft/cli-cpu">GitHub</a>
+      <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/nlnet-application-draft-en.md">NLnet NGI Zero Commons Fund pályázó</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
