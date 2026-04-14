@@ -1,5 +1,9 @@
 # CIL-T0 — ISA Specifikáció
 
+> English version: [ISA-CIL-T0-en.md](ISA-CIL-T0-en.md)
+
+> Version: 1.0
+
 Ez a dokumentum a **CIL-T0** subset-et specifikálja, amely a CLI-CPU első megvalósított utasításkészlete, és amely **Tiny Tapeout-on (F3)** gyártásra kerül.
 
 ## Áttekintés
@@ -611,3 +615,11 @@ A tesztek neve formátuma: `[ClassName]_[Opcode]_[Scenario]`, pl. `Executor_Add_
 - **`docs/roadmap.md`** — fázisok és függőségek
 - **Sky130 PDK** — https://skywater-pdk.readthedocs.io/
 - **Tiny Tapeout** — https://tinytapeout.com/
+
+---
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

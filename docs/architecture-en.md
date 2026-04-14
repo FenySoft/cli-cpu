@@ -1,0 +1,1011 @@
+# CLI-CPU — Architecture Overview
+
+> Magyar verzió: [architecture.md](architecture.md)
+
+> Version: 1.0
+
+This document describes the CLI-CPU **microarchitecture** at a high level: the stack machine model, the pipeline, the memory map, the decoding strategy, hardware support for GC and exception handling, and the techniques adopted from predecessor projects (picoJava, Jazelle, Transmeta).
+
+> **Note:** This architecture is built incrementally across phases F0–F7. The full feature set described here will be completed in the **F6-Silicon "Cognitive Fabric One"** chip (ChipIgnite or IHP MPW, 2R+24N, 10 mm²). **Tiny Tapeout (F3)** implements only the single-core CIL-T0 subset, described in a separate document (`ISA-CIL-T0.md`). The "Cognitive Fabric One" section records the concrete reference chip vision and comparison with conventional multi-core CPUs.
+
+## Strategic positioning: Cognitive Fabric
+
+The CLI-CPU **does not position itself as a classical bytecode CPU**, like Sun picoJava or ARM Jazelle once did. That path **has already been tried and failed**: software JIT + conventional CPU turned out to be cheaper and faster than dedicated bytecode hardware. Repeating that same path **would not make sense**.
+
+Instead, the CLI-CPU is a **programmable cognitive substrate** — many small, independent CIL-native cores that form a heterogeneous, event-driven network through **message-based communication**. Each core runs a **complete CIL program** with its own local state; cores communicate through **mailbox FIFOs**, with no shared memory, no cache coherence protocol, and no lock contention. Usage depends on the program: a chip can be an **Akka.NET actor cluster**, a **programmable spiking neural network**, a **multi-agent simulation**, or an **event-driven IoT edge**.
+
+### Why this is different from existing solutions
+
+| System | Programmable? | Hardware? | Open? | .NET native? | Event-driven? | Stack-compact ISA? |
+|--------|--------------|-----------|-------|-------------|--------------|-------------------|
+| Intel Loihi 2 | No — fixed LIF | Yes | No | No | Yes | No |
+| IBM TrueNorth | No — fixed LIF | Yes | No | No | Yes | No |
+| BrainChip Akida | No — fixed model | Yes | No | No | Yes | No |
+| GrAI Matter Labs GrAI-1 | No — fixed | Yes | No | No | Yes | No |
+| SpiNNaker 2 (Manchester) | Yes — C/C++ ARM | Yes | Partial | No | No (polling) | No (ARM ISA) |
+| Akka.NET / Orleans | Yes — full C#/F# | No — software | Yes | Yes | No (OS scheduler) | No (host CPU ISA) |
+| Erlang BEAM | Yes — Erlang | No — software | Yes | No | No (BEAM scheduler) | No (host CPU ISA) |
+| **CLI-CPU (Cognitive Fabric)** | **Yes — full CIL** | **Yes** | **Yes** | **Yes** | **Yes** (hw mailbox wake) | **Yes** (CIL stack machine) |
+
+The **neuromorphic competitors** (Loihi, TrueNorth, Akida, GrAI) all use **fixed neuron models** — you cannot run arbitrary algorithms on them, only configure weights and topology. **SpiNNaker** is the only one offering programmable nodes, but on **C/C++ ARM cores**, with significant engineering effort in an academic setting. **Software actor systems** (Akka.NET, Erlang) are flexible, but compete with scheduler, GC, and lock overhead on the host CPU.
+
+**The CLI-CPU occupies the only position** where **all six columns** are satisfied: programmable nodes + hardware + open + .NET native + event-driven + stack-compact ISA. This is not just "yet another bytecode CPU" — it is **a new category**.
+
+### Neuromorphic-inspired, but not neuromorphic
+
+The CLI-CPU **adopts** the most valuable principles of neuromorphic architectures:
+
+- **Many small independent units** with their own local state
+- **Message-based communication** (not shared memory)
+- **Event-driven working mode** (the core sleeps until a message arrives)
+- **Ultra-low idle power consumption**
+- **Linear scaling** with core count
+
+But it is **not neuromorphic** in the strict sense, because:
+
+- The nodes do not send **1-bit spikes** but rather **32-bit messages** (which provide sufficient precision for any digitized continuous value)
+- The nodes can run **arbitrary CIL algorithms** — a LIF neuron, an Izhikevich neuron, a DSP filter, an Akka actor, a state machine, or anything else
+- **Digital, deterministic** — not analog, not stochastic
+- **Dynamically reprogrammable** at runtime — the core can load new CIL code
+
+This means that the **same hardware chip**, depending on the chosen program, can become:
+
+| Program | What the chip becomes |
+|---------|-----------------------|
+| C# + Akka.NET actors | Native hardware actor cluster |
+| Leaky Integrate-and-Fire neurons | Spiking Neural Network simulator |
+| Izhikevich model + STDP | More biologically plausible SNN research platform |
+| Conway's Game of Life + complex rules | Cellular automata substrate |
+| Dataflow pipeline (FIR, IIR, FFT) | DSP processing fabric |
+| Multi-agent AI / game simulation | Swarm intelligence platform |
+| Per-request web handler | Embedded web server |
+| IoT edge sensor fusion | Event-driven IoT gateway |
+
+**This "one hardware, many paradigms" approach** is what could give the project its historical significance — if it succeeds.
+
+### Multi-language platform — the entire .NET ecosystem in hardware
+
+The CLI-CPU **does not run C# — it runs CIL**. The ECMA-335 Common Intermediate Language is the target format that **every .NET language** compiles to. This means the CLI-CPU natively executes:
+
+| Language | Paradigm | CLI-CPU fit |
+|----------|----------|------------|
+| **C#** | OOP + functional | Akka.NET, largest community (~6M developers) |
+| **F#** | Functional-first | **Natural fit** — immutable by default, pattern matching, algebraic types, actor-friendly |
+| **VB.NET** | OOP | Porting legacy codebases |
+| **IronPython** | Dynamic | Rapid prototyping, scripting on-chip |
+| **PowerShell** | Shell/scripting | Device management, configuration |
+
+**That is ~8 million developers' existing codebases** that can run natively on the CLI-CPU — without compilation, interpreter, or runtime overhead.
+
+#### Why this is different from Jazelle
+
+ARM Jazelle (2001) and Sun picoJava (1997) **failed** because:
+1. **Single-language** — they targeted only Java bytecode, a single ecosystem
+2. **Single-core** — on a shared-memory CPU, software JIT became faster
+3. **Not actor-native** — no hardware messaging, no mailbox
+
+The CLI-CPU is fundamentally different:
+1. **Multi-language** — every .NET language compiles to CIL, the hardware executes CIL
+2. **Multi-core, shared-nothing** — software JIT cannot run in parallel across 18 cores without cache coherency
+3. **Actor-native** — the mailbox is in hardware, context switch takes 5-8 cycles (not 500-2000)
+
+#### F# — the "perfect CLI-CPU language"
+
+F# is a particularly strong fit because the language paradigm is **identical** to the Cognitive Fabric architecture:
+
+- **Immutable by default** — the shared-nothing model arises naturally
+- **Pattern matching** — actor message dispatch is elegant and safe
+- **Pipe operator (`|>`)** — actor pipeline chains are readable
+- **Discriminated unions** — message types are checked at compile time
+- **Computation expressions** — async actor workflows are natively expressible
+- **No null** — fewer TTrapReason traps, safer code
+
+```fsharp
+// F# actor on a CLI-CPU Nano core
+[<RunsOn(CoreType.Nano)>]
+let ledController = actor {
+    let! msg = receive ()
+    match msg with
+    | SetLed (id, color) -> setGpio id color
+    | BlinkLed (id, hz)  -> startBlink id hz
+    | GetState            -> reply (currentState ())
+}
+
+// F# actor on a CLI-CPU Rich core
+[<RunsOn(CoreType.Rich)>]
+let navSupervisor = actor {
+    let! msg = receive ()
+    match msg with
+    | SubmitDocument doc ->
+        let! signed = ask cryptoActor (Sign doc)
+        let! result = ask navClient (Send signed)
+        reply result
+    | ChildFailed (child, _) ->
+        restart child    // let it crash + supervision
+}
+```
+
+#### Comparison: RISC-V vs CLI-CPU on .NET workloads
+
+On the same ~10 mm² Sky130 silicon:
+
+| Metric | CLI-CPU (10R+8N) | RISC-V 4-core + CIL interpreter | RISC-V 4-core + AOT |
+|--------|------------------|--------------------------------|---------------------|
+| **CIL execution** | Native (1x) | 10-50x slower (sw interpret) | ~1x but 10-50x larger binary |
+| **Core count** (same die) | **18** | 4 | 4 |
+| **.NET binary size** | ~1-2 MB (CIL compact) | +100KB interpreter | ~20-50 MB (AOT native) |
+| **Actor msg/sec** | **~5M** (hw mailbox) | ~25-100K (sw queue + lock) | ~100-250K (sw queue) |
+| **Context switch** | 5-8 cycles | 500-2000 cycles | 500-2000 cycles |
+| **Cache coherency** | **0%** overhead | 10-20% overhead | 10-20% overhead |
+| **GC** | Per-core, small heap | Global stop-the-world | Global stop-the-world |
+| **.NET language compatibility** | **All** (C#, F#, VB.NET, ...) | Interpreter: limited | AOT: most, but large binary |
+
+RISC-V has **two bad options** for .NET code: interpreter (10-50x slower) or AOT (10-50x larger binary, I-cache pressure). The CLI-CPU **natively executes CIL** in compact form, with hardware actor support.
+
+**The narrative:** The CLI-CPU is **not "yet another CPU"** — it is **the first hardware platform that provides native silicon for an 8-million developer ecosystem**. Every C#, F#, VB.NET code that compiles to CIL runs natively on the Cognitive Fabric — without rewriting, interpreter, or JIT.
+
+## Design principles
+
+1. **CIL is the native ISA.** The CPU's fetch unit reads the CIL bytes emitted by Roslyn/ilasm directly. There is no JIT, no AOT, no interpreter layer. The CIL bytes in memory **remain unchanged**.
+2. **Stack machine with Top-of-Stack Caching.** Externally a pure ECMA-335 evaluation stack; internally, the top 4-8 stack elements live in physical registers, the rest spills to RAM. This is the lesson from picoJava and HotSpot.
+3. **Harvard model with external memory.** Separate QSPI code flash and separate QSPI PSRAM for data. On-chip SRAM is used exclusively as cache.
+4. **Hybrid decoding.** Simple opcodes (~75%) through direct hardware, 1 cycle. Complex opcodes (~25%) through microcode ROM, multiple cycles.
+5. **Managed memory safety in silicon.** The GC write barrier, stack bounds check, branch target validation, type check — all are hardware side-effects, not software runtime tasks.
+6. **Shared-nothing multi-core.** From phase F4 onward, multiple cores operate together on a single chip, **without shared memory**. Each core has its own local SRAM and communicates exclusively through **mailbox-based messages**. This automatically eliminates cache coherence, lock contention, and memory ordering problems.
+7. **Event-driven, not clock-driven.** The core is in sleep mode by default and **only wakes** when a mailbox message arrives (or a timer fires). This results in ultra-low idle power consumption.
+8. **Aggressive power-gating.** Every unused unit stays cold — FPU, GC coprocessor, metadata walker, mailbox router are all separate power domains.
+
+## Multi-core block diagram (F4+ cognitive fabric)
+
+In phase F4, the CLI-CPU becomes a **real network** for the first time. The 4 cores independently run their own CIL programs, each with its own local SRAM, and communicate exclusively through the mailbox interfaces. There is no shared heap, no cache coherence:
+
+```
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                    CLI-CPU Cognitive Fabric (F4)                         │
+  │                                                                          │
+  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+  │  │  Core 0      │  │  Core 1      │  │  Core 2      │  │  Core 3      │  │
+  │  │              │  │              │  │              │  │              │  │
+  │  │  CIL-T0      │  │  CIL-T0      │  │  CIL-T0      │  │  CIL-T0      │  │
+  │  │  Pipeline    │  │  Pipeline    │  │  Pipeline    │  │  Pipeline    │  │
+  │  │              │  │              │  │              │  │              │  │
+  │  │  ┌────────┐  │  │  ┌────────┐  │  │  ┌────────┐  │  │  ┌────────┐  │  │
+  │  │  │ SRAM   │  │  │  │ SRAM   │  │  │  │ SRAM   │  │  │  │ SRAM   │  │  │
+  │  │  │ 16 KB  │  │  │  │ 16 KB  │  │  │  │ 16 KB  │  │  │  │ 16 KB  │  │  │
+  │  │  │ private│  │  │  │ private│  │  │  │ private│  │  │  │ private│  │  │
+  │  │  └────────┘  │  │  └────────┘  │  │  └────────┘  │  │  └────────┘  │  │
+  │  │              │  │              │  │              │  │              │  │
+  │  │ inbox FIFO   │  │ inbox FIFO   │  │ inbox FIFO   │  │ inbox FIFO   │  │
+  │  │ outbox FIFO  │  │ outbox FIFO  │  │ outbox FIFO  │  │ outbox FIFO  │  │
+  │  │ Sleep/Wake   │  │ Sleep/Wake   │  │ Sleep/Wake   │  │ Sleep/Wake   │  │
+  │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
+  │         │                 │                 │                 │          │
+  │  ═══════╧═════════════════╧═════════════════╧═════════════════╧═══════   │
+  │                         Shared Bus (4-port arbiter)                      │
+  │                                   │                                      │
+  │              ┌────────────────────┼────────────────────┐                 │
+  │              ▼                    ▼                    ▼                 │
+  │    ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐         │
+  │    │ QSPI Flash ctrl │  │   UART / GPIO   │  │  Timer / IRQ    │         │
+  │    │   (code, R/O)   │  │  (I/O interf.)  │  │  (global clock) │         │
+  │    └─────────────────┘  └─────────────────┘  └─────────────────┘         │
+  └──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key observations:**
+
+- **Every core is identical** to the F3 Tiny Tapeout single-core CIL-T0. The pipeline, decoder, microcode, stack cache — **unchanged**. Simply instantiated 4 times.
+- **No shared data SRAM.** Each core has its own 16 KB SRAM containing its own eval stack, local variables, frames, and (from F5) its own object heap.
+- **The shared bus is only for "slow" resources** — QSPI flash (code loading, infrequent), UART, timer. These are not on the critical path for the cores.
+- **Inter-core communication** goes through mailbox FIFOs, **bypassing the shared bus** — the router is a direct connection between the 4 cores (at the F4 level, a 4-port cross-connection, not yet a full crossbar, just a simple mux bundle).
+- **Sleep/Wake logic:** when a core's CIL program executes a `WAIT` microcode (or enters polling on an empty inbox), the core goes to sleep and only wakes when a mailbox message arrives. This is the **event-driven** operating mode of phase F4.
+
+### Scaling to F6 (16-64 cores)
+
+The F4 4-core design **scales linearly** up to 16 cores without bus congestion — most CIL programs work in private SRAM anyway, and the bus is only needed for infrequent events (flash fetch, I/O). **Above 16 cores**, the bus topology must be changed to a **mesh** (2D grid), where each core communicates with its neighbors and a local I/O channel. This is the physical structure of the F6 ChipIgnite tape-out.
+
+## Heterogeneous multi-core: Nano + Rich
+
+From phase F5, the CLI-CPU transitions to a **heterogeneous multi-core** architecture, analogous to ARM **big.LITTLE**, Apple **P-core + E-core**, and Intel **Alder Lake P+E** approaches, but applied to the CLI world. A single chip contains **two types of cores**:
+
+| | **Nano core** | **Rich core** |
+|-|---------------|---------------|
+| **ISA** | CIL-T0 subset (~48 opcodes, integer-only, static calls) | Full ECMA-335 CIL (~220 opcodes) |
+| **Size** | ~10,000 std cells | ~80,000 std cells |
+| **Features** | Integer ALU, stack cache, mailbox, microcode (mul/div/call/ret) | Nano + object model + GC + metadata walker + vtable cache + FPU (R4/R8) + 64-bit + exception handling + generics |
+| **Clock** | ~50-200 MHz | ~50-150 MHz (slightly slower due to more pipeline stages) |
+| **Typical role** | Worker / neuron / filter / simple actor / state machine | Supervisor / orchestrator / complex domain logic / error handler |
+| **Per-core SRAM** | 16-64 KB | 64-256 KB (including heap) |
+| **Transistor ratio** | ~8x more fit in the same area | ~8x fewer |
+
+### Why this works — Apple big.LITTLE for CIL
+
+Commercial heterogeneous multi-core CPUs (ARM big.LITTLE since 2011, Apple M1+ since 2020, Intel Alder Lake since 2021, AMD Zen 5c since 2024) are **all successful** because real workloads are **not homogeneous**. Most tasks are simple, few are complex. **Using a full Rich core for a LIF neuron would be wasteful, and a Nano core is not enough for an orchestrator.**
+
+Workload distribution in a real application:
+
+| Task type | Example | Core type |
+|-----------|---------|-----------|
+| Sensor interpretation | ADC sample -> threshold | **Nano** |
+| Neuron simulation (LIF, Izhikevich) | `potential += weight; if (potential>th) fire()` | **Nano** |
+| DSP filter (FIR, IIR) | Simple integer pipeline | **Nano** |
+| Filter chain | Stream processor on a single core | **Nano** |
+| Akka.NET worker actor | `Receive(msg) { state = f(state, msg); }` | **Nano** (if integer) |
+| Akka.NET supervisor | Exception handling, child restart | **Rich** |
+| Complex domain logic | `Order.Validate()`, `User.Authorize()` | **Rich** |
+| Orchestrator / coordinator | Multi-actor coordination, transactional logic | **Rich** |
+| Dynamic CIL loading | Runtime new code load | **Rich** |
+| Error handler / logger | Exception -> log + alert | **Rich** |
+| FP / scientific computing | NN forward pass in double precision | **Rich** |
+| String / text processing | `ldstr`, `string.Concat` | **Rich** |
+
+The **Nano** cores are the majority (that is where the real work happens), while the **Rich** cores supervise in small numbers.
+
+### Design economy — why this does not increase the budget
+
+This is the most important part: the heterogeneous model requires **no fundamentally new hardware design work**. Both core types **already appear in the roadmap**, just previously in separate phases:
+
+```
+F3 (Tiny Tapeout)  ─►  Nano core 1x  ───┐
+                                        │
+F4 (FPGA multi-core) ─►  Nano core 4x  ─┤
+                                        │
+F5 (FPGA Rich)     ─►  Rich core 1x  ───┤
+                                        │
+                                        ▼
+F6-FPGA (3xA7-200T) ─►  Heterogeneous: Rich 2x + Nano ~26x distributed (multi-board)
+F6-Silicon (MPW)    ─►  FPGA-verified design onto a single chip, optionally scaled up
+```
+
+The **additional design work for F6 is ~1-2 engineer-months**: floorplan optimization, Roslyn source generator `[RunsOn]` attribute support, and a few registers in the message router that handle Nano/Rich interoperability. **This is marginal** compared to what designing the Nano and Rich cores separately requires.
+
+### Programming model — C# attributes
+
+The .NET compiler level already supports such markers. On the CLI-CPU, a **Roslyn source generator** watches for the `[RunsOn]` attribute and compiles the method into the appropriate binary (`.t0` for Nano, `.tr` for Rich):
+
+```csharp
+[RunsOn(CoreType.Nano)]
+public class LifNeuron : CoreProgram {
+    int potential, threshold, lastTime;
+
+    public void OnSpike(int weight) {
+        potential += weight;
+        if (potential >= threshold) {
+            Fire();
+            potential = 0;
+        }
+    }
+}
+
+[RunsOn(CoreType.Rich)]
+public class NetworkSupervisor : Actor {
+    Dictionary<int, NeuronRef> neurons = new();
+
+    public void OnStartup() {
+        try {
+            LoadTopologyFromFlash();
+            InitializeNeurons();
+        } catch (Exception ex) {
+            Log.Error(ex);
+            Restart();
+        }
+    }
+}
+```
+
+The compiler verifies that `[RunsOn(CoreType.Nano)]` code contains **only CIL-T0 opcodes** — if a Nano method tries to use `newobj`, the compilation produces a **compile-time error**. This is a stricter variant of the CIL ECMA-335 `verifiable code` concept.
+
+### Suggested chip ratios by phase
+
+| Phase | Platform | Nano cores | Rich cores | Aggregate capability |
+|-------|----------|-----------|-----------|---------------------|
+| F3 | Tiny Tapeout | **1** | 0 | Proof of life, first "network node" |
+| F4 | FPGA multi-core | **4** | 0 | First shared-nothing fabric, pure Nano |
+| F5 | FPGA heterogeneous | **4** | **1** | **First heterogeneous system**, Rich core test |
+| F6-FPGA | 3x A7-Lite 200T multi-board (3x134K LUT, Ethernet mesh) | **8-10/board, ~26 total** | **2** | FPGA-verified distributed Cognitive Fabric |
+| F6-Silicon Zero | IHP SG13G2 MPW (3 mm², EUR 0-EUR 4,500) | **8** | **1** | **"Cognitive Fabric Zero"** — first heterogeneous silicon |
+| F6-Silicon One | ChipIgnite Sky130 (10 mm², ~$15K) | **24** | **2** | **"Cognitive Fabric One"** — full demonstration, benchmark |
+| F7 | Product chip (future) | **64+** | **4-8** | Commercial Cognitive Fabric |
+
+### State migration Nano <-> Rich
+
+If a Nano core's program outgrows its own capabilities (e.g., complex exception, generic struct, floating-point needed), it can **request via message** that a Rich core take over its state. This is not "migration" in the classical sense (memory copy), but rather **an actor-serialized message** that naturally fits our shared-nothing model.
+
+The Nano core's steps:
+1. Interrupts the current task with a `STATE_OVERFLOW` trap
+2. Current local variables and arguments are serialized in a JSON-like fashion (MessagePack ECMA-335-compatible)
+3. A message goes to a designated Rich core with a "take over" request + serialized state
+4. The Rich core continues the task natively with full CIL
+5. If needed, sends the result back to the Nano core or another address
+
+**This is a rare case** — the compiler type check catches most cases at build-time. Runtime migration is only for edge cases like dynamic reflection, which is not typical in cognitive fabric usage anyway.
+
+### Why not 3 or more core types
+
+In theory, there could be a "Micro" (even smaller, only 16 opcodes) and a "Mega" (Rich + more cache) — but this **complicates the programming model** and **floorplan design**. Commercial examples (Apple, ARM, Intel) **all** use exactly 2 core types, and this is the sweet spot. The CLI-CPU also **stays at 2 core types**: Nano and Rich.
+
+## Cognitive Fabric One — the reference silicon target (F6-Silicon)
+
+This section records the concrete vision for the CLI-CPU's **first true heterogeneous silicon chip**: what it contains, why we target this particular configuration, and why it is "compelling" — that is, why it demonstrates that the Cognitive Fabric paradigm is a **better alternative** to conventional multi-threaded CPUs **on the same silicon die**.
+
+### Chip specification
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│              CLI-CPU "Cognitive Fabric One"                  │
+│                     10 mm² Sky130                            │
+│                                                              │
+│   ┌─────────┐  ┌─────────┐                                   │
+│   │ Rich #0 │──│ Rich #1 │        ← 2 supervisor cores       │
+│   │ 16KB    │  │ 16KB    │          Neuron OS kernel +       │
+│   └────┬────┘  └────┬────┘          device driver actors     │
+│        │    Mesh     │                                       │
+│        │   Router    │           2D grid topology             │
+│   ┌────┴────┬───┬────┴────┐                                  │
+│   │N0  4KB │N1 │N2  4KB │N3 │N4 │                            │
+│   │N5  4KB │N6 │N7  4KB │N8 │N9 │  ← 24 Nano worker cores    │
+│   │N10 4KB │N11│N12 4KB │N13│N14│    Each core:              │
+│   │N15 4KB │N16│N17 4KB │N18│N19│    - Own 4 KB SRAM         │
+│   │N20 4KB │N21│N22 4KB │N23│   │    - Mailbox FIFO (inbox   │
+│   └────────┴───┴────────┴───┘      + outbox)                 │
+│                                    - Sleep/Wake interrupt    │
+│   QSPI Flash ── QSPI PSRAM ── UART ── Timer ── GPIO          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Sky130 area estimation reference
+
+The chip design decisions are based on the physical parameters of the Sky130 PDK (130nm, SkyWater):
+
+| Parameter | Value | Source |
+|-----------|-------|--------|
+| **Std cell density** (sky130_fd_sc_hd) | ~160K gates/mm² (routed) | SkyWater PDK docs |
+| **Raw gate density** (sky130_fd_sc_hd) | ~266K gates/mm² (unrouted) | SkyWater PDK docs |
+| **SRAM density** (OpenRAM, single-port) | ~0.03 mm²/KB (~30 KB/mm²) | OpenRAM Sky130 reference |
+| **SRAM 4 KB block** | ~0.12-0.15 mm² | OpenRAM Sky130 |
+| **SRAM 16 KB block** | ~0.45-0.55 mm² | OpenRAM Sky130 |
+| **SRAM 64 KB block** | ~1.7-2.0 mm² | OpenRAM Sky130 |
+| **Nano core logic** (~9,100 std cells) | ~0.028-0.031 mm² | ISA-CIL-T0.md estimate |
+| **Rich core logic** (~80,000 std cells) | ~0.25 mm² | architecture.md estimate |
+| **Routing overhead** | ~25-35% | General Sky130 experience |
+
+**Key insight:** **SRAM is the area-dominant element**, not logic. The logic for all 26 cores totals ~1.24 mm² (12% of the chip). The remaining 88% is SRAM and routing. Therefore, the trade-off between core count and SRAM size is the most important design decision.
+
+### Chip area breakdown
+
+| Element | Count | Per-core SRAM | Area (Sky130) |
+|---------|-------|-------------|--------------|
+| Rich core + mailbox | 2 | 16 KB | 2 x 0.75 mm² = 1.5 mm² |
+| Nano core + mailbox | 24 | 4 KB | 24 x 0.18 mm² = 4.3 mm² |
+| Mesh router (2D grid) | 1 | — | 0.02 mm² |
+| Peripherals (QSPI, UART, timer, GPIO) | — | — | 0.1 mm² |
+| Routing overhead (~25%) | — | — | 1.5 mm² |
+| **Total** | **26 cores** | **128 KB** | **~7.4 mm²** |
+| **Remaining** | | | **~2.6 mm²** (writable microcode SRAM, extra cache, reserve) |
+
+### Why this particular configuration
+
+**SRAM is the area-dominant element, not logic.** The logic for all 26 cores totals ~1.24 mm² — only 12% of the 10 mm² chip. The remaining 88% is SRAM and routing. This means:
+- Cores are **cheap** (a Nano core's logic is ~0.031 mm²)
+- Memory is **expensive** (16 KB SRAM is ~0.5 mm²)
+- The **sweet spot** is 4 KB/Nano + 16 KB/Rich — enough to keep the TOS cache, local variables, and frames on-chip, with large data coming from QSPI PSRAM
+
+Usage of the remaining ~2.6 mm² (F6-Silicon decision):
+- **Writable microcode SRAM** — firmware-updatable opcode semantics
+- **Extra Nano cores** (up to +8, without SRAM, relying on QSPI)
+- **Gated store buffer** (GC write barrier batch)
+- **Reserve** for routing and timing closure
+
+### Why it is "compelling" — comparison with conventional multi-core CPU
+
+The same 10 mm² Sky130 area, but with a conventional approach (e.g., 4-core RISC-V with shared memory):
+
+| Component | Conventional 4-core RISC-V | **CLI-CPU Cognitive Fabric One** |
+|-----------|---------------------------|--------------------------------|
+| Core logic | 4 x ~0.15 mm² = 0.6 mm² | 2R + 24N = 1.24 mm² |
+| L1 cache (per-core) | 4 x 0.3 mm² = 1.2 mm² | **Private SRAM** (no cache miss coherency) |
+| **Cache coherency** (snoop, MESI) | **~1.0-1.5 mm²** | **0 mm²** (no shared memory -> no coherence) |
+| **Shared L2 cache** | **~1.0 mm²** | **0 mm²** (nothing shared) |
+| Memory controller | 0.3 mm² | 0.1 mm² (QSPI, simpler) |
+| Routing | ~1.5 mm² | ~1.5 mm² |
+| **Useful cores** | **4** | **26** |
+| **On-chip SRAM** | ~48 KB (L1) + 32 KB (L2) = ~80 KB | **128 KB** (private, no coherence) |
+| **Free area** | ~4 mm² (but more cores -> more coherency) | **2.6 mm²** |
+
+**The key:** a conventional CPU spends ~2.0-2.5 mm² (20-25% of the chip!) on cache coherency infrastructure — snoop filter, MESI/MOESI protocol, shared L2 tag RAM, bus arbiter. On the CLI-CPU, all that area **goes to extra cores**, because the architecture is shared-nothing — the coherence problem **does not exist**.
+
+### Performance comparison on actor-based workloads
+
+| Metric | CLI-CPU (2R+24N @50MHz) | RISC-V 4-core (@50MHz, same die) | CLI-CPU advantage |
+|--------|------------------------|----------------------------------|-------------------|
+| **Actor msg/sec** | ~50M (24 cores x ~2M/core, hardware mailbox) | ~2M (software queue + lock + context switch) | **~25x** |
+| **Message latency** | ~10-20 cycles (hardware FIFO) | ~500-2000 cycles (lock acquire + context switch) | **~50-100x** |
+| **Context switch** | ~5-8 cycles (TOS cache + PC) | ~500-2000 cycles (register save/restore + TLB flush) | **~100x** |
+| **Parallel neurons (SNN)** | 24 (1/core, deterministic) | 4 (threaded, non-deterministic) | **6x** |
+| **Scaling per +1 core** | Linear | Sub-linear (Amdahl + coherency overhead) | **Fundamental** |
+| **Energy (event-driven)** | ~nJ/event (sleeping cores, wake-on-mailbox) | ~uJ/event (active polling, cache traffic) | **~100-1000x** |
+| **Determinism** | Guaranteed (no OoO, no preemption) | Not guaranteed (cache timing, preemption) | **Absolute** |
+| **Isolation** | Hardware (private SRAM, capability) | Software (MMU, but Spectre/Meltdown) | **Stronger** |
+
+**Important:** in single-core IPC, RISC-V (especially OoO variants) is faster. The CLI-CPU **does not win in the single-core race**, but rather in the fact that **on the same silicon it performs far more useful parallel work** on actor-based workloads, while remaining deterministic and secure.
+
+### Neuron OS layers on-chip
+
+| Layer | Where it runs | Function |
+|-------|--------------|----------|
+| **Neuron OS kernel** | Rich core #0 | Root supervisor, scheduler, capability registry, hot code loader |
+| **Device driver actors** | Rich core #1 | UART, QSPI, GPIO, timer — crash -> supervisor restart, not kernel panic |
+| **Application supervisor** | Rich core #0 or #1 | App lifecycle, actor spawn/kill, supervision strategies |
+| **Worker actors** (24) | Nano cores | SNN neurons, IoT handlers, filter pipeline, state machines, anything |
+| **GUI actors** (future) | Rich + Nano mix | Framebuffer actor (Rich), widget actors (Nano) — everything is an actor, no "UI thread" |
+
+The GUI is also actor-based: every widget is an actor, every input event is a message, rendering is a pipeline actor chain. There is no global state, no race condition. If a widget crashes, the supervisor restarts it — the other widgets are unaffected.
+
+### Reference demos on-chip
+
+| Demo | Core usage | What it proves |
+|------|-----------|---------------|
+| **Actor ping-pong throughput** | 24 Nano pairs | Msg/sec benchmark — comparable to RISC-V |
+| **SNN (Spiking Neural Network)** | 24 Nano (LIF/Izhikevich neurons) + 1 Rich coordinator | Linear scaling, determinism, event-driven energy |
+| **IoT edge gateway** | 2 Rich (supervisor + protocol) + 24 Nano (handlers) | Real use-case, latency measurement, fault tolerance demo |
+| **Akka.NET actor cluster** | 2 Rich (supervisor) + 24 Nano (workers) | Actor system compiled from C# code, running in hardware |
+| **Hot code loading** | Actor update on Rich core | Zero-downtime update, Erlang-style |
+| **Fault tolerance** | Worker crash -> supervisor restart | "Let it crash" — the chip does not halt, only the actor restarts |
+
+### Publication narrative
+
+The chip's purpose is not "yet another CPU" but rather **proof of a new category**:
+
+> *"The Cognitive Fabric One is the world's first open-source, heterogeneous, actor-native processor. With its 26 cores, without cache coherency, on the same 10 mm² Sky130 silicon it handles 25x more actor messages per second than a conventional 4-core RISC-V — while remaining deterministic, hardware-isolated, and linearly scalable. This is not a faster CPU — this is a new paradigm."*
+
+## Block diagram (single-core CLI-CPU, F6 single-core target)
+
+```
+                         ┌─────────────────────────────────────────┐
+                         │               CLI-CPU                   │
+                         │                                         │
+  ┌──────────────┐       │  ┌────────────────────────────────────┐ │
+  │ QSPI Flash   │◄──────┼─►│         I$  (CIL bytecode cache)   │ │
+  │ (code)       │       │  │         4 KB, 2-way associative    │ │
+  └──────────────┘       │  └──────────────┬─────────────────────┘ │
+                         │                 │                       │
+                         │                 ▼                       │
+                         │  ┌────────────────────────────────────┐ │
+                         │  │  Prefetch Buffer (16 bytes)        │ │
+                         │  └──────────────┬─────────────────────┘ │
+                         │                 │                       │
+                         │                 ▼                       │
+                         │  ┌────────────────────────────────────┐ │
+                         │  │  Length Decoder                    │ │
+                         │  │  (1st byte → full opcode length)   │ │
+                         │  └──────────────┬─────────────────────┘ │
+                         │                 │                       │
+                         │                 ▼                       │
+                         │  ┌────────────────────────────────────┐ │
+                         │  │  uop Cache (256 x 8 uop)           │ │
+                         │  │  PC-based lookup                   │ │
+                         │  └──────┬─────────────────┬───────────┘ │
+                         │         │ hit             │ miss        │
+                         │         │                 ▼             │
+                         │         │  ┌──────────────────────┐     │
+                         │         │  │  Hardwired Decoder   │──┐  │
+                         │         │  │  (trivial opcodes)   │  │  │
+                         │         │  └──────────────────────┘  │  │
+                         │         │  ┌──────────────────────┐  │  │
+                         │         │  │  Microcode ROM/SRAM  │──┤  │
+                         │         │  │  (complex opcodes)   │  │  │
+                         │         │  └──────────────────────┘  │  │
+                         │         │                            ▼  │
+                         │         │  ┌──────────────────────────┐ │
+                         │         │  │  uop Sequencer           │ │
+                         │         │  │  (fill → uop cache)      │ │
+                         │         │  └───────────┬──────────────┘ │
+                         │         │              │                │
+                         │         └──────┬───────┘                │
+                         │                │                        │
+                         │                ▼                        │
+                         │  ┌────────────────────────────────┐     │
+                         │  │        Execute Stage           │     │
+                         │  │  ┌──────┐ ┌──────┐ ┌────────┐  │     │
+                         │  │  │ ALU  │ │ FPU  │ │ Branch │  │     │
+                         │  │  │32/64 │ │R4/R8 │ │  Unit  │  │     │
+                         │  │  └──────┘ └──────┘ └────────┘  │     │
+                         │  │  ┌───────────────────────────┐ │     │
+                         │  │  │   Stack Cache (TOS..TOS-7)│ │     │
+                         │  │  └───────────────────────────┘ │     │
+                         │  │  ┌───────────────────────────┐ │     │
+                         │  │  │   Shadow RegFile (exc)    │ │     │
+                         │  │  └───────────────────────────┘ │     │
+                         │  └──────────────┬─────────────────┘     │
+                         │                 │                       │
+                         │                 ▼                       │
+                         │  ┌────────────────────────────────┐     │
+                         │  │   Load/Store Unit              │     │
+                         │  │   + Gated Store Buffer         │     │
+                         │  │   + GC Write Barrier           │     │
+                         │  └──────────────┬─────────────────┘     │
+                         │                 │                       │
+                         │                 ▼                       │
+                         │  ┌────────────────────────────────┐     │
+                         │  │ D$ (heap + locals + eval-stack)│     │
+                         │  │ 4 KB, with card table bits     │     │
+                         │  └──────────────┬─────────────────┘     │
+                         │                 │                       │
+  ┌──────────────┐       │                 ▼                       │
+  │ QSPI PSRAM   │◄──────┼───────── Memory Controller              │
+  │ (heap+stack) │       │                                         │
+  └──────────────┘       │                                         │
+                         │  ┌────────────────────────────────┐     │
+                         │  │   Metadata Walker Coproc.      │     │
+                         │  │   (PE/COFF table resolution)   │     │
+                         │  └────────────────────────────────┘     │
+                         │  ┌────────────────────────────────┐     │
+                         │  │   GC Assist Unit               │     │
+                         │  │   (bump alloc, card mark)      │     │
+                         │  └────────────────────────────────┘     │
+                         │  ┌────────────────────────────────┐     │
+                         │  │   Exception Unwinder           │     │
+                         │  │   (shadow regfile rollback)    │     │
+                         │  └────────────────────────────────┘     │
+                         └─────────────────────────────────────────┘
+```
+
+## Pipeline
+
+The CLI-CPU uses a **classic 5-stage in-order pipeline**, adapted for stack machine semantics:
+
+```
+ IF  → FETCH:     Bytes from prefetch buffer, I$ with QSPI backing
+ ID  → DECODE:    Length decoder + hardwired/microcode branching
+ EX  → EXECUTE:   ALU/FPU/Branch, operates on stack cache
+ MEM → MEMORY:    Load/store, gated buffer, GC barrier
+ WB  → WRITEBACK: Stack cache update, PC update
+```
+
+There is no superscalar, no out-of-order execution (F0-F6). This is a deliberate decision for two reasons:
+
+1. **Area:** On Sky130, an OoO core would require a higher area budget than what we can afford even on ChipIgnite. The in-order pipeline is compact.
+2. **Determinism:** Both IoT and security profiles require deterministic execution time. OoO and speculation open Spectre-class side channels, which we want to avoid on a "security-first" CIL CPU.
+
+The **uop cache**, however, significantly reduces decoding overhead on hot loops, so the effective IPC stays at ~1, but at low energy.
+
+## Memory model
+
+### Address space
+
+The CLI-CPU uses a 32-bit virtual address space, logically divided into four regions:
+
+| Region | Address range | Contents | Backing |
+|--------|--------------|----------|---------|
+| **CODE** | `0x0000_0000` - `0x3FFF_FFFF` | CIL bytecode + PE/COFF metadata tables | QSPI Flash, read-only |
+| **HEAP** | `0x4000_0000` - `0x7FFF_FFFF` | Managed object heap (GC) | QSPI PSRAM, read/write |
+| **STACK** | `0x8000_0000` - `0x8FFF_FFFF` | Evaluation stack spill + local variables + arguments + frames | QSPI PSRAM |
+| **MMIO** | `0xF000_0000` - `0xFFFF_FFFF` | Peripherals: UART, GPIO, timer, IRQ controller | On-chip |
+
+### GC card table
+
+The HEAP region has an associated **card table**: for every 512 bytes of heap data, 1 bit indicates whether a reference write has occurred in that region. The write barrier updates this in hardware. In phase F4+, the GC microcode uses this to decide which cards need to be traversed.
+
+### Stack structure
+
+The stack on the CLI-CPU is **three-tiered**:
+
+1. **Top-of-Stack Cache (TOS cache)** — 8 x 32-bit registers on-chip. The top 8 stack elements live here. Every ALU operation works on these, **without touching RAM**.
+2. **L1 D-cache** — 4 KB on-chip SRAM, spilled stack frames, local variables, heap hot lines.
+3. **QSPI PSRAM** — full stack backing, ~8 MB.
+
+Spilling to and from the TOS cache is handled automatically by hardware. To the programmer (and the compiler), a **simple, unlimited-depth stack** is visible.
+
+### Frame layout
+
+On the CLI-CPU, CIL **is the machine code** — there is no JIT, no interpreter, no intermediate compilation. What Roslyn generates (method header + opcodes) is **directly executed by the hardware**. Therefore, the frame structure is not freely determined by the hardware designer, but **fixed by the Roslyn output**:
+
+- The **method header** (`arg_count`, `local_count`, `max_stack`) determines the frame size
+- The **opcodes** (`ldarg.N`, `ldloc.N`, `stloc.N`) index the slots
+- The hardware's job: **compute the physical SRAM addresses** from the header
+
+This differs from conventional .NET, where the JIT can freely decide (put a local in a register, rearrange the frame, inline). On the CLI-CPU, there is no such freedom.
+
+### Hardware frame layout
+
+The `call` microcode computes the frame size from the method header and advances the SP. The simulator (`TCpu.cs`) and the hardware (F2+ RTL) use an **identical SRAM layout** — the simulator's `byte[] FSram` array matches the hardware STACK SRAM byte-for-byte.
+
+**Frame header: 12 bytes**
+
+```
+ Offset  Size   Field
+ +0       4      ReturnPC       (int32 LE, -1 = root frame)
+ +4       4      PrevFrameBase  (int32 LE, -1 = root frame)
+ +8       1      ArgCount       (byte, 0..16)
+ +9       1      LocalCount     (byte, 0..16)
+ +10      2      reserved       (alignment)
+```
+
+**Full frame layout in SRAM:**
+
+```
+ Stack SRAM (16 KB Nano / 64-256 KB Rich):
+
+ ┌──────────────────────────────────────────────────────────┐
+ │                                                          │
+ │  Frame 0 (root):  Add(a, b) — 2 args, 0 locals          │
+ │  ┌────────────────────────────────────────────────────┐  │
+ │  │ [FP₀+0]   ReturnPC = -1 (root)         │  4 bytes │  │
+ │  │ [FP₀+4]   PrevFrameBase = -1 (root)    │  4 bytes │  │
+ │  │ [FP₀+8]   ArgCount=2, LocalCount=0     │  4 bytes │  │
+ │  │ ─ ─ ─ ─ end of header (12 bytes) ─ ─ ─ │          │  │
+ │  │ [FP₀+12]  arg[0] = 2                   │  4 bytes │  │
+ │  │ [FP₀+16]  arg[1] = 3                   │  4 bytes │  │
+ │  │ ─ ─ ─ ─ end of args ─ ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
+ │  │ [FP₀+20]  eval[0] (a+b result)         │  4 bytes │  │
+ │  └────────────────────────────────────────────────────┘  │
+ │  Frame size: 12 + 2x4 + 0x4 = 20 bytes (+ eval stack)   │
+ │                                                          │
+ │  Frame 1 (callee):  Gcd(a, b) — 2 args, 1 local         │
+ │  ┌────────────────────────────────────────────────────┐  │
+ │  │ [FP₁+0]   ReturnPC = (opcode after call)│  4 bytes │  │
+ │  │ [FP₁+4]   PrevFrameBase = FP₀          │  4 bytes │  │
+ │  │ [FP₁+8]   ArgCount=2, LocalCount=1     │  4 bytes │  │
+ │  │ ─ ─ ─ ─ end of header (12 bytes) ─ ─ ─ │          │  │
+ │  │ [FP₁+12]  arg[0] = 48                  │  4 bytes │  │
+ │  │ [FP₁+16]  arg[1] = 18                  │  4 bytes │  │
+ │  │ ─ ─ ─ ─ end of args ─ ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
+ │  │ [FP₁+20]  local[0] = 0                 │  4 bytes │  │
+ │  │ ─ ─ ─ ─ end of locals ─ ─ ─ ─ ─ ─ ─ ─ │          │  │
+ │  │ [FP₁+24]  eval[0]                      │          │  │
+ │  │ [FP₁+28]  eval[1]                      │          │  │
+ │  │ [FP₁+32]  eval[2]                      │          │  │
+ │  └────────────────────────────────────────────────────┘  │
+ │  Frame size: 12 + 2x4 + 1x4 = 24 bytes (+ eval stack)   │
+ │                                                          │
+ │  [free SRAM]                                             │
+ │                                                          │
+ └──────────────────────────────────────────────────────────┘
+ SP ──► grows upward, points to the next free byte
+```
+
+**Address computation** (the `call` microcode sets the `frame_base` and `arg_count` registers):
+
+```
+ ldarg.N   →  SRAM[frame_base + 12 + N×4]
+ starg.N   →  SRAM[frame_base + 12 + N×4]
+ ldloc.N   →  SRAM[frame_base + 12 + arg_count×4 + N×4]
+ stloc.N   →  SRAM[frame_base + 12 + arg_count×4 + N×4]
+ eval push →  SRAM[SP] = val; SP += 4
+ eval pop  →  SP -= 4; val = SRAM[SP]
+```
+
+### Capacity
+
+```
+ Fibonacci(20) recursive: 21 frames × ~16 bytes = ~336 bytes
+ Gcd iterative:           1 frame × ~28 bytes  = ~28 bytes
+ Worst case (16 args, 16 locals, 64 eval): 12 + 16×4 + 16×4 + 64×4 = 396 bytes
+
+ In 16 KB Nano SRAM:
+   - Typical frame (~20 bytes): ~800 frame depth ← more than enough
+   - Worst case frame (396 bytes): ~41 frame depth ← tight, but rare
+```
+
+### Simulator = hardware model
+
+After the SRAM refactor, the simulator (`TCpu.cs`) maintains **identical internal state** to the hardware:
+
+| Element | Simulator | Hardware (F2+ RTL) |
+|---------|-----------|-------------------|
+| SRAM | `byte[] FSram` (16 KB) | Per-core SRAM (16 KB) |
+| SP | `int FSp` | SP register |
+| Frame base | `int FFrameBase` | FP register |
+| `ldarg.1` | `SramReadInt32(FFrameBase + 12 + 1×4)` | `SRAM[FP + 12 + 1×4]` |
+| Frame size | Computed from header (variable) | Computed from header (variable) |
+| Allocation | `FSp += frameSize` | `SP += frameSize` |
+| Debug | `SramSnapshot()` → byte[] | cocotb: SRAM dump |
+
+The F2 RTL cocotb tests can compare the simulator's `SramSnapshot()` output with the Verilog SRAM contents **byte-for-byte**.
+
+**The `call` microcode sequence:**
+1. Read header from the target RVA (arg_count, local_count, code_size validation)
+2. CallDepthExceeded check (max 512)
+3. Frame size computation: `12 + arg_count×4 + local_count×4`
+4. SramOverflow check: `SP + frame_size > SRAM_SIZE`
+5. Pop arguments from the caller eval stack (in reverse order)
+6. Write frame header: ReturnPC, PrevFrameBase, ArgCount, LocalCount
+7. Write args to SRAM
+8. Zero-initialize locals
+9. Update SP, FrameBase, ArgCount, LocalCount registers
+10. Set PC to the first byte of the callee body (after header)
+
+**The `ret` microcode sequence:**
+1. Pop return value from the callee eval stack (if any)
+2. Root frame check (CallDepth == 1 -> Halt)
+3. Read PrevFrameBase, ReturnPC from SRAM
+4. Reset SP to frame_base (the callee's SRAM is freed)
+5. Restore FrameBase, ArgCount, LocalCount from the caller frame
+6. Push return value onto the caller eval stack
+7. Reset PC to the saved ReturnPC
+3. Restore `frame_base` and `arg_count` to the caller's values
+4. Push return value onto the **caller** eval stack
+5. Reset PC to the saved return PC
+
+## Decoding strategy
+
+For details see `ISA-CIL-T0.md`, but the core strategy is:
+
+### Length decoder
+
+CIL variable-length instructions are **unambiguously deterministic based on the first byte** (except for the `switch` opcode, which derives its length from the 2nd byte). A 256-entry ROM contains the first-byte -> length table:
+
+```
+0x00 (nop)      → 1 byte
+0x02 (ldarg.0)  → 1 byte
+0x06 (ldloc.0)  → 1 byte
+...
+0x1F (ldc.i4.s) → 2 bytes
+0x20 (ldc.i4)   → 5 bytes
+...
+0x2B (br.s)     → 2 bytes
+0x38 (br)       → 5 bytes
+...
+0xFE (prefix)   → 2 + (ROM2 lookup)
+...
+```
+
+For prefixed opcodes (0xFE) there is also a second 256-entry ROM.
+
+### Hardwired vs microcoded classification
+
+~75% hardwired, ~25% microcoded. The hardwired group includes the following opcode families:
+
+- Trivial stack: `nop`, `dup`, `pop`
+- Constants: `ldc.i4.*`, `ldc.i8`, `ldc.r4`, `ldc.r8`
+- Locals / arguments: `ldloc.*`, `stloc.*`, `ldarg.*`, `starg.*`
+- Simple ALU: `add`, `sub`, `and`, `or`, `xor`, `neg`, `not`, `shl`, `shr`, `shr.un`
+- Comparison: `ceq`, `cgt*`, `clt*`
+- Short branches: `br.s`, `brtrue.s`, `brfalse.s`, `beq.s`, etc.
+- Simple memory: `ldind.*`, `stind.*`
+
+The microcoded group:
+
+- `mul`, `div`, `rem` (iterative implementation)
+- 64-bit integer arithmetic
+- FP arithmetic (FPU sequencer)
+- `call`, `callvirt`, `ret`
+- `newobj`, `newarr`, `box`, `unbox`
+- `isinst`, `castclass`
+- `ldfld`, `stfld`, `ldelem.*`, `stelem.*`
+- `ldtoken`, `ldftn`, `ldvirtftn`
+- `throw`, `rethrow`, `leave`, `endfinally`
+- `switch`
+
+## uops
+
+The CLI-CPU's internal micro-instruction format (to be finalized in F2, preliminary draft):
+
+```
+ Field    | Size  | Description
+──────────┼───────┼─────────────────────────────────────────
+ OP       | 6 bit | microcode opcode (e.g., TOS_ADD, LOAD, BRANCH)
+ DST      | 4 bit | destination: TOS, TOS-1, ..., LOCAL[i], ARG[i]
+ SRC1     | 4 bit | source 1
+ SRC2     | 4 bit | source 2
+ FLAGS    | 6 bit | uses_sp, writes_flags, last_of_op, trap_enable, ...
+ IMM      | 8 bit | optional immediate (from the CIL bytes)
+──────────┼───────┼─────────────────────────────────────────
+           32 bit
+```
+
+A CIL `add` = 1 uop (`OP=TOS_ADD, DST=TOS-1, SRC1=TOS-1, SRC2=TOS, FLAGS=pop1 | last`).
+
+A CIL `callvirt` = ~8-10 uops (see `ISA-CIL-T0.md` for a detailed trace).
+
+## Exception handling
+
+**Shadow Register File + Checkpoint** (Transmeta-inspired):
+
+- On `try` entry, the microcode emits a `SAVE_CHECKPOINT` uop that copies the entire TOS cache contents, SP, BP, and PC to a shadow register file **in a single cycle**.
+- On normal `try` exit (`leave`), the checkpoint can be discarded (`DROP_CHECKPOINT` uop).
+- On `throw`, the microcode traverses the method's exception table (from PE/COFF metadata), finds the appropriate `catch`/`filter` handler, and if found:
+  - `RESTORE_CHECKPOINT` uop restores the TOS cache
+  - The thrown object reference is placed on TOS
+  - PC jumps to the handler's first opcode
+- If there is no handler in the method, the microcode emits a `ret` toward the caller and repeats the search.
+
+This is **dramatically faster** than conventional unwind-table stepping, because the microcode uses the hardware shadow file rather than having to unwind the stack sequentially.
+
+## GC (Garbage Collection)
+
+**Generational bump-allocator + stop-the-world mark-sweep** is the simplest implementation, introduced in F4.
+
+### Allocation
+
+The `newobj` / `newarr` / `box` microcode:
+
+```
+ TOS_SIZE  ← object_size (from the type or array length)
+ NEW_ADDR  ← HEAP_TOP
+ HEAP_TOP ← HEAP_TOP + TOS_SIZE
+ if HEAP_TOP > HEAP_LIMIT → TRAP #GC
+ store type_ptr at NEW_ADDR
+ TOS ← NEW_ADDR
+```
+
+~5-8 cycles if no GC trap. On GC trap, the microcode invokes the GC subroutine (which also runs in microcode or on a small "housekeeping" coprocessor).
+
+### Write barrier
+
+The `stfld` microcode (when the field is a reference type):
+
+```
+ STORE    TOS, [TOS-1 + field_offset]
+ CARD     ← (TOS-1 + field_offset) >> 9    ; card index
+ CARD_TBL[CARD] ← 1                        ; card mark
+```
+
+A single extra cycle compared to a plain `stfld`. **Essentially free in hardware** relative to managed memory safety.
+
+### Gated Store Buffer
+
+In the F4+ microarchitecture, the write barrier card table updates accumulate in a **small store buffer** and are only written back to the D-cache at commit points (method exit, `volatile.` prefix). This Transmeta-inspired optimization reduces the amortized cost of the write barrier to **~0.3 cycles**.
+
+## Metadata Walker
+
+CIL metadata tokens (e.g., `MethodDef 0x06000042`) point into PE/COFF metadata tables. On the CLI-CPU, resolving these is the job of the **Metadata Walker coprocessor** (from F4):
+
+1. The CIL opcode pushes the token into a small FIFO
+2. The Walker begins traversing PE/COFF tables (Method table, Type table, Field table, etc.)
+3. The result is a **direct pointer** to the object's type descriptor / method entry point / field offset
+4. The Walker uses a **small TLB** to accelerate frequently-used tokens
+
+**Important:** this does NOT modify the CIL bytes in memory. The walker is merely an "address resolution service"; the code continues to run unchanged.
+
+## Prior art and adopted techniques
+
+The CLI-CPU is not the first bytecode-native CPU, and it is worth learning from each predecessor.
+
+### Sun picoJava (1997, 1999)
+
+**What it did well:** Natural stack machine for Java bytecode. Top-of-Stack Caching for the top ~4 elements. Hardware array bounds check. Simple, elegant microarchitecture.
+
+**Why it failed:** Plain ARM + HotSpot JIT was faster, and as semiconductor scaling continued over decades, the general-purpose CPU + software runtime caught up with the dedicated hardware to an unexpected degree. Sun could not price it competitively.
+
+**What we adopt:**
+- **Top-of-Stack Caching** — fundamental, adopted. 4-8 elements.
+- **Hardware array bounds check** — fits the security-first profile.
+- **Elegant simplicity** — we do not attempt OoO or superscalar.
+
+### ARM Jazelle (2001)
+
+**What it did well:** A **Java bytecode execution mode** within an ARM core (not a separate CPU). The ARM decoder switches to Java bytecode with a bit toggle, and directly executes the most important ~140 opcodes in hardware. Complex opcodes trap to a software handler.
+
+**Why it is interesting:** This **hybrid** model — we do not want to implement every opcode in hardware; for rare / complex opcodes we can trap to microcode or a small coprocessor.
+
+**What we adopt:**
+- **Trapping rare opcodes** to the metadata walker and GC coprocessor, rather than full microcode ROM implementation.
+- **Mode switch** — in the F4+ version, there may be a "CIL-T0 compatibility mode" and a "full CIL mode".
+
+### Transmeta Crusoe / Efficeon (2000, 2003)
+
+**What it did well:** Internal VLIW core, **software** x86 -> VLIW translation (Code Morphing Software), trace cache, shadow register file + checkpoint rollback, gated store buffer, writable microcode, aggressive power-gating.
+
+**Why it failed:** Software DBT (Dynamic Binary Translation) warmup was slow, the arrival of Intel Pentium M (Dothan) eliminated the power USP, and the software complexity was an enormous risk.
+
+**What we adopt (and what we do NOT):**
+
+| Technique | Adopt? | Where |
+|-----------|--------|-------|
+| Code Morphing Software (DBT) | **NO** | Contradicts the "CIL = native ISA" principle |
+| Internal VLIW core | **NO** | Stack machine is more natural for CIL |
+| uop cache / trace cache | **YES** | F4+, energy savings on hot loops |
+| Shadow register file + checkpoint | **YES** | F5 exception handling |
+| Gated store buffer | **YES** | F4 GC write barrier batch |
+| Writable microcode SRAM | **YES** | F6 ChipIgnite, firmware-updatable opcodes |
+| Aggressive power-gating | **YES** | From F0 throughout, IoT profile |
+
+### RISC-V
+
+**Not a predecessor**, but a reference architecture. RISC-V is a purely register-based RISC, the exact **opposite** of the stack machine CLI-CPU. However:
+
+- **OpenLane2 / Sky130 / Caravel tooling** — we learn this from the RISC-V community
+- **Open source spirit** — all RTL, documentation, tests will be public
+- **Custom extension pattern** — If we ever need a RISC-V core alongside the CLI-CPU (e.g., for the GC coprocessor or bootloader), a minimal RV32I core is a good choice
+
+## Power management
+
+The CLI-CPU is divided into **four power domains** (F6 target):
+
+1. **Core domain** — fetch, decode, execute, stack cache. Always active while the CPU is working.
+2. **FPU domain** — only powered on when an FP opcode is detected. Cold during integer loops.
+3. **GC / metadata domain** — the walker coprocessor and GC assist. Active only on allocation or metadata miss.
+4. **I/O domain** — QSPI controllers, UART, GPIO. Scales down during WFI (wait-for-interrupt).
+
+Clock-gating in every domain, power-gating in domains 2, 3, and 4.
+
+## Silicon-grade security
+
+This section discusses the CLI-CPU's security architecture **from an architectural perspective**. The full security model, threat model, attack immunity table, formal verification plan, and certification paths are in a separate document: see [`docs/security.md`](security.md).
+
+### The CLI-CPU security principle
+
+> **Memory safety, type safety, and control flow integrity are not software abstractions but physical properties in silicon.**
+
+This statement is not marketing but an **architectural design consequence**. The current microarchitecture does not add security **as an extra layer**, but rather it **implicitly follows** from the design principles:
+
+1. **Stack machine model** -> no ROP gadgets, because the return address is not on the user stack but in the hardware frame pointer structure
+2. **Unchanged code in memory** -> no JIT, no AOT patching, therefore no JIT spraying, no self-modifying code
+3. **Shared-nothing multi-core** -> no cross-core side-channel, no false sharing covert channel, no cache coherency-based attack
+4. **In-order pipeline, no speculation** -> immune to the entire Spectre/Meltdown family
+5. **Harvard memory model** -> the CODE region is on QSPI flash, physically R/O — shellcode cannot be injected
+6. **CIL verified code semantics** -> type safety and memory safety are built into the ISA level
+
+### Hardware checks — the current ISA already includes these
+
+| Check | Where | Trap | Phase |
+|-------|-------|------|-------|
+| Stack overflow/underflow | Every push/pop | `STACK_OVERFLOW` / `STACK_UNDERFLOW` | **F3** |
+| Local/argument index bounds | `ldloc`, `stloc`, `ldarg`, `starg` | `INVALID_LOCAL` / `INVALID_ARG` | **F3** |
+| Branch target validation | `br*` | `INVALID_BRANCH_TARGET` | **F3** |
+| Call target validation | `call` | `INVALID_CALL_TARGET` | **F3** |
+| Division by zero | `div`, `rem` | `DIV_BY_ZERO` | **F3** |
+| Call depth limit | `call` | `CALL_DEPTH_EXCEEDED` | **F3** |
+| Invalid opcode | Decoder | `INVALID_OPCODE` | **F3** |
+| Array bounds check | `ldelem`, `stelem` | `ARRAY_INDEX_OUT_OF_RANGE` | F5 |
+| Null reference check | `ldfld`, `stfld`, `callvirt` | `NULL_REFERENCE` | F5 |
+| Type check (isinst/castclass) | `isinst`, `castclass` | `INVALID_CAST` | F5 |
+| GC write barrier | Reference-type `stfld`/`stelem.ref` | — (side-effect) | F5 |
+
+**Important note:** on the F3 Tiny Tapeout chip, **most of the basic security checks are already live in silicon**. This means the CLI-CPU's first real silicon **already has security properties that no standard CPU possesses**.
+
+### Attack classes the CLI-CPU is immune to
+
+Brief summary (the detailed table is in [`docs/security.md`](security.md)):
+
+| Attack family | Status |
+|--------------|--------|
+| Buffer overflow (CWE-119, 120, 121, 122) | **Excluded** (hardware bounds check) |
+| Use-after-free (CWE-416) | **Excluded** from F5 (GC in hardware) |
+| Type confusion (CWE-843) | **Excluded** from F5 (hardware type check) |
+| Format string (CWE-134) | **Excluded** (no C strings) |
+| ROP / JOP | **Excluded** (hardware CFI) |
+| Shellcode injection (CWE-94) | **Excluded** (CODE R/O) |
+| JIT spraying | **Excluded** (no JIT) |
+| Spectre v1/v2/v4, Meltdown, L1TF, MDS | **Excluded** (no speculation) |
+| Cross-core side-channel | **Excluded** (shared-nothing) |
+| False sharing covert channel | **Excluded** (no shared cache) |
+| GC race condition | **Excluded** (per-core private heap) |
+| Lock deadlock | **Excluded** (no shared locks) |
+
+### Formal verification feasibility
+
+The CLI-CPU **Nano core's** 48-opcode ISA is **practically smaller than the seL4 microkernel** (~10,000 lines of C), which the UNSW team **formally proved** using Coq + Isabelle tools over 15+ years of work.
+
+This means that **formal verification of the CLI-CPU is feasible** — not simple, not cheap, but **not impossible either**, and **not achievable for x86, ARM, or RISC-V with their full extension sets**.
+
+For formal verification details, see the **"Formal verification"** section of [`docs/security.md`](security.md).
+
+### Related projects
+
+- **CHERI** (Cambridge) — closest relative, capability-based security in hardware; could be a potential academic partner
+- **seL4** — formally verified microkernel, a precedent to learn from
+- **CompCert** — formally verified C compiler; a similar long-term goal for the `cli-cpu-link` tool
+- **Project Everest** (Microsoft Research) — formally verified HTTPS/TLS stack in F*, potential for Microsoft support
+
+## Dual-track positioning
+
+The CLI-CPU's security profile opens a **second market track** alongside the **Cognitive Fabric** (programmable cognitive substrate) narrative:
+
+- **Track 1 — "Cognitive Fabric"** — for AI researchers, actor systems, neural network simulation, multi-agent systems. Long-term vision.
+- **Track 2 — "Trustworthy Silicon"** — for regulated industries: automotive (ISO 26262), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog chips, confidential computing. Short-to-medium-term revenue opportunity with high margins.
+
+**Same hardware, two different market segments.** Details and specific target markets in the **"What this means for the project's practical goals"** section of [`docs/security.md`](security.md).
+
+## Next step
+
+The `ISA-CIL-T0.md` document provides the complete opcode specification for the CIL-T0 subset, including encoding tables, stack effects, cycle counts, and trap conditions. **This is the foundation of the F1 C# simulator** — every test there must directly reference a specific point in the ISA-CIL-T0 spec, and the property-based tests already lay the groundwork for future formal verification.
+
+---
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

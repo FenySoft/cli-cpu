@@ -1,5 +1,9 @@
 # CLI-CPU — Security Model and Threat Analysis
 
+> English version: not yet available
+
+> Version: 1.0
+
 Ez a dokumentum a CLI-CPU **biztonsági modelljét** írja le: mit véd hardveresen, mit nem, milyen támadás-osztályokra immunis, milyen formális verifikáció lehetséges, és milyen tanúsítási útvonalakat céloz meg hosszú távon.
 
 ## Miért fontos most
@@ -364,3 +368,11 @@ Ezek fényében a CLI-CPU projektet érdemes **két párhuzamos narratívával**
 4. **F5 körül**: formális ISA specifikáció kezdete (Lean 4 vagy F\* alapon)
 5. **F6 után**: tanúsítási pre-assessment az IEC 61508-ra
 6. **F7 mellett**: a Trustworthy Silicon narratíva aktív kommunikációja, regulated industry partnerek keresése
+
+---
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

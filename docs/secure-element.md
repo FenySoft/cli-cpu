@@ -2,6 +2,10 @@
 
 > **Stratégiai pozicionálási dokumentum.** Ez a harmadik piaci pálya a Cognitive Fabric és a Trustworthy Silicon mellé. Egy külön chip-család tervét írja le, amely ugyanarra az alap architektúrára épül, kiegészítve a Secure Element specifikus hardveres komponensekkel, és a JavaCard / TEE / Secure Element piacot célozza.
 
+> English version: not yet available
+
+> Version: 1.0
+
 ## Tartalmi áttekintés
 
 1. [Miért egy harmadik pálya](#miert-egy-harmadik-palya)
@@ -725,3 +729,11 @@ A Secure Element piac **óriási** (~$30-40B), **érett**, és **most nyílik** 
 A **megkülönböztető pozíciónk** nem az, hogy "még egy nyílt SE" — hanem hogy **multi-core, aktor-alapú, több független security domain egyetlen chipen**. Ez egy **új kategória**, amit sem a TROPIC01, sem az OpenTitan, sem a zárt gyártók nem kínálnak. A jövő Secure Element-je **több security domain-t** fog igényelni (okosóra okostelefon banking + eSIM + eID + FIDO + wallet + TPM), és a CLI-CPU Secure Edition **készen áll** erre.
 
 **A Tropic Square megmutatta, hogy a piac reális és elérhető.** A CLI-CPU Secure Edition **a következő lépést teszi**: ugyanazt az auditálhatóságot és nyíltságot, **egy generációval jobb architektúrán**.
+
+---
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

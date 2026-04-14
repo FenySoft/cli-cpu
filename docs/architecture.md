@@ -1,5 +1,9 @@
 # CLI-CPU — Architektúra Áttekintés
 
+> English version: [architecture-en.md](architecture-en.md)
+
+> Version: 1.0
+
 Ez a dokumentum a CLI-CPU **mikroarchitektúráját** írja le magas szinten: a stack-gép modellt, a pipeline-t, a memória térképet, a dekódolási stratégiát, a GC és kivételkezelés hardveres támogatását, valamint az elődprojektek (picoJava, Jazelle, Transmeta) közül átvett technikákat.
 
 > **Megjegyzés:** Ez az architektúra fokozatosan épül fel az F0–F7 fázisokban. Az itt leírt teljes funkciókészlet az **F6-Silicon „Cognitive Fabric One"** chipben készül el (ChipIgnite vagy IHP MPW, 2R+24N, 10 mm²). A **Tiny Tapeout (F3)** csak az egymagos CIL-T0 subset-et valósítja meg, amit egy külön dokumentum (`ISA-CIL-T0.md`) ír le. A „Cognitive Fabric One" szekció rögzíti a konkrét referencia chip víziót és az összehasonlítást a hagyományos multi-core CPU-kkal.
@@ -12,16 +16,16 @@ Ehelyett a CLI-CPU egy **programozható kognitív szubsztrátum** — sok kis, f
 
 ### Miért más ez, mint a létező megoldások
 
-| Rendszer | Csomópont programozható? | Hardveres? | Nyílt? | .NET natív? |
-|---------|--------------------------|------------|--------|-------------|
-| Intel Loihi 2 | ❌ rögzített LIF neuron variánsok | ✓ | ❌ | ❌ |
-| IBM TrueNorth | ❌ rögzített LIF | ✓ | ❌ | ❌ |
-| BrainChip Akida | ❌ MetaTF-ből fordított fix modell | ✓ | ❌ | ❌ |
-| GrAI Matter Labs GrAI-1 | ❌ fix | ✓ | ❌ | ❌ |
-| SpiNNaker 2 (Manchester) | ✓ C/C++ ARM magokon | ✓ | részben | ❌ |
-| Akka.NET / Orleans | ✓ teljes C#/F# | ❌ szoftveres | ✓ | ✓ |
-| Erlang BEAM | ✓ Erlang | ❌ szoftveres | ✓ | ❌ |
-| **CLI-CPU (Cognitive Fabric)** | **✓ teljes CIL** | **✓** | **✓** | **✓** |
+| Rendszer | Programozható? | Hardveres? | Nyílt? | .NET natív? | Event-driven? | Stack-kompakt ISA? |
+|---------|---------------|------------|--------|-------------|--------------|-------------------|
+| Intel Loihi 2 | ❌ rögzített LIF | ✓ | ❌ | ❌ | ✓ | ❌ |
+| IBM TrueNorth | ❌ rögzített LIF | ✓ | ❌ | ❌ | ✓ | ❌ |
+| BrainChip Akida | ❌ fix modell | ✓ | ❌ | ❌ | ✓ | ❌ |
+| GrAI Matter Labs GrAI-1 | ❌ fix | ✓ | ❌ | ❌ | ✓ | ❌ |
+| SpiNNaker 2 (Manchester) | ✓ C/C++ ARM | ✓ | részben | ❌ | ❌ (polling) | ❌ (ARM ISA) |
+| Akka.NET / Orleans | ✓ teljes C#/F# | ❌ szoftveres | ✓ | ✓ | ❌ (OS scheduler) | ❌ (host CPU ISA) |
+| Erlang BEAM | ✓ Erlang | ❌ szoftveres | ✓ | ❌ | ❌ (BEAM scheduler) | ❌ (host CPU ISA) |
+| **CLI-CPU (Cognitive Fabric)** | **✓ teljes CIL** | **✓** | **✓** | **✓** | **✓** (hw mailbox wake) | **✓** (CIL stack-gép) |
 
 A **neuromorphic versenytársak** (Loihi, TrueNorth, Akida, GrAI) mind **rögzített neuron-modellel** dolgoznak — nem lehet rajtuk tetszőleges algoritmust futtatni, csak a súlyokat és a topológiát beállítani. A **SpiNNaker** az egyetlen, amely programozható csomópontokat kínál, de **C/C++ ARM magokon**, sok mérnökmunkával, akadémiai keretek között. A **szoftveres actor rendszerek** (Akka.NET, Erlang) rugalmasak, de a host CPU-n versenyeznek a scheduler, GC, lock overhead-jével.
 
@@ -997,3 +1001,11 @@ A CLI-CPU biztonsági profilja a **Cognitive Fabric** (programozható kognitív 
 ## Következő lépés
 
 A `ISA-CIL-T0.md` dokumentum adja a konkrét CIL-T0 subset teljes opkód-specifikációját, kódolási táblákat, stack-effekteket, ciklusszámokat és trap feltételeket. **Ez az F1 C# szimulátor alapja** — minden ottani tesztnek közvetlenül hivatkoznia kell az ISA-CIL-T0 spec egy-egy pontjára, és a property-based tesztek már most megalapozzák a későbbi formális verifikációt.
+
+---
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

@@ -1,97 +1,109 @@
 # CLI-CPU
 
-> **Trustworthy Cognitive Fabric — szilíciumban élő memory safety + sok kis CIL-natív core egyetlen chipen, mailbox-alapú üzenetekkel, eseményvezérelt működéssel.**
-> Nincs JIT. Nincs AOT. Nincs interpreter. A CIL bájtok közvetlenül a hardverbe mennek — **és a hardveres biztonság nem megkerülhető.**
+> **Trustworthy Cognitive Fabric -- memory safety baked into silicon + many small CIL-native cores on a single chip, communicating via mailbox messages, operating in an event-driven fashion.**
+> No JIT. No AOT. No interpreter. CIL bytes go straight into the hardware -- **and hardware-enforced security cannot be bypassed.**
 
-🌐 [clicpu.org](https://clicpu.org) *(hamarosan)*
+> Magyar verzió: [README-hu.md](README-hu.md)
 
-## Mi ez?
+> Version: 1.0
 
-A CLI-CPU egy nyílt forráskódú processzor-projekt, amely **a .NET CIL bájtkódot natívan, hardveresen futtatja**, fordítási lépés nélkül — és **sok kis egyszerű core-t** helyez egyetlen chipre, amelyek **üzenet-alapú hálózatként** működnek együtt. Minden core egy teljes CIL programot futtat saját lokális állapottal, és a core-ok kizárólag **mailbox FIFO-kon** keresztül beszélnek egymással — nincs shared memory, nincs cache koherencia, nincs lock contention.
+[clicpu.org](https://clicpu.org) *(coming soon)*
 
-A program választásától függően ugyanaz a hardver lehet:
+## What is this?
 
-- **Natív Akka.NET / Orleans actor cluster** — hardveresen, zero overhead
-- **Programozható spiking neural network** — minden core egy LIF / Izhikevich / saját neuron-modell
-- **Multi-agent szimuláció** — swarm intelligencia, cellular automata, komplex rendszerek
-- **Event-driven dataflow pipeline** — DSP, stream feldolgozás
-- **IoT edge gateway** — sok szenzor, párhuzamos feldolgozás, ultra-alacsony fogyasztás
-- **Embedded web szerver** — per-request egy core
+CLI-CPU is an open-source processor project that **executes .NET CIL bytecode natively in hardware**, without any compilation step -- and places **many small, simple cores** on a single chip that operate together as a **message-based network**. Each core runs a complete CIL program with its own local state, and cores communicate exclusively through **mailbox FIFOs** -- no shared memory, no cache coherence, no lock contention.
 
-**Egy hardver, sok paradigma.** Ez az a pozíció, amit eddig egyetlen létező rendszer sem fed le: nincs olyan chip, ami egyszerre lenne **hardveres + teljesen programozható csomópontokkal + nyílt forráskódú + .NET natív**. A meglévő neuromorphic chipek (Intel Loihi, IBM TrueNorth, BrainChip Akida) mind **rögzített neuron-modellel** dolgoznak; a szoftveres actor rendszerek (Akka.NET, Erlang) rugalmasak, de a host CPU-n versenyeznek a scheduler, GC, lock overhead-jével.
+Depending on the program, the same hardware can serve as:
 
-## Miért nem a klasszikus „bytecode CPU" út
+- **A native Akka.NET / Orleans actor cluster** -- in hardware, with zero overhead
+- **A programmable spiking neural network** -- each core running a LIF / Izhikevich / custom neuron model
+- **A multi-agent simulation** -- swarm intelligence, cellular automata, complex systems
+- **An event-driven dataflow pipeline** -- DSP, stream processing
+- **An IoT edge gateway** -- many sensors, parallel processing, ultra-low power consumption
+- **An embedded web server** -- one core per request
 
-A Sun **picoJava** (1997) és az ARM **Jazelle** (2001) pontosan azt próbálta, amit a CLI-CPU is akarhatna naivan: egy hagyományos, egymagos bytecode-natív processzort a szoftveres JIT alternatíváiként. **Mindkettő megbukott**, mert a szoftveres JIT + általános célú CPU évek alatt olcsóbb és gyorsabb lett, mint a dedikált hardver.
+**One piece of hardware, many paradigms.** This is a position that no existing system occupies: there is no chip that is simultaneously **hardware-based + fully programmable nodes + open source + .NET native**. Existing neuromorphic chips (Intel Loihi, IBM TrueNorth, BrainChip Akida) all use **fixed neuron models**; software-based actor systems (Akka.NET, Erlang) are flexible but compete on the host CPU against scheduler, GC, and lock overhead.
 
-**A CLI-CPU nem ismétli ezt a hibát.** Nem egymagos sebességben akar versenyezni a modern OoO CPU-kkal — az lehetetlen. Ehelyett **más dimenzióban** pozicionál: sok kis independens core, event-driven működés, shared-nothing izoláció, és olyan programozási modell, ami **természetesen illik a modern .NET alkalmazásokhoz** (Task, async/await, Akka.NET, Orleans, Channel). A CLI-CPU **nem C#-t futtat — CIL-t futtat**: minden .NET nyelv (C#, F#, VB.NET, IronPython, PowerShell) natívan fut a hardveren, ~8 millió fejlesztő meglévő kódbázisával. Ez az **első hardver platform, ami egy teljes szoftveres ökoszisztéma natív szilíciumát adja**.
+## Why not the classic "bytecode CPU" approach
 
-Részletek a `docs/architecture.md` **„Stratégiai pozicionálás: Cognitive Fabric"** szekciójában.
+Sun's **picoJava** (1997) and ARM's **Jazelle** (2001) attempted exactly what CLI-CPU might naively try: a conventional, single-core bytecode-native processor as an alternative to software JIT. **Both failed**, because software JIT on general-purpose CPUs became cheaper and faster than dedicated hardware within a few years.
 
-## Négy ütőkártya
+**CLI-CPU does not repeat this mistake.** It does not try to compete with modern OoO CPUs on single-core speed -- that is impossible. Instead, it positions itself in a **different dimension**: many small independent cores, event-driven operation, shared-nothing isolation, and a programming model that **naturally fits modern .NET applications** (Task, async/await, Akka.NET, Orleans, Channel). CLI-CPU **does not run C# -- it runs CIL**: every .NET language (C#, F#, VB.NET, IronPython, PowerShell) runs natively on the hardware, tapping into the existing codebase of ~8 million developers. This is the **first hardware platform that provides native silicon for an entire software ecosystem**.
 
-1. **Silicon-grade security** — a memory safety, type safety és control flow integrity **fizikai tulajdonságok a szilíciumban**, nem szoftveres absztrakciók. Immunis a Spectre/Meltdown típusú mikroarch-támadásokra (nincs spekulatív végrehajtás), a ROP/JOP támadásokra (hardveres CFI), a buffer overflow-ra (hardveres bounds check), és a JIT spraying-ra (nincs JIT). **Formálisan verifikálható** ISA, ami a CompCert/seL4 tanulságára épít. Részletek: [`docs/security.md`](docs/security.md).
-2. **Kódtömörség** — a CIL bytecode 30–50%-kal kompaktabb, mint a RISC-V RV32I vagy ARM Thumb-2 ugyanarra a funkcióra → kevesebb flash, kevesebb fogyasztás, **több neuron fér el egy chip-re**.
-3. **Shared-nothing skálázódás** — mivel a core-ok között nincs megosztott memória, a teljesítmény **lineárisan nő** a core-számmal. Nincs MESI, nincs cache coherency overhead, nincs lock contention, nincs cross-core side-channel.
-4. **Event-driven power profile** — a core-ok alapértelmezésben alvó üzemmódban vannak, és csak akkor ébrednek, amikor mailbox üzenet érkezik. **Ultra-alacsony alapfogyasztás**, ami kulcsfontosságú IoT, kritikus infrastruktúra és neuromorphic workload-okon.
+Details in the **"Strategic Positioning: Cognitive Fabric"** section of `docs/architecture.md`.
 
-## Hárompályás pozicionálás — hosszú távon a Linux utódja
+## Four trump cards
 
-A CLI-CPU + Neuron OS **három párhuzamos piaci narratívát** követ, ugyanazzal a hardveres alappal, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
+1. **Silicon-grade security** -- memory safety, type safety, and control flow integrity are **physical properties of the silicon**, not software abstractions. Immune to Spectre/Meltdown-class microarchitectural attacks (no speculative execution), ROP/JOP attacks (hardware CFI), buffer overflows (hardware bounds checking), and JIT spraying (no JIT). **Formally verifiable** ISA, building on lessons from CompCert/seL4. Details: [`docs/security.md`](docs/security.md).
+2. **Code density** -- CIL bytecode is 30-50% more compact than RISC-V RV32I or ARM Thumb-2 for equivalent functionality -- less flash, lower power, **more neurons fit on a single chip**.
+3. **Shared-nothing scalability** -- since there is no shared memory between cores, performance **scales linearly** with core count. No MESI, no cache coherency overhead, no lock contention, no cross-core side channels.
+4. **Event-driven power profile** -- cores are in sleep mode by default and only wake when a mailbox message arrives. **Ultra-low baseline power consumption**, which is critical for IoT, critical infrastructure, and neuromorphic workloads.
 
-**Pálya 1 — „Cognitive Fabric"**: programozható kognitív szubsztrátum AI kutatóknak, Akka.NET / Orleans actor rendszereknek, spiking neural network szimulációnak, multi-agent szimulációnak, IoT edge gateway-nek. **Hosszú távú vízió.**
+## Three-track positioning -- long-term successor to Linux
 
-**Pálya 2 — „Trustworthy Silicon"**: formálisan verifikálható, tanúsítható processzor regulated industries-nek — automotive (ISO 26262 ASIL-B/C/D), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog, confidential computing. **Rövid-közép távú bevételi lehetőség.**
+CLI-CPU + Neuron OS pursues **three parallel market narratives** built on the same hardware foundation, all serving a **single shared historical goal**: **replacing the 1970s Unix foundations inherited by Linux** with a modern, secure, scalable, actor-based architecture.
 
-**Pálya 3 — „Secure Edition"**: a JavaCard / TEE / Secure Element piac átalakítása — egy parallel tape-out a fő F6 mellett, Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures kiegészítésekkel. **Első termékek: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Megkülönböztető: **több független hardveres security domain egy chipen**, amit a meglévő nyílt alternatívák (TROPIC01, OpenTitan) **nem kínálnak**. Részletek: [`docs/secure-element.md`](docs/secure-element.md).
+**Track 1 -- "Cognitive Fabric"**: a programmable cognitive substrate for AI researchers, Akka.NET / Orleans actor systems, spiking neural network simulation, multi-agent simulation, and IoT edge gateways. **Long-term vision.**
 
-Ugyanaz a chip-család, három különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Neuron OS lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`docs/neuron-os.md`](docs/neuron-os.md) „A Linux öröklött problémái és a Neuron OS válasza" szekciójában.
+**Track 2 -- "Trustworthy Silicon"**: a formally verifiable, certifiable processor for regulated industries -- automotive (ISO 26262 ASIL-B/C/D), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog, and confidential computing. **Short-to-medium-term revenue opportunity.**
 
-## Heterogén multi-core: Nano + Rich
+**Track 3 -- "Secure Edition"**: transforming the JavaCard / TEE / Secure Element market -- a parallel tape-out alongside the main F6, adding Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures. **First products: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Key differentiator: **multiple independent hardware security domains on a single chip**, which existing open alternatives (TROPIC01, OpenTitan) **do not offer**. Details: [`docs/secure-element.md`](docs/secure-element.md).
 
-Az F5 fázistól a CLI-CPU **heterogén multi-core** architektúrát használ, analóg módon az ARM big.LITTLE, Apple P-core + E-core, és Intel Alder Lake megközelítéseihez — csak a .NET világra alkalmazva:
+Same chip family, three different market segments -- **but the same historical goal**: just as x86 replaced the mainframe, mobile replaced the desktop, and the cloud replaced the on-prem data center, **the Cognitive Fabric + Neuron OS will be the next replacement cycle**, delivering the OS for the modern, AI-driven, safety-critical, massively distributed era. Details in the "The inherited problems of Linux and Neuron OS's answer" section of [`docs/neuron-os.md`](docs/neuron-os.md).
+
+## Heterogeneous multi-core: Nano + Rich
+
+Starting from phase F5, CLI-CPU employs a **heterogeneous multi-core** architecture, analogous to ARM big.LITTLE, Apple P-core + E-core, and Intel Alder Lake -- but applied to the .NET world:
 
 | | **Nano core** | **Rich core** |
 |-|---------------|---------------|
-| ISA | CIL-T0 (48 opkód, integer-only) | Teljes ECMA-335 CIL (~220 opkód) |
-| Méret | ~10k std cell | ~80k std cell |
-| Funkciók | Integer, stack cache, mailbox | Nano + objektum modell + GC + FPU + kivételek + generikusok |
-| Szerep | Worker / neuron / filter / egyszerű actor | Supervisor / orchestrator / komplex domain logika |
-| Tipikus arány F6-on | **~26 db** (sok, 3 board-on elosztva) | **2 db** (kevés) |
+| ISA | CIL-T0 (48 opcodes, integer-only) | Full ECMA-335 CIL (~220 opcodes) |
+| Size | ~10k std cells | ~80k std cells |
+| Features | Integer, stack cache, mailbox | Nano + object model + GC + FPU + exceptions + generics |
+| Role | Worker / neuron / filter / simple actor | Supervisor / orchestrator / complex domain logic |
+| Typical count on F6 | **~26** (many, distributed across 3 boards) | **2** (few) |
 
-A C# programok **`[RunsOn(CoreType.Nano)]`** vagy **`[RunsOn(CoreType.Rich)]`** attribútummal jelölik, hogy melyik osztály melyik core-ra fordul. A Roslyn source generator build-time ellenőrzi, hogy a Nano-jelölt kód **csak** CIL-T0 opkódokat használ.
+C# programs use **`[RunsOn(CoreType.Nano)]`** or **`[RunsOn(CoreType.Rich)]`** attributes to indicate which class targets which core type. A Roslyn source generator verifies at build time that Nano-targeted code uses **only** CIL-T0 opcodes.
 
-## Státusz
+## Status
 
-**F1.5 — KÉSZ.** A C# referencia szimulátor (48/48 CIL-T0 opkód, 267 zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
+**F1.5 -- DONE.** The C# reference simulator (48/48 CIL-T0 opcodes, 267 green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
 
-Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
+See [docs/roadmap.md](docs/roadmap.md) for the full phase breakdown.
 
-## Dokumentumok
+## Documents
 
-- [docs/roadmap.md](docs/roadmap.md) — Hétfázisú ütemterv F0-tól F7-ig, a Cognitive Fabric pivottal F4-ben, F6.5 Secure Edition variánssal
-- [docs/architecture.md](docs/architecture.md) — CLI-CPU mikroarchitektúra, Cognitive Fabric pozicionálás, prior art elemzés (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogén Nano + Rich multi-core
-- [docs/ISA-CIL-T0.md](docs/ISA-CIL-T0.md) — CIL-T0 subset specifikáció (48 opkód), mailbox MMIO interfész
-- [docs/security.md](docs/security.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
-- [docs/neuron-os.md](docs/neuron-os.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon"
-- [docs/secure-element.md](docs/secure-element.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv
-- [docs/faq.md](docs/faq.md) — Gyakori Kérdések: koncepcionális horgonyok új olvasóknak (CLI vs CIL, CPU összehasonlítás, ütemezési költségek)
-- [docs/vision.md](docs/vision.md) — A shared-nothing jövő: OS, GUI, adatbázis, hálózat, programozási modell újragondolva
+- [docs/roadmap.md](docs/roadmap.md) -- Seven-phase roadmap from F0 to F7, with the Cognitive Fabric pivot at F4 and the F6.5 Secure Edition variant
+- [docs/architecture.md](docs/architecture.md) -- CLI-CPU microarchitecture, Cognitive Fabric positioning, prior art analysis (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogeneous Nano + Rich multi-core
+- [docs/ISA-CIL-T0.md](docs/ISA-CIL-T0.md) -- CIL-T0 subset specification (48 opcodes), mailbox MMIO interface
+- [docs/security.md](docs/security.md) -- Threat model, architectural security guarantees, attack immunity table, formal verification plan, certification paths (IEC 61508, ISO 26262, DO-178C, IEC 62304)
+- [docs/neuron-os.md](docs/neuron-os.md) -- Neuron OS vision: an actor-based operating system for CLI-CPU, "Erlang in silicon"
+- [docs/secure-element.md](docs/secure-element.md) -- Secure Edition: JavaCard / TEE / Secure Element market, detailed TROPIC01 analysis, multi-SE hardware isolation, F6.5 parallel tape-out plan
+- [docs/faq.md](docs/faq.md) -- FAQ: conceptual anchors for new readers (CLI vs CIL, CPU comparison, scheduling costs)
+- [docs/vision.md](docs/vision.md) -- The shared-nothing future: OS, GUI, database, networking, and programming model reimagined
 
-## Gyártási útvonal
+## Manufacturing path
 
-| Fázis | Cél | Platform |
-|-------|-----|----------|
-| F0 | Spec dokumentumok | — |
-| F1 | C# referencia szimulátor (TDD) | .NET |
-| F2 | RTL (Verilog/Amaranth) + cocotb, Nano core egymagos | szimuláció |
-| F3 | **Tiny Tapeout submission** — 1× Nano core + mailbox MMIO, első hálózatba illeszthető csomópont | Sky130, ~$150 |
-| F4 | **Cognitive Fabric pivot** — 4× Nano core FPGA, shared-nothing, event-driven | A7-Lite 200T, ~€320 |
-| F5 | **Rich core születése** — 2× Rich + 8× Nano (teljes CIL) FPGA, első heterogén rendszer | ugyanaz az FPGA |
-| **F6-FPGA** | **FPGA-verifikált elosztott Cognitive Fabric** — 3× A7-Lite 200T multi-board Ethernet háló, 2R + ~26N, location transparency | 3× A7-Lite 200T, ~€960 |
-| F6-Silicon | **Cognitive Fabric real silicon** *(csak F6-FPGA verifikáció után)* — az FPGA-n verifikált design valós szilíciumon | Sky130 ChipIgnite vagy IHP MPW, ~$10k |
-| F7 | Demonstrációs platform + Neuron OS csírái | PCB + szoftver |
+| Phase | Goal | Platform |
+|-------|------|----------|
+| F0 | Spec documents | -- |
+| F1 | C# reference simulator (TDD) | .NET |
+| F2 | RTL (Verilog/Amaranth) + cocotb, single Nano core | simulation |
+| F3 | **Tiny Tapeout submission** -- 1x Nano core + mailbox MMIO, first network-ready node | Sky130, ~$150 |
+| F4 | **Cognitive Fabric pivot** -- 4x Nano core FPGA, shared-nothing, event-driven | A7-Lite 200T, ~$320 |
+| F5 | **Rich core introduction** -- 2x Rich + 8x Nano (full CIL) FPGA, first heterogeneous system | same FPGA |
+| **F6-FPGA** | **FPGA-verified distributed Cognitive Fabric** -- 3x A7-Lite 200T multi-board Ethernet mesh, 2R + ~26N, location transparency | 3x A7-Lite 200T, ~$960 |
+| F6-Silicon | **Cognitive Fabric in real silicon** *(only after F6-FPGA verification)* -- the FPGA-verified design on real silicon | Sky130 ChipIgnite or IHP MPW, ~$10k |
+| F7 | Demonstration platform + Neuron OS seeds | PCB + software |
 
-## Licenc
+## License
 
-TBD (valószínűleg Apache 2.0 a kódra és CC-BY 4.0 a dokumentációra)
+[CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENCE)
+
+---
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

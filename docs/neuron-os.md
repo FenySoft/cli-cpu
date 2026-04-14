@@ -4,6 +4,10 @@
 >
 > **A tartalom iránytű, nem végleges spec.** A részleteket menet közben, az F4–F6 tapasztalatok alapján finomítjuk. A cél itt az, hogy a tervezési döntések **irányt kapjanak**, és ne minden F4 iterációnál újra vitatkozzunk az alapelvekről.
 
+> English version: [neuron-os-en.md](neuron-os-en.md)
+
+> Version: 1.0
+
 ## Filozófia — az Unix örökség leváltása, az Erlang vízió megvalósítása
 
 A **Neuron OS** célja egy olyan operációs rendszer megvalósítása, amelyben **minden entitás aktor**, és a kommunikáció **kizárólag üzenetküldéssel** történik. De ez nem csak egy alternatív megközelítés a Linux mellett — ez **egy új paradigma, amely hosszú távon a jelenlegi OS-ek által hordozott 1970-es évek öröklött döntéseit váltja fel**.
@@ -1016,3 +1020,11 @@ Ez a CLI-CPU projekt legtávolabbi, **legértékesebb** horizontja, és **ez a v
 **Amikor a jövő visszanéz erre a pillanatra**, a CLI-CPU projekt lehet az a kis, hobbi-méretű indítás, amiből a Linux-utáni korszak operációs rendszere kinőtt. Ahogyan a Linux 1991-es Usenet poszt egy finn egyetemistától egy 40 éves ipart alapozott meg, **a CLI-CPU 2026-os F0 spec dokumentumai** lehetnek a következő 40 év alapjai.
 
 **Ha ez a vízió akár csak 10%-ban valóra válik, a projekt sikeres volt.**
+
+---
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
