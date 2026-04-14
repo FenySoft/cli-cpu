@@ -1,6 +1,6 @@
 # CIL-T0 — ISA Specification
 
-> Magyar verzió: [ISA-CIL-T0.md](ISA-CIL-T0.md)
+> Magyar verzió: [ISA-CIL-T0-hu.md](ISA-CIL-T0-hu.md)
 
 > Version: 1.0
 

@@ -130,6 +130,7 @@ Future complementary funding (not overlapping with this proposal):
 - Yosys + nextpnr / OpenXC7 — FPGA synthesis
 - Verilator + cocotb — simulation and verification
 - .NET SDK (Microsoft, MIT license) — C# simulator, linker, test framework
+- Visual Studio Code / Code - OSS (MIT license) — primary development environment, extensible with C#, Verilog, and cocotb tooling
 
 **Downstream users and stakeholders:**
 - **.NET developer community (~8M developers):** Any C#/F# code compiled to CIL can potentially run on CLI-CPU hardware. The Akka.NET and Orleans actor framework communities are natural early adopters.

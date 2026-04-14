@@ -717,10 +717,10 @@ The Secure Edition **does not rush** anything in the F1-F4 phases, because the C
 
 ## Relationship to Other Documents
 
-- [`docs/security-hu.md`](security-hu.md) -- Hardware security properties are documented here; the Secure Edition builds on them.
-- [`docs/architecture-hu.md`](architecture-hu.md) -- The heterogeneous Nano + Rich multi-core architecture is also the foundation of the Secure Edition.
-- [`docs/roadmap-hu.md`](roadmap-hu.md) -- The F6.5 phase will be recorded here.
-- [`docs/neuron-os-hu.md`](neuron-os-hu.md) -- The Neuron OS actor-based model **naturally** supports the multi-SE hardware isolation.
+- [`docs/security-en.md`](security-en.md) -- Hardware security properties are documented here; the Secure Edition builds on them.
+- [`docs/architecture-en.md`](architecture-en.md) -- The heterogeneous Nano + Rich multi-core architecture is also the foundation of the Secure Edition.
+- [`docs/roadmap-en.md`](roadmap-en.md) -- The F6.5 phase will be recorded here.
+- [`docs/neuron-os-en.md`](neuron-os-en.md) -- The Neuron OS actor-based model **naturally** supports the multi-SE hardware isolation.
 
 ## Closing Thought
 

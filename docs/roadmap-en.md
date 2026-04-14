@@ -1,6 +1,6 @@
 # CLI-CPU — Roadmap
 
-> Magyar verzió: [roadmap.md](roadmap.md)
+> Magyar verzió: [roadmap-hu.md](roadmap-hu.md)
 
 > Version: 1.0
 
@@ -329,7 +329,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 #### F6-Silicon One — "Cognitive Fabric One" MPW tape-out (the full demonstration)
 
-**Goal:** The **"Cognitive Fabric One"** — the heterogeneous design verified in F6-FPGA (on A7-Lite 200T multi-board mesh) and optimized to the sweet spot, **on real silicon**: **2 Rich + 24 Nano cores, 128 KB on-chip SRAM, 10 mm² Sky130**. This chip proves that on the same silicon, the Cognitive Fabric paradigm **performs 5–25x more useful work** on actor-based workloads than a traditional multi-core CPU — while being deterministic, hardware-isolated, and linearly scalable. Detailed chip vision and benchmark comparison: [`docs/architecture.md`](architecture.md) "Cognitive Fabric One" section. **Prerequisite: all F6-FPGA done criteria are met** — silicon tape-out cannot begin without FPGA verification.
+**Goal:** The **"Cognitive Fabric One"** — the heterogeneous design verified in F6-FPGA (on A7-Lite 200T multi-board mesh) and optimized to the sweet spot, **on real silicon**: **2 Rich + 24 Nano cores, 128 KB on-chip SRAM, 10 mm² Sky130**. This chip proves that on the same silicon, the Cognitive Fabric paradigm **performs 5–25x more useful work** on actor-based workloads than a traditional multi-core CPU — while being deterministic, hardware-isolated, and linearly scalable. Detailed chip vision and benchmark comparison: [`docs/architecture-en.md`](architecture-en.md) "Cognitive Fabric One" section. **Prerequisite: all F6-FPGA done criteria are met** — silicon tape-out cannot begin without FPGA verification.
 
 **When it starts:** **Only after all F6-FPGA done criteria are met**, and only when at least one of the following is true:
 - The project has **secured funding or an industry partner** to cover the tape-out
@@ -383,7 +383,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Goal:** The CLI-CPU Secure Edition parallel tape-out variant, targeting the Secure Element / TEE / JavaCard market. Same base architecture (Nano + Rich core), **plus** Secure Element-specific hardware components: Crypto Actor (SPECT-inspired), TRNG, PUF, secure boot + attestation, tamper detection, DPA countermeasures, OTP key storage.
 
-**Detailed document:** [`docs/secure-element.md`](secure-element.md) — this captures the full Secure Element positioning, a detailed analysis of TROPIC01 (Tropic Square's first open commercial SE), the differentiating architectural advantages (multi-core, multiple independent security domains on a single chip), the certification roadmap (EAL-5+), and the specific product family (open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X, open medical SE).
+**Detailed document:** [`docs/secure-element-en.md`](secure-element-en.md) — this captures the full Secure Element positioning, a detailed analysis of TROPIC01 (Tropic Square's first open commercial SE), the differentiating architectural advantages (multi-core, multiple independent security domains on a single chip), the certification roadmap (EAL-5+), and the specific product family (open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X, open medical SE).
 
 **Why "F6.5" and not "F6"?** Because this is **a parallel tape-out variant**, not a standalone phase. Same F5 RTL base, just augmented with Secure Element hardware components. It can be ready **~6 months after** the F6-Silicon Cognitive Fabric tape-out — Secure Edition has a silicon prerequisite, so F6.5 builds on the F6-Silicon variant, **not** on F6-FPGA.
 
@@ -420,7 +420,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Goal:** The Cognitive Fabric + Neuron OS combination as a **demonstrable, developable platform** for multiple real use cases. The `Neuron OS` graduates from research status to a real developer platform here.
 
-**The full Neuron OS vision is in a separate document**: [`docs/neuron-os.md`](neuron-os.md). In brief: an actor-based operating system that realizes the Erlang OTP vision with hardware support (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchy, capability-based security, hot code loading, location transparency.
+**The full Neuron OS vision is in a separate document**: [`docs/neuron-os-en.md`](neuron-os-en.md). In brief: an actor-based operating system that realizes the Erlang OTP vision with hardware support (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchy, capability-based security, hot code loading, location transparency.
 
 **Output:**
 - **Reference PCBs** for multiple use cases:
@@ -451,7 +451,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - **F6**: hot code loading, writable microcode, distributed actors across multiple chips
 - **F7**: developer SDK, VSCode integration, NuGet publishing, real application demos
 
-Details and developer API examples: [`docs/neuron-os.md`](neuron-os.md).
+Details and developer API examples: [`docs/neuron-os-en.md`](neuron-os-en.md).
 
 ---
 

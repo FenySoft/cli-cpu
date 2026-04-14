@@ -185,9 +185,12 @@ A .NET-ben a `DllImport`-tal C vagy Win32 kódot hívhatunk. A CLI-CPU-n **nincs
 
 A .NET-ben az AppDomain szoftveres izolációt ad. A CLI-CPU-n **nincs** — helyette **fizikai core isolation**. Minden aktor egy saját core-on fut, saját privát SRAM-mal. Ez **hardveres silicon-grade isolation**, sokkal erősebb, mint szoftveres sandbox.
 
-#### ❌ Dynamic assembly loading
+#### Dynamic assembly loading — fázisonként eltérő
 
-A .NET-ben futásidőben betölthetünk új DLL-eket. A CLI-CPU-n **nem** — a binárisok **statikusan linkelt** `.t0` vagy `.tr` fájlok, a boot-loader tölti be egyszer. **Ez a formális verifikáció előfeltétele**: ha egyszer ellenőriztük a statikus képet, senki nem tudja futásidőben módosítani.
+A .NET-ben futásidőben betölthetünk új DLL-eket. A CLI-CPU-n ez **core típusonként különbözik**:
+
+- **Nano core (CIL-T0):** **Nem** — a binárisok **statikusan linkelt** `.t0` fájlok, a boot-loader tölti be egyszer. **Ez a formális verifikáció előfeltétele**: ha egyszer ellenőriztük a statikus képet, senki nem tudja futásidőben módosítani.
+- **Rich core (F5+):** **Igen** — writable microcode SRAM és a Neuron OS hot code loading funkciója lehetővé teszi aktor szintű kódcserét futás közben, **leállás nélkül** (Erlang OTP-inspiráció). Felhasználási esetek: firmware frissítés, plugin betöltés, aktor migráció Nano → Rich, biztonsági patch zero downtime-mal.
 
 #### ❌ Thread, async/await runtime
 

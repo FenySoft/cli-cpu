@@ -1,6 +1,6 @@
 # CLI-CPU — Architecture Overview
 
-> Magyar verzió: [architecture.md](architecture.md)
+> Magyar verzió: [architecture-hu.md](architecture-hu.md)
 
 > Version: 1.0
 
@@ -922,7 +922,7 @@ Clock-gating in every domain, power-gating in domains 2, 3, and 4.
 
 ## Silicon-grade security
 
-This section discusses the CLI-CPU's security architecture **from an architectural perspective**. The full security model, threat model, attack immunity table, formal verification plan, and certification paths are in a separate document: see [`docs/security.md`](security.md).
+This section discusses the CLI-CPU's security architecture **from an architectural perspective**. The full security model, threat model, attack immunity table, formal verification plan, and certification paths are in a separate document: see [`docs/security-en.md`](security-en.md).
 
 ### The CLI-CPU security principle
 
@@ -957,7 +957,7 @@ This statement is not marketing but an **architectural design consequence**. The
 
 ### Attack classes the CLI-CPU is immune to
 
-Brief summary (the detailed table is in [`docs/security.md`](security.md)):
+Brief summary (the detailed table is in [`docs/security-en.md`](security-en.md)):
 
 | Attack family | Status |
 |--------------|--------|
@@ -980,7 +980,7 @@ The CLI-CPU **Nano core's** 48-opcode ISA is **practically smaller than the seL4
 
 This means that **formal verification of the CLI-CPU is feasible** — not simple, not cheap, but **not impossible either**, and **not achievable for x86, ARM, or RISC-V with their full extension sets**.
 
-For formal verification details, see the **"Formal verification"** section of [`docs/security.md`](security.md).
+For formal verification details, see the **"Formal verification"** section of [`docs/security-en.md`](security-en.md).
 
 ### Related projects
 
@@ -996,7 +996,7 @@ The CLI-CPU's security profile opens a **second market track** alongside the **C
 - **Track 1 — "Cognitive Fabric"** — for AI researchers, actor systems, neural network simulation, multi-agent systems. Long-term vision.
 - **Track 2 — "Trustworthy Silicon"** — for regulated industries: automotive (ISO 26262), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog chips, confidential computing. Short-to-medium-term revenue opportunity with high margins.
 
-**Same hardware, two different market segments.** Details and specific target markets in the **"What this means for the project's practical goals"** section of [`docs/security.md`](security.md).
+**Same hardware, two different market segments.** Details and specific target markets in the **"What this means for the project's practical goals"** section of [`docs/security-en.md`](security-en.md).
 
 ## Next step
 

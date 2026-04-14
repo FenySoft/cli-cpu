@@ -109,4 +109,4 @@ See [docs/architecture-en.md](docs/architecture-en.md) for the full architecture
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under [CERN-OHL-S v2](LICENCE).
+By contributing, you agree that your contributions will be licensed under [CERN-OHL-S v2](LICENSE).

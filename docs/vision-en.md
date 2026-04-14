@@ -85,7 +85,7 @@ Isolation is not software-based (MMU + page table) — it is HARDWARE-BASED.
 
 **The 30 million lines of the Linux kernel exist because shared memory must be protected in software.** If the hardware guarantees isolation, the kernel's **purpose disappears**.
 
-Details: [`docs/neuron-os-hu.md`](neuron-os-hu.md).
+Details: [`docs/neuron-os-en.md`](neuron-os-en.md).
 
 ---
 
@@ -422,9 +422,9 @@ The goal is not to replace Linux or PostgreSQL — but to create a **new categor
 
 ## References
 
-- [`docs/architecture-hu.md`](architecture-hu.md) — microarchitecture, pipeline, memory model, heterogeneous Nano+Rich design
-- [`docs/neuron-os-hu.md`](neuron-os-hu.md) — detailed Neuron OS vision, actor API, supervisor tree, scheduler, hot code reload
-- [`docs/roadmap-hu.md`](roadmap-hu.md) — F0-F7 phase plan
-- [`docs/faq-hu.md`](faq-hu.md) — FAQ 5-7: CPU comparison, scheduling costs, fair benchmarking
-- [`docs/security-hu.md`](security-hu.md) — security model, formal verification plan
-- [`docs/secure-element-hu.md`](secure-element-hu.md) — Secure Edition, multi-domain hardware isolation
+- [`docs/architecture-en.md`](architecture-en.md) — microarchitecture, pipeline, memory model, heterogeneous Nano+Rich design
+- [`docs/neuron-os-en.md`](neuron-os-en.md) — detailed Neuron OS vision, actor API, supervisor tree, scheduler, hot code reload
+- [`docs/roadmap-en.md`](roadmap-en.md) — F0-F7 phase plan
+- [`docs/faq-en.md`](faq-en.md) — FAQ 5-7: CPU comparison, scheduling costs, fair benchmarking
+- [`docs/security-en.md`](security-en.md) — security model, formal verification plan
+- [`docs/secure-element-en.md`](secure-element-en.md) — Secure Edition, multi-domain hardware isolation

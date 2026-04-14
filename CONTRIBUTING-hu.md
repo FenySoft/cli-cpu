@@ -109,4 +109,4 @@ Részletek: [docs/architecture-en.md](docs/architecture-en.md) — a teljes arch
 
 ## Licenc
 
-A hozzájárulásaiddal elfogadod, hogy azok a [CERN-OHL-S v2](LICENCE) licenc alá kerülnek.
+A hozzájárulásaiddal elfogadod, hogy azok a [CERN-OHL-S v2](LICENSE) licenc alá kerülnek.

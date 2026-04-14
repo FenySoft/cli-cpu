@@ -145,6 +145,7 @@ Tervezett kiegészítő finanszírozás (nem átfedő ezzel a pályázattal):
 - Yosys + nextpnr / OpenXC7 — FPGA szintézis
 - Verilator + cocotb — szimuláció és verifikáció
 - .NET SDK (Microsoft, MIT licensz) — C# szimulátor, linker, teszt framework
+- Visual Studio Code / Code - OSS (MIT licensz) — elsődleges fejlesztői környezet, bővíthető C#, Verilog és cocotb eszközökkel
 
 **Downstream felhasználók és stakeholderek:**
 - **.NET fejlesztői közösség (~8M fejlesztő):** Bármely CIL-re fordított C#/F# kód potenciálisan futhat a CLI-CPU hardveren. Az Akka.NET és Orleans aktor framework közösségek természetes korai adoptálók.

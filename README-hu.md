@@ -34,7 +34,7 @@ Részletek a `docs/architecture.md` **„Stratégiai pozicionálás: Cognitive F
 
 ## Négy ütőkártya
 
-1. **Silicon-grade security** — a memory safety, type safety és control flow integrity **fizikai tulajdonságok a szilíciumban**, nem szoftveres absztrakciók. Immunis a Spectre/Meltdown típusú mikroarch-támadásokra (nincs spekulatív végrehajtás), a ROP/JOP támadásokra (hardveres CFI), a buffer overflow-ra (hardveres bounds check), és a JIT spraying-ra (nincs JIT). **Formálisan verifikálható** ISA, ami a CompCert/seL4 tanulságára épít. Részletek: [`docs/security.md`](docs/security.md).
+1. **Silicon-grade security** — a memory safety, type safety és control flow integrity **fizikai tulajdonságok a szilíciumban**, nem szoftveres absztrakciók. Immunis a Spectre/Meltdown típusú mikroarch-támadásokra (nincs spekulatív végrehajtás), a ROP/JOP támadásokra (hardveres CFI), a buffer overflow-ra (hardveres bounds check), és a JIT spraying-ra (nincs JIT). **Formálisan verifikálható** ISA, ami a CompCert/seL4 tanulságára épít. Részletek: [`docs/security-hu.md`](docs/security-hu.md).
 2. **Kódtömörség** — a CIL bytecode 30–50%-kal kompaktabb, mint a RISC-V RV32I vagy ARM Thumb-2 ugyanarra a funkcióra → kevesebb flash, kevesebb fogyasztás, **több neuron fér el egy chip-re**.
 3. **Shared-nothing skálázódás** — mivel a core-ok között nincs megosztott memória, a teljesítmény **lineárisan nő** a core-számmal. Nincs MESI, nincs cache coherency overhead, nincs lock contention, nincs cross-core side-channel.
 4. **Event-driven power profile** — a core-ok alapértelmezésben alvó üzemmódban vannak, és csak akkor ébrednek, amikor mailbox üzenet érkezik. **Ultra-alacsony alapfogyasztás**, ami kulcsfontosságú IoT, kritikus infrastruktúra és neuromorphic workload-okon.
@@ -47,9 +47,9 @@ A CLI-CPU + Neuron OS **három párhuzamos piaci narratívát** követ, ugyanazz
 
 **Pálya 2 — „Trustworthy Silicon"**: formálisan verifikálható, tanúsítható processzor regulated industries-nek — automotive (ISO 26262 ASIL-B/C/D), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog, confidential computing. **Rövid-közép távú bevételi lehetőség.**
 
-**Pálya 3 — „Secure Edition"**: a JavaCard / TEE / Secure Element piac átalakítása — egy parallel tape-out a fő F6 mellett, Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures kiegészítésekkel. **Első termékek: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Megkülönböztető: **több független hardveres security domain egy chipen**, amit a meglévő nyílt alternatívák (TROPIC01, OpenTitan) **nem kínálnak**. Részletek: [`docs/secure-element.md`](docs/secure-element.md).
+**Pálya 3 — „Secure Edition"**: a JavaCard / TEE / Secure Element piac átalakítása — egy parallel tape-out a fő F6 mellett, Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures kiegészítésekkel. **Első termékek: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Megkülönböztető: **több független hardveres security domain egy chipen**, amit a meglévő nyílt alternatívák (TROPIC01, OpenTitan) **nem kínálnak**. Részletek: [`docs/secure-element-hu.md`](docs/secure-element-hu.md).
 
-Ugyanaz a chip-család, három különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Neuron OS lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`docs/neuron-os.md`](docs/neuron-os.md) „A Linux öröklött problémái és a Neuron OS válasza" szekciójában.
+Ugyanaz a chip-család, három különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Neuron OS lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`docs/neuron-os-hu.md`](docs/neuron-os-hu.md) „A Linux öröklött problémái és a Neuron OS válasza" szekciójában.
 
 ## Heterogén multi-core: Nano + Rich
 
@@ -69,18 +69,18 @@ A C# programok **`[RunsOn(CoreType.Nano)]`** vagy **`[RunsOn(CoreType.Rich)]`** 
 
 **F1.5 — KÉSZ.** A C# referencia szimulátor (48/48 CIL-T0 opkód, 267 zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
 
-Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
+Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 
 ## Dokumentumok
 
-- [docs/roadmap.md](docs/roadmap.md) — Hétfázisú ütemterv F0-tól F7-ig, a Cognitive Fabric pivottal F4-ben, F6.5 Secure Edition variánssal
-- [docs/architecture.md](docs/architecture.md) — CLI-CPU mikroarchitektúra, Cognitive Fabric pozicionálás, prior art elemzés (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogén Nano + Rich multi-core
-- [docs/ISA-CIL-T0.md](docs/ISA-CIL-T0.md) — CIL-T0 subset specifikáció (48 opkód), mailbox MMIO interfész
-- [docs/security.md](docs/security.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
-- [docs/neuron-os.md](docs/neuron-os.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon"
-- [docs/secure-element.md](docs/secure-element.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv
-- [docs/faq.md](docs/faq.md) — Gyakori Kérdések: koncepcionális horgonyok új olvasóknak (CLI vs CIL, CPU összehasonlítás, ütemezési költségek)
-- [docs/vision.md](docs/vision.md) — A shared-nothing jövő: OS, GUI, adatbázis, hálózat, programozási modell újragondolva
+- [docs/roadmap-hu.md](docs/roadmap-hu.md) — Hétfázisú ütemterv F0-tól F7-ig, a Cognitive Fabric pivottal F4-ben, F6.5 Secure Edition variánssal
+- [docs/architecture-hu.md](docs/architecture-hu.md) — CLI-CPU mikroarchitektúra, Cognitive Fabric pozicionálás, prior art elemzés (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogén Nano + Rich multi-core
+- [docs/ISA-CIL-T0-hu.md](docs/ISA-CIL-T0-hu.md) — CIL-T0 subset specifikáció (48 opkód), mailbox MMIO interfész
+- [docs/security-hu.md](docs/security-hu.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
+- [docs/neuron-os-hu.md](docs/neuron-os-hu.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon"
+- [docs/secure-element-hu.md](docs/secure-element-hu.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv
+- [docs/faq-hu.md](docs/faq-hu.md) — Gyakori Kérdések: koncepcionális horgonyok új olvasóknak (CLI vs CIL, CPU összehasonlítás, ütemezési költségek)
+- [docs/vision-hu.md](docs/vision-hu.md) — A shared-nothing jövő: OS, GUI, adatbázis, hálózat, programozási modell újragondolva
 
 ## Gyártási útvonal
 
@@ -98,7 +98,7 @@ Lásd [docs/roadmap.md](docs/roadmap.md) a teljes fázisolásért.
 
 ## Licenc
 
-[CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENCE)
+[CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENSE)
 
 ---
 

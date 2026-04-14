@@ -34,7 +34,7 @@ Details in the **"Strategic Positioning: Cognitive Fabric"** section of `docs/ar
 
 ## Four trump cards
 
-1. **Silicon-grade security** -- memory safety, type safety, and control flow integrity are **physical properties of the silicon**, not software abstractions. Immune to Spectre/Meltdown-class microarchitectural attacks (no speculative execution), ROP/JOP attacks (hardware CFI), buffer overflows (hardware bounds checking), and JIT spraying (no JIT). **Formally verifiable** ISA, building on lessons from CompCert/seL4. Details: [`docs/security.md`](docs/security.md).
+1. **Silicon-grade security** -- memory safety, type safety, and control flow integrity are **physical properties of the silicon**, not software abstractions. Immune to Spectre/Meltdown-class microarchitectural attacks (no speculative execution), ROP/JOP attacks (hardware CFI), buffer overflows (hardware bounds checking), and JIT spraying (no JIT). **Formally verifiable** ISA, building on lessons from CompCert/seL4. Details: [`docs/security-en.md`](docs/security-en.md).
 2. **Code density** -- CIL bytecode is 30-50% more compact than RISC-V RV32I or ARM Thumb-2 for equivalent functionality -- less flash, lower power, **more neurons fit on a single chip**.
 3. **Shared-nothing scalability** -- since there is no shared memory between cores, performance **scales linearly** with core count. No MESI, no cache coherency overhead, no lock contention, no cross-core side channels.
 4. **Event-driven power profile** -- cores are in sleep mode by default and only wake when a mailbox message arrives. **Ultra-low baseline power consumption**, which is critical for IoT, critical infrastructure, and neuromorphic workloads.
@@ -47,9 +47,9 @@ CLI-CPU + Neuron OS pursues **three parallel market narratives** built on the sa
 
 **Track 2 -- "Trustworthy Silicon"**: a formally verifiable, certifiable processor for regulated industries -- automotive (ISO 26262 ASIL-B/C/D), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog, and confidential computing. **Short-to-medium-term revenue opportunity.**
 
-**Track 3 -- "Secure Edition"**: transforming the JavaCard / TEE / Secure Element market -- a parallel tape-out alongside the main F6, adding Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures. **First products: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Key differentiator: **multiple independent hardware security domains on a single chip**, which existing open alternatives (TROPIC01, OpenTitan) **do not offer**. Details: [`docs/secure-element.md`](docs/secure-element.md).
+**Track 3 -- "Secure Edition"**: transforming the JavaCard / TEE / Secure Element market -- a parallel tape-out alongside the main F6, adding Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures. **First products: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Key differentiator: **multiple independent hardware security domains on a single chip**, which existing open alternatives (TROPIC01, OpenTitan) **do not offer**. Details: [`docs/secure-element-en.md`](docs/secure-element-en.md).
 
-Same chip family, three different market segments -- **but the same historical goal**: just as x86 replaced the mainframe, mobile replaced the desktop, and the cloud replaced the on-prem data center, **the Cognitive Fabric + Neuron OS will be the next replacement cycle**, delivering the OS for the modern, AI-driven, safety-critical, massively distributed era. Details in the "The inherited problems of Linux and Neuron OS's answer" section of [`docs/neuron-os.md`](docs/neuron-os.md).
+Same chip family, three different market segments -- **but the same historical goal**: just as x86 replaced the mainframe, mobile replaced the desktop, and the cloud replaced the on-prem data center, **the Cognitive Fabric + Neuron OS will be the next replacement cycle**, delivering the OS for the modern, AI-driven, safety-critical, massively distributed era. Details in the "The inherited problems of Linux and Neuron OS's answer" section of [`docs/neuron-os-en.md`](docs/neuron-os-en.md).
 
 ## Heterogeneous multi-core: Nano + Rich
 
@@ -69,18 +69,18 @@ C# programs use **`[RunsOn(CoreType.Nano)]`** or **`[RunsOn(CoreType.Rich)]`** a
 
 **F1.5 -- DONE.** The C# reference simulator (48/48 CIL-T0 opcodes, 267 green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
 
-See [docs/roadmap.md](docs/roadmap.md) for the full phase breakdown.
+See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 
 ## Documents
 
-- [docs/roadmap.md](docs/roadmap.md) -- Seven-phase roadmap from F0 to F7, with the Cognitive Fabric pivot at F4 and the F6.5 Secure Edition variant
-- [docs/architecture.md](docs/architecture.md) -- CLI-CPU microarchitecture, Cognitive Fabric positioning, prior art analysis (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogeneous Nano + Rich multi-core
-- [docs/ISA-CIL-T0.md](docs/ISA-CIL-T0.md) -- CIL-T0 subset specification (48 opcodes), mailbox MMIO interface
-- [docs/security.md](docs/security.md) -- Threat model, architectural security guarantees, attack immunity table, formal verification plan, certification paths (IEC 61508, ISO 26262, DO-178C, IEC 62304)
-- [docs/neuron-os.md](docs/neuron-os.md) -- Neuron OS vision: an actor-based operating system for CLI-CPU, "Erlang in silicon"
-- [docs/secure-element.md](docs/secure-element.md) -- Secure Edition: JavaCard / TEE / Secure Element market, detailed TROPIC01 analysis, multi-SE hardware isolation, F6.5 parallel tape-out plan
-- [docs/faq.md](docs/faq.md) -- FAQ: conceptual anchors for new readers (CLI vs CIL, CPU comparison, scheduling costs)
-- [docs/vision.md](docs/vision.md) -- The shared-nothing future: OS, GUI, database, networking, and programming model reimagined
+- [docs/roadmap-en.md](docs/roadmap-en.md) -- Seven-phase roadmap from F0 to F7, with the Cognitive Fabric pivot at F4 and the F6.5 Secure Edition variant
+- [docs/architecture-en.md](docs/architecture-en.md) -- CLI-CPU microarchitecture, Cognitive Fabric positioning, prior art analysis (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogeneous Nano + Rich multi-core
+- [docs/ISA-CIL-T0-en.md](docs/ISA-CIL-T0-en.md) -- CIL-T0 subset specification (48 opcodes), mailbox MMIO interface
+- [docs/security-en.md](docs/security-en.md) -- Threat model, architectural security guarantees, attack immunity table, formal verification plan, certification paths (IEC 61508, ISO 26262, DO-178C, IEC 62304)
+- [docs/neuron-os-en.md](docs/neuron-os-en.md) -- Neuron OS vision: an actor-based operating system for CLI-CPU, "Erlang in silicon"
+- [docs/secure-element-en.md](docs/secure-element-en.md) -- Secure Edition: JavaCard / TEE / Secure Element market, detailed TROPIC01 analysis, multi-SE hardware isolation, F6.5 parallel tape-out plan
+- [docs/faq-en.md](docs/faq-en.md) -- FAQ: conceptual anchors for new readers (CLI vs CIL, CPU comparison, scheduling costs)
+- [docs/vision-en.md](docs/vision-en.md) -- The shared-nothing future: OS, GUI, database, networking, and programming model reimagined
 
 ## Manufacturing path
 
@@ -98,7 +98,7 @@ See [docs/roadmap.md](docs/roadmap.md) for the full phase breakdown.
 
 ## License
 
-[CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENCE)
+[CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENSE)
 
 ---
 

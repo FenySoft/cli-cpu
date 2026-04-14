@@ -185,9 +185,12 @@ In .NET, `DllImport` calls C or Win32 code. On CLI-CPU, **there is no native cod
 
 In .NET, AppDomains provide software-based isolation. CLI-CPU has **none** -- instead it provides **physical core isolation**. Each actor runs on its own core with its own private SRAM. This is **hardware silicon-grade isolation**, far stronger than a software sandbox.
 
-#### Dynamic assembly loading
+#### Dynamic assembly loading — varies by core type
 
-In .NET, new DLLs can be loaded at runtime. On CLI-CPU, this is **not possible** -- binaries are **statically linked** `.t0` or `.tr` files, loaded once by the boot-loader. **This is a prerequisite for formal verification**: once the static image has been verified, nobody can modify it at runtime.
+In .NET, new DLLs can be loaded at runtime. On CLI-CPU, this **differs by core type**:
+
+- **Nano core (CIL-T0):** **Not possible** -- binaries are **statically linked** `.t0` files, loaded once by the boot-loader. **This is a prerequisite for formal verification**: once the static image has been verified, nobody can modify it at runtime.
+- **Rich core (F5+):** **Yes** -- writable microcode SRAM and the Neuron OS hot code loading feature enable actor-level code replacement at runtime, **without downtime** (Erlang OTP-inspired). Use cases: firmware updates, plugin loading, actor migration Nano → Rich, zero-downtime security patches.
 
 #### Thread, async/await runtime
 

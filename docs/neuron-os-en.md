@@ -4,7 +4,7 @@
 >
 > **The content is a compass, not a final spec.** Details will be refined along the way, based on F4-F6 experience. The goal here is to give design decisions a **direction**, so we don't re-debate fundamentals at every F4 iteration.
 
-> Magyar verzió: [neuron-os.md](neuron-os.md)
+> Magyar verzió: [neuron-os-hu.md](neuron-os-hu.md)
 
 > Version: 1.0
 
