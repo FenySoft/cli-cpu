@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Why I'm Building a CPU That Runs .NET Natively — CLI-CPU Blog</title>
+  <meta name="description" content="picoJava failed. Jazelle failed. Here's why CLI-CPU won't. A different architecture for a different era.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .nav {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      line-height: 1.25;
+    }
+
+    header .subtitle {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    header .meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 16px;
+      font-family: var(--mono);
+    }
+
+    article {
+      flex: 1;
+      padding: 48px 0;
+    }
+
+    article h2 {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: #f0f6fc;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    article h2:first-child { margin-top: 0; }
+
+    article p {
+      margin-bottom: 16px;
+      font-size: 1.02rem;
+    }
+
+    article blockquote {
+      border-left: 3px solid var(--green);
+      padding: 12px 20px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    article ul, article ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+
+    article li {
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+
+    article strong { color: #f0f6fc; }
+
+    article code {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: #f0f6fc;
+    }
+
+    .comparison-table td { color: var(--text-dim); }
+
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 28px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta h3 {
+      font-family: var(--mono);
+      color: var(--green);
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      header { padding: 32px 0 24px; }
+      article h2 { font-size: 1.1rem; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>Why I'm Building a CPU That Runs .NET Natively</h1>
+    <div class="subtitle">picoJava failed. Jazelle failed. Here's why CLI-CPU won't.</div>
+    <div class="meta">April 15, 2026 &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <h2>The Question</h2>
+
+    <p>
+      What if your C# code ran directly on the silicon, with no JIT, no interpreter, no runtime? What if the CPU itself understood .NET bytecode — every <code>ldc.i4</code>, every <code>call</code>, every <code>stloc</code> — as its native instruction set?
+    </p>
+
+    <p>
+      This is not a thought experiment. I have been building exactly this for the past months, and the reference implementation is already done: 48 opcodes, 259+ passing tests, a working linker, a CLI runner, and an ALU in Verilog with 41 cocotb tests green. The project is called <strong>CLI-CPU</strong>, and it is fully open source under CERN-OHL-S v2.
+    </p>
+
+    <p>
+      But before I explain what CLI-CPU is, let me tell you why everything that came before it failed — and why this time is different.
+    </p>
+
+    <h2>The Ghosts of Bytecode Hardware Past</h2>
+
+    <p>
+      In 1997, Sun Microsystems released <strong>picoJava</strong> — a processor that could execute Java bytecodes directly in hardware. The idea was compelling: skip the overhead of interpretation and JIT compilation, and run Java at native speed. Sun built two iterations (picoJava-I and picoJava-II), licensed the design, and waited for the world to adopt it.
+    </p>
+
+    <p>
+      The world did not. By 2001, HotSpot's JIT compiler was already outperforming picoJava on most workloads. The hardware bytecode execution could not keep up with a software JIT that could specialize, inline, and optimize for the actual runtime behavior of the program. Sun quietly discontinued the architecture.
+    </p>
+
+    <p>
+      ARM tried a different approach with <strong>Jazelle DBX</strong> (2001): instead of a dedicated bytecode CPU, they added a special execution mode to existing ARM cores that could interpret Java bytecodes with hardware acceleration. Jazelle was clever — it fell back to software for complex opcodes and only accelerated the common ones. It shipped in hundreds of millions of ARM9 and ARM11 chips.
+    </p>
+
+    <p>
+      And yet, Jazelle also failed. When ARM introduced Thumb-2 and later the Cortex-A series with increasingly sophisticated out-of-order pipelines, the JIT approach (Dalvik, then ART on Android) won decisively. Jazelle was deprecated, then effectively abandoned. The last ARM architecture to include it was ARMv7. ARMv8 (AArch64) dropped it entirely.
+    </p>
+
+    <p>
+      The lesson seemed clear: <strong>software JIT on general-purpose hardware will always beat dedicated bytecode hardware</strong>. The JIT can adapt; the silicon cannot. Case closed.
+    </p>
+
+    <p>
+      Except that lesson is wrong. Or rather, it is incomplete. picoJava and Jazelle failed not because bytecode-in-hardware is a bad idea — they failed because they <strong>competed on the wrong axis</strong>.
+    </p>
+
+    <h2>The Wrong Race</h2>
+
+    <p>
+      Both picoJava and Jazelle tried to beat general-purpose CPUs at <strong>single-core performance</strong>. This was always a losing battle. A modern out-of-order CPU with a sophisticated JIT compiler can specialize code paths, devirtualize calls, eliminate dead code, and perform thousands of microarchitectural tricks that a simple bytecode pipeline cannot match. The JIT sees runtime behavior; the hardware sees only static instructions.
+    </p>
+
+    <p>
+      But single-core performance stopped being the most important metric years ago. <strong>Dennard scaling ended around 2006.</strong> Clock frequencies plateaued. Power walls appeared. The entire industry pivoted to multi-core, and has been struggling with the consequences ever since.
+    </p>
+
+    <p>
+      The problem is that multi-core in the conventional sense — shared memory, cache coherence, mutex locks — does not scale. Adding cores to a shared-memory system follows Amdahl's Law at best and leads to catastrophic contention at worst. The MESI protocol (and its descendants) that keeps caches coherent across cores consumes an increasingly absurd fraction of die area, power budget, and design complexity as core counts grow. Intel's mesh interconnect on server parts, AMD's Infinity Fabric, Apple's system-level cache — these are all heroic engineering efforts to paper over a fundamental architectural flaw: <strong>shared mutable state does not scale</strong>.
+    </p>
+
+    <p>
+      This is where CLI-CPU enters — not as a faster single-core bytecode processor, but as a <strong>fundamentally different architecture</strong>.
+    </p>
+
+    <h2>Shared-Nothing: The Only Way Forward</h2>
+
+    <p>
+      CLI-CPU does not have shared memory. Period. Each core has its own private SRAM — code, data, and stack — and <strong>no other core can access it</strong>. This is not a software convention; it is a physical property of the silicon. There are no bus lines connecting one core's memory to another.
+    </p>
+
+    <p>
+      Cores communicate exclusively through <strong>hardware mailbox FIFOs</strong>. A core writes a 32-bit message to its outgoing mailbox; the hardware delivers it to the destination core's incoming mailbox. The sending core does not block. The receiving core wakes from sleep when a message arrives, processes it, and goes back to sleep. This is the <strong>actor model in silicon</strong>.
+    </p>
+
+    <blockquote>
+      "Current software systems are built on fundamentally flawed models. We need hardware where every core is an actor."
+      <br>— Joe Armstrong, creator of Erlang, 2014
+    </blockquote>
+
+    <p>
+      The consequences of this design are profound:
+    </p>
+
+    <ul>
+      <li><strong>No cache coherence protocol.</strong> Zero. None. No MESI, no MOESI, no directory-based coherence. This alone saves enormous die area and power.</li>
+      <li><strong>No locks, no mutexes, no atomics.</strong> There is no shared state to protect. Data races are physically impossible.</li>
+      <li><strong>Linear scaling.</strong> Adding more cores adds proportionally more compute. There is no Amdahl bottleneck because there is no serial section — each core is independent.</li>
+      <li><strong>Deterministic execution.</strong> Each core's behavior depends only on its code and its incoming messages. No timing-dependent bugs, no heisenbugs, no memory ordering surprises.</li>
+      <li><strong>Event-driven power profile.</strong> Cores sleep by default. They wake on mailbox interrupt, process the message, and sleep again. Idle power approaches zero.</li>
+    </ul>
+
+    <p>
+      This is not a new idea in software. Erlang has been doing this since 1986. Akka (2009) and Akka.NET (2014) brought it to the JVM and .NET ecosystems. Orleans (2015) made it accessible to mainstream C# developers. The actor model has proven itself in production at massive scale — WhatsApp (Erlang), Discord (Elixir), Microsoft Azure (Orleans), and countless others.
+    </p>
+
+    <p>
+      But all of these run on <strong>conventional shared-memory hardware</strong>, which means the runtime must simulate message isolation through software abstractions — thread pools, mailbox queues, GC pressure, scheduler overhead. CLI-CPU removes that entire layer. <strong>The hardware is the runtime.</strong>
+    </p>
+
+    <h2>Why Now?</h2>
+
+    <p>
+      picoJava in 1997 had none of the conditions needed for this approach to work. In 2026, every single one has materialized:
+    </p>
+
+    <ul>
+      <li><strong>Open PDKs.</strong> Google and SkyWater released the Sky130 process design kit in 2020. IHP followed with SG13G2. For the first time in history, anyone can design and fabricate a chip without paying millions in licensing fees. The entire CLI-CPU silicon path uses open tools: Yosys for synthesis, OpenLane2 for place-and-route, Magic for DRC/LVS.</li>
+      <li><strong>Tiny Tapeout.</strong> Matt Venn's Tiny Tapeout project has democratized chip fabrication. For approximately $150, you can get a small design onto real Sky130 silicon. CLI-CPU's first physical chip (a single Nano core + hardware mailbox) will tape out through this program.</li>
+      <li><strong>Affordable FPGAs.</strong> The MicroPhase A7-Lite board with a Xilinx XC7A200T — 200,000 logic cells — costs about $320. Three of these boards connected via Ethernet can host a multi-board Cognitive Fabric mesh for under $1,000. This was unthinkable a decade ago.</li>
+      <li><strong>The actor model is mainstream.</strong> Akka.NET, Orleans, Dapr, Proto.Actor — the .NET ecosystem has embraced message-passing concurrency. Eight million .NET developers already write code that maps naturally to CLI-CPU's execution model. They do not need to learn a new language or paradigm; they just need hardware that runs it natively.</li>
+      <li><strong>Dennard scaling is dead.</strong> Clock frequencies have been flat for 20 years. The only path to more performance is more cores. But shared-memory multi-core has hit diminishing returns. Shared-nothing many-core is the logical next step, and CLI-CPU is designed from the ground up for it.</li>
+    </ul>
+
+    <h2>What We Have Built So Far</h2>
+
+    <p>
+      CLI-CPU is not a whitepaper. It is not a "vision document" with handwaving about future possibilities. It is working code, tested code, and — increasingly — working hardware descriptions.
+    </p>
+
+    <p>
+      <strong>Phase F1.5 is complete.</strong> This includes:
+    </p>
+
+    <ul>
+      <li>A <strong>reference simulator</strong> (<code>TCpu</code>) implementing all 48 CIL-T0 opcodes — the integer subset of ECMA-335 CIL, plus mailbox MMIO extensions. The simulator models the full memory map: CODE, DATA, STACK, and MMIO regions.</li>
+      <li>A <strong>CIL-T0 linker</strong> (<code>TCliCpuLinker</code>) that takes a standard .NET assembly (.dll compiled by Roslyn) and repackages it into a flat binary (.t0) that the hardware can boot from. No translation — the CIL opcodes in the .dll are the same ones the CPU executes.</li>
+      <li>A <strong>CLI runner</strong> with <code>run</code> and <code>link</code> commands.</li>
+      <li><strong>259+ xUnit tests</strong> covering every opcode, every trap condition, every edge case. Strict TDD — every test was written before its implementation.</li>
+      <li>An <strong>ALU module in Verilog</strong> with a full cocotb testbench (41/41 tests passing). This is the beginning of the RTL phase (F2).</li>
+    </ul>
+
+    <p>
+      The entire codebase — simulator, linker, runner, tests, Verilog, cocotb, documentation — is <a href="https://github.com/CLI-CPU/cli-cpu">open source on GitHub</a>.
+    </p>
+
+    <h2>The Cognitive Fabric One Vision</h2>
+
+    <p>
+      The target chip — <strong>Cognitive Fabric One</strong> — is designed for the Sky130 process at approximately 15 mm&sup2;:
+    </p>
+
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Cognitive Fabric One</th>
+          <th>Typical RISC-V SoC</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Cores</strong></td>
+          <td>6 Rich + 16 Nano + 1 Secure</td>
+          <td>4-8 homogeneous</td>
+        </tr>
+        <tr>
+          <td><strong>Memory model</strong></td>
+          <td>Private SRAM per core, no shared memory</td>
+          <td>Shared L1/L2 cache hierarchy</td>
+        </tr>
+        <tr>
+          <td><strong>Inter-core comm</strong></td>
+          <td>Hardware mailbox FIFOs (OPI bus)</td>
+          <td>Shared memory + cache coherence</td>
+        </tr>
+        <tr>
+          <td><strong>Coherence overhead</strong></td>
+          <td>Zero</td>
+          <td>Significant (MESI/directory)</td>
+        </tr>
+        <tr>
+          <td><strong>Scaling behavior</strong></td>
+          <td>Linear with core count</td>
+          <td>Sub-linear (Amdahl's Law)</td>
+        </tr>
+        <tr>
+          <td><strong>Idle power</strong></td>
+          <td>Near-zero (sleep until mailbox)</td>
+          <td>Significant (cache, coherence logic)</td>
+        </tr>
+        <tr>
+          <td><strong>Security isolation</strong></td>
+          <td>Physical (no shared memory)</td>
+          <td>Software (TrustZone, TEE)</td>
+        </tr>
+        <tr>
+          <td><strong>ISA</strong></td>
+          <td>CIL (stack, compact)</td>
+          <td>RISC-V (register, wider encoding)</td>
+        </tr>
+        <tr>
+          <td><strong>I/O</strong></td>
+          <td>USB 1.1 FS, UART, SPI, GPIO</td>
+          <td>Varies</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      The <strong>Rich cores</strong> handle supervisor logic, complex domain code, GC-managed objects, floating point, and exception handling — the full ECMA-335 CIL instruction set (~220 opcodes). The <strong>Nano cores</strong> are tiny (~10k standard cells each) and run the CIL-T0 integer subset — ideal for workers, neurons, filters, simple actors. The <strong>Secure Core</strong> is a hardened Rich core with crypto acceleration, TRNG, and PUF — the trust anchor for the entire fabric.
+    </p>
+
+    <p>
+      This heterogeneous design is analogous to ARM big.LITTLE or Apple's P-core + E-core, but applied to the .NET world. A C# developer annotates their classes with <code>[RunsOn(CoreType.Nano)]</code> or <code>[RunsOn(CoreType.Rich)]</code>, and a Roslyn source generator verifies at compile time that Nano-targeted code stays within the CIL-T0 subset.
+    </p>
+
+    <h2>Security: Immune by Design</h2>
+
+    <p>
+      Every major CPU vulnerability of the past decade — Spectre, Meltdown, L1 Terminal Fault, Rowhammer, Retbleed, Inception — exploits one of three things: <strong>speculative execution</strong>, <strong>shared caches</strong>, or <strong>shared memory</strong>. CLI-CPU has none of these.
+    </p>
+
+    <ul>
+      <li><strong>No speculative execution.</strong> CLI-CPU cores are simple, in-order, deterministic. There is no branch predictor to poison, no speculative load to leak data through a side channel.</li>
+      <li><strong>No shared cache.</strong> Each core has its own private SRAM. There is no L2, no L3, no system-level cache. No Flush+Reload, no Prime+Probe, no cache timing attacks.</li>
+      <li><strong>No shared memory.</strong> Cross-core information flow is limited to explicit mailbox messages. One compromised core cannot read another core's state — not through software, not through microarchitectural side channels, not through anything short of physical decapsulation.</li>
+    </ul>
+
+    <p>
+      On top of this, the CIL execution model provides <strong>hardware-enforced type safety and control flow integrity</strong>. Every memory access is bounds-checked in hardware. Every method call is verified against its declared signature. Stack overflow and underflow generate hardware traps. ROP and JOP attacks are impossible because the hardware enforces that execution can only transfer to valid method entry points.
+    </p>
+
+    <p>
+      This is not security bolted on after the fact. This is security as a <strong>physical property of the silicon</strong>. You cannot patch around it, and you cannot exploit around it.
+    </p>
+
+    <h2>What Comes Next</h2>
+
+    <p>
+      The roadmap from here is concrete:
+    </p>
+
+    <ul>
+      <li><strong>F2 — RTL:</strong> Complete the Verilog/Amaranth HDL implementation of a single Nano core. Verify every opcode against the C# simulator using cocotb golden-vector testing. Synthesize for Sky130 with Yosys.</li>
+      <li><strong>F3 — First Silicon:</strong> Tape out a Nano core + hardware mailbox on Tiny Tapeout. Run Fibonacci(20) and an "echo neuron" demo on real silicon. This will be the first physical CIL-native processor in history.</li>
+      <li><strong>F4 — Cognitive Fabric Pivot:</strong> Demonstrate 4 Nano cores on an FPGA, communicating via hardware mailboxes in a shared-nothing event-driven fabric. Prove that the architecture scales.</li>
+      <li><strong>F5 — Rich Core:</strong> Add the full CIL instruction set — objects, GC assist, exception handling, FPU. Demonstrate heterogeneous Nano + Rich operation.</li>
+      <li><strong>F6 — Cognitive Fabric One:</strong> The target chip. First on FPGA (multi-board mesh), then on real silicon via ChipIgnite or IHP MPW.</li>
+      <li><strong>F7 — Neuron OS:</strong> An actor-based operating system designed from the ground up for shared-nothing hardware. No kernel. No syscalls. No virtual memory. Just actors communicating through messages.</li>
+    </ul>
+
+    <p>
+      We have applied for an <a href="https://github.com/CLI-CPU/cli-cpu/blob/main/docs/nlnet-application-draft-en.md">NLnet NGI Zero Commons Fund grant</a> to fund phases F2 through F5. The entire project — hardware, software, documentation — will remain open source under CERN-OHL-S v2.
+    </p>
+
+    <div class="cta">
+      <h3>// join the journey</h3>
+      <p>
+        CLI-CPU is open source. The simulator runs today. The silicon path is funded and planned. If you believe that the future of computing is many small cores communicating through messages — not fewer big cores fighting over shared memory — then this project is for you.
+      </p>
+      <div class="cta-links">
+        <a href="https://github.com/CLI-CPU/cli-cpu">Star on GitHub</a>
+        <a href="https://github.com/CLI-CPU/cli-cpu/blob/main/CONTRIBUTING.md">Contribute</a>
+        <a href="https://github.com/CLI-CPU/cli-cpu/blob/main/docs/architecture-en.md">Read the Architecture</a>
+      </div>
+    </div>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <span>CERN-OHL-S v2</span>
+      <a href="https://github.com/CLI-CPU/cli-cpu">GitHub</a>
+      <a href="https://github.com/CLI-CPU/cli-cpu/blob/main/docs/nlnet-application-draft-en.md">NLnet NGI Zero Commons Fund applicant</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
