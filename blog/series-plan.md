@@ -40,6 +40,17 @@
 - The golden vector approach: cocotb tests vs C# simulator
 - Why this matters: confidence that the RTL matches the spec
 - The Fibonacci(20) = 6,765 end-to-end test
+- F2.7: FPGA validation BEFORE silicon — the principle of "no tape-out without FPGA"
+
+## Article #3.5 — Outline (optional, after F2.7 is done)
+
+**Title:** From Simulation to Real Hardware: Our First FPGA Run
+
+- The gap between simulation and real hardware
+- F2.7: single Nano core running on A7-Lite XC7A200T
+- Fibonacci(20) over UART — the first "hello world" on real silicon (FPGA)
+- What we learned: timing closure, I/O pin assignment, clock domain
+- Why this step saves money: bugs on FPGA cost €0, bugs on ASIC cost $1,300+
 
 ## Article #4 — Outline
 
