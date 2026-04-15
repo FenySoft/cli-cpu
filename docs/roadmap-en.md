@@ -108,6 +108,31 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 ---
 
+### F2.7 — Single-core FPGA Validation
+
+**Goal:** Validate the F2 RTL **on real FPGA hardware** before the Tiny Tapeout submission (F3). This ensures the design works on physical hardware, not just in simulation — reducing F3 tape-out risk.
+
+**Platform:** MicroPhase A7-Lite XC7A200T (the first of the 3 boards). Vivado WebPACK (free for Artix-7).
+
+**Output:**
+- `rtl/fpga/` — FPGA-specific top-level wrapper (clock, I/O pin assignment)
+- Single Nano core + UART running on the FPGA board
+- Fibonacci(20) = 6765 demo over UART on real hardware
+
+**Done criteria:**
+- Nano core RTL synthesized and running on A7-Lite 200T
+- Fibonacci(20) runs correctly with UART output
+- Timing closed (min. 50 MHz on FPGA)
+- Cocotb golden-vector test results match FPGA output
+
+**Dependency:** F2 done (RTL + cocotb simulation green).
+
+**Cost:** ~€0 (the FPGA board is also needed for F4, already ordered).
+
+**Why this matters:** *"No silicon tape-out with a design that hasn't run on FPGA."* F2.7 is this principle in practice — cheap, fast, and bugs are found on FPGA, not on the Tiny Tapeout chip.
+
+---
+
 ### F3 — Tiny Tapeout Submission (single-core CIL-T0 + Mailbox)
 
 **Goal:** The first real CLI-CPU silicon. On Sky130 PDK, via Tiny Tapeout shuttle, single-core CIL-T0 subset + **hardware mailbox interface**, enabling the first "networkable node" demo.

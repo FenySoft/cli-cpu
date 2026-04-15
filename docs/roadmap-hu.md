@@ -108,6 +108,31 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 ---
 
+### F2.7 — Egymagos FPGA validáció
+
+**Cél:** Az F2 RTL **valós FPGA hardveren** történő validálása a Tiny Tapeout submission (F3) **előtt**. Ez biztosítja, hogy a design működik fizikai hardveren, nem csak szimulációban — csökkentve az F3 tape-out kockázatát.
+
+**Platform:** MicroPhase A7-Lite XC7A200T (a 3 board-ból az első). Vivado WebPACK (ingyenes az Artix-7-re).
+
+**Kimenet:**
+- `rtl/fpga/` — FPGA-specifikus top-level wrapper (clock, I/O pin assignment)
+- Egyetlen Nano core + UART futtatása az FPGA board-on
+- Fibonacci(20) = 6765 demó UART-on keresztül, valós hardveren
+
+**Kész kritérium:**
+- A Nano core RTL szintetizálva és futtatva A7-Lite 200T-n
+- Fibonacci(20) helyesen fut UART kimeneten
+- Timing zárt (min. 50 MHz az FPGA-n)
+- A cocotb golden-vector tesztek eredménye megegyezik az FPGA kimenetével
+
+**Függőség:** F2 kész (RTL + cocotb szimuláció zöld).
+
+**Költség:** ~€0 (az FPGA board az F4-hez is kell, már megrendeltük).
+
+**Miért fontos:** *„Nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n."* Az F2.5 ez az elv gyakorlatban — olcsó, gyors, és a hibákat az FPGA-n találjuk meg, nem a Tiny Tapeout chipen.
+
+---
+
 ### F3 — Tiny Tapeout Submission (egymagos CIL-T0 + Mailbox)
 
 **Cél:** Az első valódi CLI-CPU szilícium. Sky130 PDK-n, Tiny Tapeout shuttle-n, egymagos CIL-T0 subset + **hardveres mailbox interfésszel**, ami az első „hálózatba illeszthető csomópont" demót teszi lehetővé.
