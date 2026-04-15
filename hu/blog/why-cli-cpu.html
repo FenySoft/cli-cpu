@@ -456,7 +456,8 @@
 
     <ul>
       <li><strong>F2 — RTL:</strong> Egyetlen Nano core teljes Verilog/Amaranth HDL implementációja. Minden opkód verifikálása a C# szimulátorral, cocotb golden-vector teszteléssel. Szintézis Sky130-ra Yosys-szal.</li>
-      <li><strong>F3 — Első szilícium:</strong> Nano core + hardveres mailbox tape-out a Tiny Tapeout-on. Fibonacci(20) és egy „echo neuron" demó futtatása valódi szilíciumon. Ez lesz a történelem első fizikai CIL-natív processzora.</li>
+      <li><strong>F2.7 — FPGA validáció:</strong> Az egyetlen Nano core futtatása valós FPGA-n (MicroPhase A7-Lite XC7A200T) a szilícium tape-out előtt. Fibonacci(20) UART-on, valós hardveren. Elv: nincs tape-out FPGA validáció nélkül.</li>
+      <li><strong>F3 — Első szilícium:</strong> Az FPGA-n validált Nano core + hardveres mailbox tape-out a Tiny Tapeout-on. Fibonacci(20) és egy „echo neuron" demó valódi szilíciumon. A történelem első fizikai CIL-natív processzora.</li>
       <li><strong>F4 — Cognitive Fabric fordulópont:</strong> 4 Nano core demonstrálása FPGA-n, hardveres mailbox-okon keresztüli kommunikációval, shared-nothing eseményvezérelt fabric-ban. Az architektúra skálázhatóságának bizonyítása.</li>
       <li><strong>F5 — Rich Core:</strong> A teljes CIL utasításkészlet hozzáadása — objektumok, GC-támogatás, kivételkezelés, FPU. Heterogén Nano + Rich működés demonstrálása.</li>
       <li><strong>F6 — Cognitive Fabric One:</strong> A célchip. Először FPGA-n (több kártyás hálózat), majd valódi szilíciumon ChipIgnite vagy IHP MPW programon keresztül.</li>
@@ -464,7 +465,7 @@
     </ul>
 
     <p>
-      Pályáztunk az <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/nlnet-application-draft-en.md">NLnet NGI Zero Commons Fund</a> támogatásra az F2-től F5-ig terjedő fázisok finanszírozásához. A teljes projekt — hardver, szoftver, dokumentáció — nyílt forráskódú marad CERN-OHL-S v2 licenc alatt.
+      A teljes projekt — hardver, szoftver, dokumentáció — nyílt forráskódú és az is marad, CERN-OHL-S v2 licenc alatt.
     </p>
 
     <div class="cta">
@@ -487,7 +488,6 @@
     <div class="footer-links">
       <span>CERN-OHL-S v2</span>
       <a href="https://github.com/FenySoft/cli-cpu">GitHub</a>
-      <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/nlnet-application-draft-en.md">NLnet NGI Zero Commons Fund pályázó</a>
     </div>
   </div>
 </footer>
