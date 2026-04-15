@@ -522,4 +522,285 @@ public class TRunnerTests
 
         Assert.NotEqual(0, exitCode);
     }
+
+    // ------------------------------------------------------------------
+    // hu: Lefedetlen ág tesztek — Runner és Program edge case-ek
+    // en: Uncovered branch tests — Runner and Program edge cases
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: RunBinary null programmal ArgumentNullException-t dob.
+    /// <br />
+    /// en: RunBinary with null program throws ArgumentNullException.
+    /// </summary>
+    [Fact]
+    public void RunBinary_NullProgram_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            TRunner.RunBinary(null!, 0));
+    }
+
+    /// <summary>
+    /// hu: RunBinary void metódussal (üres stack) → Result = null.
+    /// <br />
+    /// en: RunBinary with void method (empty stack) → Result = null.
+    /// </summary>
+    [Fact]
+    public void RunBinary_VoidMethod_ReturnsNullResult()
+    {
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00,
+            0x2A
+        };
+
+        var result = TRunner.RunBinary(program, 0);
+
+        Assert.False(result.Trapped);
+        Assert.Null(result.Result);
+    }
+
+    /// <summary>
+    /// hu: LinkDll null osztálynévvel ArgumentNullException-t dob.
+    /// <br />
+    /// en: LinkDll with null class name throws ArgumentNullException.
+    /// </summary>
+    [Fact]
+    public void LinkDll_NullClassName_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            TRunner.LinkDll([], null!, "Add"));
+    }
+
+    /// <summary>
+    /// hu: LinkDll null metódusnévvel ArgumentNullException-t dob.
+    /// <br />
+    /// en: LinkDll with null method name throws ArgumentNullException.
+    /// </summary>
+    [Fact]
+    public void LinkDll_NullMethodName_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            TRunner.LinkDll([], "Pure", null!));
+    }
+
+    /// <summary>
+    /// hu: Program.Main run nem létező fájlhoz non-zero exit kódot ad.
+    /// <br />
+    /// en: Program.Main run with non-existent file returns non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void Main_RunNonExistentFile_ReturnsNonZero()
+    {
+        var exitCode = Program.Main(["run", "/tmp/does_not_exist_99999.t0"]);
+
+        Assert.NotEqual(0, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main run trap-et okozó programmal exit code 2.
+    /// <br />
+    /// en: Program.Main run with a trap-causing program returns exit code 2.
+    /// </summary>
+    [Fact]
+    public void Main_RunTrapProgram_ReturnsExitCode2()
+    {
+        var t0Bytes = BuildDivByZeroProgram();
+
+        using var tempFile = new TTempFile();
+        File.WriteAllBytes(tempFile.Path, t0Bytes);
+
+        var exitCode = Program.Main(["run", tempFile.Path, "--args", "10"]);
+
+        Assert.Equal(2, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main run --entry flag-gel az entry RVA-t használja.
+    /// <br />
+    /// en: Program.Main run with --entry flag uses the entry RVA.
+    /// </summary>
+    [Fact]
+    public void Main_RunWithEntryFlag_UsesEntryRva()
+    {
+        var t0Bytes = BuildAddProgram();
+
+        using var tempFile = new TTempFile();
+        File.WriteAllBytes(tempFile.Path, t0Bytes);
+
+        var exitCode = Program.Main(["run", tempFile.Path, "--entry", "0", "--args", "2,3"]);
+
+        Assert.Equal(0, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main void metódussal exit code 0.
+    /// <br />
+    /// en: Program.Main with void method returns exit code 0.
+    /// </summary>
+    [Fact]
+    public void Main_RunVoidProgram_ReturnsZero()
+    {
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00,
+            0x2A
+        };
+
+        using var tempFile = new TTempFile();
+        File.WriteAllBytes(tempFile.Path, program);
+
+        var exitCode = Program.Main(["run", tempFile.Path]);
+
+        Assert.Equal(0, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main link --class nélkül non-zero exit kódot ad.
+    /// <br />
+    /// en: Program.Main link without --class returns non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void Main_LinkMissingClass_ReturnsNonZero()
+    {
+        using var tempFile = new TTempFile();
+
+        var exitCode = Program.Main(["link", tempFile.Path, "--method", "Add", "-o", "out.t0"]);
+
+        Assert.NotEqual(0, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main link --method nélkül non-zero exit kódot ad.
+    /// <br />
+    /// en: Program.Main link without --method returns non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void Main_LinkMissingMethod_ReturnsNonZero()
+    {
+        using var tempFile = new TTempFile();
+
+        var exitCode = Program.Main(["link", tempFile.Path, "--class", "Pure", "-o", "out.t0"]);
+
+        Assert.NotEqual(0, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main link -o nélkül non-zero exit kódot ad.
+    /// <br />
+    /// en: Program.Main link without -o returns non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void Main_LinkMissingOutput_ReturnsNonZero()
+    {
+        using var tempFile = new TTempFile();
+
+        var exitCode = Program.Main(["link", tempFile.Path, "--class", "Pure", "--method", "Add"]);
+
+        Assert.NotEqual(0, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main link parancs fájl nélkül non-zero exit kódot ad.
+    /// <br />
+    /// en: Program.Main link without file returns non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void Main_LinkWithoutFile_ReturnsNonZero()
+    {
+        var exitCode = Program.Main(["link"]);
+
+        Assert.NotEqual(0, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main link nem létező DLL-lel non-zero exit kódot ad.
+    /// <br />
+    /// en: Program.Main link with non-existent DLL returns non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void Main_LinkNonExistentDll_ReturnsNonZero()
+    {
+        var exitCode = Program.Main([
+            "link", "/tmp/does_not_exist_99999.dll",
+            "--class", "Pure", "--method", "Add", "-o", "/tmp/out.t0"
+        ]);
+
+        Assert.NotEqual(0, exitCode);
+    }
+
+    /// <summary>
+    /// hu: Program.Main link érvénytelen DLL-lel (nem PE) non-zero exit kódot ad.
+    /// <br />
+    /// en: Program.Main link with invalid DLL (not PE) returns non-zero exit code.
+    /// </summary>
+    [Fact]
+    public void Main_LinkInvalidDll_ReturnsNonZero()
+    {
+        using var tempFile = new TTempFile();
+        File.WriteAllBytes(tempFile.Path, [0xFF, 0xFF, 0xFF, 0xFF]);
+
+        var t0Path = Path.ChangeExtension(tempFile.Path, ".t0");
+
+        try
+        {
+            var exitCode = Program.Main([
+                "link", tempFile.Path,
+                "--class", "Pure", "--method", "Add", "-o", t0Path
+            ]);
+
+            Assert.NotEqual(0, exitCode);
+        }
+        finally
+        {
+            if (File.Exists(t0Path))
+                File.Delete(t0Path);
+        }
+    }
+
+    /// <summary>
+    /// hu: TRunResult.Trapped true, ha TrapReason nem null.
+    /// <br />
+    /// en: TRunResult.Trapped is true when TrapReason is not null.
+    /// </summary>
+    [Fact]
+    public void TRunResult_Trapped_TrueWhenTrapReasonSet()
+    {
+        var result = new TRunResult(null, TTrapReason.DivByZero, "test");
+
+        Assert.True(result.Trapped);
+    }
+
+    /// <summary>
+    /// hu: TRunResult.Trapped false, ha TrapReason null.
+    /// <br />
+    /// en: TRunResult.Trapped is false when TrapReason is null.
+    /// </summary>
+    [Fact]
+    public void TRunResult_Trapped_FalseWhenNoTrap()
+    {
+        var result = new TRunResult(42, null, null);
+
+        Assert.False(result.Trapped);
+    }
+
+    /// <summary>
+    /// hu: Program.Main run üres .t0 fájllal non-zero exit kódot ad vissza —
+    /// az ArgumentException a generic Exception catch ágát aktiválja a
+    /// HandleRun metódusban (nem FileNotFoundException, nem FormatException).
+    /// <br />
+    /// en: Program.Main run with an empty .t0 file returns non-zero exit code —
+    /// ArgumentException activates the generic Exception catch branch in
+    /// HandleRun (not FileNotFoundException, not FormatException).
+    /// </summary>
+    [Fact]
+    public void Main_RunEmptyFile_ReturnsNonZero()
+    {
+        using var tempFile = new TTempFile();
+        File.WriteAllBytes(tempFile.Path, []);
+
+        var exitCode = Program.Main(["run", tempFile.Path]);
+
+        Assert.NotEqual(0, exitCode);
+    }
 }

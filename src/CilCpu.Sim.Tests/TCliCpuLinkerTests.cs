@@ -450,4 +450,539 @@ public class TCliCpuLinkerTests
         cpuAbs.Execute(t0Abs, 0, [-5]);
         Assert.Equal(5, cpuAbs.Peek(0));
     }
+
+    // ------------------------------------------------------------------
+    // hu: Lefedetlen ág tesztek — linker edge case-ek
+    // en: Uncovered branch tests — linker edge cases
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: Link null assembly byte-okkal ArgumentNullException-t dob.
+    /// <br />
+    /// en: Link with null assembly bytes throws ArgumentNullException.
+    /// </summary>
+    [Fact]
+    public void Link_NullAssemblyBytes_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            TCliCpuLinker.Link(null!, "Foo", "Bar"));
+    }
+
+    /// <summary>
+    /// hu: Link null osztálynévvel ArgumentNullException-t dob.
+    /// <br />
+    /// en: Link with null class name throws ArgumentNullException.
+    /// </summary>
+    [Fact]
+    public void Link_NullClassName_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            TCliCpuLinker.Link([], null!, "Bar"));
+    }
+
+    /// <summary>
+    /// hu: Link null metódusnévvel ArgumentNullException-t dob.
+    /// <br />
+    /// en: Link with null method name throws ArgumentNullException.
+    /// </summary>
+    [Fact]
+    public void Link_NullMethodName_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            TCliCpuLinker.Link([], "Foo", null!));
+    }
+
+    /// <summary>
+    /// hu: Link nem létező metódussal TCilT0LinkException-t dob.
+    /// <br />
+    /// en: Link with non-existent method throws TCilT0LinkException.
+    /// </summary>
+    [Fact]
+    public void Link_NonExistentMethod_ThrowsLinkException()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Add(int a, int b) => a + b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+
+        Assert.Throws<TCilT0LinkException>(() =>
+            TCliCpuLinker.Link(dllBytes, "Pure", "NonExistent"));
+    }
+
+    /// <summary>
+    /// hu: Link nem létező osztálynévvel TCilT0LinkException-t dob.
+    /// <br />
+    /// en: Link with non-existent class name throws TCilT0LinkException.
+    /// </summary>
+    [Fact]
+    public void Link_NonExistentClass_ThrowsLinkException()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Add(int a, int b) => a + b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+
+        Assert.Throws<TCilT0LinkException>(() =>
+            TCliCpuLinker.Link(dllBytes, "NonExistent", "Add"));
+    }
+
+    /// <summary>
+    /// hu: Link nem CIL-T0 kompatibilis opkóddal (static field) TCilT0LinkException-t dob.
+    /// <br />
+    /// en: Link with non-CIL-T0 compatible opcode (static field) throws TCilT0LinkException.
+    /// </summary>
+    [Fact]
+    public void Link_UnsupportedOpcode_ThrowsLinkException()
+    {
+        const string source = """
+            public static class Bad
+            {
+                private static int _counter = 0;
+                public static int Increment()
+                {
+                    _counter++;
+                    return _counter;
+                }
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+
+        Assert.Throws<TCilT0LinkException>(() =>
+            TCliCpuLinker.Link(dllBytes, "Bad", "Increment"));
+    }
+
+    /// <summary>
+    /// hu: Link lokális változó nélküli metódussal sikeres.
+    /// <br />
+    /// en: Link with a method without locals succeeds.
+    /// </summary>
+    [Fact]
+    public void Link_NoLocals_LinksSuccessfully()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Identity(int a) => a;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Identity");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [42]);
+
+        Assert.Equal(42, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link 0xFE prefix opkódot tartalmazó kóddal (ceq) sikeres.
+    /// <br />
+    /// en: Link with 0xFE-prefixed opcode (ceq) succeeds.
+    /// </summary>
+    [Fact]
+    public void Link_FePrefixedOpcode_Ceq_LinksSuccessfully()
+    {
+        const string source = """
+            public static class Logic
+            {
+                public static int IsEqual(int a, int b)
+                {
+                    if (a == b) return 1;
+                    return 0;
+                }
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Logic", "IsEqual");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [5, 5]);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link tranzitív hívással — az entry metódus hív egy másikat.
+    /// <br />
+    /// en: Link with transitive calls — the entry method calls another.
+    /// </summary>
+    [Fact]
+    public void Link_TransitiveCall_LinksSuccessfully()
+    {
+        const string source = """
+            public static class Math
+            {
+                public static int Double(int a) => Add(a, a);
+                public static int Add(int a, int b) => a + b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Double");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [7]);
+
+        Assert.Equal(14, cpu.Peek(0));
+    }
+
+    // ------------------------------------------------------------------
+    // hu: OpcodeLength lefedetlen ág tesztek — bitwise és shift opkódok
+    // en: OpcodeLength uncovered branch tests — bitwise and shift opcodes
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: Link div opkóddal (0x5B) — Div(10, 2) = 5.
+    /// <br />
+    /// en: Link with div opcode (0x5B) — Div(10, 2) = 5.
+    /// </summary>
+    [Fact]
+    public void Link_DivOpcode_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Div(int a, int b) => a / b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Div");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [10, 2]);
+
+        Assert.Equal(5, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link bitwise AND opkóddal (0x5F) — And(12, 10) = 8.
+    /// <br />
+    /// en: Link with bitwise AND opcode (0x5F) — And(12, 10) = 8.
+    /// </summary>
+    [Fact]
+    public void Link_BitwiseAndOpcode_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int And(int a, int b) => a & b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "And");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [12, 10]);
+
+        Assert.Equal(8, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link bitwise OR opkóddal (0x60) — Or(12, 10) = 14.
+    /// <br />
+    /// en: Link with bitwise OR opcode (0x60) — Or(12, 10) = 14.
+    /// </summary>
+    [Fact]
+    public void Link_BitwiseOrOpcode_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Or(int a, int b) => a | b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Or");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [12, 10]);
+
+        Assert.Equal(14, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link bitwise XOR opkóddal (0x61) — Xor(12, 10) = 6.
+    /// <br />
+    /// en: Link with bitwise XOR opcode (0x61) — Xor(12, 10) = 6.
+    /// </summary>
+    [Fact]
+    public void Link_BitwiseXorOpcode_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Xor(int a, int b) => a ^ b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Xor");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [12, 10]);
+
+        Assert.Equal(6, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link shift left opkóddal (0x62) — Shl(3, 4) = 48.
+    /// <br />
+    /// en: Link with shift left opcode (0x62) — Shl(3, 4) = 48.
+    /// </summary>
+    [Fact]
+    public void Link_ShiftLeftOpcode_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Shl(int a, int b) => a << b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Shl");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [3, 4]);
+
+        Assert.Equal(48, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link shift right opkóddal (0x63) — Shr(48, 4) = 3.
+    /// <br />
+    /// en: Link with shift right opcode (0x63) — Shr(48, 4) = 3.
+    /// </summary>
+    [Fact]
+    public void Link_ShiftRightOpcode_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Shr(int a, int b) => a >> b;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Shr");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [48, 4]);
+
+        Assert.Equal(3, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link bitwise NOT opkóddal (0x66) — Not(0) = -1.
+    /// <br />
+    /// en: Link with bitwise NOT opcode (0x66) — Not(0) = -1.
+    /// </summary>
+    [Fact]
+    public void Link_BitwiseNotOpcode_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Not(int a) => ~a;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Not");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [0]);
+
+        Assert.Equal(-1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link ldarg.s opkóddal (0x0E) — 5 paraméteres metódus,
+    /// az 5. paraméter (index 4) ldarg.s-el töltődik be.
+    /// Sum5(1, 2, 3, 4, 5) = 15.
+    /// <br />
+    /// en: Link with ldarg.s opcode (0x0E) — 5-parameter method,
+    /// the 5th parameter (index 4) is loaded via ldarg.s.
+    /// Sum5(1, 2, 3, 4, 5) = 15.
+    /// </summary>
+    [Fact]
+    public void Link_LdargS_FiveParams_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int Sum5(int a, int b, int c, int d, int e)
+                    => a + b + c + d + e;
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Sum5");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [1, 2, 3, 4, 5]);
+
+        Assert.Equal(15, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: Link starg.s opkóddal (0x10) — paraméterhez értékadás.
+    /// Egy metódus, amelyik módosítja saját paraméterét, majd visszaadja.
+    /// IncrParam(10) = 11.
+    /// <br />
+    /// en: Link with starg.s opcode (0x10) — assignment to parameter.
+    /// A method that modifies its own parameter and returns it.
+    /// IncrParam(10) = 11.
+    /// </summary>
+    [Fact]
+    public void Link_StargS_ParameterAssignment_ReturnsCorrectResult()
+    {
+        const string source = """
+            public static class Pure
+            {
+                public static int IncrParam(int a, int b, int c, int d, int e)
+                {
+                    e = e + 1;
+                    return e;
+                }
+            }
+            """;
+
+        var dllBytes = TRoslynCompiler.CompileToBytes(source);
+        var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "IncrParam");
+
+        var cpu = new TCpu();
+        cpu.Execute(t0Bytes, 0, [0, 0, 0, 0, 10]);
+
+        Assert.Equal(11, cpu.Peek(0));
+    }
+
+    // ------------------------------------------------------------------
+    // hu: ResolveCallTokens és OpcodeLength direkt unit tesztek —
+    //     internal metódusok hiba-ágai (InternalsVisibleTo).
+    // en: ResolveCallTokens and OpcodeLength direct unit tests —
+    //     internal method error branches (InternalsVisibleTo).
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: ResolveCallTokens non-MethodDef token (tableType != 0x06)
+    /// esetén TCilT0LinkException-t dob.
+    /// <br />
+    /// en: ResolveCallTokens throws TCilT0LinkException when encountering
+    /// a non-MethodDef token (tableType != 0x06).
+    /// </summary>
+    [Fact]
+    public void ResolveCallTokens_NonMethodDefToken_ThrowsLinkException()
+    {
+        // hu: Kézzel készített IL: call 0x0A000001 (MemberRef token, tableType=0x0A)
+        // en: Hand-crafted IL: call 0x0A000001 (MemberRef token, tableType=0x0A)
+        var il = new byte[] { 0x28, 0x01, 0x00, 0x00, 0x0A };
+        var methodRva = new Dictionary<System.Reflection.Metadata.MethodDefinitionHandle, int>();
+
+        Assert.Throws<TCilT0LinkException>(() =>
+            TCliCpuLinker.ResolveCallTokens(il, methodRva));
+    }
+
+    /// <summary>
+    /// hu: ResolveCallTokens ismeretlen MethodDef target esetén
+    /// TCilT0LinkException-t dob.
+    /// <br />
+    /// en: ResolveCallTokens throws TCilT0LinkException when the
+    /// MethodDef target is not found in the linked methods.
+    /// </summary>
+    [Fact]
+    public void ResolveCallTokens_UnknownMethodDefTarget_ThrowsLinkException()
+    {
+        // hu: Kézzel készített IL: call 0x06000099 (MethodDef token, row 153 — nem létezik)
+        // en: Hand-crafted IL: call 0x06000099 (MethodDef token, row 153 — doesn't exist)
+        var il = new byte[] { 0x28, 0x99, 0x00, 0x00, 0x06 };
+        var methodRva = new Dictionary<System.Reflection.Metadata.MethodDefinitionHandle, int>();
+
+        Assert.Throws<TCilT0LinkException>(() =>
+            TCliCpuLinker.ResolveCallTokens(il, methodRva));
+    }
+
+    /// <summary>
+    /// hu: OpcodeLength truncált 0xFE prefix esetén (program vége)
+    /// TCilT0LinkException-t dob.
+    /// <br />
+    /// en: OpcodeLength throws TCilT0LinkException when 0xFE prefix
+    /// is truncated (at end of program).
+    /// </summary>
+    [Fact]
+    public void OpcodeLength_TruncatedFePrefix_ThrowsLinkException()
+    {
+        var program = new byte[] { 0xFE };
+
+        Assert.Throws<TCilT0LinkException>(() =>
+            TCliCpuLinker.OpcodeLength(0xFE, program, 0));
+    }
+
+    /// <summary>
+    /// hu: OpcodeLength érvénytelen 0xFE-prefixes opkód (0xFE 0x99)
+    /// esetén TCilT0LinkException-t dob.
+    /// <br />
+    /// en: OpcodeLength throws TCilT0LinkException for invalid
+    /// 0xFE-prefixed opcode (0xFE 0x99).
+    /// </summary>
+    [Fact]
+    public void OpcodeLength_InvalidFePrefixedOpcode_ThrowsLinkException()
+    {
+        var program = new byte[] { 0xFE, 0x99 };
+
+        Assert.Throws<TCilT0LinkException>(() =>
+            TCliCpuLinker.OpcodeLength(0xFE, program, 0));
+    }
+
+    /// <summary>
+    /// hu: OpcodeLength nem támogatott opkód (0xA0 — nem a CIL-T0 készletben)
+    /// esetén TCilT0LinkException-t dob.
+    /// <br />
+    /// en: OpcodeLength throws TCilT0LinkException for unsupported
+    /// opcode (0xA0 — not in CIL-T0 set).
+    /// </summary>
+    [Fact]
+    public void OpcodeLength_UnsupportedOpcode_ThrowsLinkException()
+    {
+        var program = new byte[] { 0xA0 };
+
+        Assert.Throws<TCilT0LinkException>(() =>
+            TCliCpuLinker.OpcodeLength(0xA0, program, 0));
+    }
+
+    /// <summary>
+    /// hu: OpcodeLength érvényes 0xFE prefix opkódok (0x01-0x05) helyes
+    /// hosszat adnak vissza (2 byte).
+    /// <br />
+    /// en: OpcodeLength returns correct length (2 bytes) for valid
+    /// 0xFE-prefixed opcodes (0x01-0x05).
+    /// </summary>
+    [Theory]
+    [InlineData(0x01)] // ceq
+    [InlineData(0x02)] // cgt
+    [InlineData(0x03)] // cgt.un
+    [InlineData(0x04)] // clt
+    [InlineData(0x05)] // clt.un
+    public void OpcodeLength_ValidFePrefixedOpcodes_Returns2(byte ASecondByte)
+    {
+        var program = new byte[] { 0xFE, ASecondByte };
+
+        var length = TCliCpuLinker.OpcodeLength(0xFE, program, 0);
+
+        Assert.Equal(2, length);
+    }
 }

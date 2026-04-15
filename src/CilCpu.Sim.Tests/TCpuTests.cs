@@ -570,4 +570,358 @@ public class TCpuTests
 
         Assert.Contains("call stack is empty", ex.Message);
     }
+
+    // ------------------------------------------------------------------
+    // hu: Lefedetlen ág tesztek — TCpu belső állapot edge case-ek
+    // en: Uncovered branch tests — TCpu internal state edge cases
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: StackDepth üres call stack-kel 0-t ad vissza.
+    /// <br />
+    /// en: StackDepth returns 0 when call stack is empty.
+    /// </summary>
+    [Fact]
+    public void StackDepth_EmptyCallStack_ReturnsZero()
+    {
+        var cpu = new TCpu();
+
+        Assert.Equal(0, cpu.StackDepth);
+    }
+
+    /// <summary>
+    /// hu: Header-vezérelt Execute negatív RVA-val InvalidCallTarget trap-et dob.
+    /// <br />
+    /// en: Header-driven Execute with negative RVA raises InvalidCallTarget trap.
+    /// </summary>
+    [Fact]
+    public void Execute_NegativeEntryRva_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00,
+            0x16, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, -1));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Header-vezérelt Execute, ahol a header RVA túl van a program végén.
+    /// <br />
+    /// en: Header-driven Execute where header RVA exceeds program length.
+    /// </summary>
+    [Fact]
+    public void Execute_HeaderRvaPastEnd_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[] { 0xFE, 0x00, 0x00, 0x01 }; // 4 bytes, header needs 8
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Header-vezérelt Execute rossz magic-kel InvalidCallTarget trap-et dob.
+    /// <br />
+    /// en: Header-driven Execute with wrong magic raises InvalidCallTarget trap.
+    /// </summary>
+    [Fact]
+    public void Execute_WrongHeaderMagic_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x00, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00,
+            0x16, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Header-vezérelt Execute, ahol argCount > 16 → InvalidCallTarget trap.
+    /// <br />
+    /// en: Header-driven Execute with argCount > 16 raises InvalidCallTarget trap.
+    /// </summary>
+    [Fact]
+    public void Execute_HeaderArgCountExceedsMax_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0xFE, 0xFF, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00,
+            0x16, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Header-vezérelt Execute, ahol localCount > 16 → InvalidCallTarget trap.
+    /// <br />
+    /// en: Header-driven Execute with localCount > 16 raises InvalidCallTarget trap.
+    /// </summary>
+    [Fact]
+    public void Execute_HeaderLocalCountExceedsMax_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0xFF, 0x01, 0x02, 0x00, 0x00, 0x00,
+            0x16, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Header-vezérelt Execute, ahol a kód túlnyúlik a program végén.
+    /// <br />
+    /// en: Header-driven Execute where code extends past program end.
+    /// </summary>
+    [Fact]
+    public void Execute_CodeExtendsPastEnd_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x64, 0x00, 0x00, 0x00,
+            0x16, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    // ------------------------------------------------------------------
+    // hu: TDecoder lefedetlen ágak — ritkább decode path-ok
+    // en: TDecoder uncovered branches — rare decode paths
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: 0xFE prefix érvénytelen második byte-tal (pl. 0x99) InvalidOpcode
+    /// trap-et dob — a combined switch default ága.
+    /// <br />
+    /// en: 0xFE prefix with invalid second byte (e.g. 0x99) raises an
+    /// InvalidOpcode trap — the combined switch default branch.
+    /// </summary>
+    [Fact]
+    public void Execute_FePrefixInvalidSecondByte_TrapsInvalidOpcode()
+    {
+        var cpu = new TCpu();
+        var program = new byte[] { 0xFE, 0x99 };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.InvalidOpcode, trap.Reason);
+        Assert.Equal(0, trap.ProgramCounter);
+    }
+
+    /// <summary>
+    /// hu: Csonkított ldarg.s operand (0x0E az utolsó byte, nincs indexe)
+    /// InvalidOpcode trap-et dob.
+    /// <br />
+    /// en: Truncated ldarg.s operand (0x0E is the last byte, no index byte)
+    /// raises an InvalidOpcode trap.
+    /// </summary>
+    [Fact]
+    public void Execute_TruncatedLdargS_TrapsInvalidOpcode()
+    {
+        var cpu = new TCpu();
+        var program = new byte[] { 0x0E }; // ldarg.s, operand hiányzik
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.InvalidOpcode, trap.Reason);
+        Assert.Equal(0, trap.ProgramCounter);
+    }
+
+    /// <summary>
+    /// hu: Csonkított call operand (0x28 után kevesebb mint 4 byte) InvalidOpcode
+    /// trap-et dob.
+    /// <br />
+    /// en: Truncated call operand (fewer than 4 bytes after 0x28) raises an
+    /// InvalidOpcode trap.
+    /// </summary>
+    [Fact]
+    public void Execute_TruncatedCall_TrapsInvalidOpcode()
+    {
+        var cpu = new TCpu();
+        var program = new byte[] { 0x28, 0x01, 0x02 }; // call, csak 3 byte operand (4 helyett)
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.InvalidOpcode, trap.Reason);
+        Assert.Equal(0, trap.ProgramCounter);
+    }
+
+    // ------------------------------------------------------------------
+    // hu: TCpu internal metódus tesztek (InternalsVisibleTo)
+    // en: TCpu internal method tests (InternalsVisibleTo)
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: EvalPeek negatív offset-tel ArgumentOutOfRangeException-t dob.
+    /// <br />
+    /// en: EvalPeek with negative offset throws ArgumentOutOfRangeException.
+    /// </summary>
+    [Fact]
+    public void EvalPeek_NegativeOffset_ThrowsArgumentOutOfRange()
+    {
+        var cpu = new TCpu();
+        var program = new byte[] { 0x16 }; // ldc.i4.0 — push 0
+
+        cpu.Execute(program);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => cpu.EvalPeek(-1));
+    }
+
+    /// <summary>
+    /// hu: EvalPeek offset >= EvalDepth ArgumentOutOfRangeException-t dob.
+    /// <br />
+    /// en: EvalPeek with offset >= EvalDepth throws ArgumentOutOfRangeException.
+    /// </summary>
+    [Fact]
+    public void EvalPeek_OffsetBeyondDepth_ThrowsArgumentOutOfRange()
+    {
+        var cpu = new TCpu();
+        var program = new byte[] { 0x16 }; // ldc.i4.0
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.StackDepth);
+        Assert.Throws<ArgumentOutOfRangeException>(() => cpu.EvalPeek(1));
+    }
+
+    /// <summary>
+    /// hu: LoadArg érvénytelen index-szel (>= ArgCount) InvalidArg trap-et dob.
+    /// <br />
+    /// en: LoadArg with invalid index (>= ArgCount) raises an InvalidArg trap.
+    /// </summary>
+    [Fact]
+    public void LoadArg_InvalidIndex_TrapsInvalidArg()
+    {
+        var cpu = new TCpu();
+        cpu.Execute(new byte[] { 0x00 }, 1, 0, [42]); // 1 arg
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.LoadArg(5, 0));
+
+        Assert.Equal(TTrapReason.InvalidArg, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: LoadLocal érvénytelen index-szel (>= LocalCount) InvalidLocal trap-et dob.
+    /// <br />
+    /// en: LoadLocal with invalid index (>= LocalCount) raises an InvalidLocal trap.
+    /// </summary>
+    [Fact]
+    public void LoadLocal_InvalidIndex_TrapsInvalidLocal()
+    {
+        var cpu = new TCpu();
+        cpu.Execute(new byte[] { 0x00 }, 0, 1); // 1 local
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.LoadLocal(5, 0));
+
+        Assert.Equal(TTrapReason.InvalidLocal, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: StoreArg érvénytelen index-szel (>= ArgCount) InvalidArg trap-et dob.
+    /// <br />
+    /// en: StoreArg with invalid index (>= ArgCount) raises an InvalidArg trap.
+    /// </summary>
+    [Fact]
+    public void StoreArg_InvalidIndex_TrapsInvalidArg()
+    {
+        var cpu = new TCpu();
+        cpu.Execute(new byte[] { 0x00 }, 1, 0, [42]); // 1 arg
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.StoreArg(5, 99, 0));
+
+        Assert.Equal(TTrapReason.InvalidArg, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: StoreLocal érvénytelen index-szel (>= LocalCount) InvalidLocal trap-et dob.
+    /// <br />
+    /// en: StoreLocal with invalid index (>= LocalCount) raises an InvalidLocal trap.
+    /// </summary>
+    [Fact]
+    public void StoreLocal_InvalidIndex_TrapsInvalidLocal()
+    {
+        var cpu = new TCpu();
+        cpu.Execute(new byte[] { 0x00 }, 0, 1); // 1 local
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.StoreLocal(5, 99, 0));
+
+        Assert.Equal(TTrapReason.InvalidLocal, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: PopCallFrame root frame-en (prevBase = -1) — az else ág fut, amely
+    /// az SRAM[0]-ból olvassa vissza az ArgCount/LocalCount értékeket.
+    /// Közvetlenül hívjuk PopCallFrame-et (InternalsVisibleTo), hogy a normál
+    /// végrehajtásban nem elérhető defenzív ágat lefedve teszteljük.
+    /// <br />
+    /// en: PopCallFrame on root frame (prevBase = -1) — the else branch runs,
+    /// reading ArgCount/LocalCount back from SRAM[0]. Called directly via
+    /// InternalsVisibleTo to cover the defensive branch unreachable via normal
+    /// execution.
+    /// </summary>
+    [Fact]
+    public void PopCallFrame_OnRootFrame_RestoresArgLocalFromSram()
+    {
+        var cpu = new TCpu();
+
+        // hu: Inicializáljuk a root frame-et 1 arg, 0 local - ez beírja az SRAM-ba
+        // en: Initialize root frame with 1 arg, 0 locals — writes to SRAM
+        cpu.Execute(new byte[] { 0x00 }, 1, 0, [42]);
+
+        // hu: Az Execute befejezése után a CPU halted, de az SRAM állapot megmaradt.
+        //     A PopCallFrame-et közvetlenül hívjuk, hogy az else ágat lefedjük.
+        // en: After Execute the CPU is halted but SRAM state is preserved.
+        //     Directly call PopCallFrame to cover the else branch.
+        var returnPc = cpu.PopCallFrame();
+
+        Assert.Equal(-1, returnPc); // root frame ReturnPC = -1
+    }
+
+    // ------------------------------------------------------------------
+    // hu: TExecutor.Execute default ág (InternalsVisibleTo)
+    // en: TExecutor.Execute default branch (InternalsVisibleTo)
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: TExecutor.Execute ismeretlen opkóddal (nem szerepel a switch-ben)
+    /// InvalidOpcode trap-et dob — a default ág.
+    /// <br />
+    /// en: TExecutor.Execute with an unknown opcode (not in switch) raises
+    /// InvalidOpcode trap — the default branch.
+    /// </summary>
+    [Fact]
+    public void TExecutor_Execute_UnknownOpcode_TrapsInvalidOpcode()
+    {
+        var cpu = new TCpu();
+        cpu.Execute(new byte[] { 0x00 }); // inicializálja a root frame-et
+
+        var fakeDecoded = new TDecodedOpcode((TOpcode)0xAB, 1, 0);
+        var program = new byte[] { 0x00 };
+
+        var trap = Assert.Throws<TTrapException>(() =>
+            TExecutor.Execute(cpu, program, fakeDecoded));
+
+        Assert.Equal(TTrapReason.InvalidOpcode, trap.Reason);
+    }
 }

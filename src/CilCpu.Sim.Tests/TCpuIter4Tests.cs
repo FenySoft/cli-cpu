@@ -510,4 +510,178 @@ public class TCpuIter4Tests
         Assert.Equal(1, cpu.StackDepth);
         Assert.Equal(3 + 2 + 1, cpu.Peek(0));
     }
+
+    // ------------------------------------------------------------------
+    // hu: Lefedetlen ág tesztek — call/ret/memory edge case-ek
+    // en: Uncovered branch tests — call/ret/memory edge cases
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: Call negatív target RVA-val InvalidCallTarget trap-et dob.
+    /// <br />
+    /// en: Call with negative target RVA raises InvalidCallTarget trap.
+    /// </summary>
+    [Fact]
+    public void Execute_Call_NegativeTargetRva_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
+            0x28, 0xF0, 0xFF, 0xFF, 0xFF, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Call target, ahol argCount > MaxArgs → InvalidCallTarget trap.
+    /// <br />
+    /// en: Call target with argCount > MaxArgs raises InvalidCallTarget trap.
+    /// </summary>
+    [Fact]
+    public void Execute_Call_TargetArgCountExceedsMax_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
+            0x28, 0x0E, 0x00, 0x00, 0x00, 0x2A,
+            0xFE, 0xFF, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00,
+            0x16, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Call target, ahol localCount > MaxLocals → InvalidCallTarget trap.
+    /// <br />
+    /// en: Call target with localCount > MaxLocals raises InvalidCallTarget trap.
+    /// </summary>
+    [Fact]
+    public void Execute_Call_TargetLocalCountExceedsMax_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
+            0x28, 0x0E, 0x00, 0x00, 0x00, 0x2A,
+            0xFE, 0x00, 0xFF, 0x01, 0x02, 0x00, 0x00, 0x00,
+            0x16, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Call target, ahol a callee kódja túlnyúlik a program végén.
+    /// <br />
+    /// en: Call target where callee code extends past program end.
+    /// </summary>
+    [Fact]
+    public void Execute_Call_TargetCodePastEnd_TrapsInvalidCallTarget()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
+            0x28, 0x0E, 0x00, 0x00, 0x00, 0x2A,
+            0xFE, 0x00, 0x00, 0x01, 0x64, 0x00, 0x00, 0x00,
+            0x16, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.InvalidCallTarget, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: Ret üres eval stack-kel (void metódus) — a caller eval stack-je
+    /// változatlan marad.
+    /// <br />
+    /// en: Ret with empty eval stack (void method) — caller's eval stack is
+    /// unchanged.
+    /// </summary>
+    [Fact]
+    public void Execute_RetVoid_NoReturnValuePushed()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            // caller header: arg=0, local=0, max=2, code_size=8
+            0xFE, 0x00, 0x00, 0x02, 0x08, 0x00, 0x00, 0x00,
+            // caller code (8..15): ldc.i4.s 99, call 16, ret, padding
+            0x1F, 0x63, 0x28, 0x10, 0x00, 0x00, 0x00, 0x2A,
+            // callee header at 16: arg=0, local=0, max=1, code_size=1
+            0xFE, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00,
+            // callee code: ret (no value pushed)
+            0x2A
+        };
+
+        cpu.Execute(program, 0);
+
+        Assert.Equal(1, cpu.StackDepth);
+        Assert.Equal(99, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: ldind.i4 negatív címmel InvalidMemoryAccess trap-et dob.
+    /// <br />
+    /// en: ldind.i4 with negative address raises InvalidMemoryAccess trap.
+    /// </summary>
+    [Fact]
+    public void Execute_LdindI4_NegativeAddress_TrapsInvalidMemory()
+    {
+        var data = new byte[8];
+        var cpu = new TCpu(data);
+        var program = new byte[] { 0x15, 0x4A }; // ldc.i4.m1; ldind.i4
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.InvalidMemoryAccess, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: stind.i4 negatív címmel InvalidMemoryAccess trap-et dob.
+    /// <br />
+    /// en: stind.i4 with negative address raises InvalidMemoryAccess trap.
+    /// </summary>
+    [Fact]
+    public void Execute_StindI4_NegativeAddress_TrapsInvalidMemory()
+    {
+        var data = new byte[8];
+        var cpu = new TCpu(data);
+        var program = new byte[] { 0x15, 0x16, 0x54 }; // ldc.i4.m1; ldc.i4.0; stind.i4
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.InvalidMemoryAccess, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: PushCallFrame kis SRAM-mal SramOverflow trap-et dob.
+    /// <br />
+    /// en: PushCallFrame with small SRAM raises SramOverflow trap.
+    /// </summary>
+    [Fact]
+    public void Execute_Call_SmallSram_TrapsSramOverflow()
+    {
+        var cpu = new TCpu(null, 80);
+        var program = new byte[]
+        {
+            0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
+            0x28, 0x00, 0x00, 0x00, 0x00, 0x2A
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
+
+        Assert.Equal(TTrapReason.SramOverflow, trap.Reason);
+    }
 }

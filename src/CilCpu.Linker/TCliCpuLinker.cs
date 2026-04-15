@@ -147,7 +147,7 @@ public static class TCliCpuLinker
     /// en: Walks the IL bytes and rewrites every 'call' opcode operand
     /// to the target method's absolute RVA.
     /// </summary>
-    private static byte[] ResolveCallTokens(
+    internal static byte[] ResolveCallTokens(
         byte[] AIlBytes,
         Dictionary<MethodDefinitionHandle, int> AMethodRva)
     {
@@ -293,7 +293,7 @@ public static class TCliCpuLinker
     /// <br />
     /// en: Computes the full length of a CIL opcode for the CIL-T0 set.
     /// </summary>
-    private static int OpcodeLength(byte AOpcode, byte[] AProgram, int APc)
+    internal static int OpcodeLength(byte AOpcode, byte[] AProgram, int APc)
     {
         if (AOpcode == 0x00) return 1;
         if (AOpcode is >= 0x02 and <= 0x09) return 1;
