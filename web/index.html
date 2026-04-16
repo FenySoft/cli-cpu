@@ -1,11 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="refresh" content="0;url=en/">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CLI-CPU</title>
+  <style>
+    html, body {
+      background: #0d1117;
+      color: #c9d1d9;
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    a {
+      color: #58a6ff;
+      text-decoration: none;
+    }
+    a:hover {
+      color: #79c0ff;
+      text-decoration: underline;
+    }
+    p {
+      font-size: 0.95rem;
+      color: #8b949e;
+    }
+  </style>
+  <meta http-equiv="refresh" content="0;url=en/">
+  <script>
+    // Browser language-based redirect (runs before meta refresh completes)
+    (function () {
+      var lang = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
+      if (lang.indexOf('hu') === 0) {
+        window.location.replace('hu/');
+      } else {
+        window.location.replace('en/');
+      }
+    })();
+  </script>
 </head>
 <body>
-  <p>Redirecting to <a href="en/">English version</a>... | <a href="hu/">Magyar verzió</a></p>
+  <p>
+    <a href="en/">English</a> &nbsp;·&nbsp; <a href="hu/">Magyar</a>
+  </p>
 </body>
 </html>
