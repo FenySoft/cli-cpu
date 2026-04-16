@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CLI-CPU — Nyílt forráskódú Cognitive Fabric processzor</title>
-  <meta name="description" content="CLI-CPU: nyílt forráskódú processzor, amely .NET CIL bájtkódot hajt végre natívan hardverben. Sok kis core, osztott-semmi modell, hardveres mailbox kommunikáció.">
+  <title>CLI-CPU — Nyílt forráskódú Cognitive Fabric Processing Unit (CFPU)</title>
+  <meta name="description" content="A CLI-CPU a Cognitive Fabric Processing Unit (CFPU) nyílt forráskódú referencia implementációja — egy új processzor-kategória, amely natívan hardverben hajt végre .NET CIL bájtkódot. Sok kis core, shared-nothing, hardveres mailbox kommunikáció.">
   <style>
     :root {
       --bg: #0d1117;
@@ -201,11 +201,11 @@
 <header>
   <div class="container">
     <h1>CLI-CPU</h1>
-    <div class="subtitle">Nyílt forráskódú Cognitive Fabric processzor</div>
+    <div class="subtitle">Nyílt forráskódú Cognitive Fabric Processing Unit (CFPU)</div>
     <div class="tagline">
-      Natív CIL végrehajtás szabad szilíciumon
+      A CFPU referencia implementációja — natív CIL végrehajtás szabad szilíciumon
     </div>
-    <div class="status-badge">F1.5 KÉSZ — 259+ teszt zöld</div>
+    <div class="status-badge">F1.5 KÉSZ — 330+ teszt zöld</div>
   </div>
 </header>
 
@@ -214,30 +214,47 @@
 
     <div class="abstract">
       <p>
-        A CLI-CPU egy nyílt forráskódú processzor-architektúra, amely .NET Common Intermediate Language (CIL) bájtkódot
-        hajt végre natívan hardverben — JIT fordítás, AOT transzláció vagy interpreter réteg nélkül. Ahelyett, hogy
-        egymagos sebességben versenyezne (ezt a csatát a picoJava és a Jazelle évtizedekkel ezelőtt elveszítette),
-        a CLI-CPU sok kis, független CIL-natív magot helyez egyetlen chipre, amelyek kizárólag hardveres mailbox FIFO-kon
-        keresztül kommunikálnak, osztott-semmi modellben. Ez a „Cognitive Fabric" architektúra teljesen kiküszöböli a
-        gyorsítótár-koherencia többletterhelését, lehetővé téve a lineáris skálázást a magok számával.
+        A CLI-CPU a <strong>Cognitive Fabric Processing Unit (CFPU)</strong> nyílt forráskódú referencia implementációja
+        &mdash; egy új kategóriájú feldolgozó egység, amely a .NET Common Intermediate Language (CIL) bájtkódot natívan,
+        hardveresen hajtja végre, JIT fordítás, AOT transzláció vagy interpreter nélkül. A megszokott
+        <em>CPU / GPU / TPU / NPU</em> család mellé a CFPU az első <strong>MIMD aktor-natív</strong> feldolgozó egység:
+        sok kis, független CIL-natív core egyetlen chipen, kizárólag hardveres mailbox FIFO-kon át kommunikálva,
+        shared-nothing modellben. Ahelyett, hogy egymagos sebességben versenyezne (ezt a csatát a picoJava és a Jazelle
+        évtizedekkel ezelőtt elveszítette), a CFPU teljesen kiküszöböli a cache koherencia többletterhelését, lehetővé
+        téve a lineáris skálázást a core-ok számával.
+      </p>
+      <p style="margin-top: 16px; font-size: 0.95rem; color: var(--text-dim);">
+        A testvér projekt, a <a href="https://github.com/FenySoft/NeuronOS">Neuron&nbsp;OS</a> a capability-alapú aktor
+        runtime, amit a CFPU hardverrel együtt fejlesztünk. Már a nulladik naptól alakítja a hardveres követelményeket,
+        az Apple M-sorozat OS/szilícium co-evolúciós filozófiáját követve &mdash; teljesen nyílt forráskóddal.
       </p>
     </div>
 
     <div class="cards">
       <div class="card">
         <h3>Architektúra</h3>
-        <p>Mikroarchitektúra áttekintés, Cognitive Fabric pozicionálás, előzmények elemzése, heterogén Nano + Rich többmagos felépítés.</p>
+        <p>CFPU mikroarchitektúra, Cognitive Fabric pozicionálás, előzmények elemzése, heterogén CFPU Nano + Rich többmagos felépítés.</p>
         <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/architecture-hu.md">Olvasás &rarr;</a>
       </div>
       <div class="card">
         <h3>Ütemterv</h3>
-        <p>Hétfázisú terv az F0 specifikációtól az F7 Neuron OS-ig, Tiny Tapeout-tal az F3-ban és FPGA Cognitive Fabric-kel az F4-ben.</p>
+        <p>Hétfázisú terv az F0 specifikációtól az F7-ig, Tiny Tapeout-tal az F3-ban és FPGA Cognitive Fabric-kel az F4-ben.</p>
         <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/roadmap-hu.md">Olvasás &rarr;</a>
+      </div>
+      <div class="card">
+        <h3>GYIK</h3>
+        <p>Mi a CFPU? Mi a kapcsolata a CLI-CPU-val? CLI vs CIL? Ütemezési költségek? Területigény Zen 4-hez képest?</p>
+        <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/faq-hu.md">Olvasás &rarr;</a>
       </div>
       <div class="card">
         <h3>Biztonsági modell</h3>
         <p>Hardveresen érvényesített memóriabiztonság, típusbiztonság, CFI. Tervezésénél fogva immunis a Spectre, Meltdown, ROP és JOP támadásokra.</p>
         <a href="https://github.com/FenySoft/cli-cpu/blob/main/docs/security-hu.md">Olvasás &rarr;</a>
+      </div>
+      <div class="card">
+        <h3>Neuron OS</h3>
+        <p>Capability-alapú aktor runtime, a CFPU-val együtt fejlesztve. Az OS-igények alakítják a hardvert, az Apple M-sorozat filozófiáját követve.</p>
+        <a href="https://github.com/FenySoft/NeuronOS">Repó megtekintése &rarr;</a>
       </div>
       <div class="card">
         <h3>Blog</h3>
@@ -256,12 +273,14 @@
     <div class="highlights">
       <h2>// kiemelések</h2>
       <ul>
+        <li><strong>Új kategória</strong> — A CFPU belép a CPU / GPU / TPU / NPU családba az első MIMD aktor-natív PU-ként</li>
         <li><strong>48 opkód</strong> — CIL-T0 egész szám részhalmaz, teljesen specifikált és tesztelt</li>
-        <li><strong>259+ teszt</strong> — Referencia szimulátor, linker és runner, mind TDD</li>
+        <li><strong>330+ teszt</strong> — Referencia szimulátor, linker és runner, mind TDD</li>
         <li><strong>ALU Verilog-ban</strong> — 41/41 cocotb teszt zöld, szintézisre kész</li>
-        <li><strong>Osztott-semmi</strong> — Nincs gyorsítótár-koherencia, nincs zárolás, lineáris skálázás</li>
+        <li><strong>Shared-nothing</strong> — Nincs cache koherencia, nincs zárolás, lineáris skálázás</li>
         <li><strong>Sky130 célplatform</strong> — Tiny Tapeout első szilícium, teljesen nyílt eszközlánc</li>
         <li><strong>8 millió fejlesztő</strong> — Minden .NET nyelv CIL-re fordul és natívan fut</li>
+        <li><strong>Co-designed OS</strong> — A Neuron OS runtime a nulladik naptól alakítja a hardveres követelményeket</li>
         <li><strong>CERN-OHL-S v2</strong> — Erősen reciprok nyílt hardver licenc</li>
       </ul>
     </div>
