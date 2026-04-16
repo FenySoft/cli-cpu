@@ -1,5 +1,7 @@
 # Neuron OS -- the actor-based operating system of the Cognitive Fabric Processing Unit (CFPU)
 
+> **📦 Implementation:** [**github.com/FenySoft/NeuronOS**](https://github.com/FenySoft/NeuronOS) — Neuron OS has moved to its own repository. This document captures the long-term vision; the actual runtime code, tests, API, and CI/CD live in the NeuronOS repo.
+
 > **Vision document.** This is the long-term plan for the OS, which begins to take shape with the F4 multi-core simulator, reaches its first real usability with F5-F6 hardware, and reaches mature developer platform level in F7.
 >
 > **The content is a compass, not a final spec.** Details will be refined along the way, based on F4-F6 experience. The goal here is to give design decisions a **direction**, so we don't re-debate fundamentals at every F4 iteration.
@@ -8,7 +10,7 @@
 
 > Magyar verzió: [neuron-os-hu.md](neuron-os-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 ## Philosophy -- replacing the Unix legacy, realizing the Erlang vision
 

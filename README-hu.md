@@ -61,7 +61,9 @@ Részletek a `docs/architecture.md` **„Stratégiai pozicionálás: Cognitive F
 
 ## Hárompályás pozicionálás — hosszú távon a Linux utódja
 
-A CLI-CPU + Neuron OS **három párhuzamos piaci narratívát** követ, ugyanazzal a hardveres alappal, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
+A CLI-CPU + [**Neuron OS**](https://github.com/FenySoft/NeuronOS/blob/main/README-hu.md) **három párhuzamos piaci narratívát** követ, ugyanazzal a hardveres alappal, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
+
+> **Testvérprojekt:** [**FenySoft/NeuronOS**](https://github.com/FenySoft/NeuronOS/blob/main/README-hu.md) — a capability-alapú aktor runtime, a CFPU-val együtt fejlesztve. Ma bármely .NET hoszton fut; holnap CFPU szilíciumra. Apache-2.0.
 
 **Pálya 1 — „Cognitive Fabric"**: programozható kognitív szubsztrátum AI kutatóknak, Akka.NET / Orleans actor rendszereknek, spiking neural network szimulációnak, multi-agent szimulációnak, IoT edge gateway-nek. **Hosszú távú vízió.**
 
@@ -101,7 +103,7 @@ Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 - [docs/architecture-hu.md](docs/architecture-hu.md) — CLI-CPU mikroarchitektúra, Cognitive Fabric pozicionálás, prior art elemzés (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogén Nano + Rich multi-core
 - [docs/ISA-CIL-T0-hu.md](docs/ISA-CIL-T0-hu.md) — CIL-T0 subset specifikáció (48 opkód), mailbox MMIO interfész
 - [docs/security-hu.md](docs/security-hu.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
-- [docs/neuron-os-hu.md](docs/neuron-os-hu.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon"
+- [docs/neuron-os-hu.md](docs/neuron-os-hu.md) — Neuron OS vízió: aktor-alapú operációs rendszer a CLI-CPU-ra, „Erlang in silicon". **Implementáció:** [github.com/FenySoft/NeuronOS](https://github.com/FenySoft/NeuronOS/blob/main/README-hu.md)
 - [docs/secure-element-hu.md](docs/secure-element-hu.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv
 - [docs/faq-hu.md](docs/faq-hu.md) — Gyakori Kérdések: koncepcionális horgonyok új olvasóknak (CLI vs CIL, CPU összehasonlítás, ütemezési költségek)
 - [docs/vision-hu.md](docs/vision-hu.md) — A shared-nothing jövő: OS, GUI, adatbázis, hálózat, programozási modell újragondolva

@@ -61,7 +61,9 @@ Details in the **"Strategic Positioning: Cognitive Fabric"** section of `docs/ar
 
 ## Three-track positioning -- long-term successor to Linux
 
-CLI-CPU + Neuron OS pursues **three parallel market narratives** built on the same hardware foundation, all serving a **single shared historical goal**: **replacing the 1970s Unix foundations inherited by Linux** with a modern, secure, scalable, actor-based architecture.
+CLI-CPU + [**Neuron OS**](https://github.com/FenySoft/NeuronOS) pursues **three parallel market narratives** built on the same hardware foundation, all serving a **single shared historical goal**: **replacing the 1970s Unix foundations inherited by Linux** with a modern, secure, scalable, actor-based architecture.
+
+> **Companion project:** [**FenySoft/NeuronOS**](https://github.com/FenySoft/NeuronOS) — the capability-based actor runtime co-designed with the CFPU. Runs on any .NET host today; targets CFPU silicon tomorrow. Apache-2.0.
 
 **Track 1 -- "Cognitive Fabric"**: a programmable cognitive substrate for AI researchers, Akka.NET / Orleans actor systems, spiking neural network simulation, multi-agent simulation, and IoT edge gateways. **Long-term vision.**
 
@@ -101,7 +103,7 @@ See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 - [docs/architecture-en.md](docs/architecture-en.md) -- CLI-CPU microarchitecture, Cognitive Fabric positioning, prior art analysis (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogeneous Nano + Rich multi-core
 - [docs/ISA-CIL-T0-en.md](docs/ISA-CIL-T0-en.md) -- CIL-T0 subset specification (48 opcodes), mailbox MMIO interface
 - [docs/security-en.md](docs/security-en.md) -- Threat model, architectural security guarantees, attack immunity table, formal verification plan, certification paths (IEC 61508, ISO 26262, DO-178C, IEC 62304)
-- [docs/neuron-os-en.md](docs/neuron-os-en.md) -- Neuron OS vision: an actor-based operating system for CLI-CPU, "Erlang in silicon"
+- [docs/neuron-os-en.md](docs/neuron-os-en.md) -- Neuron OS vision: an actor-based operating system for CLI-CPU, "Erlang in silicon". **Implementation:** [github.com/FenySoft/NeuronOS](https://github.com/FenySoft/NeuronOS)
 - [docs/secure-element-en.md](docs/secure-element-en.md) -- Secure Edition: JavaCard / TEE / Secure Element market, detailed TROPIC01 analysis, multi-SE hardware isolation, F6.5 parallel tape-out plan
 - [docs/faq-en.md](docs/faq-en.md) -- FAQ: conceptual anchors for new readers (CLI vs CIL, CPU comparison, scheduling costs)
 - [docs/vision-en.md](docs/vision-en.md) -- The shared-nothing future: OS, GUI, database, networking, and programming model reimagined
