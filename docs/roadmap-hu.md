@@ -98,6 +98,16 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - `rtl/tb/` — cocotb testbench
 - `rtl/scripts/` — szintézis és szimuláció scriptek (OpenLane2 kompatibilis)
 
+**Alszakaszok:**
+- F2.1 ALU — 32-bit egész ALU (Verilog + cocotb) — **KÉSZ**
+- F2.2a Decoder — hossz dekóder + opkód dekód (jelenlegi sprint)
+- F2.2b Decoder — microcode ROM komplex opkódokhoz (következő sprint)
+- F2.3 Stack cache — 4×32-bit TOS + spill logika
+- F2.4 QSPI vezérlő — kód + adat fetch
+- F2.5 Golden vector harness — cocotb vs C# szimulátor
+- F2.6 Yosys szintézis — Sky130 PDK, terület becslés
+- F2.7 FPGA validáció — egymagos Nano core, valós hardveren (A7-Lite)
+
 **Kész kritérium:**
 - Verilator szimuláció minden F1 teszten zöld
 - Yosys szintézis Sky130 PDK-ra sikeres

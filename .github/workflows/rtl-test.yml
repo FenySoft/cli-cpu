@@ -1,0 +1,39 @@
+name: RTL Test (Verilator + cocotb)
+
+# hu: Triggerek — ugyanazok mint build-test.yml: push és PR main branch-re
+# en: Triggers — same as build-test.yml: push and PR to main branch
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  rtl-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # hu: Verilator telepítése apt-ból
+      # en: Install Verilator from apt
+      - name: Install Verilator
+        run: sudo apt-get update && sudo apt-get install -y verilator
+
+      # hu: cocotb és függőségeinek telepítése pip-pel
+      # en: Install cocotb and dependencies via pip
+      - name: Install cocotb
+        run: pip3 install cocotb
+
+      # hu: ALU tesztek futtatása
+      # en: Run ALU tests
+      - name: Run ALU tests
+        working-directory: rtl/tb
+        run: make test_alu
+
+      # hu: Decoder tesztek futtatása
+      # en: Run Decoder tests
+      - name: Run Decoder tests
+        working-directory: rtl/tb
+        run: make test_decoder

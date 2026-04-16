@@ -98,6 +98,16 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - `rtl/tb/` — cocotb testbench
 - `rtl/scripts/` — synthesis and simulation scripts (OpenLane2 compatible)
 
+**Subsections:**
+- F2.1 ALU — 32-bit integer ALU (Verilog + cocotb) — **DONE**
+- F2.2a Decoder — length decoder + opcode decode (current sprint)
+- F2.2b Decoder — microcode ROM for complex opcodes (next sprint)
+- F2.3 Stack cache — 4×32-bit TOS + spill logic
+- F2.4 QSPI controller — code + data fetch
+- F2.5 Golden vector harness — cocotb vs C# simulator
+- F2.6 Yosys synthesis — Sky130 PDK, area estimate
+- F2.7 FPGA validation — single Nano core on real hardware (A7-Lite)
+
 **Done criteria:**
 - Verilator simulation passes on all F1 tests
 - Yosys synthesis to Sky130 PDK succeeds

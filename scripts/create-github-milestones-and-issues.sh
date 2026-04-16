@@ -40,10 +40,15 @@ gh issue create -R $REPO -t "F2.1: ALU module (32-bit integer, Verilog + cocotb)
   -m "$F2_NUM" -l "F2-RTL"
 echo "✓ F2.1"
 
-gh issue create -R $REPO -t "F2.2: Decoder — length decoder + hardwired/microcode dispatch" \
-  -b "CIL variable-length instruction decoder. Hardwired path for simple opcodes, microcode ROM for complex ones (mul, div, call, ret). Match TDecoder behavior." \
+gh issue create -R $REPO -t "F2.2a: Decoder — length decoder + opcode decode (hardwired)" \
+  -b "CIL variable-length instruction length decoder and opcode decoder. Hardwired path: decode opcode byte, determine instruction length (1–5 bytes), extract immediate operand. Cocotb testbench. Match TDecoder behavior for all 48 CIL-T0 opcodes." \
   -m "$F2_NUM" -l "F2-RTL"
-echo "✓ F2.2"
+echo "✓ F2.2a"
+
+gh issue create -R $REPO -t "F2.2b: Decoder — microcode ROM for complex opcodes" \
+  -b "Microcode ROM dispatch for multi-cycle opcodes (mul, div, call, ret). Sequencer FSM that expands a single opcode into a sequence of micro-operations. Depends on F2.2a (basic decoder) and F2.1 (ALU). Cocotb testbench matching C# TExecutor behavior." \
+  -m "$F2_NUM" -l "F2-RTL"
+echo "✓ F2.2b"
 
 gh issue create -R $REPO -t "F2.3: Stack cache (4×32-bit TOS + spill logic)" \
   -b "Top-of-stack cache: 4 registers holding the top stack elements. Automatic spill/fill to SRAM/QSPI when cache overflows/underflows. Match TCpu stack semantics." \
