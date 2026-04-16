@@ -1,8 +1,10 @@
-# CLI-CPU — Vízió: A Shared-Nothing Jövő
+# Cognitive Fabric — Vízió: A Shared-Nothing Jövő
 
 > English version: [vision-en.md](vision-en.md)
 
-Ez a dokumentum azt vizsgálja, mi történik, ha a CLI-CPU hardvermodelljéhez **az egész szoftver stack-et újratervezzük** — operációs rendszer, GUI, adatbázis, hálózat, programozási modell. Nem a mai szoftverrel mérjük a hardvert, hanem a hardverhez tervezzük a szoftvert.
+Ez a dokumentum azt vizsgálja, mi történik, ha a **Cognitive Fabric Processing Unit (CFPU)** hardvermodelljéhez **az egész szoftver stack-et újratervezzük** — operációs rendszer, GUI, adatbázis, hálózat, programozási modell. Nem a mai szoftverrel mérjük a hardvert, hanem a hardverhez tervezzük a szoftvert.
+
+> *A CFPU a Cognitive Fabric architektúra hivatalos megnevezése. A **CLI-CPU** ennek első nyílt forráskódú referencia implementációja — részletek: [FAQ #1](faq-hu.md#1-mi-a-cfpu-és-mi-a-kapcsolata-a-cli-cpu-val).*
 
 > **Joe Armstrong, az Erlang atyja, 2014-ben:**
 > *„A jelenlegi szoftver-rendszerek alapjaiban rossz modellekre épülnek. Szükség van egy olyan hardverre, ahol minden core egy aktor."*

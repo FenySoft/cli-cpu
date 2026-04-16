@@ -29,7 +29,9 @@ dotnet run --project src/CilCpu.Sim.Runner -- run fibonacci.t0 --args 20
 
 ## Mi ez?
 
-A CLI-CPU egy nyílt forráskódú processzor-projekt, amely **a .NET CIL bájtkódot natívan, hardveresen futtatja**, fordítási lépés nélkül — és **sok kis egyszerű core-t** helyez egyetlen chipre, amelyek **üzenet-alapú hálózatként** működnek együtt. Minden core egy teljes CIL programot futtat saját lokális állapottal, és a core-ok kizárólag **mailbox FIFO-kon** keresztül beszélnek egymással — nincs shared memory, nincs cache koherencia, nincs lock contention.
+A **Cognitive Fabric Processing Unit (CFPU)** egy új kategóriájú processzor-egység: **sok kis, független CIL-natív core egyetlen chipen**, amelyek kizárólag **hardveres mailbox FIFO-kon** keresztül kommunikálnak, shared-nothing modellben. A *CPU / GPU / TPU / NPU* családot a **CFPU** egészíti ki mint az első **MIMD aktor-natív** feldolgozó egység — minden core tetszőleges CIL programot futtat hardveres izolációval.
+
+**CLI-CPU** a **CFPU referencia implementációja** — a nyílt forráskódú projekt, amely a CFPU architektúrát C# szimulátorban, majd RTL-ben, majd szilíciumban valósítja meg. A CLI-CPU **natívan, hardveresen futtatja a .NET CIL bájtkódot**, fordítási lépés nélkül. Minden core egy teljes CIL programot futtat saját lokális állapottal — nincs shared memory, nincs cache koherencia, nincs lock contention.
 
 A program választásától függően ugyanaz a hardver lehet:
 
@@ -69,11 +71,11 @@ A CLI-CPU + Neuron OS **három párhuzamos piaci narratívát** követ, ugyanazz
 
 Ugyanaz a chip-család, három különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Neuron OS lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`docs/neuron-os-hu.md`](docs/neuron-os-hu.md) „A Linux öröklött problémái és a Neuron OS válasza" szekciójában.
 
-## Heterogén multi-core: Nano + Rich
+## Heterogén multi-core: CFPU Nano + CFPU Rich
 
-Az F5 fázistól a CLI-CPU **heterogén multi-core** architektúrát használ, analóg módon az ARM big.LITTLE, Apple P-core + E-core, és Intel Alder Lake megközelítéseihez — csak a .NET világra alkalmazva:
+Az F5 fázistól a CFPU **heterogén multi-core** architektúrát használ, analóg módon az ARM big.LITTLE, Apple P-core + E-core, és Intel Alder Lake megközelítéseihez — csak a .NET világra alkalmazva:
 
-| | **Nano core** | **Rich core** |
+| | **CFPU Nano** | **CFPU Rich** |
 |-|---------------|---------------|
 | ISA | CIL-T0 (48 opkód, integer-only) | Teljes ECMA-335 CIL (~220 opkód) |
 | Méret | ~10k std cell | ~80k std cell |

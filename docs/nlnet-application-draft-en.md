@@ -3,11 +3,11 @@
 > **Deadline:** June 1, 2026, 12:00 CEST
 > **Form:** https://nlnet.nl/propose/
 > **Call:** NGI Zero Commons Fund (13th call)
-> **Status:** DRAFT — awaiting review
+> **Status:** SUBMITTED (v1.1 as filed). Documentation updated post-submission to introduce CFPU naming — see Changelog.
 
 > Magyar verzió: [nlnet-application-draft-hu.md](nlnet-application-draft-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 ---
 
@@ -17,7 +17,7 @@ NGI Zero Commons Fund
 
 ## Proposal Name
 
-**CLI-CPU: Open Source Cognitive Fabric Processor — Native CIL Execution on Libre Silicon**
+**CLI-CPU: Open Source Cognitive Fabric Processing Unit (CFPU) — Native CIL Execution on Libre Silicon**
 
 ## Website / Wiki
 
@@ -27,7 +27,7 @@ https://github.com/FenySoft/cli-cpu
 
 The project has already completed its reference implementation phase (F1.5): a fully tested C# simulator covering all 48 CIL-T0 opcodes (250+ passing xUnit tests), a Roslyn-based CIL-T0 linker, and a CLI runner — all developed with strict TDD methodology. **This grant funds the transition from proven software simulation to physical hardware:** RTL, first silicon (Tiny Tapeout), and multi-core FPGA verification.
 
-CLI-CPU is an open-source processor architecture that executes .NET Common Intermediate Language (CIL) bytecode natively in hardware — without JIT compilation, AOT translation, or interpreter layers. Instead of competing on single-core speed (a battle lost by picoJava and Jazelle decades ago), CLI-CPU places many small, independent CIL-native cores on a single chip, communicating exclusively through hardware mailbox FIFOs in a shared-nothing model. This "Cognitive Fabric" architecture eliminates cache coherency overhead entirely, enabling linear scaling with core count.
+CLI-CPU is the open-source reference implementation of the **Cognitive Fabric Processing Unit (CFPU)** — a new category of processing unit that executes .NET Common Intermediate Language (CIL) bytecode natively in hardware, without JIT compilation, AOT translation, or interpreter layers. Alongside the familiar *CPU / GPU / TPU / NPU* family, the CFPU is the first **MIMD actor-native** processing unit: many small, independent CIL-native cores on a single chip, communicating exclusively through hardware mailbox FIFOs in a shared-nothing model. Instead of competing on single-core speed (a battle lost by picoJava and Jazelle decades ago), the CFPU architecture eliminates cache coherency overhead entirely, enabling linear scaling with core count.
 
 **The project targets three outcomes within this grant:**
 
@@ -165,5 +165,6 @@ PDF attachment:
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 1.1 | 2026-04-14 | Timeline 18 months, €35K with all 5 milestones, hourly rate, test count 250+, RTL experience, sustainability plan, Why now, ECMA-335 independence, concrete use case, Plan B for TT |
+| 1.2 | 2026-04-16 | **Post-submission doc update only** — introduced "Cognitive Fabric Processing Unit (CFPU)" naming in title and abstract. The submitted application (v1.1) did not use the CFPU abbreviation. Technical content, budget, milestones unchanged. |
+| 1.1 | 2026-04-14 | **SUBMITTED version.** Timeline 18 months, €35K with all 5 milestones, hourly rate, test count 250+, RTL experience, sustainability plan, Why now, ECMA-335 independence, concrete use case, Plan B for TT |
 | 1.0 | 2026-04-14 | Initial version |

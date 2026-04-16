@@ -10,20 +10,80 @@ A FAQ célja, hogy egy **új olvasó** (akár mérnök, akár befektető, akár 
 
 ## Tartalom
 
-- [1. CLI vagy CIL — mi a helyes szóhasználat?](#1-cli-vagy-cil--mi-a-helyes-szóhasználat)
-- [2. A CLI-t meg lehet valósítani hardveren?](#2-a-cli-t-meg-lehet-valósítani-hardveren)
-- [3. Egy fizikai core több logikai aktort kiszolgálhat?](#3-egy-fizikai-core-több-logikai-aktort-kiszolgálhat)
-- [4. Miért kötelező az F6-FPGA verifikáció a silicon tape-out előtt?](#4-miért-kötelező-az-f6-fpga-verifikáció-a-silicon-tape-out-előtt)
-- [5. Hogyan érik el a modern CPU-k a magas teljesítményt?](#5-hogyan-érik-el-a-modern-cpu-k-a-magas-teljesítményt)
-- [6. Mi a különbség a RISC-V, ARM, x86/x64 és CLI-CPU között?](#6-mi-a-különbség-a-risc-v-arm-x86x64-és-cli-cpu-között)
-- [7. Hogyan alakulnak a feladat-ütemezési költségek?](#7-hogyan-alakulnak-a-feladat-ütemezési-költségek)
-- [8. Hány CLI-CPU core fér egy AMD Zen 4 chip területére?](#8-hány-cli-cpu-core-fér-egy-amd-zen-4-chip-területére)
-- [9. Mennyivel kevesebbet fogyaszt a CLI-CPU?](#9-mennyivel-kevesebbet-fogyaszt-a-cli-cpu)
-- [10. Miért nem emeljük az órajelet magasabbra?](#10-miért-nem-emeljük-az-órajelet-magasabbra)
+- [1. Mi a CFPU és mi a kapcsolata a CLI-CPU-val?](#1-mi-a-cfpu-és-mi-a-kapcsolata-a-cli-cpu-val)
+- [2. CLI vagy CIL — mi a helyes szóhasználat?](#2-cli-vagy-cil--mi-a-helyes-szóhasználat)
+- [3. A CLI-t meg lehet valósítani hardveren?](#3-a-cli-t-meg-lehet-valósítani-hardveren)
+- [4. Egy fizikai core több logikai aktort kiszolgálhat?](#4-egy-fizikai-core-több-logikai-aktort-kiszolgálhat)
+- [5. Miért kötelező az F6-FPGA verifikáció a silicon tape-out előtt?](#5-miért-kötelező-az-f6-fpga-verifikáció-a-silicon-tape-out-előtt)
+- [6. Hogyan érik el a modern CPU-k a magas teljesítményt?](#6-hogyan-érik-el-a-modern-cpu-k-a-magas-teljesítményt)
+- [7. Mi a különbség a RISC-V, ARM, x86/x64 és CLI-CPU között?](#7-mi-a-különbség-a-risc-v-arm-x86x64-és-cli-cpu-között)
+- [8. Hogyan alakulnak a feladat-ütemezési költségek?](#8-hogyan-alakulnak-a-feladat-ütemezési-költségek)
+- [9. Hány CLI-CPU core fér egy AMD Zen 4 chip területére?](#9-hány-cli-cpu-core-fér-egy-amd-zen-4-chip-területére)
+- [10. Mennyivel kevesebbet fogyaszt a CLI-CPU?](#10-mennyivel-kevesebbet-fogyaszt-a-cli-cpu)
+- [11. Miért nem emeljük az órajelet magasabbra?](#11-miért-nem-emeljük-az-órajelet-magasabbra)
 
 ---
 
-## 1. CLI vagy CIL — mi a helyes szóhasználat?
+## 1. Mi a CFPU és mi a kapcsolata a CLI-CPU-val?
+
+**Rövid válasz:** A **CFPU** a feldolgozó egység típusa (kategória). A **CLI-CPU** a CFPU első nyílt forráskódú implementációja (projekt).
+
+### Elnevezési hierarchia
+
+```
+Cognitive Fabric       ← architektúra család / marketing narratíva
+  └─ CFPU              ← a feldolgozó egység kategóriája
+       ├─ CFPU Nano    ← integer-only, kicsi, worker
+       └─ CFPU Rich    ← teljes CIL, GC, FPU, supervisor
+  └─ CLI-CPU           ← a CFPU nyílt forráskódú referencia implementációja (ez a projekt)
+       ├─ GitHub: FenySoft/CLI-CPU
+       ├─ C# szimulátor: CilCpu.Sim
+       └─ ISA spec: CIL-T0
+```
+
+### Analógia
+
+| Kategória (mi a *típus*) | Implementáció (mi a *termék*) |
+|--------------------------|--------------------------------|
+| **CPU** (Central Processing Unit) | x86, ARM, RISC-V, POWER, MIPS |
+| **GPU** (Graphics Processing Unit) | NVIDIA RTX, AMD Radeon, Intel Arc |
+| **TPU** (Tensor Processing Unit) | Google TPU v5, Groq LPU |
+| **NPU** (Neural Processing Unit) | Apple Neural Engine, Qualcomm Hexagon |
+| **CFPU** (Cognitive Fabric Processing Unit) | **CLI-CPU** (első nyílt forráskódú) |
+
+Ahogy a „CPU" nem egy konkrét termék, hanem egy **kategória**, úgy a „CFPU" is: sok kis, független CIL-natív core egyetlen chipen, shared-nothing mailbox kommunikációval. A CLI-CPU az **első** ilyen processzor, de nem kell az utolsónak lennie — a CFPU kategória nyílt, más implementációk is érkezhetnek.
+
+### Miért a CFPU a \*PU családba illik
+
+A CFPU **MIMD aktor-natív** — minden core **más-más** CIL programot futtat saját állapottal. Ez különbözteti meg a többi PU-tól:
+
+| Típus | Paradigma | Példa workload |
+|-------|-----------|----------------|
+| CPU | SISD / MIMD (shared memory) | általános célú |
+| GPU | SIMD (data parallel) | mátrix, shader |
+| TPU | Systolic array | neurális inference (rögzített) |
+| NPU | Fixed neuron model | neurális inference (edge) |
+| **CFPU** | **MIMD (shared-nothing, actor)** | **aktor rendszer, SNN, multi-agent, IoT edge** |
+
+### Mikor melyiket használjuk
+
+- **CFPU** — ha a **chip kategóriájáról**, architektúráról, a processzor típusáról beszélünk
+  - *„A CFPU egy új feldolgozó egység kategória"*
+  - *„CFPU Nano vs. CFPU Rich heterogén multi-core"*
+- **CLI-CPU** — ha a **projektről**, a repóról, a konkrét implementációról beszélünk
+  - *„A CLI-CPU projekt állapota F1.5 KÉSZ"*
+  - *„Klónozd: `git clone https://github.com/FenySoft/CLI-CPU`"*
+  - *„A CLI-CPU referencia szimulátor 250+ teszttel"*
+- **Cognitive Fabric** — ha az **architektúra család / marketing narratíváról** beszélünk
+  - *„A Cognitive Fabric + Neuron OS a Linux utódja"*
+
+### Miért nem „CFP"
+
+Mert a **CFP** rövidítés erősen foglalt a hardveres iparban (*C Form-factor Pluggable* — 100G/400G optikai transceiver szabvány, MSA, adatközpontok, telekom). A **CFPU** a végén a **\*PU** utótaggal **egyértelműen** feldolgozó egység, és nincs ipari ütközés.
+
+---
+
+## 2. CLI vagy CIL — mi a helyes szóhasználat?
 
 **Mindkettő helyes, de más dolgot jelentenek.** A két rövidítés testvér, nem szinonima.
 
@@ -71,7 +131,7 @@ Ezek **nem szinonimák**. Ha felcseréljük őket, a szöveg értelme megváltoz
 
 ---
 
-## 2. A CLI-t meg lehet valósítani hardveren?
+## 3. A CLI-t meg lehet valósítani hardveren?
 
 **Rövid válasz:** a CLI **~95%-a hardverre + mikrokódra képezhető**. A maradék 5% (dynamic codegen, P/Invoke, reflection.emit) **szándékosan kimarad**, és ez a kimaradás **erény, nem hiány** — formális verifikálhatóságot, silicon-grade security-t, és ultra-alacsony fogyasztást ad cserébe.
 
@@ -243,7 +303,7 @@ A `docs/architecture-hu.md` „Stratégiai pozicionálás: Cognitive Fabric" sze
 
 ---
 
-## 3. Egy fizikai core több logikai aktort kiszolgálhat?
+## 4. Egy fizikai core több logikai aktort kiszolgálhat?
 
 **Rövid válasz: igen, és ez nem opcionális optimalizáció, hanem a Neuron OS vízió alapvető része.** A fizikai core egy hardver erőforrás, a logikai aktor egy futtatási egység — a kettő aránya **dizájn-döntés**, nem fix 1:1 leképzés.
 
@@ -399,7 +459,7 @@ Ez pont az, ami **megkülönbözteti a CLI-CPU-t** a hagyományos neuromorphic c
 
 ---
 
-## 4. Miért kötelező az F6-FPGA verifikáció a silicon tape-out előtt?
+## 5. Miért kötelező az F6-FPGA verifikáció a silicon tape-out előtt?
 
 **Rövid válasz:** mert **nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n**. 3 darab MicroPhase A7-Lite XC7A200T (134K LUT/db, Gigabit Ethernet hálóban, ~€960 összesen) elegendő a heterogén Cognitive Fabric (2 Rich + 26 Nano elosztva) teljes verifikálásához — és **reálisabb teszt**, mert a valódi Cognitive Fabric is multi-chip. Az F6-FPGA **kötelező előfeltétele** az F6-Silicon-nak.
 
@@ -464,7 +524,7 @@ A silicon target az FPGA multi-board hálón verifikált konfigurációra épül
 
 ---
 
-## 5. Hogyan érik el a modern CPU-k a magas teljesítményt?
+## 6. Hogyan érik el a modern CPU-k a magas teljesítményt?
 
 **Rövid válasz:** Három egymásra épülő technikával: **pipeline** (átlapolás), **szuperszkaláris végrehajtás** (több pipeline párhuzamosan), és **out-of-order végrehajtás** (sorrenden kívüli feldolgozás). A CLI-CPU tudatosan egyiket sem használja — más úton keres teljesítményt.
 
@@ -599,7 +659,7 @@ A **változó utasításhossz** drága: a pre-decode-nak ki kell találnia, hol 
 
 ---
 
-## 6. Mi a különbség a RISC-V, ARM, x86/x64 és CLI-CPU között?
+## 7. Mi a különbség a RISC-V, ARM, x86/x64 és CLI-CPU között?
 
 **Rövid válasz:** Mindegyik más problémát old meg, és más kompromisszumot köt. Az x86 a kompatibilitásért, az ARM az energia-hatékonyságért, a RISC-V a nyíltságért, a CLI-CPU a **sok mag közötti üzenetküldés hatékonyságáért** optimalizál.
 
@@ -722,7 +782,7 @@ protokoll kell → DRÁGA            → OLCSÓ, lineárisan skálázik
 
 ---
 
-## 7. Hogyan alakulnak a feladat-ütemezési költségek?
+## 8. Hogyan alakulnak a feladat-ütemezési költségek?
 
 **Rövid válasz:** A kontextusváltás a CLI-CPU-n **3-4 nagyságrenddel** (1,000-20,000×) kevesebb órajelciklust igényel, mint a hagyományos architektúrákon — és ez **az architektúra tulajdonsága**, nem a gyártási technológiáé. Az összehasonlítás órajelciklusban történik, hogy a technológia-különbség ne torzítson.
 
@@ -934,7 +994,7 @@ Single-thread-ben a CLI-CPU **~20× lassabb** — de ez nem a versenyterep, amir
 
 ---
 
-## 8. Hány CLI-CPU core fér egy AMD Zen 4 chip területére?
+## 9. Hány CLI-CPU core fér egy AMD Zen 4 chip területére?
 
 **Rövid válasz:** Egy 32-core-os AMD EPYC chip ~288 mm² számítási területén **~2,225 CLI-CPU Fat Rich core** fér el — **~70× több**, azonos funkcionalitással (teljes CIL, FPU, GC, kivételkezelés). Az aggregált throughput párhuzamos workload-on **~8-11× magasabb**.
 
@@ -992,7 +1052,7 @@ Ugyanaz a chip, **a workload-hoz igazított arányban**.
 
 ---
 
-## 9. Mennyivel kevesebbet fogyaszt a CLI-CPU?
+## 10. Mennyivel kevesebbet fogyaszt a CLI-CPU?
 
 **Rövid válasz:** Csúcsterhelésen **~2× kevesebbet**, szerver workload-on (ahol a core-ok többsége I/O-ra vár) **~8-15× kevesebbet**. A megtakarítás fő forrása nem a tranzisztor szám (az **közel azonos** azonos chipterületen), hanem az **alacsonyabb activity factor** és a **hardveres sleep/wake**.
 
@@ -1071,7 +1131,7 @@ CLI-CPU (szerver, 99% I/O wait):
 
 ---
 
-## 10. Miért nem emeljük az órajelet magasabbra?
+## 11. Miért nem emeljük az órajelet magasabbra?
 
 **Rövid válasz:** Mert **két core fele órajellel hatékonyabb**, mint egy core dupla órajellel. Az órajel duplázása a fogyasztást ~4×-esére emeli (V² hatás), míg a core szám duplázása **lineárisan** skálázik. A CLI-CPU filozófiája: ne egy core-t gyorsíts, hanem **rakj be többet**.
 

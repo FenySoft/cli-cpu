@@ -3,12 +3,12 @@
 > **Deadline:** 2026. június 1., 12:00 CEST
 > **Form:** https://nlnet.nl/propose/
 > **Kiírás:** NGI Zero Commons Fund (13. kör)
-> **Státusz:** VÁZLAT — felülvizsgálatra vár
-> **Megjegyzés:** A pályázat **angolul kerül beadásra** (NLnet követelmény). Ez a magyar változat a te tájékoztatásodra készült — hogy tudd, mit mond az angol szöveg, és véleményezhesd mielőtt beadjuk. A beadandó angol verzió: `nlnet-application-draft-en.md`.
+> **Státusz:** BEADVA (v1.1-es verzió ahogy benyújtva). A dokumentáció beadás után frissítve a CFPU elnevezéssel — lásd Changelog.
+> **Megjegyzés:** A pályázat **angolul került beadásra** (NLnet követelmény). Ez a magyar változat tájékoztató jellegű — bemutatja, mit mondott az angol szöveg. A beadott angol verzió: `nlnet-application-draft-en.md`.
 
 > English version: [nlnet-application-draft-en.md](nlnet-application-draft-en.md)
 
-> Version: 1.1
+> Version: 1.2
 
 ---
 
@@ -18,7 +18,7 @@ NGI Zero Commons Fund
 
 ## Pályázat neve
 
-**CLI-CPU: Nyílt forráskódú Cognitive Fabric processzor — natív CIL végrehajtás libre szilíciumon**
+**CLI-CPU: Nyílt forráskódú Cognitive Fabric Processing Unit (CFPU) — natív CIL végrehajtás libre szilíciumon**
 
 ## Weboldal / Wiki
 
@@ -30,7 +30,7 @@ https://github.com/FenySoft/cli-cpu
 
 A projekt referencia implementációs fázisa (F1.5) **kész és tesztelve van**: a C# szimulátor lefedi mind a 48 CIL-T0 opkódot (**250+ zöld xUnit teszt**), a Roslyn-alapú CIL-T0 linker működik (C# forráskód → .dll → CIL-T0 bináris), és a CLI futtatóeszköz (`run` / `link` parancsok) kész. Minden TDD módszertannal fejlesztve, Devil's Advocate review-val. **Ez a pályázat a bizonyított szoftveres szimulációból a fizikai hardverbe való átmenetet finanszírozza.**
 
-A CLI-CPU egy nyílt forráskódú processzor-architektúra, amely a .NET Common Intermediate Language (CIL) bájtkódot **natívan, hardveresen hajtja végre** — JIT fordítás, AOT transzláció vagy interpreter nélkül. Ahelyett, hogy egymagos sebességben versenyezne (ezt a picoJava és a Jazelle már megpróbálta és megbukott), a CLI-CPU **sok kis, független CIL-natív core-t** helyez egyetlen chipre, amelyek kizárólag **hardveres mailbox FIFO-kon** kommunikálnak, shared-nothing modellben. Ez a „Cognitive Fabric" architektúra **teljesen kiküszöböli a cache koherencia overhead-et**, és a teljesítmény lineárisan skálázódik a core-számmal.
+A CLI-CPU a **Cognitive Fabric Processing Unit (CFPU)** nyílt forráskódú referencia implementációja — egy új kategóriájú feldolgozó egység, amely a .NET Common Intermediate Language (CIL) bájtkódot **natívan, hardveresen hajtja végre**, JIT fordítás, AOT transzláció vagy interpreter nélkül. A *CPU / GPU / TPU / NPU* család mellé a **CFPU** az első **MIMD aktor-natív** feldolgozó egység: sok kis, független CIL-natív core egyetlen chipen, kizárólag **hardveres mailbox FIFO-kon** kommunikálva, shared-nothing modellben. Ahelyett, hogy egymagos sebességben versenyezne (ezt a picoJava és a Jazelle már megpróbálta és megbukott), a CFPU architektúra **teljesen kiküszöböli a cache koherencia overhead-et**, és a teljesítmény lineárisan skálázódik a core-számmal.
 
 **A pályázat három konkrét eredményt céloz:**
 
@@ -217,5 +217,6 @@ A pályázathoz csatolandó PDF:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
-| 1.1 | 2026-04-14 | 18 hónapos timeline, €35K mind az 5 mérföldkővel, óradíj bontás, teszt szám 250+, RTL tapasztalat, sustainability plan, Why now, ECMA-335 függetlenség, konkrét use case, Plan B TT-hoz |
+| 1.2 | 2026-04-16 | **Csak dokumentáció frissítés a beadás után** — a „Cognitive Fabric Processing Unit (CFPU)" elnevezés bevezetése a címben és absztraktban. A beadott pályázat (v1.1) még nem használta a CFPU rövidítést. A technikai tartalom, a költségvetés és a mérföldkövek változatlanok. |
+| 1.1 | 2026-04-14 | **BEADOTT verzió.** 18 hónapos timeline, €35K mind az 5 mérföldkővel, óradíj bontás, teszt szám 250+, RTL tapasztalat, sustainability plan, Why now, ECMA-335 függetlenség, konkrét use case, Plan B TT-hoz |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

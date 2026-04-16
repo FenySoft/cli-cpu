@@ -29,7 +29,9 @@ dotnet run --project src/CilCpu.Sim.Runner -- run fibonacci.t0 --args 20
 
 ## What is this?
 
-CLI-CPU is an open-source processor project that **executes .NET CIL bytecode natively in hardware**, without any compilation step -- and places **many small, simple cores** on a single chip that operate together as a **message-based network**. Each core runs a complete CIL program with its own local state, and cores communicate exclusively through **mailbox FIFOs** -- no shared memory, no cache coherence, no lock contention.
+The **Cognitive Fabric Processing Unit (CFPU)** is a new category of processing unit: **many small, independent CIL-native cores on a single chip**, communicating exclusively through **hardware mailbox FIFOs** in a shared-nothing model. Alongside the *CPU / GPU / TPU / NPU* family, the **CFPU** is the first **MIMD actor-native** processing unit — where each core runs arbitrary CIL programs with hardware-enforced isolation.
+
+**CLI-CPU** is the **reference implementation of the CFPU** — the open-source project that realises the CFPU architecture in a C# simulator, then in RTL, then in silicon. CLI-CPU **executes .NET CIL bytecode natively in hardware**, without any compilation step. Each core runs a complete CIL program with its own local state -- no shared memory, no cache coherence, no lock contention.
 
 Depending on the program, the same hardware can serve as:
 
@@ -69,11 +71,11 @@ CLI-CPU + Neuron OS pursues **three parallel market narratives** built on the sa
 
 Same chip family, three different market segments -- **but the same historical goal**: just as x86 replaced the mainframe, mobile replaced the desktop, and the cloud replaced the on-prem data center, **the Cognitive Fabric + Neuron OS will be the next replacement cycle**, delivering the OS for the modern, AI-driven, safety-critical, massively distributed era. Details in the "The inherited problems of Linux and Neuron OS's answer" section of [`docs/neuron-os-en.md`](docs/neuron-os-en.md).
 
-## Heterogeneous multi-core: Nano + Rich
+## Heterogeneous multi-core: CFPU Nano + CFPU Rich
 
-Starting from phase F5, CLI-CPU employs a **heterogeneous multi-core** architecture, analogous to ARM big.LITTLE, Apple P-core + E-core, and Intel Alder Lake -- but applied to the .NET world:
+Starting from phase F5, the CFPU employs a **heterogeneous multi-core** architecture, analogous to ARM big.LITTLE, Apple P-core + E-core, and Intel Alder Lake -- but applied to the .NET world:
 
-| | **Nano core** | **Rich core** |
+| | **CFPU Nano** | **CFPU Rich** |
 |-|---------------|---------------|
 | ISA | CIL-T0 (48 opcodes, integer-only) | Full ECMA-335 CIL (~220 opcodes) |
 | Size | ~10k std cells | ~80k std cells |

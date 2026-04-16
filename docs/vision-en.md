@@ -1,8 +1,10 @@
-# CLI-CPU — Vision: The Shared-Nothing Future
+# Cognitive Fabric — Vision: The Shared-Nothing Future
 
 > Magyar verzio: [vision-hu.md](vision-hu.md)
 
-This document explores what happens when we **redesign the entire software stack** around the CLI-CPU hardware model — operating system, GUI, database, networking, programming model. Instead of measuring the hardware by today's software, we design the software to fit the hardware.
+This document explores what happens when we **redesign the entire software stack** around the **Cognitive Fabric Processing Unit (CFPU)** hardware model — operating system, GUI, database, networking, programming model. Instead of measuring the hardware by today's software, we design the software to fit the hardware.
+
+> *CFPU is the official name for the Cognitive Fabric architecture. **CLI-CPU** is its first open-source reference implementation — see [FAQ #1](faq-en.md#1-what-is-the-cfpu-and-how-does-it-relate-to-cli-cpu) for details.*
 
 > **Joe Armstrong, creator of Erlang, 2014:**
 > *"Current software systems are built on fundamentally flawed models. We need hardware where every core is an actor."*

@@ -10,17 +10,77 @@ The purpose of this FAQ is to help a **new reader** (whether engineer, investor,
 
 ## Contents
 
-- [1. CLI or CIL -- which is the correct term?](#1-cli-or-cil--which-is-the-correct-term)
-- [2. Can CLI be implemented in hardware?](#2-can-cli-be-implemented-in-hardware)
-- [3. Can a single physical core serve multiple logical actors?](#3-can-a-single-physical-core-serve-multiple-logical-actors)
-- [4. Why is F6-FPGA verification mandatory before silicon tape-out?](#4-why-is-f6-fpga-verification-mandatory-before-silicon-tape-out)
-- [5. How do modern CPUs achieve high performance?](#5-how-do-modern-cpus-achieve-high-performance)
-- [6. What are the differences between RISC-V, ARM, x86/x64, and CLI-CPU?](#6-what-are-the-differences-between-risc-v-arm-x86x64-and-cli-cpu)
-- [7. What are the task scheduling costs?](#7-what-are-the-task-scheduling-costs)
+- [1. What is the CFPU and how does it relate to CLI-CPU?](#1-what-is-the-cfpu-and-how-does-it-relate-to-cli-cpu)
+- [2. CLI or CIL -- which is the correct term?](#2-cli-or-cil--which-is-the-correct-term)
+- [3. Can CLI be implemented in hardware?](#3-can-cli-be-implemented-in-hardware)
+- [4. Can a single physical core serve multiple logical actors?](#4-can-a-single-physical-core-serve-multiple-logical-actors)
+- [5. Why is F6-FPGA verification mandatory before silicon tape-out?](#5-why-is-f6-fpga-verification-mandatory-before-silicon-tape-out)
+- [6. How do modern CPUs achieve high performance?](#6-how-do-modern-cpus-achieve-high-performance)
+- [7. What are the differences between RISC-V, ARM, x86/x64, and CLI-CPU?](#7-what-are-the-differences-between-risc-v-arm-x86x64-and-cli-cpu)
+- [8. What are the task scheduling costs?](#8-what-are-the-task-scheduling-costs)
 
 ---
 
-## 1. CLI or CIL -- which is the correct term?
+## 1. What is the CFPU and how does it relate to CLI-CPU?
+
+**Short answer:** The **CFPU** is the *category* of processing unit. The **CLI-CPU** is the first open-source *implementation* of the CFPU (this project).
+
+### Naming hierarchy
+
+```
+Cognitive Fabric       <- architecture family / marketing narrative
+  `- CFPU              <- the processing-unit category
+       |- CFPU Nano    <- integer-only, small, worker
+       `- CFPU Rich    <- full CIL, GC, FPU, supervisor
+  `- CLI-CPU           <- the open-source reference implementation of the CFPU (this project)
+       |- GitHub: FenySoft/CLI-CPU
+       |- C# simulator: CilCpu.Sim
+       `- ISA spec: CIL-T0
+```
+
+### Analogy
+
+| Category (the *type*) | Implementation (the *product*) |
+|-----------------------|--------------------------------|
+| **CPU** (Central Processing Unit) | x86, ARM, RISC-V, POWER, MIPS |
+| **GPU** (Graphics Processing Unit) | NVIDIA RTX, AMD Radeon, Intel Arc |
+| **TPU** (Tensor Processing Unit) | Google TPU v5, Groq LPU |
+| **NPU** (Neural Processing Unit) | Apple Neural Engine, Qualcomm Hexagon |
+| **CFPU** (Cognitive Fabric Processing Unit) | **CLI-CPU** (first open-source implementation) |
+
+Just as "CPU" is not a specific product but a **category**, so is "CFPU": many small, independent CIL-native cores on a single chip, communicating via shared-nothing mailboxes. CLI-CPU is the **first** such processor, but need not be the last -- the CFPU category is open, and other implementations may follow.
+
+### Why the CFPU fits the \*PU family
+
+The CFPU is **MIMD actor-native** -- every core runs a **different** CIL program with its own state. This distinguishes it from the other PUs:
+
+| Type | Paradigm | Example workload |
+|------|----------|------------------|
+| CPU | SISD / MIMD (shared memory) | general purpose |
+| GPU | SIMD (data parallel) | matrix, shader |
+| TPU | Systolic array | neural inference (fixed) |
+| NPU | Fixed neuron model | neural inference (edge) |
+| **CFPU** | **MIMD (shared-nothing, actor)** | **actor systems, SNN, multi-agent, IoT edge** |
+
+### When to use which term
+
+- **CFPU** -- when talking about the **chip category**, architecture, or processor type
+  - *"The CFPU is a new category of processing unit"*
+  - *"CFPU Nano vs. CFPU Rich heterogeneous multi-core"*
+- **CLI-CPU** -- when talking about the **project**, repo, or concrete implementation
+  - *"The CLI-CPU project status is F1.5 DONE"*
+  - *"Clone: `git clone https://github.com/FenySoft/CLI-CPU`"*
+  - *"The CLI-CPU reference simulator has 250+ tests"*
+- **Cognitive Fabric** -- when talking about the **architecture family / marketing narrative**
+  - *"Cognitive Fabric + Neuron OS is the successor to Linux"*
+
+### Why not "CFP"
+
+Because the **CFP** abbreviation is heavily reserved in the hardware industry (*C Form-factor Pluggable* -- 100G/400G optical transceiver MSA standard, data centers, telecom). The **CFPU** with the trailing **\*PU** suffix is **unambiguously** a processing unit, with no industry collision.
+
+---
+
+## 2. CLI or CIL -- which is the correct term?
 
 **Both are correct, but they mean different things.** The two acronyms are siblings, not synonyms.
 
@@ -68,7 +128,7 @@ These are **not synonyms**. Swapping them changes the meaning of a sentence, or 
 
 ---
 
-## 2. Can CLI be implemented in hardware?
+## 3. Can CLI be implemented in hardware?
 
 **Short answer:** roughly **~95% of CLI maps onto hardware + microcode**. The remaining 5% (dynamic codegen, P/Invoke, reflection.emit) is **intentionally excluded**, and this exclusion is a **virtue, not a deficiency** -- it yields formal verifiability, silicon-grade security, and ultra-low power consumption in return.
 
@@ -240,7 +300,7 @@ According to the "Strategic positioning: Cognitive Fabric" section in `docs/arch
 
 ---
 
-## 3. Can a single physical core serve multiple logical actors?
+## 4. Can a single physical core serve multiple logical actors?
 
 **Short answer: yes, and this is not an optional optimization but a fundamental part of the Neuron OS vision.** A physical core is a hardware resource, a logical actor is an execution unit -- the ratio between them is a **design decision**, not a fixed 1:1 mapping.
 
@@ -396,7 +456,7 @@ This is precisely what **distinguishes CLI-CPU** from traditional neuromorphic c
 
 ---
 
-## 4. Why is F6-FPGA verification mandatory before silicon tape-out?
+## 5. Why is F6-FPGA verification mandatory before silicon tape-out?
 
 **Short answer:** because **no silicon tape-out proceeds with a design that has not run on FPGA**. Three MicroPhase A7-Lite XC7A200T boards (134K LUT each, in a Gigabit Ethernet mesh, ~EUR960 total) are sufficient to fully verify the heterogeneous Cognitive Fabric (2 Rich + 26 Nano distributed) -- and it is a **more realistic test**, because the real Cognitive Fabric is also multi-chip. F6-FPGA is a **mandatory prerequisite** for F6-Silicon.
 
@@ -461,7 +521,7 @@ The silicon target builds on the configuration verified on the FPGA multi-board 
 
 ---
 
-## 5. How do modern CPUs achieve high performance?
+## 6. How do modern CPUs achieve high performance?
 
 **Short answer:** Through three layered techniques: **pipelining** (overlapping), **superscalar execution** (multiple pipelines in parallel), and **out-of-order execution** (processing instructions as operands become available). CLI-CPU deliberately uses none of these -- it pursues performance through a different path.
 
@@ -596,7 +656,7 @@ The **variable instruction length** is expensive: the pre-decoder must figure ou
 
 ---
 
-## 6. What are the differences between RISC-V, ARM, x86/x64, and CLI-CPU?
+## 7. What are the differences between RISC-V, ARM, x86/x64, and CLI-CPU?
 
 **Short answer:** Each solves a different problem and makes different trade-offs. x86 optimizes for compatibility, ARM for power efficiency, RISC-V for openness, and CLI-CPU for **efficient message passing between many cores**.
 
@@ -719,7 +779,7 @@ Any core sees any memory          Each core ONLY sends messages
 
 ---
 
-## 7. What are the task scheduling costs?
+## 8. What are the task scheduling costs?
 
 **Short answer:** Context switching on CLI-CPU requires **3-4 orders of magnitude** (1,000-20,000x) fewer clock cycles than on traditional architectures -- and this is **an architectural property**, not a manufacturing technology property. The comparison is in clock cycles to avoid distortion from technology differences.
 

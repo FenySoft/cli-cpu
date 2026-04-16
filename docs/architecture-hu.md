@@ -1,10 +1,12 @@
-# CLI-CPU — Architektúra Áttekintés
+# Cognitive Fabric Processing Unit (CFPU) — Architektúra Áttekintés
 
 > English version: [architecture-en.md](architecture-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
-Ez a dokumentum a CLI-CPU **mikroarchitektúráját** írja le magas szinten: a stack-gép modellt, a pipeline-t, a memória térképet, a dekódolási stratégiát, a GC és kivételkezelés hardveres támogatását, valamint az elődprojektek (picoJava, Jazelle, Transmeta) közül átvett technikákat.
+Ez a dokumentum a **Cognitive Fabric Processing Unit (CFPU)** **mikroarchitektúráját** írja le magas szinten: a stack-gép modellt, a pipeline-t, a memória térképet, a dekódolási stratégiát, a GC és kivételkezelés hardveres támogatását, valamint az elődprojektek (picoJava, Jazelle, Transmeta) közül átvett technikákat.
+
+> *A CFPU a processzor-egység hivatalos kategória-neve (mint a CPU/GPU/TPU/NPU). Ennek a nyílt forráskódú referencia implementációja a **CLI-CPU** projekt — a szimulátor, a linker, az ISA spec (CIL-T0) és minden build artefaktum a „CLI-CPU" nevet viseli. Részletek: [FAQ #1](faq-hu.md#1-mi-a-cfpu-és-mi-a-kapcsolata-a-cli-cpu-val).*
 
 > **Megjegyzés:** Ez az architektúra fokozatosan épül fel az F0–F7 fázisokban. Az itt leírt teljes funkciókészlet az **F6-Silicon „Cognitive Fabric One"** chipben készül el (ChipIgnite vagy IHP MPW, 6R+16N+1S, 15 mm²). A **Tiny Tapeout (F3)** csak az egymagos CIL-T0 subset-et valósítja meg, amit egy külön dokumentum (`ISA-CIL-T0-hu.md`) ír le. A „Cognitive Fabric One" szekció rögzíti a konkrét referencia chip víziót és az összehasonlítást a hagyományos multi-core CPU-kkal.
 

@@ -1,12 +1,14 @@
-# Neuron OS — a CLI-CPU aktor-alapú operációs rendszere
+# Neuron OS — a Cognitive Fabric Processing Unit (CFPU) aktor-alapú operációs rendszere
 
 > **Vízió dokumentum.** Ez az OS hosszú távú terve, amely F4 multi-core szimulátorral kezd kibontakozni, F5-F6 hardverrel éri el az első valós használhatóságot, és F7-ben lép ki kiforrott fejlesztői platform szinten.
 >
 > **A tartalom iránytű, nem végleges spec.** A részleteket menet közben, az F4–F6 tapasztalatok alapján finomítjuk. A cél itt az, hogy a tervezési döntések **irányt kapjanak**, és ne minden F4 iterációnál újra vitatkozzunk az alapelvekről.
 
+> *A Neuron OS a **CFPU** hardveres platformra készül — a CFPU referencia implementációja a **CLI-CPU** projekt. Részletek: [FAQ #1](faq-hu.md#1-mi-a-cfpu-és-mi-a-kapcsolata-a-cli-cpu-val).*
+
 > English version: [neuron-os-en.md](neuron-os-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 ## Filozófia — az Unix örökség leváltása, az Erlang vízió megvalósítása
 
