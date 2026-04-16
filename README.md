@@ -61,9 +61,9 @@ Details in the **"Strategic Positioning: Cognitive Fabric"** section of `docs/ar
 
 ## Three-track positioning -- long-term successor to Linux
 
-CLI-CPU + [**Neuron OS**](https://github.com/FenySoft/NeuronOS) pursues **three parallel market narratives** built on the same hardware foundation, all serving a **single shared historical goal**: **replacing the 1970s Unix foundations inherited by Linux** with a modern, secure, scalable, actor-based architecture.
+CLI-CPU + [**Neuron OS**](https://neuron-os.org) pursues **three parallel market narratives** built on the same hardware foundation, all serving a **single shared historical goal**: **replacing the 1970s Unix foundations inherited by Linux** with a modern, secure, scalable, actor-based architecture.
 
-> **Companion project:** [**FenySoft/NeuronOS**](https://github.com/FenySoft/NeuronOS) — the capability-based actor runtime co-designed with the CFPU. Runs on any .NET host today; targets CFPU silicon tomorrow. Apache-2.0.
+> **Companion project:** [**neuron-os.org**](https://neuron-os.org) ([source on GitHub](https://github.com/FenySoft/NeuronOS)) — the capability-based actor runtime co-designed with the CFPU. Runs on any .NET host today; targets CFPU silicon tomorrow. Apache-2.0.
 
 **Track 1 -- "Cognitive Fabric"**: a programmable cognitive substrate for AI researchers, Akka.NET / Orleans actor systems, spiking neural network simulation, multi-agent simulation, and IoT edge gateways. **Long-term vision.**
 

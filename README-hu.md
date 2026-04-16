@@ -61,9 +61,9 @@ Részletek a `docs/architecture.md` **„Stratégiai pozicionálás: Cognitive F
 
 ## Hárompályás pozicionálás — hosszú távon a Linux utódja
 
-A CLI-CPU + [**Neuron OS**](https://github.com/FenySoft/NeuronOS/blob/main/README-hu.md) **három párhuzamos piaci narratívát** követ, ugyanazzal a hardveres alappal, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
+A CLI-CPU + [**Neuron OS**](https://neuron-os.org/hu/) **három párhuzamos piaci narratívát** követ, ugyanazzal a hardveres alappal, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
 
-> **Testvérprojekt:** [**FenySoft/NeuronOS**](https://github.com/FenySoft/NeuronOS/blob/main/README-hu.md) — a capability-alapú aktor runtime, a CFPU-val együtt fejlesztve. Ma bármely .NET hoszton fut; holnap CFPU szilíciumra. Apache-2.0.
+> **Testvérprojekt:** [**neuron-os.org**](https://neuron-os.org/hu/) ([forrás a GitHubon](https://github.com/FenySoft/NeuronOS/blob/main/README-hu.md)) — a capability-alapú aktor runtime, a CFPU-val együtt fejlesztve. Ma bármely .NET hoszton fut; holnap CFPU szilíciumra. Apache-2.0.
 
 **Pálya 1 — „Cognitive Fabric"**: programozható kognitív szubsztrátum AI kutatóknak, Akka.NET / Orleans actor rendszereknek, spiking neural network szimulációnak, multi-agent szimulációnak, IoT edge gateway-nek. **Hosszú távú vízió.**
 
