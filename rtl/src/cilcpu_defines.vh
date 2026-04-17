@@ -171,4 +171,73 @@
 `define OP_FE_CLT       8'h04
 `define OP_FE_CLT_UN    8'h05
 
+// ============================================================
+// Microcode vezérlőszó mezőpozíciók (cilcpu_microcode.v)
+// Microcode control word field positions (cilcpu_microcode.v)
+// ============================================================
+
+// hu: A 32 bites vezérlőszó mezői fentről lefelé.
+// en: 32-bit control word fields, MSB to LSB.
+
+`define UC_DONE         31      // utolsó mikrolépés / last micro-step
+`define UC_TRAP         30      // trap generálás / raise trap
+`define UC_TRAP_CODE_HI 29      // trap_code[3:0] felső bit / trap code high
+`define UC_TRAP_CODE_LO 26      // trap_code[3:0] alsó bit / trap code low
+`define UC_STACK_POP_HI 25      // stack_pop[1:0] / pop count
+`define UC_STACK_POP_LO 24
+`define UC_STACK_PUSH   23      // push engedélyezés / push enable
+`define UC_PUSH_SRC_HI  22      // push_src[1:0] / push source
+`define UC_PUSH_SRC_LO  21
+`define UC_ALU_EN       20      // ALU engedélyezés / ALU enable
+`define UC_ALU_OP_HI    19      // alu_op[4:0] / ALU operation
+`define UC_ALU_OP_LO    15
+`define UC_SRAM_RD      14      // SRAM olvasás / SRAM read
+`define UC_SRAM_WR      13      // SRAM írás / SRAM write
+`define UC_ADDR_SRC_HI  12      // addr_src[1:0] / address source
+`define UC_ADDR_SRC_LO  11
+`define UC_PC_WR        10      // PC frissítés / PC write
+`define UC_PC_SRC_HI     9      // pc_src[1:0] / PC source
+`define UC_PC_SRC_LO     8
+`define UC_FRAME_PUSH    7      // call frame push
+`define UC_FRAME_POP     6      // call frame pop
+`define UC_HALT          5      // CPU megállítás / halt
+`define UC_COND_EN       4      // feltételes branch / conditional branch
+`define UC_COND_TYPE_HI  3      // cond_type[1:0] / condition type
+`define UC_COND_TYPE_LO  2
+`define UC_COND_SIGNED   1      // signed összehasonlítás / signed comparison
+`define UC_COND_POP      0      // feltételes pop (csak ha eval depth > 0) / conditional pop (only if eval depth > 0)
+
+// hu: push_src értékek — mi kerül a stack-re push-kor.
+// en: push_src values — what gets pushed onto the stack.
+`define PUSH_SRC_ALU    2'd0    // ALU eredmény / ALU result
+`define PUSH_SRC_IMM    2'd1    // immediát/operandus / immediate/operand
+`define PUSH_SRC_SRAM   2'd2    // SRAM olvasott adat / SRAM read data
+`define PUSH_SRC_TOS    2'd3    // TOS másolat (dup) / TOS copy (dup)
+
+// hu: pc_src értékek — honnan jön az új PC.
+// en: pc_src values — source of the new PC.
+`define PC_SRC_NEXT     2'd0    // PC + utasítás hossz / PC + instruction length
+`define PC_SRC_BRANCH   2'd1    // PC + len + offset (branch target)
+`define PC_SRC_CALL     2'd2    // operandus + header_size (call target)
+`define PC_SRC_RET      2'd3    // mentett return PC / saved return PC
+
+// hu: addr_src értékek — SRAM cím forrás.
+// en: addr_src values — SRAM address source.
+`define ADDR_SRC_ARG    2'd0    // argumentum slot / argument slot
+`define ADDR_SRC_LOCAL  2'd1    // lokális slot / local slot
+`define ADDR_SRC_FRAME  2'd2    // frame header / frame header
+`define ADDR_SRC_IND    2'd3    // indirekt (TOS cím) / indirect (TOS address)
+
+// hu: cond_type értékek — branch feltétel típus.
+// en: cond_type values — branch condition type.
+`define COND_EQ         2'd0    // == (beq / brfalse / ceq)
+`define COND_NE         2'd1    // != (bne.un / brtrue)
+`define COND_LT         2'd2    // < (blt)
+`define COND_GE         2'd3    // >= (bge)
+
+// hu: Segéd makrók a cond_type kódoláshoz — bgt = !(<=) = swap+lt,
+//     ble = !(>) = swap+ge. A swap logika a sequencer-ben van.
+// en: Helper notes for cond_type encoding — bgt = !(<=) = swap+lt,
+//     ble = !(>) = swap+ge. The swap logic lives in the sequencer.
+
 `endif

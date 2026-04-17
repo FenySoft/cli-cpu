@@ -965,6 +965,40 @@ public class TCliCpuLinkerTests
     }
 
     /// <summary>
+    /// hu: OpcodeLength egybyte-os opkódok, amelyek a linker integrációs
+    /// teszteken NEM fordulnak elő (dup, pop, ldind.i4, stind.i4, break).
+    /// <br />
+    /// en: OpcodeLength single-byte opcodes that do NOT appear in linker
+    /// integration tests (dup, pop, ldind.i4, stind.i4, break).
+    /// </summary>
+    [Theory]
+    [InlineData(0x25, 1)] // dup
+    [InlineData(0x26, 1)] // pop
+    [InlineData(0x4A, 1)] // ldind.i4
+    [InlineData(0x54, 1)] // stind.i4
+    [InlineData(0xDD, 1)] // break
+    [InlineData(0x65, 1)] // neg
+    [InlineData(0x00, 1)] // nop
+    [InlineData(0x14, 1)] // ldnull
+    [InlineData(0x0E, 2)] // ldarg.s
+    [InlineData(0x10, 2)] // starg.s
+    [InlineData(0x11, 2)] // ldloc.s
+    [InlineData(0x13, 2)] // stloc.s
+    [InlineData(0x1F, 2)] // ldc.i4.s
+    [InlineData(0x2B, 2)] // br.s
+    [InlineData(0x20, 5)] // ldc.i4
+    [InlineData(0x28, 5)] // call
+    public void OpcodeLength_AllCilT0Opcodes_ReturnsCorrectLength(byte AOpcode, int AExpectedLength)
+    {
+        var program = new byte[8];
+        program[0] = AOpcode;
+
+        var length = TCliCpuLinker.OpcodeLength(AOpcode, program, 0);
+
+        Assert.Equal(AExpectedLength, length);
+    }
+
+    /// <summary>
     /// hu: OpcodeLength érvényes 0xFE prefix opkódok (0x01-0x05) helyes
     /// hosszat adnak vissza (2 byte).
     /// <br />

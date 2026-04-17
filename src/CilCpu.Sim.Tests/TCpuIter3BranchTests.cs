@@ -646,4 +646,252 @@ public class TCpuIter3BranchTests
 
         Assert.Equal(2, cpu.ProgramCounter);
     }
+
+    // ------------------------------------------------------------------
+    // Boundary value tesztek
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: br.s maximális pozitív offset (+127): a 0. byte-ról ugrik a 129.
+    /// byte-ra (0+2+127=129), ahol ldc.i4.1 + ret vár. A közbülső nop-ok
+    /// átugrásra kerülnek.
+    /// <br />
+    /// en: br.s maximum positive offset (+127): jumps from byte 0 to byte
+    /// 129 (0+2+127=129), where ldc.i4.1 + ret awaits. Intermediate nops
+    /// are skipped.
+    /// </summary>
+    [Fact]
+    public void Execute_BrS_MaxPositiveOffset127_Valid()
+    {
+        var cpu = new TCpu();
+
+        // Total: 131 bytes
+        // [0]=0x2B, [1]=0x7F → br.s +127 → target = 0+2+127 = 129
+        // [2..128] = 127 × nop (0x00)
+        // [129]=0x17 (ldc.i4.1), [130]=0x2A (ret)
+        var program = new byte[131];
+        program[0] = 0x2B;       // br.s
+        program[1] = 0x7F;       // +127
+        // [2..128] already 0x00 (nop)
+        program[129] = 0x17;     // ldc.i4.1
+        program[130] = 0x2A;     // ret
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: br.s maximális negatív offset (-128): a program elején br.s +126
+    /// a 128. byte-ra ugrik, onnan br.s -128 visszaugrik a 2. byte-ra
+    /// (128+2-128=2), ahol ldc.i4.1 + ret vár.
+    /// <br />
+    /// en: br.s maximum negative offset (-128): first br.s +126 jumps to
+    /// byte 128, then br.s -128 jumps back to byte 2 (128+2-128=2), where
+    /// ldc.i4.1 + ret awaits.
+    /// </summary>
+    [Fact]
+    public void Execute_BrS_MaxNegativeOffsetMinus128_Valid()
+    {
+        var cpu = new TCpu();
+
+        // Total: 130 bytes
+        // [0]=0x2B, [1]=0x7E → br.s +126 → target = 0+2+126 = 128
+        // [2]=0x17 (ldc.i4.1), [3]=0x2A (ret)
+        // [4..127] = nops
+        // [128]=0x2B, [129]=0x80 → br.s -128 → target = 128+2-128 = 2
+        var program = new byte[130];
+        program[0] = 0x2B;       // br.s
+        program[1] = 0x7E;       // +126
+        program[2] = 0x17;       // ldc.i4.1
+        program[3] = 0x2A;       // ret
+        // [4..127] already 0x00 (nop)
+        program[128] = 0x2B;     // br.s
+        program[129] = 0x80;     // -128 (signed)
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: brfalse.s INT_MIN (0x80000000) TOS-szal → fall-through, mert
+    /// INT_MIN != 0. Az elágazás NEM következik be, ldc.i4.1 végrehajtódik.
+    /// <br />
+    /// en: brfalse.s with TOS = INT_MIN (0x80000000) → fall-through, because
+    /// INT_MIN != 0. The branch is NOT taken, ldc.i4.1 is executed.
+    /// </summary>
+    [Fact]
+    public void Execute_BrfalseS_IntMin_FallThrough()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
+            0x2C, 0x02,                     // 5: brfalse.s +2 → target 9 (not taken)
+            0x17,                           // 7: ldc.i4.1 (executed)
+            0x2A,                           // 8: ret
+            0x18,                           // 9: ldc.i4.2
+            0x2A                            // 10: ret
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: brfalse.s INT_MAX (0x7FFFFFFF) TOS-szal → fall-through, mert
+    /// INT_MAX != 0. Az elágazás NEM következik be, ldc.i4.1 végrehajtódik.
+    /// <br />
+    /// en: brfalse.s with TOS = INT_MAX (0x7FFFFFFF) → fall-through, because
+    /// INT_MAX != 0. The branch is NOT taken, ldc.i4.1 is executed.
+    /// </summary>
+    [Fact]
+    public void Execute_BrfalseS_IntMax_FallThrough()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // 0: ldc.i4 INT_MAX
+            0x2C, 0x02,                     // 5: brfalse.s +2 → target 9 (not taken)
+            0x17,                           // 7: ldc.i4.1 (executed)
+            0x2A,                           // 8: ret
+            0x18,                           // 9: ldc.i4.2
+            0x2A                            // 10: ret
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: brtrue.s INT_MIN (0x80000000) TOS-szal → branch, mert INT_MIN != 0.
+    /// Az elágazás bekövetkezik, a fall-through ldc.i4.1 átugrásra kerül.
+    /// <br />
+    /// en: brtrue.s with TOS = INT_MIN (0x80000000) → branch taken, because
+    /// INT_MIN != 0. The fall-through ldc.i4.1 is skipped.
+    /// </summary>
+    [Fact]
+    public void Execute_BrtrueS_IntMin_TakesBranch()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
+            0x2D, 0x02,                     // 5: brtrue.s +2 → target 9 (taken)
+            0x17,                           // 7: ldc.i4.1 (skipped)
+            0x2A,                           // 8: ret (skipped)
+            0x18,                           // 9: ldc.i4.2 (executed)
+            0x2A                            // 10: ret
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(2, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: brtrue.s -1 TOS-szal → branch, mert -1 != 0.
+    /// Az elágazás bekövetkezik, a fall-through ldc.i4.1 átugrásra kerül.
+    /// <br />
+    /// en: brtrue.s with TOS = -1 → branch taken, because -1 != 0.
+    /// The fall-through ldc.i4.1 is skipped.
+    /// </summary>
+    [Fact]
+    public void Execute_BrtrueS_MinusOne_TakesBranch()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x15,       // 0: ldc.i4.m1
+            0x2D, 0x01, // 1: brtrue.s +1 → target 4 (taken)
+            0x17        // 3: ldc.i4.1 (skipped)
+                        // 4: end
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(0, cpu.StackDepth);
+        Assert.Equal(4, cpu.ProgramCounter);
+    }
+
+    /// <summary>
+    /// hu: beq.s INT_MIN == INT_MIN → branch. Mindkét operandus INT_MIN,
+    /// az összehasonlítás igaz, az elágazás bekövetkezik.
+    /// <br />
+    /// en: beq.s INT_MIN == INT_MIN → branch taken. Both operands are
+    /// INT_MIN, the comparison is true, the branch is taken.
+    /// </summary>
+    [Fact]
+    public void Execute_BeqS_IntMinIntMin_TakesBranch()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
+            0x20, 0x00, 0x00, 0x00, 0x80, // 5: ldc.i4 INT_MIN
+            0x2E, 0x01,                     // 10: beq.s +1 → target 13 (taken)
+            0x17                            // 12: ldc.i4.1 (skipped)
+                                            // 13: end
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(0, cpu.StackDepth);
+        Assert.Equal(13, cpu.ProgramCounter);
+    }
+
+    /// <summary>
+    /// hu: bge.s INT_MIN >= INT_MAX → fall-through, mert INT_MIN &lt; INT_MAX.
+    /// Az elágazás NEM következik be, ldc.i4.1 végrehajtódik.
+    /// <br />
+    /// en: bge.s INT_MIN >= INT_MAX → fall-through, because INT_MIN &lt; INT_MAX.
+    /// The branch is NOT taken, ldc.i4.1 is executed.
+    /// </summary>
+    [Fact]
+    public void Execute_BgeS_IntMinIntMax_FallThrough()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // 5: ldc.i4 INT_MAX
+            0x2F, 0x01,                     // 10: bge.s +1 → target 13 (not taken)
+            0x17                            // 12: ldc.i4.1 (executed)
+                                            // 13: end
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.StackDepth);
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: blt.s INT_MIN &lt; INT_MAX → branch, mert INT_MIN kisebb, mint INT_MAX.
+    /// Az elágazás bekövetkezik, a fall-through ldc.i4.1 átugrásra kerül.
+    /// <br />
+    /// en: blt.s INT_MIN &lt; INT_MAX → branch taken, because INT_MIN is less
+    /// than INT_MAX. The fall-through ldc.i4.1 is skipped.
+    /// </summary>
+    [Fact]
+    public void Execute_BltS_IntMinIntMax_TakesBranch()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // 5: ldc.i4 INT_MAX
+            0x32, 0x01,                     // 10: blt.s +1 → target 13 (taken)
+            0x17                            // 12: ldc.i4.1 (skipped)
+                                            // 13: end
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(0, cpu.StackDepth);
+        Assert.Equal(13, cpu.ProgramCounter);
+    }
 }

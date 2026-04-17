@@ -924,4 +924,159 @@ public class TCpuTests
 
         Assert.Equal(TTrapReason.InvalidOpcode, trap.Reason);
     }
+
+    // ------------------------------------------------------------------
+    // hu: TDecoder.Decode lefedettség — negatív PC és túlcímzés
+    // en: TDecoder.Decode coverage — negative PC and out-of-range
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: TDecoder.Decode negatív PC esetén InvalidOpcode trap-et dob.
+    /// <br />
+    /// en: TDecoder.Decode raises InvalidOpcode trap for negative PC.
+    /// </summary>
+    [Fact]
+    public void Decode_NegativePc_TrapsInvalidOpcode()
+    {
+        var program = new byte[] { 0x00 };
+
+        var trap = Assert.Throws<TTrapException>(() =>
+            TDecoder.Decode(program, -1));
+
+        Assert.Equal(TTrapReason.InvalidOpcode, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: TDecoder.Decode program-végén túli PC esetén InvalidOpcode trap.
+    /// <br />
+    /// en: TDecoder.Decode raises InvalidOpcode trap for PC past program end.
+    /// </summary>
+    [Fact]
+    public void Decode_PcPastEnd_TrapsInvalidOpcode()
+    {
+        var program = new byte[] { 0x00 };
+
+        var trap = Assert.Throws<TTrapException>(() =>
+            TDecoder.Decode(program, 1));
+
+        Assert.Equal(TTrapReason.InvalidOpcode, trap.Reason);
+    }
+
+    // ------------------------------------------------------------------
+    // hu: Exhaustív érvénytelen opkód teszt — 0x00..0xFF teljes tartomány
+    // en: Exhaustive invalid opcode test — full 0x00..0xFF range
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: A CIL-T0 készletben NEM szereplő minden egybyte-os opkód (0x00..0xFF)
+    /// InvalidOpcode trap-et dob. A teszt kiszűri a 48 érvényes CIL-T0
+    /// opkód byte-értékeit és a 0xFE prefix-et, majd ellenőrzi, hogy a
+    /// maradék 207 byte-érték mindegyike trap-el.
+    /// <br />
+    /// en: Every single-byte opcode NOT in the CIL-T0 set (0x00..0xFF)
+    /// raises an InvalidOpcode trap. The test filters out the 48 valid
+    /// CIL-T0 opcode byte values and the 0xFE prefix, then verifies that
+    /// each of the remaining 207 byte values traps.
+    /// </summary>
+    [Fact]
+    public void Decode_AllInvalidSingleByteOpcodes_TrapInvalidOpcode()
+    {
+        // hu: Érvényes egybyte-os CIL-T0 opkód byte-értékek (TOpcode enum-ból).
+        //     A 0xFE prefix önmagában nem opkód, de a dekóder kezeli.
+        // en: Valid single-byte CIL-T0 opcode byte values (from TOpcode enum).
+        //     The 0xFE prefix is not an opcode itself, but the decoder handles it.
+        var validBytes = new HashSet<byte>
+        {
+            0x00,                                           // nop
+            0x02, 0x03, 0x04, 0x05,                         // ldarg.0..3
+            0x06, 0x07, 0x08, 0x09,                         // ldloc.0..3
+            0x0A, 0x0B, 0x0C, 0x0D,                         // stloc.0..3
+            0x0E,                                           // ldarg.s
+            0x10,                                           // starg.s
+            0x11,                                           // ldloc.s
+            0x13,                                           // stloc.s
+            0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A,       // ldnull, ldc.i4.m1..4
+            0x1B, 0x1C, 0x1D, 0x1E,                         // ldc.i4.5..8
+            0x1F,                                           // ldc.i4.s
+            0x20,                                           // ldc.i4
+            0x25,                                           // dup
+            0x26,                                           // pop
+            0x28,                                           // call
+            0x2A,                                           // ret
+            0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, // br.s..bne.un.s
+            0x4A,                                           // ldind.i4
+            0x54,                                           // stind.i4
+            0x58, 0x59, 0x5A, 0x5B, 0x5D,                   // add, sub, mul, div, rem
+            0x5F, 0x60, 0x61, 0x62, 0x63, 0x64,             // and, or, xor, shl, shr, shr.un
+            0x65, 0x66,                                     // neg, not
+            0xDD,                                           // break
+            0xFE,                                           // prefix (nem opkód, de nem invalid)
+        };
+
+        var failedBytes = new List<byte>();
+
+        for (var b = 0; b <= 0xFF; b++)
+        {
+            if (validBytes.Contains((byte)b))
+                continue;
+
+            // hu: 5 byte program: a tesztelt byte + 4 padding (a 5-byte opkódok miatt).
+            // en: 5-byte program: the tested byte + 4 padding (for 5-byte opcodes).
+            var program = new byte[] { (byte)b, 0x00, 0x00, 0x00, 0x00 };
+
+            try
+            {
+                TDecoder.Decode(program, 0);
+                failedBytes.Add((byte)b);
+            }
+            catch (TTrapException ex) when (ex.Reason == TTrapReason.InvalidOpcode)
+            {
+                // hu: Elvárt viselkedés — trap.
+                // en: Expected behavior — trap.
+            }
+        }
+
+        Assert.True(failedBytes.Count == 0,
+            $"The following byte values did NOT trap InvalidOpcode: " +
+            $"{string.Join(", ", failedBytes.Select(b => $"0x{b:X2}"))}");
+    }
+
+    /// <summary>
+    /// hu: A 0xFE prefix után minden érvénytelen második byte (0x00, 0x06..0xFF)
+    /// InvalidOpcode trap-et dob. Érvényes: 0x01 (ceq), 0x02 (cgt),
+    /// 0x03 (cgt.un), 0x04 (clt), 0x05 (clt.un).
+    /// <br />
+    /// en: After the 0xFE prefix, every invalid second byte (0x00, 0x06..0xFF)
+    /// raises an InvalidOpcode trap. Valid: 0x01 (ceq), 0x02 (cgt),
+    /// 0x03 (cgt.un), 0x04 (clt), 0x05 (clt.un).
+    /// </summary>
+    [Fact]
+    public void Decode_AllInvalidFePrefixedOpcodes_TrapInvalidOpcode()
+    {
+        var validSecondBytes = new HashSet<byte> { 0x01, 0x02, 0x03, 0x04, 0x05 };
+        var failedBytes = new List<byte>();
+
+        for (var b = 0; b <= 0xFF; b++)
+        {
+            if (validSecondBytes.Contains((byte)b))
+                continue;
+
+            var program = new byte[] { 0xFE, (byte)b };
+
+            try
+            {
+                TDecoder.Decode(program, 0);
+                failedBytes.Add((byte)b);
+            }
+            catch (TTrapException ex) when (ex.Reason == TTrapReason.InvalidOpcode)
+            {
+                // hu: Elvárt viselkedés — trap.
+                // en: Expected behavior — trap.
+            }
+        }
+
+        Assert.True(failedBytes.Count == 0,
+            $"The following 0xFE-prefixed second bytes did NOT trap InvalidOpcode: " +
+            $"{string.Join(", ", failedBytes.Select(b => $"0xFE 0x{b:X2}"))}");
+    }
 }

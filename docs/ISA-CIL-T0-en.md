@@ -2,7 +2,7 @@
 
 > Magyar verzió: [ISA-CIL-T0-hu.md](ISA-CIL-T0-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 This document specifies the **CIL-T0** subset, which is the first implemented instruction set of CLI-CPU, targeted for **Tiny Tapeout (F3)** fabrication.
 
@@ -186,99 +186,100 @@ The following 48 opcodes constitute the complete CIL-T0 instruction set. Every o
 - **Operand** — the immediate byte(s) following the opcode, if any.
 - **Length** — total opcode length in bytes.
 - **Stack** — stack effect: `(-> I4)` pushes one int32, `(I4, I4 -> I4)` pops two int32s and pushes one, `(I4 ->)` pops one to nothing, etc.
-- **Cycles** — estimated cycle count at 50 MHz, assuming cache hit.
-- **Dec.** — `HW` = hardwired, `uC` = microcoded.
+- **μstep** — microcode ROM step count (`o_nsteps`): how many ROM lookups the sequencer performs. This number is **deterministic and cocotb-tested** (`rtl/tb/test_microcode.py`).
+- **Cycles** — total execution time in clock cycles at 50 MHz, assuming TOS cache hit. Equals μstep + ALU latency + pipeline flush. `mul`/`div`/`rem` are longer due to iterative ALU. Branch opcodes add +1 pipeline flush cycle when taken.
+- **Dec.** — `HW` = hardwired (1 μstep), `uC` = microcoded (>1 μstep or ALU iteration).
 - **Trap** — possible hardware trap conditions.
 
 ### 1. Constant loading
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0x14` | `ldnull` | 1 | `(-> I4)` | 1 | HW | Push 0 (null as int). |
-| `0x15` | `ldc.i4.m1` | 1 | `(-> I4)` | 1 | HW | Push -1. |
-| `0x16` | `ldc.i4.0` | 1 | `(-> I4)` | 1 | HW | Push 0. |
-| `0x17` | `ldc.i4.1` | 1 | `(-> I4)` | 1 | HW | Push 1. |
-| `0x18` | `ldc.i4.2` | 1 | `(-> I4)` | 1 | HW | Push 2. |
-| `0x19` | `ldc.i4.3` | 1 | `(-> I4)` | 1 | HW | Push 3. |
-| `0x1A` | `ldc.i4.4` | 1 | `(-> I4)` | 1 | HW | Push 4. |
-| `0x1B` | `ldc.i4.5` | 1 | `(-> I4)` | 1 | HW | Push 5. |
-| `0x1C` | `ldc.i4.6` | 1 | `(-> I4)` | 1 | HW | Push 6. |
-| `0x1D` | `ldc.i4.7` | 1 | `(-> I4)` | 1 | HW | Push 7. |
-| `0x1E` | `ldc.i4.8` | 1 | `(-> I4)` | 1 | HW | Push 8. |
-| `0x1F` | `ldc.i4.s <sb>` | 2 | `(-> I4)` | 1 | HW | Push sign-extended 8-bit immediate. |
-| `0x20` | `ldc.i4 <i4>` | 5 | `(-> I4)` | 1 | HW | Push 32-bit immediate. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0x14` | `ldnull` | 1 | `(-> I4)` | 1 | 1 | HW | Push 0 (null as int). |
+| `0x15` | `ldc.i4.m1` | 1 | `(-> I4)` | 1 | 1 | HW | Push -1. |
+| `0x16` | `ldc.i4.0` | 1 | `(-> I4)` | 1 | 1 | HW | Push 0. |
+| `0x17` | `ldc.i4.1` | 1 | `(-> I4)` | 1 | 1 | HW | Push 1. |
+| `0x18` | `ldc.i4.2` | 1 | `(-> I4)` | 1 | 1 | HW | Push 2. |
+| `0x19` | `ldc.i4.3` | 1 | `(-> I4)` | 1 | 1 | HW | Push 3. |
+| `0x1A` | `ldc.i4.4` | 1 | `(-> I4)` | 1 | 1 | HW | Push 4. |
+| `0x1B` | `ldc.i4.5` | 1 | `(-> I4)` | 1 | 1 | HW | Push 5. |
+| `0x1C` | `ldc.i4.6` | 1 | `(-> I4)` | 1 | 1 | HW | Push 6. |
+| `0x1D` | `ldc.i4.7` | 1 | `(-> I4)` | 1 | 1 | HW | Push 7. |
+| `0x1E` | `ldc.i4.8` | 1 | `(-> I4)` | 1 | 1 | HW | Push 8. |
+| `0x1F` | `ldc.i4.s <sb>` | 2 | `(-> I4)` | 1 | 1 | HW | Push sign-extended 8-bit immediate. |
+| `0x20` | `ldc.i4 <i4>` | 5 | `(-> I4)` | 1 | 1 | HW | Push 32-bit immediate. |
 
 **Trap:** Stack overflow (when the eval stack reaches max depth of 64).
 
 ### 2. Local variable access
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0x06` | `ldloc.0` | 1 | `(-> I4)` | 1 | HW | Push local[0]. |
-| `0x07` | `ldloc.1` | 1 | `(-> I4)` | 1 | HW | Push local[1]. |
-| `0x08` | `ldloc.2` | 1 | `(-> I4)` | 1 | HW | Push local[2]. |
-| `0x09` | `ldloc.3` | 1 | `(-> I4)` | 1 | HW | Push local[3]. |
-| `0x11` | `ldloc.s <ub>` | 2 | `(-> I4)` | 1 | HW | Push local[ub], 0 <= ub <= 15. |
-| `0x0A` | `stloc.0` | 1 | `(I4 ->)` | 1 | HW | Pop -> local[0]. |
-| `0x0B` | `stloc.1` | 1 | `(I4 ->)` | 1 | HW | Pop -> local[1]. |
-| `0x0C` | `stloc.2` | 1 | `(I4 ->)` | 1 | HW | Pop -> local[2]. |
-| `0x0D` | `stloc.3` | 1 | `(I4 ->)` | 1 | HW | Pop -> local[3]. |
-| `0x13` | `stloc.s <ub>` | 2 | `(I4 ->)` | 1 | HW | Pop -> local[ub], 0 <= ub <= 15. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0x06` | `ldloc.0` | 1 | `(-> I4)` | 1 | 1 | HW | Push local[0]. |
+| `0x07` | `ldloc.1` | 1 | `(-> I4)` | 1 | 1 | HW | Push local[1]. |
+| `0x08` | `ldloc.2` | 1 | `(-> I4)` | 1 | 1 | HW | Push local[2]. |
+| `0x09` | `ldloc.3` | 1 | `(-> I4)` | 1 | 1 | HW | Push local[3]. |
+| `0x11` | `ldloc.s <ub>` | 2 | `(-> I4)` | 1 | 1 | HW | Push local[ub], 0 <= ub <= 15. |
+| `0x0A` | `stloc.0` | 1 | `(I4 ->)` | 1 | 1 | HW | Pop -> local[0]. |
+| `0x0B` | `stloc.1` | 1 | `(I4 ->)` | 1 | 1 | HW | Pop -> local[1]. |
+| `0x0C` | `stloc.2` | 1 | `(I4 ->)` | 1 | 1 | HW | Pop -> local[2]. |
+| `0x0D` | `stloc.3` | 1 | `(I4 ->)` | 1 | 1 | HW | Pop -> local[3]. |
+| `0x13` | `stloc.s <ub>` | 2 | `(I4 ->)` | 1 | 1 | HW | Pop -> local[ub], 0 <= ub <= 15. |
 
 **Trap:** Stack underflow (pop from empty stack), Local index out of range (ub >= 16 -> `INVALID_LOCAL` trap).
 
 ### 3. Argument access
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0x02` | `ldarg.0` | 1 | `(-> I4)` | 1 | HW | Push arg[0]. |
-| `0x03` | `ldarg.1` | 1 | `(-> I4)` | 1 | HW | Push arg[1]. |
-| `0x04` | `ldarg.2` | 1 | `(-> I4)` | 1 | HW | Push arg[2]. |
-| `0x05` | `ldarg.3` | 1 | `(-> I4)` | 1 | HW | Push arg[3]. |
-| `0x0E` | `ldarg.s <ub>` | 2 | `(-> I4)` | 1 | HW | Push arg[ub], 0 <= ub <= 15. |
-| `0x10` | `starg.s <ub>` | 2 | `(I4 ->)` | 1 | HW | Pop -> arg[ub], 0 <= ub <= 15. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0x02` | `ldarg.0` | 1 | `(-> I4)` | 1 | 1 | HW | Push arg[0]. |
+| `0x03` | `ldarg.1` | 1 | `(-> I4)` | 1 | 1 | HW | Push arg[1]. |
+| `0x04` | `ldarg.2` | 1 | `(-> I4)` | 1 | 1 | HW | Push arg[2]. |
+| `0x05` | `ldarg.3` | 1 | `(-> I4)` | 1 | 1 | HW | Push arg[3]. |
+| `0x0E` | `ldarg.s <ub>` | 2 | `(-> I4)` | 1 | 1 | HW | Push arg[ub], 0 <= ub <= 15. |
+| `0x10` | `starg.s <ub>` | 2 | `(I4 ->)` | 1 | 1 | HW | Pop -> arg[ub], 0 <= ub <= 15. |
 
 **Trap:** Stack underflow, `INVALID_ARG` if ub >= 16 or ub >= actual arg count.
 
 ### 4. Stack manipulation
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0x00` | `nop` | 1 | `(->)` | 1 | HW | No operation. |
-| `0x25` | `dup` | 1 | `(I4 -> I4, I4)` | 1 | HW | Duplicate TOS. |
-| `0x26` | `pop` | 1 | `(I4 ->)` | 1 | HW | Discard TOS. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0x00` | `nop` | 1 | `(->)` | 1 | 1 | HW | No operation. |
+| `0x25` | `dup` | 1 | `(I4 -> I4, I4)` | 1 | 1 | HW | Duplicate TOS. |
+| `0x26` | `pop` | 1 | `(I4 ->)` | 1 | 1 | HW | Discard TOS. |
 
 **Trap:** Stack overflow (dup), stack underflow (pop, dup).
 
 ### 5. Arithmetic (integer)
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0x58` | `add` | 1 | `(I4, I4 -> I4)` | 1 | HW | TOS-1 + TOS, wrap. |
-| `0x59` | `sub` | 1 | `(I4, I4 -> I4)` | 1 | HW | TOS-1 - TOS, wrap. |
-| `0x5A` | `mul` | 1 | `(I4, I4 -> I4)` | 4–8 | uC | TOS-1 x TOS, iterative. |
-| `0x5B` | `div` | 1 | `(I4, I4 -> I4)` | 16–32 | uC | TOS-1 / TOS signed. |
-| `0x5D` | `rem` | 1 | `(I4, I4 -> I4)` | 16–32 | uC | TOS-1 % TOS signed. |
-| `0x65` | `neg` | 1 | `(I4 -> I4)` | 1 | HW | -TOS. |
-| `0x66` | `not` | 1 | `(I4 -> I4)` | 1 | HW | ~TOS. |
-| `0x5F` | `and` | 1 | `(I4, I4 -> I4)` | 1 | HW | TOS-1 & TOS. |
-| `0x60` | `or` | 1 | `(I4, I4 -> I4)` | 1 | HW | TOS-1 \| TOS. |
-| `0x61` | `xor` | 1 | `(I4, I4 -> I4)` | 1 | HW | TOS-1 ^ TOS. |
-| `0x62` | `shl` | 1 | `(I4, I4 -> I4)` | 1 | HW | TOS-1 << (TOS & 31). |
-| `0x63` | `shr` | 1 | `(I4, I4 -> I4)` | 1 | HW | TOS-1 >> (TOS & 31), sign-extend. |
-| `0x64` | `shr.un` | 1 | `(I4, I4 -> I4)` | 1 | HW | TOS-1 >> (TOS & 31), zero-extend. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0x58` | `add` | 1 | `(I4, I4 -> I4)` | 1 | 1 | HW | TOS-1 + TOS, wrap. |
+| `0x59` | `sub` | 1 | `(I4, I4 -> I4)` | 1 | 1 | HW | TOS-1 - TOS, wrap. |
+| `0x5A` | `mul` | 1 | `(I4, I4 -> I4)` | 1 | 4–8 | uC | TOS-1 x TOS. Iterative shift-add multiplier, 3–7 ALU latency cycles. |
+| `0x5B` | `div` | 1 | `(I4, I4 -> I4)` | 1 | 16–32 | uC | TOS-1 / TOS signed. Restoring divider (32 iterations), 15–31 ALU latency cycles. |
+| `0x5D` | `rem` | 1 | `(I4, I4 -> I4)` | 1 | 16–32 | uC | TOS-1 % TOS signed. Restoring divider (32 iterations), 15–31 ALU latency cycles. |
+| `0x65` | `neg` | 1 | `(I4 -> I4)` | 1 | 1 | HW | -TOS. |
+| `0x66` | `not` | 1 | `(I4 -> I4)` | 1 | 1 | HW | ~TOS. |
+| `0x5F` | `and` | 1 | `(I4, I4 -> I4)` | 1 | 1 | HW | TOS-1 & TOS. |
+| `0x60` | `or` | 1 | `(I4, I4 -> I4)` | 1 | 1 | HW | TOS-1 \| TOS. |
+| `0x61` | `xor` | 1 | `(I4, I4 -> I4)` | 1 | 1 | HW | TOS-1 ^ TOS. |
+| `0x62` | `shl` | 1 | `(I4, I4 -> I4)` | 1 | 1 | HW | TOS-1 << (TOS & 31). |
+| `0x63` | `shr` | 1 | `(I4, I4 -> I4)` | 1 | 1 | HW | TOS-1 >> (TOS & 31), sign-extend. |
+| `0x64` | `shr.un` | 1 | `(I4, I4 -> I4)` | 1 | 1 | HW | TOS-1 >> (TOS & 31), zero-extend. |
 
 **Trap:** Stack underflow, `DIV_BY_ZERO` (if `div`/`rem` and TOS == 0), `OVERFLOW` (only for `div`, if TOS-1 == INT_MIN and TOS == -1).
 
 ### 6. Comparison
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0xFE 0x01` | `ceq` | 2 | `(I4, I4 -> I4)` | 1 | HW | 1 if TOS-1 == TOS, else 0. |
-| `0xFE 0x02` | `cgt` | 2 | `(I4, I4 -> I4)` | 1 | HW | 1 if TOS-1 > TOS signed. |
-| `0xFE 0x03` | `cgt.un` | 2 | `(I4, I4 -> I4)` | 1 | HW | 1 if TOS-1 > TOS unsigned. |
-| `0xFE 0x04` | `clt` | 2 | `(I4, I4 -> I4)` | 1 | HW | 1 if TOS-1 < TOS signed. |
-| `0xFE 0x05` | `clt.un` | 2 | `(I4, I4 -> I4)` | 1 | HW | 1 if TOS-1 < TOS unsigned. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0xFE 0x01` | `ceq` | 2 | `(I4, I4 -> I4)` | 1 | 1 | HW | 1 if TOS-1 == TOS, else 0. |
+| `0xFE 0x02` | `cgt` | 2 | `(I4, I4 -> I4)` | 1 | 1 | HW | 1 if TOS-1 > TOS signed. |
+| `0xFE 0x03` | `cgt.un` | 2 | `(I4, I4 -> I4)` | 1 | 1 | HW | 1 if TOS-1 > TOS unsigned. |
+| `0xFE 0x04` | `clt` | 2 | `(I4, I4 -> I4)` | 1 | 1 | HW | 1 if TOS-1 < TOS signed. |
+| `0xFE 0x05` | `clt.un` | 2 | `(I4, I4 -> I4)` | 1 | 1 | HW | 1 if TOS-1 < TOS unsigned. |
 
 **Trap:** Stack underflow.
 
@@ -286,26 +287,26 @@ The following 48 opcodes constitute the complete CIL-T0 instruction set. Every o
 
 CIL-T0 only implements **short** branches in F3 (8-bit offset) to reduce hardware requirements. **Long** variants (32-bit offset) become available from F4 onward.
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0x2B` | `br.s <sb>` | 2 | `(->)` | 2 | HW | PC += sb (signed 8-bit). |
-| `0x2C` | `brfalse.s <sb>` | 2 | `(I4 ->)` | 2 | HW | If TOS == 0, PC += sb. |
-| `0x2D` | `brtrue.s <sb>` | 2 | `(I4 ->)` | 2 | HW | If TOS != 0, PC += sb. |
-| `0x2E` | `beq.s <sb>` | 2 | `(I4, I4 ->)` | 2 | HW | If TOS-1 == TOS, PC += sb. |
-| `0x2F` | `bge.s <sb>` | 2 | `(I4, I4 ->)` | 2 | HW | If TOS-1 >= TOS, PC += sb. |
-| `0x30` | `bgt.s <sb>` | 2 | `(I4, I4 ->)` | 2 | HW | If TOS-1 > TOS, PC += sb. |
-| `0x31` | `ble.s <sb>` | 2 | `(I4, I4 ->)` | 2 | HW | If TOS-1 <= TOS, PC += sb. |
-| `0x32` | `blt.s <sb>` | 2 | `(I4, I4 ->)` | 2 | HW | If TOS-1 < TOS, PC += sb. |
-| `0x33` | `bne.un.s <sb>` | 2 | `(I4, I4 ->)` | 2 | HW | If TOS-1 != TOS, PC += sb. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0x2B` | `br.s <sb>` | 2 | `(->)` | 1 | 1+1 | HW | PC += sb (signed 8-bit). +1 pipeline flush. |
+| `0x2C` | `brfalse.s <sb>` | 2 | `(I4 ->)` | 1 | 1/1+1 | HW | If TOS == 0, PC += sb. Taken: +1 flush. |
+| `0x2D` | `brtrue.s <sb>` | 2 | `(I4 ->)` | 1 | 1/1+1 | HW | If TOS != 0, PC += sb. Taken: +1 flush. |
+| `0x2E` | `beq.s <sb>` | 2 | `(I4, I4 ->)` | 1 | 1/1+1 | HW | If TOS-1 == TOS, PC += sb. ALU ceq + cond. |
+| `0x2F` | `bge.s <sb>` | 2 | `(I4, I4 ->)` | 1 | 1/1+1 | HW | If TOS-1 >= TOS, PC += sb. ALU clt + !cond. |
+| `0x30` | `bgt.s <sb>` | 2 | `(I4, I4 ->)` | 1 | 1/1+1 | HW | If TOS-1 > TOS, PC += sb. ALU cgt + cond. |
+| `0x31` | `ble.s <sb>` | 2 | `(I4, I4 ->)` | 1 | 1/1+1 | HW | If TOS-1 <= TOS, PC += sb. ALU cgt + !cond. |
+| `0x32` | `blt.s <sb>` | 2 | `(I4, I4 ->)` | 1 | 1/1+1 | HW | If TOS-1 < TOS, PC += sb. ALU clt + cond. |
+| `0x33` | `bne.un.s <sb>` | 2 | `(I4, I4 ->)` | 1 | 1/1+1 | HW | If TOS-1 != TOS, PC += sb. ALU ceq + !cond. |
 
 **Trap:** Stack underflow, `INVALID_BRANCH_TARGET` (if the target address falls outside the method's code range).
 
 ### 8. Call and return
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0x28` | `call <token>` | 5 | `(args -> ret)` | 6–10 | uC | Static call. The token points to an RVA within the CODE region. |
-| `0x2A` | `ret` | 1 | `(ret ->)` | 4–6 | uC | Return to caller. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0x28` | `call <token>` | 5 | `(args -> ret)` | 2 | 2+N | uC | Static call. 2 ROM steps + N arg pop (sequencer loop). N = callee arg_count. |
+| `0x2A` | `ret` | 1 | `(ret ->)` | 2 | 2 | uC | Return to caller. Step 0: conditional pop (cond_pop), step 1: frame_pop/halt + PC=ret. |
 
 **CIL-T0 deviation from the standard:** In ECMA-335, the `call` token must resolve to a metadata table entry (MethodDef token). **In CIL-T0** there is no metadata walker, so the **call token is directly an RVA** (Relative Virtual Address) into the CODE region. The CIL-T0 binary format (see below) contains pre-linked RVAs. This simplifies `call` to a pure machine call and eliminates the need for a metadata walker.
 
@@ -315,18 +316,18 @@ CIL-T0 only implements **short** branches in F3 (8-bit offset) to reduce hardwar
 
 CIL-T0 implements the 32-bit integer indirect load/store opcodes, which access the `DATA` and `MMIO` regions (or the provided data memory array in the F1 simulator). The byte values are **strictly per ECMA-335 Partition III**, so a standard CIL disassembler will recognize them.
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0x4A` | `ldind.i4` | 1 | `(I4 -> I4)` | 2–4 | HW | TOS = address; pop, read a 32-bit LE int from data memory, push the result. |
-| `0x54` | `stind.i4` | 1 | `(I4, I4 ->)` | 2–4 | HW | TOS = value, TOS-1 = address; pop value, pop address, write a 32-bit LE int to data memory. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0x4A` | `ldind.i4` | 1 | `(I4 -> I4)` | 1 | 1–3 | HW | TOS = address; pop, read a 32-bit LE int from data memory, push the result. +QSPI/PSRAM latency. |
+| `0x54` | `stind.i4` | 1 | `(I4, I4 ->)` | 1 | 1–3 | HW | TOS = value, TOS-1 = address; pop value, pop address, write a 32-bit LE int to data memory. +QSPI/PSRAM latency. |
 
 **Trap:** Stack underflow, `INVALID_MEMORY_ACCESS` (if the address falls outside the data memory range or no data memory is assigned to the CPU). This trap corresponds to a hardware memory controller fault in the F2 RTL.
 
 ### 10. Miscellaneous
 
-| Byte | Opcode | Length | Stack | Cycles | Dec. | Description |
-|------|--------|--------|-------|--------|------|-------------|
-| `0xDD` | `break` | 1 | `(->)` | — | HW | Debug trap. Halts and signals via UART. |
+| Byte | Opcode | Length | Stack | μstep | Cycles | Dec. | Description |
+|------|--------|--------|-------|-------|--------|------|-------------|
+| `0xDD` | `break` | 1 | `(->)` | 1 | 1 | HW | Debug trap. Halts and signals via UART. |
 
 **CIL-T0 deviation from the standard:** In ECMA-335, the `break` opcode byte value is `0x01`. CIL-T0 uses `0xDD` instead, because `0x01` is adjacent to `nop` (`0x00`) from the F2/F3 decoder's perspective, and it was intentionally moved to the "rare, debug-only" range so it can be separated from hot opcodes in the decoder. This is a **deliberate deviation** that CIL-T0 to standard CIL translators (`ilasm-t0`) handle automatically.
 
@@ -616,10 +617,46 @@ Test name format: `[ClassName]_[Opcode]_[Scenario]`, e.g. `Executor_Add_WrapsAro
 - **Sky130 PDK** — https://skywater-pdk.readthedocs.io/
 - **Tiny Tapeout** — https://tinytapeout.com/
 
+## Clock cycle model (F2.2b)
+
+The execution time of CIL-T0 instructions is determined by three factors:
+
+1. **μstep** — the microcode ROM step count (`o_nsteps`). This is **deterministic** and verified by `rtl/tb/test_microcode.py` cocotb tests. Most opcodes are 1 μstep; `call` and `ret` are 2 μstep.
+
+2. **ALU latency** — the cycle cost of the ALU's internal iterative logic. Simple operations (add, sub, and, or, xor, shl, shr, neg, not, ceq, cgt, clt) add 0 extra cycles (combinational ALU). `mul` adds 3–7 cycles (shift-add multiplier), `div`/`rem` add 15–31 cycles (restoring divider, 32 iterations).
+
+3. **Pipeline and memory effects** — branch opcodes add +1 pipeline flush cycle when taken. `ldind.i4`/`stind.i4` opcodes may add +0–2 cycles for QSPI/PSRAM latency (on-chip SRAM: 0; QSPI flash: 1–2).
+
+**Formula:** `Total cycles = μstep + ALU latency + pipeline flush + memory latency`
+
+### Summary table (48 opcodes)
+
+| Category | Opcodes | μstep | Cycles | Notes |
+|----------|---------|-------|--------|-------|
+| Constant load | ldnull, ldc.i4.* | 1 | 1 | — |
+| Local/arg load | ldloc.*, ldarg.* | 1 | 1 | TOS cache hit |
+| Local/arg store | stloc.*, starg.s | 1 | 1 | — |
+| Stack manip. | nop, dup, pop | 1 | 1 | — |
+| ALU simple | add, sub, and, or, xor, shl, shr, shr.un, neg, not | 1 | 1 | combinational ALU |
+| ALU multiply | mul | 1 | 4–8 | iterative shift-add |
+| ALU division | div, rem | 1 | 16–32 | restoring divider |
+| Comparison | ceq, cgt, cgt.un, clt, clt.un | 1 | 1 | — |
+| Branch unconditional | br.s | 1 | 1+1 | +1 pipeline flush |
+| Branch 1-operand | brfalse.s, brtrue.s | 1 | 1/1+1 | +1 if taken |
+| Branch 2-operand | beq.s..bne.un.s | 1 | 1/1+1 | ALU cmp + cond |
+| Indirect load | ldind.i4 | 1 | 1–3 | +QSPI/PSRAM lat. |
+| Indirect store | stind.i4 | 1 | 1–3 | +QSPI/PSRAM lat. |
+| Call | call | 2 | 2+N | N = arg count |
+| Return | ret | 2 | 2 | cond_pop + frame |
+| Debug | break | 1 | 1 | trap, CPU halts |
+
+**Source:** `rtl/src/cilcpu_microcode.v` — the μstep values are read from the `o_nsteps` output, and verified by the `rtl/tb/test_microcode.py` cocotb tests (24 tests, 0 failures).
+
 ---
 
 ## Changelog
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-04-17 | F2.2b μstep + clock cycle documentation for all opcodes |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

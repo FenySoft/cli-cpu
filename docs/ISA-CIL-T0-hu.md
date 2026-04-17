@@ -186,99 +186,100 @@ Az alábbi 48 opkód képezi a CIL-T0 teljes utasításkészletét. Minden opkó
 - **Operandus** — az opkód után következő immediate bájt(ok), ha van.
 - **Hossz** — teljes opkód hossza bájtban.
 - **Stack** — stack hatás: `(→ I4)` push egy int32-t, `(I4, I4 → I4)` pop két int32-t, push egyet, `(I4 →)` pop egyet nothing-ra, stb.
-- **Ciklus** — előre becsült ciklusszám @ 50 MHz, cache hit mellett.
-- **Dek.** — `HW` = hardwired, `μC` = mikrokódolt.
+- **μstep** — microcode ROM lépésszám (`o_nsteps`): hány ROM-lookup szükséges a sequencer-ben. Ez a szám **determinisztikus és cocotb-vel tesztelt** (`rtl/tb/test_microcode.py`).
+- **Ciklus** — teljes végrehajtási idő órajelciklusban @ 50 MHz, TOS cache hit mellett. Az `μstep + ALU latencia + pipeline flush` összege. A `mul`/`div`/`rem` az ALU belső iteratív logikája miatt hosszabb. Branch opkódoknál a „taken" eset +1 pipeline flush ciklust ad.
+- **Dek.** — `HW` = hardwired (1 μstep), `μC` = mikrokódolt (>1 μstep vagy ALU iteráció).
 - **Trap** — a lehetséges hardveres trap feltételek.
 
 ### 1. Konstans betöltés
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0x14` | `ldnull` | 1 | `(→ I4)` | 1 | HW | Push 0-t (null mint int). |
-| `0x15` | `ldc.i4.m1` | 1 | `(→ I4)` | 1 | HW | Push -1. |
-| `0x16` | `ldc.i4.0` | 1 | `(→ I4)` | 1 | HW | Push 0. |
-| `0x17` | `ldc.i4.1` | 1 | `(→ I4)` | 1 | HW | Push 1. |
-| `0x18` | `ldc.i4.2` | 1 | `(→ I4)` | 1 | HW | Push 2. |
-| `0x19` | `ldc.i4.3` | 1 | `(→ I4)` | 1 | HW | Push 3. |
-| `0x1A` | `ldc.i4.4` | 1 | `(→ I4)` | 1 | HW | Push 4. |
-| `0x1B` | `ldc.i4.5` | 1 | `(→ I4)` | 1 | HW | Push 5. |
-| `0x1C` | `ldc.i4.6` | 1 | `(→ I4)` | 1 | HW | Push 6. |
-| `0x1D` | `ldc.i4.7` | 1 | `(→ I4)` | 1 | HW | Push 7. |
-| `0x1E` | `ldc.i4.8` | 1 | `(→ I4)` | 1 | HW | Push 8. |
-| `0x1F` | `ldc.i4.s <sb>` | 2 | `(→ I4)` | 1 | HW | Push signed-extended 8-bit immediate. |
-| `0x20` | `ldc.i4 <i4>` | 5 | `(→ I4)` | 1 | HW | Push 32-bit immediate. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0x14` | `ldnull` | 1 | `(→ I4)` | 1 | 1 | HW | Push 0-t (null mint int). |
+| `0x15` | `ldc.i4.m1` | 1 | `(→ I4)` | 1 | 1 | HW | Push -1. |
+| `0x16` | `ldc.i4.0` | 1 | `(→ I4)` | 1 | 1 | HW | Push 0. |
+| `0x17` | `ldc.i4.1` | 1 | `(→ I4)` | 1 | 1 | HW | Push 1. |
+| `0x18` | `ldc.i4.2` | 1 | `(→ I4)` | 1 | 1 | HW | Push 2. |
+| `0x19` | `ldc.i4.3` | 1 | `(→ I4)` | 1 | 1 | HW | Push 3. |
+| `0x1A` | `ldc.i4.4` | 1 | `(→ I4)` | 1 | 1 | HW | Push 4. |
+| `0x1B` | `ldc.i4.5` | 1 | `(→ I4)` | 1 | 1 | HW | Push 5. |
+| `0x1C` | `ldc.i4.6` | 1 | `(→ I4)` | 1 | 1 | HW | Push 6. |
+| `0x1D` | `ldc.i4.7` | 1 | `(→ I4)` | 1 | 1 | HW | Push 7. |
+| `0x1E` | `ldc.i4.8` | 1 | `(→ I4)` | 1 | 1 | HW | Push 8. |
+| `0x1F` | `ldc.i4.s <sb>` | 2 | `(→ I4)` | 1 | 1 | HW | Push signed-extended 8-bit immediate. |
+| `0x20` | `ldc.i4 <i4>` | 5 | `(→ I4)` | 1 | 1 | HW | Push 32-bit immediate. |
 
 **Trap:** Stack overflow (ha az eval stack eléri a max 64 mélységet).
 
 ### 2. Lokális változó hozzáférés
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0x06` | `ldloc.0` | 1 | `(→ I4)` | 1 | HW | Push local[0]. |
-| `0x07` | `ldloc.1` | 1 | `(→ I4)` | 1 | HW | Push local[1]. |
-| `0x08` | `ldloc.2` | 1 | `(→ I4)` | 1 | HW | Push local[2]. |
-| `0x09` | `ldloc.3` | 1 | `(→ I4)` | 1 | HW | Push local[3]. |
-| `0x11` | `ldloc.s <ub>` | 2 | `(→ I4)` | 1 | HW | Push local[ub], 0 ≤ ub ≤ 15. |
-| `0x0A` | `stloc.0` | 1 | `(I4 →)` | 1 | HW | Pop → local[0]. |
-| `0x0B` | `stloc.1` | 1 | `(I4 →)` | 1 | HW | Pop → local[1]. |
-| `0x0C` | `stloc.2` | 1 | `(I4 →)` | 1 | HW | Pop → local[2]. |
-| `0x0D` | `stloc.3` | 1 | `(I4 →)` | 1 | HW | Pop → local[3]. |
-| `0x13` | `stloc.s <ub>` | 2 | `(I4 →)` | 1 | HW | Pop → local[ub], 0 ≤ ub ≤ 15. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0x06` | `ldloc.0` | 1 | `(→ I4)` | 1 | 1 | HW | Push local[0]. |
+| `0x07` | `ldloc.1` | 1 | `(→ I4)` | 1 | 1 | HW | Push local[1]. |
+| `0x08` | `ldloc.2` | 1 | `(→ I4)` | 1 | 1 | HW | Push local[2]. |
+| `0x09` | `ldloc.3` | 1 | `(→ I4)` | 1 | 1 | HW | Push local[3]. |
+| `0x11` | `ldloc.s <ub>` | 2 | `(→ I4)` | 1 | 1 | HW | Push local[ub], 0 ≤ ub ≤ 15. |
+| `0x0A` | `stloc.0` | 1 | `(I4 →)` | 1 | 1 | HW | Pop → local[0]. |
+| `0x0B` | `stloc.1` | 1 | `(I4 →)` | 1 | 1 | HW | Pop → local[1]. |
+| `0x0C` | `stloc.2` | 1 | `(I4 →)` | 1 | 1 | HW | Pop → local[2]. |
+| `0x0D` | `stloc.3` | 1 | `(I4 →)` | 1 | 1 | HW | Pop → local[3]. |
+| `0x13` | `stloc.s <ub>` | 2 | `(I4 →)` | 1 | 1 | HW | Pop → local[ub], 0 ≤ ub ≤ 15. |
 
 **Trap:** Stack underflow (üres stackről pop), Local index out of range (ub ≥ 16 → `INVALID_LOCAL` trap).
 
 ### 3. Argumentum hozzáférés
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0x02` | `ldarg.0` | 1 | `(→ I4)` | 1 | HW | Push arg[0]. |
-| `0x03` | `ldarg.1` | 1 | `(→ I4)` | 1 | HW | Push arg[1]. |
-| `0x04` | `ldarg.2` | 1 | `(→ I4)` | 1 | HW | Push arg[2]. |
-| `0x05` | `ldarg.3` | 1 | `(→ I4)` | 1 | HW | Push arg[3]. |
-| `0x0E` | `ldarg.s <ub>` | 2 | `(→ I4)` | 1 | HW | Push arg[ub], 0 ≤ ub ≤ 15. |
-| `0x10` | `starg.s <ub>` | 2 | `(I4 →)` | 1 | HW | Pop → arg[ub], 0 ≤ ub ≤ 15. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0x02` | `ldarg.0` | 1 | `(→ I4)` | 1 | 1 | HW | Push arg[0]. |
+| `0x03` | `ldarg.1` | 1 | `(→ I4)` | 1 | 1 | HW | Push arg[1]. |
+| `0x04` | `ldarg.2` | 1 | `(→ I4)` | 1 | 1 | HW | Push arg[2]. |
+| `0x05` | `ldarg.3` | 1 | `(→ I4)` | 1 | 1 | HW | Push arg[3]. |
+| `0x0E` | `ldarg.s <ub>` | 2 | `(→ I4)` | 1 | 1 | HW | Push arg[ub], 0 ≤ ub ≤ 15. |
+| `0x10` | `starg.s <ub>` | 2 | `(I4 →)` | 1 | 1 | HW | Pop → arg[ub], 0 ≤ ub ≤ 15. |
 
 **Trap:** Stack underflow, `INVALID_ARG` ha ub ≥ 16 vagy ub ≥ tényleges arg count.
 
 ### 4. Stack manipuláció
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0x00` | `nop` | 1 | `(→)` | 1 | HW | Semmi. |
-| `0x25` | `dup` | 1 | `(I4 → I4, I4)` | 1 | HW | TOS duplikálása. |
-| `0x26` | `pop` | 1 | `(I4 →)` | 1 | HW | TOS eldobása. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0x00` | `nop` | 1 | `(→)` | 1 | 1 | HW | Semmi. |
+| `0x25` | `dup` | 1 | `(I4 → I4, I4)` | 1 | 1 | HW | TOS duplikálása. |
+| `0x26` | `pop` | 1 | `(I4 →)` | 1 | 1 | HW | TOS eldobása. |
 
 **Trap:** Stack overflow (dup), stack underflow (pop, dup).
 
 ### 5. Aritmetika (integer)
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0x58` | `add` | 1 | `(I4, I4 → I4)` | 1 | HW | TOS-1 + TOS, wrap. |
-| `0x59` | `sub` | 1 | `(I4, I4 → I4)` | 1 | HW | TOS-1 − TOS, wrap. |
-| `0x5A` | `mul` | 1 | `(I4, I4 → I4)` | 4–8 | μC | TOS-1 × TOS, iteratív. |
-| `0x5B` | `div` | 1 | `(I4, I4 → I4)` | 16–32 | μC | TOS-1 / TOS signed. |
-| `0x5D` | `rem` | 1 | `(I4, I4 → I4)` | 16–32 | μC | TOS-1 % TOS signed. |
-| `0x65` | `neg` | 1 | `(I4 → I4)` | 1 | HW | −TOS. |
-| `0x66` | `not` | 1 | `(I4 → I4)` | 1 | HW | ~TOS. |
-| `0x5F` | `and` | 1 | `(I4, I4 → I4)` | 1 | HW | TOS-1 & TOS. |
-| `0x60` | `or` | 1 | `(I4, I4 → I4)` | 1 | HW | TOS-1 \| TOS. |
-| `0x61` | `xor` | 1 | `(I4, I4 → I4)` | 1 | HW | TOS-1 ^ TOS. |
-| `0x62` | `shl` | 1 | `(I4, I4 → I4)` | 1 | HW | TOS-1 << (TOS & 31). |
-| `0x63` | `shr` | 1 | `(I4, I4 → I4)` | 1 | HW | TOS-1 >> (TOS & 31), sign-extend. |
-| `0x64` | `shr.un` | 1 | `(I4, I4 → I4)` | 1 | HW | TOS-1 >> (TOS & 31), zero-extend. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0x58` | `add` | 1 | `(I4, I4 → I4)` | 1 | 1 | HW | TOS-1 + TOS, wrap. |
+| `0x59` | `sub` | 1 | `(I4, I4 → I4)` | 1 | 1 | HW | TOS-1 − TOS, wrap. |
+| `0x5A` | `mul` | 1 | `(I4, I4 → I4)` | 1 | 4–8 | μC | TOS-1 × TOS. ALU iteratív szorzó (shift-add), 3–7 ciklus ALU latencia. |
+| `0x5B` | `div` | 1 | `(I4, I4 → I4)` | 1 | 16–32 | μC | TOS-1 / TOS signed. ALU restoring osztó (32 iteráció), 15–31 ciklus ALU latencia. |
+| `0x5D` | `rem` | 1 | `(I4, I4 → I4)` | 1 | 16–32 | μC | TOS-1 % TOS signed. ALU restoring maradék, 15–31 ciklus ALU latencia. |
+| `0x65` | `neg` | 1 | `(I4 → I4)` | 1 | 1 | HW | −TOS. |
+| `0x66` | `not` | 1 | `(I4 → I4)` | 1 | 1 | HW | ~TOS. |
+| `0x5F` | `and` | 1 | `(I4, I4 → I4)` | 1 | 1 | HW | TOS-1 & TOS. |
+| `0x60` | `or` | 1 | `(I4, I4 → I4)` | 1 | 1 | HW | TOS-1 \| TOS. |
+| `0x61` | `xor` | 1 | `(I4, I4 → I4)` | 1 | 1 | HW | TOS-1 ^ TOS. |
+| `0x62` | `shl` | 1 | `(I4, I4 → I4)` | 1 | 1 | HW | TOS-1 << (TOS & 31). |
+| `0x63` | `shr` | 1 | `(I4, I4 → I4)` | 1 | 1 | HW | TOS-1 >> (TOS & 31), sign-extend. |
+| `0x64` | `shr.un` | 1 | `(I4, I4 → I4)` | 1 | 1 | HW | TOS-1 >> (TOS & 31), zero-extend. |
 
 **Trap:** Stack underflow, `DIV_BY_ZERO` (ha `div`/`rem` és TOS == 0), `OVERFLOW` (csak `div` esetén, ha TOS-1 == INT_MIN és TOS == -1).
 
 ### 6. Összehasonlítás
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0xFE 0x01` | `ceq` | 2 | `(I4, I4 → I4)` | 1 | HW | 1 ha TOS-1 == TOS, else 0. |
-| `0xFE 0x02` | `cgt` | 2 | `(I4, I4 → I4)` | 1 | HW | 1 ha TOS-1 > TOS signed. |
-| `0xFE 0x03` | `cgt.un` | 2 | `(I4, I4 → I4)` | 1 | HW | 1 ha TOS-1 > TOS unsigned. |
-| `0xFE 0x04` | `clt` | 2 | `(I4, I4 → I4)` | 1 | HW | 1 ha TOS-1 < TOS signed. |
-| `0xFE 0x05` | `clt.un` | 2 | `(I4, I4 → I4)` | 1 | HW | 1 ha TOS-1 < TOS unsigned. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0xFE 0x01` | `ceq` | 2 | `(I4, I4 → I4)` | 1 | 1 | HW | 1 ha TOS-1 == TOS, else 0. |
+| `0xFE 0x02` | `cgt` | 2 | `(I4, I4 → I4)` | 1 | 1 | HW | 1 ha TOS-1 > TOS signed. |
+| `0xFE 0x03` | `cgt.un` | 2 | `(I4, I4 → I4)` | 1 | 1 | HW | 1 ha TOS-1 > TOS unsigned. |
+| `0xFE 0x04` | `clt` | 2 | `(I4, I4 → I4)` | 1 | 1 | HW | 1 ha TOS-1 < TOS signed. |
+| `0xFE 0x05` | `clt.un` | 2 | `(I4, I4 → I4)` | 1 | 1 | HW | 1 ha TOS-1 < TOS unsigned. |
 
 **Trap:** Stack underflow.
 
@@ -286,26 +287,26 @@ Az alábbi 48 opkód képezi a CIL-T0 teljes utasításkészletét. Minden opkó
 
 A CIL-T0 csak a **rövid** elágazásokat implementálja F3-ban (8-bit offset), hogy a hardverigényt csökkentse. A **hosszú** változatok (32-bit offset) F4-től elérhetőek.
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0x2B` | `br.s <sb>` | 2 | `(→)` | 2 | HW | PC += sb (signed 8-bit). |
-| `0x2C` | `brfalse.s <sb>` | 2 | `(I4 →)` | 2 | HW | ha TOS == 0, PC += sb. |
-| `0x2D` | `brtrue.s <sb>` | 2 | `(I4 →)` | 2 | HW | ha TOS != 0, PC += sb. |
-| `0x2E` | `beq.s <sb>` | 2 | `(I4, I4 →)` | 2 | HW | ha TOS-1 == TOS, PC += sb. |
-| `0x2F` | `bge.s <sb>` | 2 | `(I4, I4 →)` | 2 | HW | ha TOS-1 ≥ TOS, PC += sb. |
-| `0x30` | `bgt.s <sb>` | 2 | `(I4, I4 →)` | 2 | HW | ha TOS-1 > TOS, PC += sb. |
-| `0x31` | `ble.s <sb>` | 2 | `(I4, I4 →)` | 2 | HW | ha TOS-1 ≤ TOS, PC += sb. |
-| `0x32` | `blt.s <sb>` | 2 | `(I4, I4 →)` | 2 | HW | ha TOS-1 < TOS, PC += sb. |
-| `0x33` | `bne.un.s <sb>` | 2 | `(I4, I4 →)` | 2 | HW | ha TOS-1 != TOS, PC += sb. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0x2B` | `br.s <sb>` | 2 | `(→)` | 1 | 1+1 | HW | PC += sb (signed 8-bit). +1 pipeline flush. |
+| `0x2C` | `brfalse.s <sb>` | 2 | `(I4 →)` | 1 | 1/1+1 | HW | ha TOS == 0, PC += sb. Taken: +1 flush. |
+| `0x2D` | `brtrue.s <sb>` | 2 | `(I4 →)` | 1 | 1/1+1 | HW | ha TOS != 0, PC += sb. Taken: +1 flush. |
+| `0x2E` | `beq.s <sb>` | 2 | `(I4, I4 →)` | 1 | 1/1+1 | HW | ha TOS-1 == TOS, PC += sb. ALU ceq + cond. |
+| `0x2F` | `bge.s <sb>` | 2 | `(I4, I4 →)` | 1 | 1/1+1 | HW | ha TOS-1 ≥ TOS, PC += sb. ALU clt + !cond. |
+| `0x30` | `bgt.s <sb>` | 2 | `(I4, I4 →)` | 1 | 1/1+1 | HW | ha TOS-1 > TOS, PC += sb. ALU cgt + cond. |
+| `0x31` | `ble.s <sb>` | 2 | `(I4, I4 →)` | 1 | 1/1+1 | HW | ha TOS-1 ≤ TOS, PC += sb. ALU cgt + !cond. |
+| `0x32` | `blt.s <sb>` | 2 | `(I4, I4 →)` | 1 | 1/1+1 | HW | ha TOS-1 < TOS, PC += sb. ALU clt + cond. |
+| `0x33` | `bne.un.s <sb>` | 2 | `(I4, I4 →)` | 1 | 1/1+1 | HW | ha TOS-1 != TOS, PC += sb. ALU ceq + !cond. |
 
 **Trap:** Stack underflow, `INVALID_BRANCH_TARGET` (ha a cél cím kívül esik a metódus kód-tartományán).
 
 ### 8. Hívás és visszatérés
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0x28` | `call <token>` | 5 | `(args → ret)` | 6–10 | μC | Statikus hívás. A token egy RVA-ra mutat a CODE régióban. |
-| `0x2A` | `ret` | 1 | `(ret →)` | 4–6 | μC | Visszatérés a caller-hez. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0x28` | `call <token>` | 5 | `(args → ret)` | 2 | 2+N | μC | Statikus hívás. 2 ROM lépés + N arg pop (sequencer loop). N = callee arg_count. |
+| `0x2A` | `ret` | 1 | `(ret →)` | 2 | 2 | μC | Visszatérés. Step 0: feltételes pop (cond_pop), step 1: frame_pop/halt + PC=ret. |
 
 **CIL-T0 eltérés a standardtól:** Az ECMA-335-ben a `call` tokennek egy metaadat-tábla bejegyzést kell feloldania (MethodDef token). **CIL-T0-ban** nincs metaadat-walker, ezért a **call token közvetlenül egy RVA** (Relative Virtual Address) a CODE régióba. A CIL-T0 bináris formátum (lásd lent) már előre-linkelt RVA-kat tartalmaz. Ezzel a `call` tisztán gépi hívássá egyszerűsödik, és a `metadata walker` elmarad.
 
@@ -315,18 +316,18 @@ A CIL-T0 csak a **rövid** elágazásokat implementálja F3-ban (8-bit offset), 
 
 A CIL-T0 a 32-bites integer indirekt load/store opkódokat implementálja, amelyek a `DATA` és `MMIO` régiókat (illetve az F1 szimulátorban a megadott data memory tömböt) érik el. A bájt-értékek **szigorúan az ECMA-335 Partition III** szerintiek, így egy szabványos CIL disassembler is felismeri őket.
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0x4A` | `ldind.i4` | 1 | `(I4 → I4)` | 2–4 | HW | TOS = cím; pop, olvas egy 32-bit LE int-et a data memory-ból, push az eredményt. |
-| `0x54` | `stind.i4` | 1 | `(I4, I4 →)` | 2–4 | HW | TOS = érték, TOS-1 = cím; pop érték, pop cím, ír egy 32-bit LE int-et a data memory-ba. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0x4A` | `ldind.i4` | 1 | `(I4 → I4)` | 1 | 1–3 | HW | TOS = cím; pop, olvas egy 32-bit LE int-et a data memory-ból, push az eredményt. +QSPI/PSRAM latencia. |
+| `0x54` | `stind.i4` | 1 | `(I4, I4 →)` | 1 | 1–3 | HW | TOS = érték, TOS-1 = cím; pop érték, pop cím, ír egy 32-bit LE int-et a data memory-ba. +QSPI/PSRAM latencia. |
 
 **Trap:** Stack underflow, `INVALID_MEMORY_ACCESS` (ha a cím a data memory tartományán kívül esik vagy nincs data memory rendelve a CPU-hoz). Ez a trap az F2 RTL-ben a hardveres memory controller hibájának felel meg.
 
 ### 10. Egyéb
 
-| Bájt | Opkód | Hossz | Stack | Ciklus | Dek. | Leírás |
-|------|-------|-------|-------|--------|------|--------|
-| `0xDD` | `break` | 1 | `(→)` | — | HW | Debug trap. Megáll és UART-on jelez. |
+| Bájt | Opkód | Hossz | Stack | μstep | Ciklus | Dek. | Leírás |
+|------|-------|-------|-------|-------|--------|------|--------|
+| `0xDD` | `break` | 1 | `(→)` | 1 | 1 | HW | Debug trap. Megáll és UART-on jelez. |
 
 **CIL-T0 eltérés a standardtól:** Az ECMA-335-ben a `break` opkód byte értéke `0x01`. A CIL-T0 viszont a `0xDD`-t használja, mert a `0x01` az F2/F3 dekóder szempontjából a `nop` (`0x00`) szomszédja, és szándékosan a "ritka, debug-only" tartományba toltuk, hogy a forró opkódoktól dekóderben elválasztható legyen. Ez egy **tudatos eltérés**, amelyet a CIL-T0 → standard CIL fordítók (`ilasm-t0`) automatikusan kezelnek.
 
@@ -618,8 +619,44 @@ A tesztek neve formátuma: `[ClassName]_[Opcode]_[Scenario]`, pl. `Executor_Add_
 
 ---
 
+## Órajelciklus modell (F2.2b)
+
+A CIL-T0 utasítások végrehajtási idejét három tényező határozza meg:
+
+1. **μstep** — a microcode ROM lépésszáma (`o_nsteps`). Ez **determinisztikus** és a `rtl/tb/test_microcode.py` cocotb tesztekkel verifikált. A legtöbb opkód 1 μstep; a `call` és `ret` 2 μstep.
+
+2. **ALU latencia** — az ALU belső iteratív logikájának ciklusigénye. Az egyszerű műveletek (add, sub, and, or, xor, shl, shr, neg, not, ceq, cgt, clt) 0 extra ciklust adnak (kombinációs ALU). A `mul` 3–7 ciklust ad (shift-add szorzó), a `div`/`rem` 15–31 ciklust (restoring osztó, 32 iteráció).
+
+3. **Pipeline és memória hatás** — branch opkódoknál a „taken" eset +1 pipeline flush ciklust ad. Az `ldind.i4`/`stind.i4` opkódoknál a QSPI/PSRAM latencia +0–2 ciklust adhat (on-chip SRAM: 0; QSPI flash: 1–2).
+
+**Képlet:** `Σ ciklus = μstep + ALU latencia + pipeline flush + memória latencia`
+
+### Összefoglaló táblázat (48 opkód)
+
+| Kategória | Opkódok | μstep | Σ ciklus | Megjegyzés |
+|-----------|---------|-------|----------|------------|
+| Konstans load | ldnull, ldc.i4.* | 1 | 1 | — |
+| Lokális/arg load | ldloc.*, ldarg.* | 1 | 1 | TOS cache hit |
+| Lokális/arg store | stloc.*, starg.s | 1 | 1 | — |
+| Stack manip. | nop, dup, pop | 1 | 1 | — |
+| ALU egyszerű | add, sub, and, or, xor, shl, shr, shr.un, neg, not | 1 | 1 | kombinációs ALU |
+| ALU szorzás | mul | 1 | 4–8 | iteratív shift-add |
+| ALU osztás | div, rem | 1 | 16–32 | restoring divider |
+| Összehasonlítás | ceq, cgt, cgt.un, clt, clt.un | 1 | 1 | — |
+| Branch feltétlen | br.s | 1 | 1+1 | +1 pipeline flush |
+| Branch 1-értékű | brfalse.s, brtrue.s | 1 | 1/1+1 | +1 ha taken |
+| Branch 2-értékű | beq.s..bne.un.s | 1 | 1/1+1 | ALU cmp + cond |
+| Indirekt load | ldind.i4 | 1 | 1–3 | +QSPI/PSRAM lat. |
+| Indirekt store | stind.i4 | 1 | 1–3 | +QSPI/PSRAM lat. |
+| Call | call | 2 | 2+N | N = arg count |
+| Return | ret | 2 | 2 | cond_pop + frame |
+| Debug | break | 1 | 1 | trap, CPU áll |
+
+**Forrás:** `rtl/src/cilcpu_microcode.v` — a μstep értékek az `o_nsteps` kimenetből olvashatók, és a `rtl/tb/test_microcode.py` cocotb tesztekkel vannak verifikálva (24 teszt, 0 hiba).
+
 ## Changelog
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-04-17 | F2.2b μstep + órajelciklus dokumentáció minden opkódhoz |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

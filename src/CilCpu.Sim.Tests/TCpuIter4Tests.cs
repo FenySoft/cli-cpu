@@ -684,4 +684,226 @@ public class TCpuIter4Tests
 
         Assert.Equal(TTrapReason.SramOverflow, trap.Reason);
     }
+
+    // ------------------------------------------------------------------
+    // hu: Memória határ tesztek (ldind.i4 / stind.i4)
+    // en: Memory boundary tests (ldind.i4 / stind.i4)
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: ldind.i4 az utolsó érvényes címről (4) 8 byte-os data memory-ból —
+    /// 4+4=8 ≤ 8, sikeres olvasás.
+    /// <br />
+    /// en: ldind.i4 from the last valid address (4) in 8-byte data memory —
+    /// 4+4=8 ≤ 8, succeeds.
+    /// </summary>
+    [Fact]
+    public void Execute_LdindI4_LastValidAddress_Succeeds()
+    {
+        var data = new byte[8];
+        data[4] = 0x78;
+        data[5] = 0x56;
+        data[6] = 0x34;
+        data[7] = 0x12;
+        var cpu = new TCpu(data);
+        // ldc.i4 4; ldind.i4
+        var program = new byte[] { 0x20, 0x04, 0x00, 0x00, 0x00, 0x4A };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.StackDepth);
+        Assert.Equal(0x12345678, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: ldind.i4 az első érvénytelen címről (5) 8 byte-os data memory-ból —
+    /// 5+4=9 > 8, InvalidMemoryAccess trap.
+    /// <br />
+    /// en: ldind.i4 from the first invalid address (5) in 8-byte data memory —
+    /// 5+4=9 > 8, InvalidMemoryAccess trap.
+    /// </summary>
+    [Fact]
+    public void Execute_LdindI4_FirstInvalidAddress_Traps()
+    {
+        var data = new byte[8];
+        var cpu = new TCpu(data);
+        // ldc.i4 5; ldind.i4
+        var program = new byte[] { 0x20, 0x05, 0x00, 0x00, 0x00, 0x4A };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.InvalidMemoryAccess, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: stind.i4 az utolsó érvényes címre (4) 8 byte-os data memory-ban —
+    /// 4+4=8 ≤ 8, sikeres írás.
+    /// <br />
+    /// en: stind.i4 to the last valid address (4) in 8-byte data memory —
+    /// 4+4=8 ≤ 8, succeeds.
+    /// </summary>
+    [Fact]
+    public void Execute_StindI4_LastValidAddress_Succeeds()
+    {
+        var data = new byte[8];
+        var cpu = new TCpu(data);
+        // ldc.i4 4 (address); ldc.i4 0x12345678 (value); stind.i4
+        var program = new byte[]
+        {
+            0x20, 0x04, 0x00, 0x00, 0x00,
+            0x20, 0x78, 0x56, 0x34, 0x12,
+            0x54
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(0, cpu.StackDepth);
+        Assert.Equal(0x78, data[4]);
+        Assert.Equal(0x56, data[5]);
+        Assert.Equal(0x34, data[6]);
+        Assert.Equal(0x12, data[7]);
+    }
+
+    /// <summary>
+    /// hu: stind.i4 az első érvénytelen címre (5) 8 byte-os data memory-ban —
+    /// 5+4=9 > 8, InvalidMemoryAccess trap.
+    /// <br />
+    /// en: stind.i4 to the first invalid address (5) in 8-byte data memory —
+    /// 5+4=9 > 8, InvalidMemoryAccess trap.
+    /// </summary>
+    [Fact]
+    public void Execute_StindI4_FirstInvalidAddress_Traps()
+    {
+        var data = new byte[8];
+        var cpu = new TCpu(data);
+        // ldc.i4 5 (address); ldc.i4 0 (value); stind.i4
+        var program = new byte[]
+        {
+            0x20, 0x05, 0x00, 0x00, 0x00,
+            0x16,
+            0x54
+        };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.InvalidMemoryAccess, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: ldind.i4 INT_MAX címmel 8 byte-os data memory-ból →
+    /// InvalidMemoryAccess trap (messze a határokon kívül).
+    /// <br />
+    /// en: ldind.i4 with INT_MAX address from 8-byte data memory →
+    /// InvalidMemoryAccess trap (far outside bounds).
+    /// </summary>
+    [Fact]
+    public void Execute_LdindI4_AddressIntMax_Traps()
+    {
+        var data = new byte[8];
+        var cpu = new TCpu(data);
+        // ldc.i4 INT_MAX (0x7FFFFFFF); ldind.i4
+        var program = new byte[] { 0x20, 0xFF, 0xFF, 0xFF, 0x7F, 0x4A };
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.InvalidMemoryAccess, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: ldind.i4 a 0 címről 4 byte-os data memory-ból — az alsó határ
+    /// érvényes, sikeres olvasás.
+    /// <br />
+    /// en: ldind.i4 from address 0 in 4-byte data memory — lower bound is
+    /// valid, succeeds.
+    /// </summary>
+    [Fact]
+    public void Execute_LdindI4_AddressZero_Succeeds()
+    {
+        var data = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD };
+        var cpu = new TCpu(data);
+        // ldc.i4.0; ldind.i4
+        var program = new byte[] { 0x16, 0x4A };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.StackDepth);
+        Assert.Equal(unchecked((int)0xDDCCBBAA), cpu.Peek(0));
+    }
+
+    // ------------------------------------------------------------------
+    // hu: Stack mélység határ tesztek
+    // en: Stack depth boundary tests
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: Pontosan 64 elem push-olása (MaxStackDepth) — nem dob trap-et.
+    /// <br />
+    /// en: Pushing exactly 64 items (MaxStackDepth) — no trap raised.
+    /// </summary>
+    [Fact]
+    public void Execute_Push_AtDepth64_Succeeds()
+    {
+        var cpu = new TCpu();
+        // 64 × ldc.i4.1 (0x17)
+        var program = Enumerable.Repeat((byte)0x17, 64).ToArray();
+
+        cpu.Execute(program);
+
+        Assert.Equal(64, cpu.StackDepth);
+    }
+
+    /// <summary>
+    /// hu: 65 elem push-olása (MaxStackDepth + 1) → StackOverflow trap.
+    /// <br />
+    /// en: Pushing 65 items (MaxStackDepth + 1) → StackOverflow trap.
+    /// </summary>
+    [Fact]
+    public void Execute_Push_AtDepth65_TrapsStackOverflow()
+    {
+        var cpu = new TCpu();
+        // 65 × ldc.i4.1 (0x17)
+        var program = Enumerable.Repeat((byte)0x17, 65).ToArray();
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.StackOverflow, trap.Reason);
+    }
+
+    /// <summary>
+    /// hu: 63 elem push + dup → mélység 64, sikeres (MaxStackDepth határ).
+    /// <br />
+    /// en: 63 items pushed + dup → depth 64, succeeds (at MaxStackDepth).
+    /// </summary>
+    [Fact]
+    public void Execute_Dup_AtDepth63_Succeeds()
+    {
+        var cpu = new TCpu();
+        // 63 × ldc.i4.1 + dup
+        var program = Enumerable.Repeat((byte)0x17, 63)
+            .Append((byte)0x25)
+            .ToArray();
+
+        cpu.Execute(program);
+
+        Assert.Equal(64, cpu.StackDepth);
+    }
+
+    /// <summary>
+    /// hu: 64 elem push + dup → mélység 65, StackOverflow trap.
+    /// <br />
+    /// en: 64 items pushed + dup → depth would be 65, StackOverflow trap.
+    /// </summary>
+    [Fact]
+    public void Execute_Dup_AtDepth64_TrapsStackOverflow()
+    {
+        var cpu = new TCpu();
+        // 64 × ldc.i4.1 + dup
+        var program = Enumerable.Repeat((byte)0x17, 64)
+            .Append((byte)0x25)
+            .ToArray();
+
+        var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
+
+        Assert.Equal(TTrapReason.StackOverflow, trap.Reason);
+    }
 }

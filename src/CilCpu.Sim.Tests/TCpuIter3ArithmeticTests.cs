@@ -696,4 +696,408 @@ public class TCpuIter3ArithmeticTests
 
         Assert.Equal(4, cpu.Peek(0));
     }
+
+    // ==================================================================
+    // Boundary value tests — Integer Arithmetic
+    // ==================================================================
+
+    /// <summary>
+    /// hu: add INT_MAX + INT_MAX = -2 (0xFFFFFFFE), túlcsordulás wrap.
+    /// <br />
+    /// en: add INT_MAX + INT_MAX = -2 (0xFFFFFFFE), overflow wraps.
+    /// </summary>
+    [Fact]
+    public void Execute_Add_IntMaxPlusIntMax_Wraps()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
+            0x58                           // add
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(-2, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: sub 0 - INT_MIN = INT_MIN (wrap, mert -INT_MIN nem ábrázolható).
+    /// <br />
+    /// en: sub 0 - INT_MIN = INT_MIN (wraps, because -INT_MIN is not representable).
+    /// </summary>
+    [Fact]
+    public void Execute_Sub_ZeroMinusIntMin_Wraps()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x16,                         // ldc.i4.0
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
+            0x59                           // sub
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(int.MinValue, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: mul INT_MAX * 2 = -2 (túlcsordulás wrap).
+    /// <br />
+    /// en: mul INT_MAX * 2 = -2 (overflow wraps).
+    /// </summary>
+    [Fact]
+    public void Execute_Mul_IntMaxTimesTwo_Wraps()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
+            0x18,                         // ldc.i4.2
+            0x5A                          // mul
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(-2, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: div INT_MIN / 1 = INT_MIN (nincs overflow, az osztó 1).
+    /// <br />
+    /// en: div INT_MIN / 1 = INT_MIN (no overflow, divisor is 1).
+    /// </summary>
+    [Fact]
+    public void Execute_Div_IntMinByOne_ReturnsIntMin()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
+            0x17,                         // ldc.i4.1
+            0x5B                          // div
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(int.MinValue, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: div INT_MIN / INT_MIN = 1.
+    /// <br />
+    /// en: div INT_MIN / INT_MIN = 1.
+    /// </summary>
+    [Fact]
+    public void Execute_Div_IntMinByIntMin_ReturnsOne()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
+            0x5B                           // div
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: div 1 / INT_MAX = 0 (egész osztás, csonkolás).
+    /// <br />
+    /// en: div 1 / INT_MAX = 0 (integer division, truncation).
+    /// </summary>
+    [Fact]
+    public void Execute_Div_OneByIntMax_ReturnsZero()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x17,                         // ldc.i4.1
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
+            0x5B                          // div
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(0, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: rem INT_MIN % 1 = 0.
+    /// <br />
+    /// en: rem INT_MIN % 1 = 0.
+    /// </summary>
+    [Fact]
+    public void Execute_Rem_IntMinByOne_ReturnsZero()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
+            0x17,                         // ldc.i4.1
+            0x5D                          // rem
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(0, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: rem 1 % INT_MAX = 1.
+    /// <br />
+    /// en: rem 1 % INT_MAX = 1.
+    /// </summary>
+    [Fact]
+    public void Execute_Rem_OneByIntMax_ReturnsOne()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x17,                         // ldc.i4.1
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
+            0x5D                          // rem
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: neg INT_MAX = -2147483647 (-INT_MAX).
+    /// <br />
+    /// en: neg INT_MAX = -2147483647 (-INT_MAX).
+    /// </summary>
+    [Fact]
+    public void Execute_Neg_IntMax_ReturnsMinIntMaxPlus1()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
+            0x65                          // neg
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(-2147483647, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: not INT_MAX = INT_MIN (~0x7FFFFFFF = 0x80000000 = -2147483648).
+    /// <br />
+    /// en: not INT_MAX = INT_MIN (~0x7FFFFFFF = 0x80000000 = -2147483648).
+    /// </summary>
+    [Fact]
+    public void Execute_Not_IntMax_ReturnsIntMin()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
+            0x66                          // not
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(int.MinValue, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: not INT_MIN = INT_MAX (~0x80000000 = 0x7FFFFFFF = 2147483647).
+    /// <br />
+    /// en: not INT_MIN = INT_MAX (~0x80000000 = 0x7FFFFFFF = 2147483647).
+    /// </summary>
+    [Fact]
+    public void Execute_Not_IntMin_ReturnsIntMax()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
+            0x66                          // not
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(int.MaxValue, cpu.Peek(0));
+    }
+
+    // ==================================================================
+    // Boundary value tests — Shifts
+    // ==================================================================
+
+    /// <summary>
+    /// hu: shl 0-val eltolás: 42 &lt;&lt; 0 = 42 (identitás).
+    /// <br />
+    /// en: shl by zero: 42 &lt;&lt; 0 = 42 (identity).
+    /// </summary>
+    [Fact]
+    public void Execute_Shl_ByZero_Identity()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x1F, 0x2A, // ldc.i4.s 42
+            0x16,       // ldc.i4.0
+            0x62        // shl
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(42, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: shl 1 &lt;&lt; 31 = INT_MIN (-2147483648), csak a sign bit marad.
+    /// <br />
+    /// en: shl 1 &lt;&lt; 31 = INT_MIN (-2147483648), only sign bit remains.
+    /// </summary>
+    [Fact]
+    public void Execute_Shl_By31_OnlySignBit()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x17,       // ldc.i4.1
+            0x1F, 0x1F, // ldc.i4.s 31
+            0x62        // shl
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(int.MinValue, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: shl 1 &lt;&lt; 32 = 1 (32 &amp; 31 = 0, tehát identitás).
+    /// <br />
+    /// en: shl 1 &lt;&lt; 32 = 1 (32 &amp; 31 = 0, so identity).
+    /// </summary>
+    [Fact]
+    public void Execute_Shl_By32_MasksToZero_Identity()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x17,       // ldc.i4.1
+            0x1F, 0x20, // ldc.i4.s 32
+            0x62        // shl
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: shr INT_MIN &gt;&gt; 31 = -1 (aritmetikai, sign extend).
+    /// <br />
+    /// en: shr INT_MIN &gt;&gt; 31 = -1 (arithmetic, sign extend).
+    /// </summary>
+    [Fact]
+    public void Execute_Shr_By31_NegativeBecomesMinusOne()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
+            0x1F, 0x1F,                   // ldc.i4.s 31
+            0x63                          // shr
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(-1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: shr 0-val eltolás: -42 &gt;&gt; 0 = -42 (identitás).
+    /// <br />
+    /// en: shr by zero: -42 &gt;&gt; 0 = -42 (identity).
+    /// </summary>
+    [Fact]
+    public void Execute_Shr_ByZero_Identity()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x1F, 0xD6, // ldc.i4.s -42
+            0x16,       // ldc.i4.0
+            0x63        // shr
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(-42, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: shr.un INT_MIN &gt;&gt;&gt; 31 = 1 (unsigned, zero extend).
+    /// <br />
+    /// en: shr.un INT_MIN &gt;&gt;&gt; 31 = 1 (unsigned, zero extend).
+    /// </summary>
+    [Fact]
+    public void Execute_ShrUn_By31_ReturnsOne()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
+            0x1F, 0x1F,                   // ldc.i4.s 31
+            0x64                          // shr.un
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(1, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: shr.un 0x80000000 &gt;&gt;&gt; 0 = 0x80000000 (identitás, INT_MIN mint int).
+    /// <br />
+    /// en: shr.un 0x80000000 &gt;&gt;&gt; 0 = 0x80000000 (identity, INT_MIN as int).
+    /// </summary>
+    [Fact]
+    public void Execute_ShrUn_ByZero_Identity()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue (0x80000000)
+            0x16,                         // ldc.i4.0
+            0x64                          // shr.un
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(int.MinValue, cpu.Peek(0));
+    }
+
+    /// <summary>
+    /// hu: shl negatív eltolás: 1 &lt;&lt; -1 → 1 &lt;&lt; (-1 &amp; 31) = 1 &lt;&lt; 31 = INT_MIN.
+    /// <br />
+    /// en: shl negative amount: 1 &lt;&lt; -1 → 1 &lt;&lt; (-1 &amp; 31) = 1 &lt;&lt; 31 = INT_MIN.
+    /// </summary>
+    [Fact]
+    public void Execute_Shl_NegativeAmount_MaskedTo31()
+    {
+        var cpu = new TCpu();
+        var program = new byte[]
+        {
+            0x17, // ldc.i4.1
+            0x15, // ldc.i4.m1
+            0x62  // shl
+        };
+
+        cpu.Execute(program);
+
+        Assert.Equal(int.MinValue, cpu.Peek(0));
+    }
 }

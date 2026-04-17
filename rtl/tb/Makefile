@@ -28,4 +28,7 @@ test_sram:
 test_decoder:
 	$(MAKE) MODULE=test_decoder TOPLEVEL=cilcpu_decoder VERILOG_SOURCES="$(PWD)/../src/cilcpu_decoder.v"
 
-.PHONY: test_alu test_sram test_decoder
+test_microcode:
+	$(MAKE) MODULE=test_microcode TOPLEVEL=cilcpu_microcode VERILOG_SOURCES="$(PWD)/../src/cilcpu_microcode.v"
+
+.PHONY: test_alu test_sram test_decoder test_microcode
