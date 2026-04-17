@@ -484,7 +484,7 @@ This v1.0 document captures the vision-level architecture. Details are to be res
 - `docs/quench-ram-en.md` — the QRAM cell providing CODE protection in the QRAM era
 - `docs/security-en.md` — the CFPU security model
 - `docs/architecture-en.md` — the CFPU microarchitecture hosting Seal Core as third core category
-- `docs/neuron-os-en.md` — the `hot_code_loader` actor hosted by the Seal Core
+- [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) — the `hot_code_loader` actor hosted by the Seal Core
 
 ### External references
 

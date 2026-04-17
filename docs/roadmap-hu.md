@@ -455,7 +455,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Cél:** A Cognitive Fabric + Neuron OS kombináció mint **demonstrálható, fejleszthető platform** több valós use-case-re. A `Neuron OS` itt lép ki kutatási státuszból valós fejlesztői platform szintre.
 
-**A Neuron OS teljes víziója egy külön dokumentumban**: [`docs/neuron-os-hu.md`](neuron-os-hu.md). Röviden: aktor-alapú operációs rendszer, amely az Erlang OTP víziót valósítja meg hardveres támogatással (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchia, capability-alapú biztonság, hot code loading, location transparency.
+**A Neuron OS teljes víziója egy külön dokumentumban**: [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md). Röviden: aktor-alapú operációs rendszer, amely az Erlang OTP víziót valósítja meg hardveres támogatással (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchia, capability-alapú biztonság, hot code loading, location transparency.
 
 **Kimenet:**
 - **Referencia PCB-k** több use-case-re:
@@ -486,7 +486,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - **F6**: hot code loading, writable microcode, elosztott aktorok több chipen
 - **F7**: fejlesztői SDK, VSCode integráció, NuGet publikálás, valódi alkalmazás demók
 
-Részletek és fejlesztői API példák: [`docs/neuron-os-hu.md`](neuron-os-hu.md).
+Részletek és fejlesztői API példák: [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md).
 
 ---
 

@@ -4,7 +4,7 @@
 
 > Version: 1.0
 
-Ez a dokumentum olyan koncepcionális kérdéseket gyűjt, amelyek a projekt megértéséhez szükségesek, de nem férnek bele a részletes spec dokumentumokba (`architecture-hu.md`, `ISA-CIL-T0-hu.md`, `security-hu.md`, `neuron-os-hu.md`, `secure-element-hu.md`).
+Ez a dokumentum olyan koncepcionális kérdéseket gyűjt, amelyek a projekt megértéséhez szükségesek, de nem férnek bele a részletes spec dokumentumokba (`architecture-hu.md`, `ISA-CIL-T0-hu.md`, `security-hu.md`, [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md), `secure-element-hu.md`).
 
 A FAQ célja, hogy egy **új olvasó** (akár mérnök, akár befektető, akár érdeklődő) gyorsan elhelyezze magában a projekt pozícióját anélkül, hogy a teljes ~3500+ soros dokumentáción végig kellene rágnia magát.
 
@@ -257,7 +257,7 @@ A .NET-ben futásidőben betölthetünk új DLL-eket. A CLI-CPU-n ez **core típ
 
 #### ❌ Thread, async/await runtime
 
-A C# `async/await` kulcsszavak **build-time állapotgép kompilációra** fordulnak (a Roslyn csinálja). Nincs „async runtime" a CLI-CPU-n — csak **egy aktor üzenet a mailbox-on**. Az async/await és a Task minta **természetesen leképződik** a mailbox-alapú üzenetre (részletek: `neuron-os-hu.md`).
+A C# `async/await` kulcsszavak **build-time állapotgép kompilációra** fordulnak (a Roslyn csinálja). Nincs „async runtime" a CLI-CPU-n — csak **egy aktor üzenet a mailbox-on**. Az async/await és a Task minta **természetesen leképződik** a mailbox-alapú üzenetre (részletek: [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md)).
 
 ### Történelmi tanulságok — mit csinál másképp a CLI-CPU
 
@@ -309,7 +309,7 @@ A `docs/architecture-hu.md` „Stratégiai pozicionálás: Cognitive Fabric" sze
 
 ### A projekt saját dokumentációja explicit támogatja
 
-A `docs/neuron-os-hu.md` négy különböző helyen is rögzíti a „több aktor egy core-on" modellt:
+A [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) négy különböző helyen is rögzíti a „több aktor egy core-on" modellt:
 
 **Location transparency** (107. sor):
 > „Egy aktor referencia **nem árulja el**, hogy a target **lokális (ugyanezen a core-on)**, másik core-on, vagy másik chipen van."
@@ -381,7 +381,7 @@ Az üzenet-feldolgozás lépései:
 4. **Runtime** → átkapcsol annak az aktornak az állapotára, végrehajtja az üzenet-kezelőt
 5. **Aktor** → visszatér, a runtime várja a következő üzenetet (akár másik aktornak)
 
-Ez pont olyan, mint az **Akka.NET / Erlang runtime**, csak **hardveres mailbox és privát SRAM** támogatással — **kooperatív multitasking**, ahol a scheduler nem szakítja félbe az üzenet-feldolgozást (`neuron-os-hu.md` 278. sor).
+Ez pont olyan, mint az **Akka.NET / Erlang runtime**, csak **hardveres mailbox és privát SRAM** támogatással — **kooperatív multitasking**, ahol a scheduler nem szakítja félbe az üzenet-feldolgozást ([`NeuronOS/vision-hu.md#2-start`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md#2-start)).
 
 ### Hány aktor fér egy core-on?
 
@@ -415,7 +415,7 @@ Van amikor szándékosan dedikált core-t kap egy aktor:
 
 ### Mikor érdemes „1 core = sok aktor" modellt használni?
 
-- **Nagy aktor populáció** — ezer vagy több aktor (pl. webszerver: 1 kérés = 1 aktor, `neuron-os-hu.md` 434. sor)
+- **Nagy aktor populáció** — ezer vagy több aktor (pl. webszerver: 1 kérés = 1 aktor, [`NeuronOS/vision-hu.md#új-aktor-dinamikusan-indítása`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md#új-aktor-dinamikusan-indítása))
 - **Hot/cold workload** — sok aktor, de csak kevés aktív egyidejűleg (pl. session handler)
 - **Supervisor fa belső csomópontjai** — ritkán dolgoznak, dedikált core pazarló lenne
 - **Kernel aktorok együtt** — `root_supervisor` + `scheduler` + `router` osztoznak egy Rich core-on
@@ -451,7 +451,7 @@ Ugyanaz a chip, különböző aktor/core arányok az igényeknek megfelelően.
 
 Vigyázz egy potenciális ellentmondással: a `docs/roadmap-hu.md` **F3 Tiny Tapeout** verziója egyetlen core-on **egyetlen CIL program**ot futtat. Ez **nem** azt jelenti, hogy a core csak 1 aktort tud hordozni — F3-ban egyszerűen a Tiny Tapeout tile SRAM annyira kicsi, hogy nem érdemes runtime-ot tenni rá.
 
-**A multi-aktor runtime F4-től jön be** (`neuron-os-hu.md` 617–624. sor), amikor már a `scheduler` + `router` valódi szerepet játszik, és F5-től természetes a több aktor egy core-on.
+**A multi-aktor runtime F4-től jön be** ([`NeuronOS/vision-hu.md#f4--multi-core-scheduler--router`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md#f4--multi-core-scheduler--router)), amikor már a `scheduler` + `router` valódi szerepet játszik, és F5-től természetes a több aktor egy core-on.
 
 ### A megkülönböztető pont más neuromorphic chipekkel szemben
 

@@ -455,7 +455,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Goal:** The Cognitive Fabric + Neuron OS combination as a **demonstrable, developable platform** for multiple real use cases. The `Neuron OS` graduates from research status to a real developer platform here.
 
-**The full Neuron OS vision is in a separate document**: [`docs/neuron-os-en.md`](neuron-os-en.md). In brief: an actor-based operating system that realizes the Erlang OTP vision with hardware support (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchy, capability-based security, hot code loading, location transparency.
+**The full Neuron OS vision is in a separate document**: [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md). In brief: an actor-based operating system that realizes the Erlang OTP vision with hardware support (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchy, capability-based security, hot code loading, location transparency.
 
 **Output:**
 - **Reference PCBs** for multiple use cases:
@@ -486,7 +486,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - **F6**: hot code loading, writable microcode, distributed actors across multiple chips
 - **F7**: developer SDK, VSCode integration, NuGet publishing, real application demos
 
-Details and developer API examples: [`docs/neuron-os-en.md`](neuron-os-en.md).
+Details and developer API examples: [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md).
 
 ---
 

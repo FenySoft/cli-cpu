@@ -123,7 +123,7 @@ Earlier drafts proposed a separate `WIPE` primitive for "pre-release sanitizatio
 
 ## Trust boundary <a name="trust-boundary"></a>
 
-Quench-RAM security is **not based on privilege separation** (no kernel mode vs. user mode — Neuron OS explicitly rejects this, see `docs/neuron-os-en.md` line 731). It rests instead on **the combination of two existing mechanisms**:
+Quench-RAM security is **not based on privilege separation** (no kernel mode vs. user mode — Neuron OS explicitly rejects this, see [`vision-en.md#2-not-a-monolithic-kernel----instead-an-actor-hierarchy`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#2-not-a-monolithic-kernel----instead-an-actor-hierarchy)). It rests instead on **the combination of two existing mechanisms**:
 
 ### 1. Microcode-only primitives (SEAL, RELEASE)
 
@@ -225,7 +225,7 @@ This is simultaneously a **security** and a **performance** advantage from a sin
 
 ## Synergy with per-core GC <a name="gc-synergy"></a>
 
-`docs/neuron-os-en.md` lines 366–369 establish that every Rich core has its own **bump allocator + mark-sweep GC**. Quench-RAM **dramatically simplifies** this GC:
+[`NeuronOS/vision-en.md#per-core-private-gc`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#per-core-private-gc) establishes that every Rich core has its own **bump allocator + mark-sweep GC**. Quench-RAM **dramatically simplifies** this GC:
 
 ### Mark phase
 Unchanged: the GC walks the reference graph and marks every reachable object.
@@ -264,7 +264,7 @@ The "pinned object" notion in traditional .NET GC: an object the GC cannot move 
 
 ## Synergy with the actor-model capability system <a name="actor-synergy"></a>
 
-The `ActorRef` capability token defined in `docs/neuron-os-en.md` lines 388–398 becomes **physically defendable** with Quench-RAM:
+The `ActorRef` capability token defined in [`NeuronOS/vision-en.md#the-concept-of-a-capability`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#the-concept-of-a-capability) becomes **physically defendable** with Quench-RAM:
 
 ```csharp
 public readonly struct ActorRef
@@ -468,7 +468,7 @@ Quench-RAM is **not a prerequisite** for F0-F4; these continue to operate on the
 
 - `docs/architecture-en.md` — the CFPU microarchitecture into which Quench-RAM integrates
 - `docs/security-en.md` — security model that Quench-RAM extends
-- `docs/neuron-os-en.md` — the per-core GC and capability registry that use Quench-RAM
+- [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) — the per-core GC and capability registry that use Quench-RAM
 - `docs/secure-element-en.md` — F6.5 Secure Edition, where fine-grained Quench-RAM is mandatory
 
 ## Changelog <a name="changelog"></a>

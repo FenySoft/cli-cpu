@@ -513,7 +513,7 @@ The Quench-RAM per-block status bit mechanism guarantees **exactly** what CodeLo
 
 ### Neuron OS hot code loader
 
-`docs/neuron-os-en.md` line 244 describes a `hot_code_loader` actor receiving new CIL code. AuthCode becomes its **security module**:
+[`NeuronOS/vision-en.md#kernel-actors-root-level`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#kernel-actors-root-level) describes a `hot_code_loader` actor receiving new CIL code. AuthCode becomes its **security module**:
 
 ```
 hot_code_loader (Neuron OS kernel actor):
@@ -527,7 +527,7 @@ The `hot_code_loader` itself is **a signed actor** — part of the root supervis
 
 ### Per-actor capability model
 
-AuthCode verifies only **code loading** — interactions among running actors are still governed by the existing capability-based system (`docs/neuron-os-en.md` lines 377-413). The two are orthogonal:
+AuthCode verifies only **code loading** — interactions among running actors are still governed by the existing capability-based system ([`NeuronOS/vision-en.md#capability-based-security`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#capability-based-security)). The two are orthogonal:
 
 - **AuthCode:** "who may run on the chip at all"
 - **Capability:** "what a running actor may do"
@@ -575,7 +575,7 @@ These questions **do not block** earlier phases — the v1.0 model allows consis
 
 - `docs/quench-ram-en.md` — the Quench-RAM memory cell on which CodeLock is built
 - `docs/security-en.md` — the CFPU security model that AuthCode extends
-- `docs/neuron-os-en.md` — the `hot_code_loader` actor and the capability model
+- [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) — the `hot_code_loader` actor and the capability model
 - `docs/architecture-en.md` — the CFPU Harvard architecture on which CodeLock builds
 - `docs/secure-element-en.md` — the Secure Edition (F6.5) may use this mechanism for its TEE
 

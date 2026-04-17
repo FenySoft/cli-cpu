@@ -4,7 +4,7 @@
 
 > Version: 1.0
 
-This document collects conceptual questions that are essential for understanding the project but do not fit neatly into the detailed spec documents (`architecture-en.md`, `ISA-CIL-T0-en.md`, `security-en.md`, `neuron-os-en.md`, `secure-element-en.md`).
+This document collects conceptual questions that are essential for understanding the project but do not fit neatly into the detailed spec documents (`architecture-en.md`, `ISA-CIL-T0-en.md`, `security-en.md`, [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md), `secure-element-en.md`).
 
 The purpose of this FAQ is to help a **new reader** (whether engineer, investor, or curious observer) quickly orient themselves without having to wade through the full ~3,500+ lines of documentation.
 
@@ -254,7 +254,7 @@ In .NET, new DLLs can be loaded at runtime. On CLI-CPU, this **differs by core t
 
 #### Thread, async/await runtime
 
-The C# `async/await` keywords compile to **build-time state machine compilation** (done by Roslyn). There is no "async runtime" on CLI-CPU -- just **an actor message on the mailbox**. The async/await and Task patterns **naturally map** to mailbox-based messaging (details in `neuron-os-en.md`).
+The C# `async/await` keywords compile to **build-time state machine compilation** (done by Roslyn). There is no "async runtime" on CLI-CPU -- just **an actor message on the mailbox**. The async/await and Task patterns **naturally map** to mailbox-based messaging (details in [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md)).
 
 ### Historical lessons -- what CLI-CPU does differently
 
@@ -306,7 +306,7 @@ According to the "Strategic positioning: Cognitive Fabric" section in `docs/arch
 
 ### The project documentation explicitly supports this
 
-The `docs/neuron-os-en.md` records the "multiple actors on one core" model in four distinct places:
+The [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) records the "multiple actors on one core" model in four distinct places:
 
 **Location transparency** (line 107):
 > "An actor reference **does not reveal** whether the target is **local (on the same core)**, on another core, or on another chip."
@@ -378,7 +378,7 @@ Message processing steps:
 4. **Runtime** --> switches to that actor's state, executes the message handler
 5. **Actor** --> returns, the runtime waits for the next message (possibly for a different actor)
 
-This is exactly like an **Akka.NET / Erlang runtime**, but with **hardware mailbox and private SRAM** support -- **cooperative multitasking** where the scheduler does not interrupt message processing (`neuron-os-en.md`, line 278).
+This is exactly like an **Akka.NET / Erlang runtime**, but with **hardware mailbox and private SRAM** support -- **cooperative multitasking** where the scheduler does not interrupt message processing ([`NeuronOS/vision-en.md#2-start`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#2-start)).
 
 ### How many actors fit on a single core?
 
@@ -412,7 +412,7 @@ There are cases where an actor is intentionally given a dedicated core:
 
 ### When should you use the "1 core = many actors" model?
 
-- **Large actor population** -- thousands or more actors (e.g., web server: 1 request = 1 actor, `neuron-os-en.md`, line 434)
+- **Large actor population** -- thousands or more actors (e.g., web server: 1 request = 1 actor, [`NeuronOS/vision-en.md#starting-a-new-actor-dynamically`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#starting-a-new-actor-dynamically))
 - **Hot/cold workload** -- many actors, but only a few active at any given time (e.g., session handler)
 - **Internal nodes of a supervisor tree** -- rarely do work, a dedicated core would be wasteful
 - **Kernel actors together** -- `root_supervisor` + `scheduler` + `router` sharing a Rich core
@@ -448,7 +448,7 @@ Same chip, different actor/core ratios tailored to the workload.
 
 Watch out for a potential apparent contradiction: the `docs/roadmap-en.md` **F3 Tiny Tapeout** version runs a single CIL program on a single core. This does **not** mean the core can only host 1 actor -- in F3, the Tiny Tapeout tile's SRAM is simply too small to justify a runtime.
 
-**The multi-actor runtime arrives in F4** (`neuron-os-en.md`, lines 617-624), when the `scheduler` + `router` take on real roles, and from F5 onward, multiple actors on a single core is natural.
+**The multi-actor runtime arrives in F4** ([`NeuronOS/vision-en.md#f4----multi-core-scheduler--router`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#f4----multi-core-scheduler--router)), when the `scheduler` + `router` take on real roles, and from F5 onward, multiple actors on a single core is natural.
 
 ### The differentiating point versus other neuromorphic chips
 

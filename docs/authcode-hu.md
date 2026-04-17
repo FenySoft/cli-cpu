@@ -513,7 +513,7 @@ A Quench-RAM per-blokk status-bit mechanizmusa **pontosan azt** garantálja, ami
 
 ### Neuron OS hot code loader
 
-A `docs/neuron-os-hu.md` 244. sora leír egy `hot_code_loader` aktort, ami új CIL kódot fogad. Az AuthCode **ennek a aktornak a biztonsági moduljává** válik:
+A [`NeuronOS/vision-hu.md#kernel-aktorok-root-level`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md#kernel-aktorok-root-level) szakasza leír egy `hot_code_loader` aktort, ami új CIL kódot fogad. Az AuthCode **ennek a aktornak a biztonsági moduljává** válik:
 
 ```
 hot_code_loader (Neuron OS kernel aktor):
@@ -527,7 +527,7 @@ A `hot_code_loader` maga is **aláírt aktor** — a root supervisor része, ven
 
 ### Per-actor capability model
 
-Az AuthCode csak a **kódbetöltést** ellenőrzi — a futó aktorok egymás közötti interakcióját **továbbra is a meglévő capability-alapú rendszer** kezeli (`docs/neuron-os-hu.md` 377-413. sor). A kettő ortogonális:
+Az AuthCode csak a **kódbetöltést** ellenőrzi — a futó aktorok egymás közötti interakcióját **továbbra is a meglévő capability-alapú rendszer** kezeli ([`NeuronOS/vision-hu.md#capability-alapú-biztonság`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md#capability-alapú-biztonság)). A kettő ortogonális:
 
 - **AuthCode:** "ki futtatható a chipen egyáltalán"
 - **Capability:** "mit tud egy futó aktor"
@@ -575,7 +575,7 @@ Ezek a kérdések **nem blokkolják** az alsóbb fázisokat — a v1.0 modell ko
 
 - `docs/quench-ram-hu.md` — a Quench-RAM memóriacella, amin a CodeLock mechanizmusa alapul
 - `docs/security-hu.md` — a CFPU biztonsági modell, amit az AuthCode kibővít
-- `docs/neuron-os-hu.md` — a `hot_code_loader` aktor és a capability-modell
+- [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) — a `hot_code_loader` aktor és a capability-modell
 - `docs/architecture-hu.md` — a CFPU Harvard-architektúra, amire a CodeLock épül
 - `docs/secure-element-hu.md` — a Secure Edition (F6.5) potenciálisan ezt a mechanizmust használja a TEE-jéhez
 

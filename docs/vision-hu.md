@@ -87,7 +87,7 @@ Az izoláció nem szoftveres (MMU + page table) → HARDVERES.
 
 **A Linux kernel 30 millió sora azért létezik, mert a shared memory-t szoftveresen kell védeni.** Ha a hardver garantálja az izolációt, a kernel **feladata eltűnik**.
 
-Részletek: [`docs/neuron-os-hu.md`](neuron-os-hu.md).
+Részletek: [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md).
 
 ---
 
@@ -423,7 +423,7 @@ A cél nem az, hogy lecseréljük a Linuxot vagy a PostgreSQL-t — hanem hogy e
 ## Hivatkozások
 
 - [`docs/architecture-hu.md`](architecture-hu.md) — mikroarchitektúra, pipeline, memória modell, heterogén Nano+Rich design
-- [`docs/neuron-os-hu.md`](neuron-os-hu.md) — a Neuron OS részletes víziója, aktor API, supervisor fa, scheduler, hot code reload
+- [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) — a Neuron OS részletes víziója, aktor API, supervisor fa, scheduler, hot code reload
 - [`docs/roadmap-hu.md`](roadmap-hu.md) — F0-F7 fázisterv
 - [`docs/faq-hu.md`](faq-hu.md) — FAQ 5-7: CPU összehasonlítás, ütemezési költségek, igazságos összevetés
 - [`docs/security-hu.md`](security-hu.md) — biztonsági modell, formális verifikáció terv

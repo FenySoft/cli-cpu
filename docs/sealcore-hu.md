@@ -484,7 +484,7 @@ Ez a v1.0 doksi a vízió-szintű architektúrát rögzíti. A részletek a megf
 - `docs/quench-ram-hu.md` — a QRAM memóriacella, ami QRAM érában a CODE védelmét adja
 - `docs/security-hu.md` — a CFPU biztonsági modell
 - `docs/architecture-hu.md` — a CFPU mikroarchitektúra, ahova a Seal Core mint harmadik core-kategória beilleszkedik
-- `docs/neuron-os-hu.md` — a `hot_code_loader` aktor, amit a Seal Core hosteol
+- [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) — a `hot_code_loader` aktor, amit a Seal Core hosteol
 
 ### Külső referenciák
 

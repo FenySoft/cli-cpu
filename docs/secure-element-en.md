@@ -24,7 +24,7 @@
 
 ## Why a Third Track <a name="why-a-third-track"></a>
 
-The existing `docs/architecture-hu.md`, `docs/security-hu.md`, and `docs/neuron-os-hu.md` documents established **two market tracks**:
+The existing `docs/architecture-en.md`, `docs/security-en.md`, and [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) documents established **two market tracks**:
 
 1. **Cognitive Fabric** — programmable cognitive substrate, AI/SNN/actor cluster (long-term vision)
 2. **Trustworthy Silicon** — regulated industries (automotive, aviation, medical, critical infra), short-to-medium-term revenue
@@ -720,7 +720,7 @@ The Secure Edition **does not rush** anything in the F1-F4 phases, because the C
 - [`docs/security-en.md`](security-en.md) -- Hardware security properties are documented here; the Secure Edition builds on them.
 - [`docs/architecture-en.md`](architecture-en.md) -- The heterogeneous Nano + Rich multi-core architecture is also the foundation of the Secure Edition.
 - [`docs/roadmap-en.md`](roadmap-en.md) -- The F6.5 phase will be recorded here.
-- [`docs/neuron-os-en.md`](neuron-os-en.md) -- The Neuron OS actor-based model **naturally** supports the multi-SE hardware isolation.
+- [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) -- The Neuron OS actor-based model **naturally** supports the multi-SE hardware isolation.
 
 ## Closing Thought
 

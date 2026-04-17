@@ -71,7 +71,7 @@ CLI-CPU + [**Neuron OS**](https://neuron-os.org) pursues **three parallel market
 
 **Track 3 -- "Secure Edition"**: transforming the JavaCard / TEE / Secure Element market -- a parallel tape-out alongside the main F6, adding Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures. **First products: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Key differentiator: **multiple independent hardware security domains on a single chip**, which existing open alternatives (TROPIC01, OpenTitan) **do not offer**. Details: [`docs/secure-element-en.md`](docs/secure-element-en.md).
 
-Same chip family, three different market segments -- **but the same historical goal**: just as x86 replaced the mainframe, mobile replaced the desktop, and the cloud replaced the on-prem data center, **the Cognitive Fabric + Neuron OS will be the next replacement cycle**, delivering the OS for the modern, AI-driven, safety-critical, massively distributed era. Details in the "The inherited problems of Linux and Neuron OS's answer" section of [`docs/neuron-os-en.md`](docs/neuron-os-en.md).
+Same chip family, three different market segments -- **but the same historical goal**: just as x86 replaced the mainframe, mobile replaced the desktop, and the cloud replaced the on-prem data center, **the Cognitive Fabric + Neuron OS will be the next replacement cycle**, delivering the OS for the modern, AI-driven, safety-critical, massively distributed era. Details in the "The inherited problems of Linux and Neuron OS's answer" section of [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md).
 
 ## Heterogeneous multi-core: CFPU Nano + CFPU Rich
 
@@ -103,7 +103,7 @@ See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 - [docs/architecture-en.md](docs/architecture-en.md) -- CLI-CPU microarchitecture, Cognitive Fabric positioning, prior art analysis (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogeneous Nano + Rich multi-core
 - [docs/ISA-CIL-T0-en.md](docs/ISA-CIL-T0-en.md) -- CIL-T0 subset specification (48 opcodes), mailbox MMIO interface
 - [docs/security-en.md](docs/security-en.md) -- Threat model, architectural security guarantees, attack immunity table, formal verification plan, certification paths (IEC 61508, ISO 26262, DO-178C, IEC 62304)
-- [docs/neuron-os-en.md](docs/neuron-os-en.md) -- Neuron OS vision: an actor-based operating system for CLI-CPU, "Erlang in silicon". **Implementation:** [github.com/FenySoft/NeuronOS](https://github.com/FenySoft/NeuronOS)
+- [Neuron OS vision](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) -- an actor-based operating system for the CFPU, "Erlang in silicon". **Implementation:** [github.com/FenySoft/NeuronOS](https://github.com/FenySoft/NeuronOS) (the vision document also lives there; local redirect stub: [`docs/neuron-os-en.md`](docs/neuron-os-en.md))
 - [docs/secure-element-en.md](docs/secure-element-en.md) -- Secure Edition: JavaCard / TEE / Secure Element market, detailed TROPIC01 analysis, multi-SE hardware isolation, F6.5 parallel tape-out plan
 - [docs/faq-en.md](docs/faq-en.md) -- FAQ: conceptual anchors for new readers (CLI vs CIL, CPU comparison, scheduling costs)
 - [docs/vision-en.md](docs/vision-en.md) -- The shared-nothing future: OS, GUI, database, networking, and programming model reimagined
