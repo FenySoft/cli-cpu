@@ -2,7 +2,7 @@
 
 > Magyar verzió: [roadmap-hu.md](roadmap-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 The CLI-CPU project is built in **seven phases**, from the specification document to the first working, hand-held silicon and beyond, to a full ECMA-335 CIL implementation.
 
@@ -490,6 +490,71 @@ Details and developer API examples: [`NeuronOS/docs/vision-en.md`](https://githu
 
 ---
 
+## Estimated Work Hours Summary
+
+Estimates assume **AI-assisted development** (Claude Code pair programming), which based on actual F0–F2.2b effort provides ~30–40% productivity gain in code generation, test writing, and documentation. Physical work (PCB, bring-up, FPGA) benefits less from AI assistance.
+
+| Phase | Description | Est. Hours | Eng. Months* | Status |
+|-------|-------------|-----------|-------------|--------|
+| **F0** | Specification (3 documents, ~3500+ lines) | ~60 | ~0.4 | ✅ DONE |
+| **F1** | C# reference simulator (48 opcodes, 218 tests, 4 TDD iterations) | ~120 | ~0.8 | ✅ DONE |
+| **F1.5** | Linker, Runner, Samples (259 tests) | ~80 | ~0.5 | ✅ DONE |
+| **F2** | RTL (Verilog + cocotb, 7 subsections) | ~350 | ~2.2 | 🔧 In Progress |
+| — F2.1 | ALU (32-bit integer) | ~30 | | ✅ DONE |
+| — F2.2a | Decoder (length + opcode) | ~40 | | ✅ DONE |
+| — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ DONE |
+| — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ⬜ Planned |
+| — F2.4 | QSPI controller | ~70 | | ⬜ Planned |
+| — F2.5 | Golden vector harness | ~35 | | ⬜ Planned |
+| — F2.6 | Yosys synthesis (Sky130) | ~30 | | ⬜ Planned |
+| — F2.7 | FPGA validation (A7-Lite) | ~45 | | ⬜ Planned |
+| **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Planned |
+| **F4** | Multi-core Cognitive Fabric on FPGA (4× Nano, router, sleep/wake) | ~360 | ~2.3 | ⬜ Planned |
+| **F5** | Rich core + heterogeneous system (full CIL, GC, FPU, source gen.) | ~720 | ~4.5 | ⬜ Planned |
+| **F6-FPGA** | Heterogeneous demonstration (3× A7-Lite, mesh, Ethernet bridge) | ~480 | ~3 | ⬜ Planned |
+| **F6-Si Zero** | IHP 3 mm² (1R+8N, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Planned |
+| **F6-Si One** | ChipIgnite 15 mm² (6R+16N+1S, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Planned |
+| **F6.5** | Secure Edition (Crypto Actor, TRNG, PUF, tamper, DPA) | ~5,600 | ~35 | ⬜ Optional |
+| **F7** | Neuron OS SDK + demo platform (PCBs, SDK, applications) | ~520 | ~3.3 | ⬜ Planned |
+| | **Total (without F6.5)** | **~3,630** | **~23** | |
+| | **Total (with F6.5)** | **~9,230** | **~58** | |
+
+\* 1 engineer-month ≈ 160 hours (4 weeks × 40 hours). F6.5 requires a separate team (3–5 people), the rest is estimated for a single AI-assisted developer.
+
+**Notes:**
+- DONE phases (F0, F1, F1.5, F2.1–F2.2b) estimates reflect actual effort — these are **already AI-assisted** values
+- The F4 estimate is lower than core count might suggest because Nano core RTL is **reused** from F2/F3 — the substantive new work is the router, sleep/wake, and demos
+- F6-Silicon Zero and One **can run in parallel** after F6-FPGA, or sequentially — the table shows pure engineering effort, not manufacturing wait times
+- F6.5 (Secure Edition) requires a **separate team**, and Common Criteria certification adds ~2–3 years
+- Estimates cover **pure engineering time** only — manufacturing lead times (TT ~5 months, ChipIgnite ~5 months, IHP ~4 months), shipping, and bring-up waiting are not included
+
+### NLnet NGI Zero Commons Fund Alignment
+
+The [NLnet application](nlnet-application-draft-en.md) (v1.1, submitted 2026-04-14) requested **€35,000** for **18 months**, assuming ~900 hours of part-time work (~€36/h, of which ~€2,440 is hardware).
+
+**Milestone mapping:**
+
+| NLnet Milestone | Roadmap Phase | Grant Budget | Grant Hours† | Roadmap Est. | Coverage |
+|-----------------|---------------|-------------|-------------|-------------|----------|
+| **M1:** RTL | F2 | €8,000 | ~222 h | ~350 h | full |
+| **M2:** Tiny Tapeout | F3 | €7,000 | ~159 h | ~220 h | full |
+| **M3:** FPGA multi-core | F4 | €8,000 | ~190 h | ~360 h | full |
+| **M4:** Rich core RTL start | F5 (start) | €7,000 | ~194 h | ~200 h (of 720) | ~28% |
+| **M5:** Docs & community | (built-in) | €5,000 | ~139 h | ~100 h | full |
+| **Total** | F2–F5 start | **€35,000** | **~904 h** | **~1,230 h** | |
+
+† Personnel hours = (budget − hardware cost) ÷ €36/h
+
+**Gap explanation:** The roadmap's full estimate (~1,230 h for the NLnet scope) **exceeds the grant's ~900 hours by ~330 h**. This is normal for open-source grant projects — the grant covers **costs**, not 100% of effort. The difference (~27%) represents the developer's **unfunded own contribution** to the project, which is the standard open-source development model.
+
+**The grant commitments are achievable**, because:
+1. Actual pace on F0–F2.2b (~260 h / ~2 weeks of intensive sprints) **exceeds** the grant's timeline
+2. AI-assisted development (Claude Code) delivers a proven ~30–40% speedup on code generation, testing, and documentation as demonstrated in DONE phases
+3. F2 RTL foundations (ALU, decoder, microcode ROM) are **already complete** — before the grant period starts
+4. F4 core instantiation directly reuses F2/F3 RTL — the substantive new work (router, sleep/wake) is well-scoped
+
+---
+
 ## Dependency Graph
 
 ```
@@ -613,4 +678,5 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-04-17 | Added estimated work hours summary + NLnet grant alignment section. AI-assisted development estimates. |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

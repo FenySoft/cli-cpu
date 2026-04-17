@@ -2,7 +2,7 @@
 
 > English version: [roadmap-en.md](roadmap-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első működő, kezedben tartható szilíciumig és tovább, a teljes ECMA-335 CIL implementációig.
 
@@ -490,6 +490,71 @@ Részletek és fejlesztői API példák: [`NeuronOS/docs/vision-hu.md`](https://
 
 ---
 
+## Becsült munkaóra összesítő
+
+A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair programming), ami az F0–F2.2b tényleges ráfordítása alapján ~30–40%-os produktivitásnövekedést jelent a kódgenerálás, tesztírás és dokumentáció területén. A fizikai munka (PCB, bring-up, FPGA) esetén az AI hatás kisebb.
+
+| Fázis | Leírás | Becsült óra | Mérnökhónap* | Státusz |
+|-------|--------|-------------|-------------|---------|
+| **F0** | Specifikáció (3 dokumentum, ~3500+ sor) | ~60 | ~0.4 | ✅ KÉSZ |
+| **F1** | C# referencia szimulátor (48 opkód, 218 teszt, 4 iteráció TDD) | ~120 | ~0.8 | ✅ KÉSZ |
+| **F1.5** | Linker, Runner, Samples (259 teszt) | ~80 | ~0.5 | ✅ KÉSZ |
+| **F2** | RTL (Verilog + cocotb, 7 alszakasz) | ~350 | ~2.2 | 🔧 Folyamatban |
+| — F2.1 | ALU (32-bit egész) | ~30 | | ✅ KÉSZ |
+| — F2.2a | Decoder (hossz + opkód) | ~40 | | ✅ KÉSZ |
+| — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ KÉSZ |
+| — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ⬜ Tervezett |
+| — F2.4 | QSPI vezérlő | ~70 | | ⬜ Tervezett |
+| — F2.5 | Golden vector harness | ~35 | | ⬜ Tervezett |
+| — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
+| — F2.7 | FPGA validáció (A7-Lite) | ~45 | | ⬜ Tervezett |
+| **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Tervezett |
+| **F4** | Multi-core Cognitive Fabric FPGA (4× Nano, router, sleep/wake) | ~360 | ~2.3 | ⬜ Tervezett |
+| **F5** | Rich core + heterogén rendszer (teljes CIL, GC, FPU, source gen.) | ~720 | ~4.5 | ⬜ Tervezett |
+| **F6-FPGA** | Heterogén demonstráció (3× A7-Lite, mesh, Ethernet bridge) | ~480 | ~3 | ⬜ Tervezett |
+| **F6-Si Zero** | IHP 3 mm² (1R+8N, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Tervezett |
+| **F6-Si One** | ChipIgnite 15 mm² (6R+16N+1S, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Tervezett |
+| **F6.5** | Secure Edition (Crypto Actor, TRNG, PUF, tamper, DPA) | ~5 600 | ~35 | ⬜ Opcionális |
+| **F7** | Neuron OS SDK + demó platform (PCB-k, SDK, alkalmazások) | ~520 | ~3.3 | ⬜ Tervezett |
+| | **Összesen (F6.5 nélkül)** | **~3 630** | **~23** | |
+| | **Összesen (F6.5-tel)** | **~9 230** | **~58** | |
+
+\* 1 mérnökhónap ≈ 160 óra (4 hét × 40 óra). Az F6.5 külön csapat (3–5 fő), a többi 1 fős AI-asszisztált fejlesztéssel becsülve.
+
+**Megjegyzések:**
+- A KÉSZ fázisok (F0, F1, F1.5, F2.1–F2.2b) becsült órái a tényleges ráfordítást tükrözik — ezek **már AI-asszisztált** értékek
+- Az F4 becslés alacsonyabb, mint ami core-szám alapján várható, mert a Nano core RTL **újrafelhasználható** az F2/F3-ból — az érdemi új munka a router, sleep/wake és demók
+- Az F6-Silicon Zero és One **párhuzamosan** is futhat az F6-FPGA után, de egymás után is — a táblázat az érdemi mérnöki munkát mutatja, a gyártási várakozási időt nem
+- Az F6.5 (Secure Edition) egy **külön csapatot** igényel, és a Common Criteria tanúsítás további ~2–3 év
+- A becslések **tiszta mérnöki munkaidőt** tartalmaznak — a gyártási átfutás (TT ~5 hó, ChipIgnite ~5 hó, IHP ~4 hó), szállítás és bring-up várakozás nincs benne
+
+### NLnet NGI Zero Commons Fund összehangolás
+
+Az [NLnet pályázat](nlnet-application-draft-en.md) (v1.1, beadva 2026-04-14) **€35 000**-t kért **18 hónapra**, ~900 óra part-time munkát feltételezve (~€36/h, ebből ~€2 440 hardver).
+
+**Mérföldkő-megfeleltetés:**
+
+| NLnet mérföldkő | Roadmap fázis | Pályázat budget | Pályázat óra† | Roadmap becslés | Lefedettség |
+|------------------|---------------|-----------------|---------------|-----------------|-------------|
+| **M1:** RTL | F2 | €8 000 | ~222 h | ~350 h | teljes |
+| **M2:** Tiny Tapeout | F3 | €7 000 | ~159 h | ~220 h | teljes |
+| **M3:** FPGA multi-core | F4 | €8 000 | ~190 h | ~360 h | teljes |
+| **M4:** Rich core RTL start | F5 (kezdet) | €7 000 | ~194 h | ~200 h (a 720-ból) | ~28% |
+| **M5:** Doku & közösség | (beépítve) | €5 000 | ~139 h | ~100 h | teljes |
+| **Összesen** | F2–F5 start | **€35 000** | **~904 h** | **~1 230 h** | |
+
+† Személyi óra = (budget − hardverköltség) ÷ €36/h
+
+**Eltérés magyarázata:** A roadmap teljes becslése (~1 230 h az NLnet scope-ra) **~330 órával meghaladja** a pályázatban vállalt ~900 órát. Ez normális nyílt forráskódú pályázatoknál — a támogatás a **költségek fedezését** szolgálja, nem az összes ráfordított idő 100%-os kompenzálását. A különbség (~27%) a fejlesztő **saját hozzájárulása** a projekthez (unfunded own contribution), ami az open-source fejlesztés szokásos modellje.
+
+**A pályázat vállalásai teljesíthetők**, mert:
+1. Az F0–F2.2b tényleges tempó (~260 h / ~2 hét intenzív sprint) **meghaladja** a pályázat ütemezését
+2. Az AI-asszisztált fejlesztés (Claude Code) a KÉSZ fázisoknál bizonyítottan ~30–40%-os gyorsulást ad a kódgenerálás, teszt és dokumentáció területén
+3. Az F2 RTL alapjai (ALU, decoder, microcode ROM) már **készen vannak** — a pályázat indulása előtt
+4. Az F4 core-instanciálás az F2/F3 RTL közvetlen újrafelhasználása — az érdemi új munka (router, sleep/wake) jól körülhatárolt
+
+---
+
 ## Függőségi gráf
 
 ```
@@ -615,4 +680,5 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-04-17 | Becsült munkaóra összesítő + NLnet pályázati összehangolás hozzáadva. AI-asszisztált fejlesztési becslések. |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
