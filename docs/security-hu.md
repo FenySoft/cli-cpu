@@ -148,7 +148,7 @@ A CLI-CPU in-order, nem-speculative pipeline. **Nincs branch prediction bypass, 
 | Capability tag forging | — | RAM patcheléssel lehetséges | **Kizárva** ([Quench-RAM](quench-ram-hu.md): sealed régióban tárolva) |
 | Unsigned code execution | CWE-345 | OS-függő, bypass-olható | **Kizárva** ([AuthCode](authcode-hu.md): minden bytecode hardveres verify) |
 | Tampered binary execution | CWE-345 | Szoftveres check, kerülhető | **Kizárva** ([AuthCode](authcode-hu.md): SHA-256(bytecode) ↔ cert.PkHash binding) |
-| Stateful signature key reuse | — | Könnyű szoftveres signer-nél | **Kizárva** ([Neuron OS Card](authcode-hu.md#neuroncard): single-use NVRAM) |
+| Stateful signature key reuse | — | Könnyű szoftveres signer-nél | **Kizárva** ([Neuron OS HSM Card](authcode-hu.md#neuroncard): single-use NVRAM) |
 | Quantum break of signature | — | Shor töri ECDSA/Ed25519-et | **Kizárva** ([BitIce](authcode-hu.md): WOTS+/LMS hash-alapú PQC) |
 | Hot code loader tamper | — | Kernel-szintű támadás esetén exponált | **Kizárva** ([Seal Core](sealcore-hu.md) firmware: mask ROM / eFuse immutable) |
 | Memory controller write-path bypass | — | Szoftveres check kerülhető | **Kizárva** ([Seal Core](sealcore-hu.md): pre-QRAM WE-routing / QRAM SEAL microcode-trigger) |
@@ -159,7 +159,7 @@ A CLI-CPU in-order, nem-speculative pipeline. **Nincs branch prediction bypass, 
 
 > **Részletek a memóriacelláról:** a Quench-RAM sorok a [Quench-RAM](quench-ram-hu.md) hardveres memóriacellán alapulnak, amely per-blokk státuszbittel + atomi „wipe-on-release" szemantikával fizikailag kizárja a memória-újrahasznosítási hibákat.
 
-> **Részletek a kódbetöltésről:** az AuthCode / BitIce / Neuron OS Card sorok a [AuthCode + CodeLock](authcode-hu.md) mechanizmuson alapulnak, amely hash-alapú PQC tanúsítvány-lánccal (eFuse → CA → vendor → fejlesztői kártya → bytecode) és runtime W⊕X szeparációval garantálja, hogy csak hitelesített kód fut a chipen, és adat soha nem lehet kód.
+> **Részletek a kódbetöltésről:** az AuthCode / BitIce / Neuron OS HSM Card sorok a [AuthCode + CodeLock](authcode-hu.md) mechanizmuson alapulnak, amely hash-alapú PQC tanúsítvány-lánccal (eFuse → CA → vendor → fejlesztői kártya → bytecode) és runtime W⊕X szeparációval garantálja, hogy csak hitelesített kód fut a chipen, és adat soha nem lehet kód.
 
 ## Formális verifikáció
 

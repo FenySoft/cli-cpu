@@ -71,10 +71,9 @@ A Seal Core beilleszkedik a CFPU komplementer biztonsági mechanizmusok családj
                                     │
        ┌────────────────┬───────────┼───────────┬───────────────┐
        │                │           │           │               │
-  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [BitIce +
-   memóriacella   kód-aláírás   runtime W⊕X   gatekeeper    Neuron OS
-                                              core          Card]
-                                                           crypto + signing
+  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [Neuron OS
+   memóriacella   kód-aláírás   runtime W⊕X   gatekeeper    HSM Card]
+                                              core          crypto + signing
 ```
 
 A Seal Core az a **fizikai komponens**, amelyik a többi mechanizmust **gyakorlatilag aktiválja**:

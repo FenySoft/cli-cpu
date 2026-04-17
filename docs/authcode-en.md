@@ -4,9 +4,9 @@
 
 > Version: 1.0
 
-This document describes the **CFPU code-loading security model**: how the hardware guarantees that **only authentic code** can execute, and that **data can never become code**. The mechanism consists of two complementary components: **AuthCode** (signature verification at code load) and **CodeLock** (runtime W⊕X separation). Together they form the foundation of the trust chain — from the CA root hash burned into the eFuse to the Neuron OS Card in the developer's hand.
+This document describes the **CFPU code-loading security model**: how the hardware guarantees that **only authentic code** can execute, and that **data can never become code**. The mechanism consists of two complementary components: **AuthCode** (signature verification at code load) and **CodeLock** (runtime W⊕X separation). Together they form the foundation of the trust chain — from the CA root hash burned into the eFuse to the Neuron OS HSM Card in the developer's hand.
 
-> **Vision-level document.** The full model takes shape in F5 RTL and reaches silicon in F6. BitIce integration and the Neuron OS Card straddle software and hardware design; concrete parameters (AID, form factor, HSS depth, PIN policy) are open questions tied to specific F-phases.
+> **Vision-level document.** The full model takes shape in F5 RTL and reaches silicon in F6. BitIce integration and the Neuron OS HSM Card straddle software and hardware design; concrete parameters (AID, form factor, HSS depth, PIN policy) are open questions tied to specific F-phases.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ This document describes the **CFPU code-loading security model**: how the hardwa
 5. [CodeLock — hardware-enforced W⊕X separation](#codelock)
 6. [BitIce certificate integration](#bitice)
 7. [The trust chain](#trustchain)
-8. [Neuron OS Card](#neuroncard)
+8. [Neuron OS HSM Card](#neuroncard)
 9. [The `.acode` container format](#acode)
 10. [Developer workflow](#workflow)
 11. [Operational patterns](#operational)
@@ -68,7 +68,7 @@ Together: **only and exclusively** CIL bytecode that a known publisher has signe
 ┌─────────────────────────────────────────────────────────────────┐
 │ OUTSIDE WORLD                                                   │
 │                                                                 │
-│  Developer          Neuron OS Card           CIL bytecode       │
+│  Developer          Neuron OS HSM Card           CIL bytecode       │
 │     │                     │                       │             │
 │     └──── sign(hash) ─────┘                       │             │
 │                     │                             │             │
@@ -255,7 +255,7 @@ Five SHA-256-based steps. A hardware SHA-256 unit on the CFPU executes this dire
 | Stateful? | No | **Yes** — single-use leaf enforcement required |
 | Hardware state management | Unnecessary | **Mandatory** (NIST SP 800-208 SHALL) |
 
-The stateful nature of hash-based schemes is a **positive property** in the CFPU context because the BitIce card physically enforces single-use (see [Neuron OS Card](#neuroncard)).
+The stateful nature of hash-based schemes is a **positive property** in the CFPU context because the Neuron OS HSM Card physically enforces single-use (see [Neuron OS HSM Card](#neuroncard)).
 
 ## The trust chain <a name="trustchain"></a>
 
@@ -271,8 +271,8 @@ The full authentication chain from the manufacturing-time hardware root to the d
 [Neuron OS Vendor Delegate Cert]                      ← vendor (e.g., FenySoft)
         │ signs WOTS+ (HSS level 2)
         ▼
-[Neuron OS Card]                                      ◄── DEVELOPER CARD
-   └─ BitIce Neuron OS Applet                         ← physical SE, single-use leaf
+[Neuron OS HSM Card]                                      ◄── DEVELOPER CARD
+   └─ Neuron OS HSM Applet                         ← physical SE, single-use leaf
         │ signs WOTS+ (leaf in XMSS tree, h=10)
         ▼
 [CIL Binary Cert]                                     ← specific bytecode signature
@@ -288,14 +288,14 @@ The full authentication chain from the manufacturing-time hardware root to the d
 | CA Root Hash | eFuse on chip | burned at manufacture, never modifiable |
 | Foundation Root CA | dedicated HSM | FIPS 140-3 Level 3+ tamper-resistant |
 | Vendor Delegate Cert | vendor HSM | same |
-| Neuron OS Card | developer's hand | tamper-resistant smart card, single-use NVRAM counter |
+| Neuron OS HSM Card | developer's hand | tamper-resistant smart card, single-use NVRAM counter |
 | `.acode` file | developer's machine | needs no protection — the signature is self-authenticating |
 
 **No point in the chain relies on software alone.** Trust always lives in a physical device.
 
-## Neuron OS Card <a name="neuroncard"></a>
+## Neuron OS HSM Card <a name="neuroncard"></a>
 
-The Neuron OS Card is a dedicated, single-purpose BitIce smart card running a separate **BitIce Neuron OS Applet** on the **JavaCard runtime**. This card is **mandatory** for every developer deploying actors to the CFPU.
+The Neuron OS HSM Card is a dedicated, dedicated, single-purpose HSM smart card running a separate **Neuron OS HSM Applet** on the **JavaCard runtime**. This card is **mandatory** for every developer deploying actors to the CFPU.
 
 ### Why hardware-enforced signing is mandatory
 
@@ -311,7 +311,7 @@ A software signer can **never** reliably guarantee this:
 
 > *"State management for stateful hash-based signature schemes SHALL be performed by the cryptographic module that contains the private key, and SHALL NOT rely on external software or operating system support."*
 
-The Neuron OS Card's tamper-resistant smart card hardware guarantees:
+The Neuron OS HSM Card's tamper-resistant smart card hardware guarantees:
 
 | Guarantee | Mechanism |
 |-----------|-----------|
@@ -379,7 +379,7 @@ The exact format is an **implementation question** to be finalized when `cli-cpu
 2. dotnet build → CIL bytecode              (Roslyn)
 3. cli-cpu-link:
      hash ← SHA-256(bytecode)
-4. Neuron OS Card connected:
+4. Neuron OS HSM Card connected:
      SELECT_APPLET <Neuron OS Applet AID>
      PIN / biometric prompt
 5. cli-cpu-link → card:
@@ -433,7 +433,7 @@ A GitHub contributor cannot sign CFPU-deployable code directly (no delegate cert
 
 ## Revocation strategy <a name="revocation"></a>
 
-If a Neuron OS Card is lost, stolen, or its private key is otherwise compromised, associated certs **must be revoked**.
+If a Neuron OS HSM Card is lost, stolen, or its private key is otherwise compromised, associated certs **must be revoked**.
 
 ### Possible mechanisms (F-phase decision)
 
@@ -485,7 +485,7 @@ Loading 100 KB CIL bytecode: ~100 µs (SHA-256 compute) + 41 µs (verify) + 10 �
 
 ## Security guarantees <a name="security"></a>
 
-AuthCode + CodeLock + Neuron OS Card together **eliminate eight** classic attack categories at hardware level:
+AuthCode + CodeLock + Neuron OS HSM Card together **eliminate eight** classic attack categories at hardware level:
 
 | Attack class | CWE | Traditional CPU | CFPU (AuthCode+CodeLock) |
 |-------------|-----|-----------------|---------------------------|
@@ -495,7 +495,7 @@ AuthCode + CodeLock + Neuron OS Card together **eliminate eight** classic attack
 | Unsigned code execution | CWE-345 | OS-dependent, bypassable | **Eliminated** (AuthCode mandatory) |
 | Tampered binary | CWE-345 | Software check, bypassable | **Eliminated** (SHA-256 hash ↔ PkHash binding) |
 | Supply chain at code level | — | Unverifiable | **Verifiable** (BitIce trust chain) |
-| Stateful sig key reuse | — | Easy with software signer | **Eliminated** (Neuron OS Card single-use NVRAM) |
+| Stateful sig key reuse | — | Easy with software signer | **Eliminated** (Neuron OS HSM Card single-use NVRAM) |
 | Quantum break of signature | — | Shor breaks ECDSA/Ed25519 | **Eliminated** (WOTS+/LMS hash-based PQC) |
 
 ## Synergy with Quench-RAM and Neuron OS <a name="synergy"></a>
@@ -544,10 +544,10 @@ v1.0 captures the vision-level architecture. The following details are to be res
 
 ### Around F5-F6 (first hardware)
 
-4. **Neuron OS Card AID** — registered ISO/IEC AID under the BitIce RID (e.g. `<RID>+"NEURONOS"`).
+4. **Neuron OS HSM Card AID** — registered ISO/IEC AID under the Neuron OS RID (e.g. `<RID>+"NEURONOS"`).
 5. **Form factor** — ISO 7816 ID-1 (card), USB token, NFC, or multiple variants in parallel.
 6. **PIN / biometric policy** — single PIN, dual-PIN (m-of-n), on-card fingerprint, or opt-in combinations.
-7. **Server-side BitIce HSM** — PCIe or network appliance for CI/CD pipelines.
+7. **Server-side Neuron OS HSM** — PCIe or network appliance for CI/CD pipelines.
 
 ### Around F6-F7 (production)
 
@@ -559,13 +559,13 @@ These questions **do not block** earlier phases — the v1.0 model allows consis
 
 ## Phase introduction <a name="phases"></a>
 
-| Phase | Role of AuthCode + CodeLock + Neuron OS Card |
+| Phase | Role of AuthCode + CodeLock + Neuron OS HSM Card |
 |-------|----------------------------------------------|
 | F0–F2 (simulator) | Software emulation in `TCpu`: AuthCode verify mock, CodeLock as runtime check; `.acode` format can be finalized here |
 | F3 (Tiny Tapeout) | No hardware AuthCode (area limit), but CIL-T0 ISA already specifies the `hot_code_loader` interface |
-| F4 (multi-core sim) | Full software AuthCode flow, BitIce library integrated into the simulator; **simulated Neuron OS Card** for unit tests |
-| **F5 (RTL prototype)** | First hardware SHA-256 + WOTS+ verifier; **real Neuron OS Card** prototype (dev kit); first version of the BitIce Neuron OS Applet |
-| F6 (ChipIgnite tape-out) | Full hardware AuthCode + CodeLock + eFuse; production Neuron OS Card available to developers |
+| F4 (multi-core sim) | Full software AuthCode flow, BitIce library integrated into the simulator; **simulated Neuron OS HSM Card** for unit tests |
+| **F5 (RTL prototype)** | First hardware SHA-256 + WOTS+ verifier; **real Neuron OS HSM Card** prototype (dev kit); first version of the Neuron OS HSM Applet |
+| F6 (ChipIgnite tape-out) | Full hardware AuthCode + CodeLock + eFuse; production Neuron OS HSM Card available to developers |
 | F6.5 (Secure Edition) | Finer revocation mechanism, dual-cert support (e.g., for FIPS certification path) |
 | F7 (silicon iter 2) | Emergency response protocol, global revocation grid |
 
@@ -592,4 +592,4 @@ These questions **do not block** earlier phases — the v1.0 model allows consis
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 1.0 | 2026-04-16 | Initial vision-level release. AuthCode (load-time verify) + CodeLock (W⊕X hardware) + BitIce WOTS+/LMS integration + Neuron OS Card (dedicated JavaCard applet). Detailed parameters (AID, form factor, HSS depth, PIN policy, revocation, CI/CD HSM) are F-phase-dependent open questions. |
+| 1.0 | 2026-04-16 | Initial vision-level release. AuthCode (load-time verify) + CodeLock (W⊕X hardware) + BitIce WOTS+/LMS integration + Neuron OS HSM Card (dedicated JavaCard applet). Detailed parameters (AID, form factor, HSS depth, PIN policy, revocation, CI/CD HSM) are F-phase-dependent open questions. |

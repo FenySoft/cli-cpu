@@ -147,7 +147,7 @@ The CLI-CPU uses an in-order, non-speculative pipeline. **There is no branch pre
 | Capability tag forging | — | Possible via RAM patching | **Eliminated** ([Quench-RAM](quench-ram-en.md): stored in sealed region) |
 | Unsigned code execution | CWE-345 | OS-dependent, bypassable | **Eliminated** ([AuthCode](authcode-en.md): hardware verify of every bytecode) |
 | Tampered binary execution | CWE-345 | Software check, bypassable | **Eliminated** ([AuthCode](authcode-en.md): SHA-256(bytecode) ↔ cert.PkHash binding) |
-| Stateful signature key reuse | — | Easy with software signer | **Eliminated** ([Neuron OS Card](authcode-en.md#neuroncard): single-use NVRAM) |
+| Stateful signature key reuse | — | Easy with software signer | **Eliminated** ([Neuron OS HSM Card](authcode-en.md#neuroncard): single-use NVRAM) |
 | Quantum break of signature | — | Shor breaks ECDSA/Ed25519 | **Eliminated** ([BitIce](authcode-en.md): WOTS+/LMS hash-based PQC) |
 | Hot code loader tamper | — | Exposed by kernel-level attack | **Eliminated** ([Seal Core](sealcore-en.md) firmware: mask ROM / eFuse immutable) |
 | Memory controller write-path bypass | — | Software check bypassable | **Eliminated** ([Seal Core](sealcore-en.md): pre-QRAM WE routing / QRAM SEAL microcode trigger) |
@@ -156,7 +156,7 @@ The CLI-CPU uses an in-order, non-speculative pipeline. **There is no branch pre
 
 > **Memory cell details:** the Quench-RAM rows are based on the [Quench-RAM](quench-ram-en.md) hardware memory cell, which physically eliminates memory-reuse bugs via a per-block status bit plus atomic "wipe-on-release" semantics.
 
-> **Code loading details:** the AuthCode / BitIce / Neuron OS Card rows are based on the [AuthCode + CodeLock](authcode-en.md) mechanism, which uses a hash-based PQC certificate chain (eFuse → CA → vendor → developer card → bytecode) plus runtime W⊕X separation to guarantee that only authenticated code runs on the chip, and data can never become code.
+> **Code loading details:** the AuthCode / BitIce / Neuron OS HSM Card rows are based on the [AuthCode + CodeLock](authcode-en.md) mechanism, which uses a hash-based PQC certificate chain (eFuse → CA → vendor → developer card → bytecode) plus runtime W⊕X separation to guarantee that only authenticated code runs on the chip, and data can never become code.
 
 **Given the above, it is clear why the CLI-CPU security profile is stronger than that of any existing commercial CPU.** We are not adding a few extra layers — the architecture fundamentally **does not permit** these attacks.
 

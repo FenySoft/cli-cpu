@@ -71,10 +71,9 @@ The Seal Core fits into the family of complementary CFPU security mechanisms:
                                     │
        ┌────────────────┬───────────┼───────────┬───────────────┐
        │                │           │           │               │
-  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [BitIce +
-   memory cell     code sign.   runtime W⊕X   gatekeeper    Neuron OS
-                                              core          Card]
-                                                           crypto + signing
+  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [Neuron OS
+   memory cell     code sign.   runtime W⊕X   gatekeeper    HSM Card]
+                                              core          crypto + signing
 ```
 
 The Seal Core is the **physical component** that **practically activates** the other mechanisms:
