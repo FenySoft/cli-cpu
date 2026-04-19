@@ -79,7 +79,7 @@ The Seal Core fits into the family of complementary CFPU security mechanisms:
 The Seal Core is the **physical component** that **practically activates** the other mechanisms:
 - The **AuthCode** verification flow runs here
 - The **CodeLock** W⊕X enforcement (in pre-QRAM era) originates from WE-pin routing here
-- The **Quench-RAM** CODE-region SEAL microcode-trigger is invoked here
+- The **Quench-RAM** CODE-region SEAL HW trigger is invoked here
 
 ## General architecture <a name="architecture"></a>
 
@@ -98,7 +98,7 @@ Seal Core internal components (identical across phases):
 │           │                             │                 │
 │           ▼                             ▼                 │
 │  ┌──────────────────────────────────────────────────┐    │
-│  │    Simple CPU core (RISC-V or custom, small)     │    │
+│  │    Simple CPU core (CIL-Seal ISA — F5)           │    │
 │  │    - 5-stage in-order pipeline                   │    │
 │  │    - 16 register file                            │    │
 │  └────────────┬─────────────────────────────────────┘    │
@@ -233,11 +233,11 @@ Multi-Seal Core redundancy in the pre-QRAM era is **as cheap** as it will be in 
 
 ## Seal Core in the QRAM era (F5+) <a name="qram"></a>
 
-The QRAM era begins in the late F5 RTL prototype phase and is complete by F6 ChipIgnite. Here CODE lives in an **on-chip Quench-RAM array**, whose protection comes from the **per-block status bit** (SEAL/RELEASE microcode primitives, see `docs/quench-ram-en.md`).
+The QRAM era begins in the late F5 RTL prototype phase and is complete by F6 ChipIgnite. Here CODE lives in an **on-chip Quench-RAM array**, whose protection comes from the **per-block status bit** (SEAL/RELEASE hardware state-machine operations, see `docs/quench-ram-en.md`).
 
 ### Core principle — verification gatekeeper
 
-> **The Seal Core here does NOT defend physical pin routing.** CODE protection comes from the Quench-RAM status bit. The Seal Core's role is solely **AuthCode verification** — it decides whether an incoming `.acode` container is authentic, and it triggers the Quench-RAM SEAL microcode to seal the CODE region.
+> **The Seal Core here does NOT defend physical pin routing.** CODE protection comes from the Quench-RAM status bit. The Seal Core's role is solely **AuthCode verification** — it decides whether an incoming `.acode` container is authentic, and it triggers the Quench-RAM SEAL hardware state machine to seal the CODE region.
 
 This is a **fundamentally different role** than in the pre-QRAM era. The protection source is a different mechanism; the Seal Core only runs the verification pipeline.
 
@@ -253,12 +253,12 @@ This is a **fundamentally different role** than in the pre-QRAM era. The protect
 4. If all OK:
       - Seal Core writes bytecode via normal writes to a mutable
         (status=0) Quench-RAM region
-      - Seal Core invokes the SEAL microcode primitive to close it
+      - Seal Core invokes the SEAL hardware state-machine operation to close it
       - Quench-RAM HW: status=1, bytecode is immutable henceforth
 5. Seal Core notifies Neuron OS scheduler: "new actor loaded, may start"
 ```
 
-In **step 4**, the Seal Core uses no special WE pin. It performs ordinary memory writes to the Quench-RAM mutable region (granted by its capability), then SEALs to lock. Protection comes from the fact that **only the Seal Core firmware can trigger the `SEAL` microcode primitive in the AuthCode verify context** — an actor on another core might write a mutable block, but cannot call SEAL (the SEAL trigger list is closed: `SEND`, `newobj`, `newarr`, `GC_SWEEP`, or Seal Core hot_code_loader).
+In **step 4**, the Seal Core uses no special WE pin. It performs ordinary memory writes to the Quench-RAM mutable region (granted by its capability), then SEALs to lock. Protection comes from the fact that **only the Seal Core firmware can trigger the `SEAL` hardware state-machine operation in the AuthCode verify context** — the SEAL trigger list is closed: CODE region (Seal Core boot / hot_code_loader), SEND (payload leaves the Core), swap-out (DMA evict to external QRAM).
 
 ### Redundancy — from a verification throughput perspective
 
@@ -276,7 +276,7 @@ The ring/mesh topology is for **hot_code_loader actor host migration** (if Seal 
 
 - **Not** a physical gatekeeper over the WE pin (no separate CODE chip either)
 - **Yes** a logical gatekeeper on the AuthCode flow
-- **Yes** the SEAL microcode-trigger source
+- **Yes** the SEAL HW-trigger source
 - Multiple Seal Cores = **parallel verify + redundancy**
 - CODE memory protection is **entirely** via the Quench-RAM status-bit mechanism
 
@@ -432,7 +432,7 @@ The Seal Core's **unique contribution** to the CFPU security model:
 
 | Attack class | Traditional system | CFPU with Seal Core |
 |--------------|---------------------|----------------------|
-| Memory controller write-path bypass | software check bypassable | **Eliminated** (pre-QRAM: physical WE routing; QRAM: SEAL microcode triggered only from Seal Core firmware) |
+| Memory controller write-path bypass | software check bypassable | **Eliminated** (pre-QRAM: physical WE routing; QRAM: SEAL HW FSM triggered only from Seal Core firmware) |
 | Hot code loader tamper | kernel-level attack | **Eliminated** (Seal Core firmware is immutable, mask ROM / eFuse) |
 | Unsigned code introduction | ring-0 exploit | **Eliminated** (every code-load passes through Seal Core) |
 | DoS on the authenticator | single signing service | **Redundant** (multiple Seal Cores, graceful degradation) |
@@ -444,7 +444,7 @@ This v1.0 document captures the vision-level architecture. Details are to be res
 
 ### F4-F5 (sim + RTL)
 
-1. **Seal Core CPU architecture** — RISC-V subset, custom ISA, or trimmed CIL-T0 variant?
+1. **Seal Core CPU architecture** — CIL-Seal ISA: which CIL-T0 opcodes to keep, which crypto opcodes to add?
 2. **Firmware store** — mask ROM vs. eFuse vs. flash+integrity check
 3. **Heartbeat frequency and timeout** — what N, acceptable response time?
 
@@ -495,4 +495,4 @@ This v1.0 document captures the vision-level architecture. Details are to be res
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 1.0 | 2026-04-16 | Initial vision-level release. Seal Core as two distinct mechanisms: (1) pre-QRAM era physical WE pin routing to the CODE RAM chip; (2) QRAM era AuthCode verification gatekeeper acting as SEAL microcode-trigger source. Explicit separation between eras, no cross-contamination. Ring and 2D mesh failover topologies, graceful degradation. Firmware immutability via mask ROM / eFuse. |
+| 1.0 | 2026-04-16 | Initial vision-level release. Seal Core as two distinct mechanisms: (1) pre-QRAM era physical WE pin routing to the CODE RAM chip; (2) QRAM era AuthCode verification gatekeeper acting as SEAL HW-trigger source. Explicit separation between eras, no cross-contamination. Ring and 2D mesh failover topologies, graceful degradation. Firmware immutability via mask ROM / eFuse. |

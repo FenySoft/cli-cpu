@@ -2,11 +2,9 @@
 
 > Magyar verzió: [quench-ram-hu.md](quench-ram-hu.md)
 
-> Version: 1.1
+> Version: 1.3
 
-This document describes the **architecture and ISA integration of the Quench-RAM** memory cell: per-block status-bit semantics, the two hardware microcode primitives (`SEAL`, `RELEASE`), the NAND-flash-derived "erase-on-release" pattern, and its relationship to ECMA-335 default-initialization semantics, the actor-model capability system, and the per-core garbage collector.
-
-> **v1.1 security fix:** `SEAL` and `RELEASE` are **not CIL opcodes** but microcode-level primitives invoked only by well-defined trigger events (`SEND`, `newobj`, `newarr`, `GC_SWEEP`, `hot_code_loader`). This prevents a malicious actor from sealing or releasing arbitrary blocks. Details: [Trust boundary](#trust-boundary) section.
+This document describes the **architecture and ISA integration of the Quench-RAM** memory cell: per-block status-bit semantics, the two hardware state-machine operations (`SEAL`, `RELEASE`), the NAND-flash-derived "erase-on-release" pattern, and its relationship to ECMA-335 default-initialization semantics, the actor-model capability system, and the per-core garbage collector.
 
 > **Vision-level document.** Quench-RAM may begin appearing in F5 RTL as an optional hardware layer above the SRAM arrays, and may become a mandatory building block of the CFPU memory hierarchy in F6. The invariants captured here are amenable to formal verification.
 
@@ -15,7 +13,7 @@ This document describes the **architecture and ISA integration of the Quench-RAM
 1. [Motivation](#motivation)
 2. [Core rule](#core-rule)
 3. [State machine and invariant](#state-machine)
-4. [Microcode primitives and trigger events](#isa-primitives)
+4. [Hardware state-machine operations and trigger events](#isa-primitives)
 5. [Trust boundary](#trust-boundary)
 6. [Hardware implementation](#hardware)
 6. [Relationship to ECMA-335 default-init semantics](#ecma335)
@@ -25,21 +23,26 @@ This document describes the **architecture and ISA integration of the Quench-RAM
 10. [Formal verification profile](#formal)
 11. [Granularity and area overhead](#granularity)
 12. [Related technologies](#related)
-13. [Open questions](#open)
-14. [Phase introduction](#phases)
-15. [Changelog](#changelog)
+13. [Phase introduction](#phases)
+14. [Changelog](#changelog)
 
 ## Motivation <a name="motivation"></a>
 
-The largest portion of **memory-safety bugs** in modern CPU architectures fall into three categories:
+The **primary purpose** of Quench-RAM is to hardware-enforce two architectural guarantees:
+
+1. **Code verified by the Seal Core cannot be modified.** The verified CIL binary is written to the CODE region and SEAL-ed — from that point on, not even the running core can overwrite its own code. This extends the secure boot guarantee into runtime. Within the Core, **only the CODE region** needs SEAL protection, because data is protected by the CIL type system and other actors physically cannot access the Core's SRAM (shared-nothing).
+
+2. **Data in external QRAM cannot be manipulated from outside the Core.** When a core writes data to external QRAM (swap-out, persistence), the data is SEAL-ed — it cannot be modified from the external bus. Data only becomes writable again once loaded back into the Core, after RELEASE (atomic wipe) and reallocation. This makes the shared-nothing model **physically enforced beyond the chip boundary**, not merely a convention.
+
+### Secondary benefits
+
+The SEAL/RELEASE model also **eliminates three classic memory-safety bug classes**:
 
 - **Use-after-free (CWE-416)** — a freed memory region is read or written while another context has begun using it for a new purpose
 - **Information leak in freed memory (CWE-244, CWE-226)** — a re-allocated block contains data from its previous use (Heartbleed-class)
 - **Cold boot key recovery** — secrets recoverable from DRAM/SRAM of a powered-off device
 
-All three are symptoms of **the same root cause**: **memory release is a software flag flip**, not a physical event. The "free()" operation in Linux/Windows/macOS can be skipped, sabotaged, or forgotten by anyone.
-
-Quench-RAM provides a **physical answer** to this problem: release is no longer a bit in a table, but **an atomic hardware event** that mandatorily forces every bit of the block to zero **in the same cycle** that resets the status bit.
+All three are symptoms of **the same root cause**: **memory release is a software flag flip**, not a physical event. Quench-RAM provides a **physical answer**: release is no longer a bit in a table, but **an atomic hardware event** that mandatorily forces every bit of the block to zero **in the same cycle** that resets the status bit.
 
 The concept is **a generalization of NAND flash erase semantics** to general-purpose RAM, with finer granularity and integration into the CIL-T0 ISA.
 
@@ -82,11 +85,11 @@ The system's single invariant, true after every cycle:
 
 This invariant is **minimal from a formal-verification perspective**: a single predicate, no disjunction, no runtime-checkable property — purely a constructive guarantee.
 
-## Microcode primitives and trigger events <a name="isa-primitives"></a>
+## Hardware state-machine operations and trigger events <a name="isa-primitives"></a>
 
-`SEAL` and `RELEASE` are **NOT CIL opcodes** — they cannot be invoked directly from CIL code. They are **hardware microcode primitives**, triggered only by **well-defined ISA-level events**. This prevents a malicious actor from sealing or releasing arbitrary blocks (see [Trust boundary](#trust-boundary)).
+`SEAL` and `RELEASE` are **hardware state-machine operations (HW FSM)**, triggered only by **well-defined ISA-level events**. They cannot be invoked directly from CIL code — this prevents a malicious actor from sealing or releasing arbitrary blocks (see [Trust boundary](#trust-boundary)).
 
-### `SEAL addr` — microcode primitive
+### `SEAL addr` — HW FSM operation
 
 ```
 SEAL addr        ; status: 0 → 1   (atomic)
@@ -95,12 +98,12 @@ SEAL addr        ; status: 0 → 1   (atomic)
 - **Effect:** the block's status bit transitions from 0 to 1. Data is unchanged.
 - **Idempotent:** if the block is already sealed, no-op (no trap).
 - **Triggers (the only paths by which it may be invoked):**
-  - `newobj` / `newarr` microcode seals the object's header region after init-only fields are written
-  - `SEND mailbox_ref, block_addr` microcode seals the payload atomically together with cap transfer
-  - `hot_code_loader` actor seals the CODE region after AuthCode verify (see `docs/authcode-en.md`)
+  - **CODE region SEAL** — the Seal Core at boot, or the `hot_code_loader` after AuthCode verify, seals the CODE region (see `docs/authcode-en.md`). Within the Core, **only the CODE region** needs SEAL, because data is protected by the CIL type system and other actors physically cannot access the Core's SRAM (shared-nothing).
+  - **SEND** — during `SEND mailbox_ref, block_addr` execution, the hardware automatically seals the payload, because data is leaving the Core's SRAM boundary.
+  - **Swap-out** — during DMA evict, when Core data is written to external QRAM. SEAL protects against bus-level manipulation.
 - **From CIL applications:** unreachable by any path. There is no `[SealAttribute]`, no `Asm.Seal(...)` API.
 
-### `RELEASE addr` — microcode primitive
+### `RELEASE addr` — HW FSM operation
 
 ```
 RELEASE addr     ; status: 1 → 0,  data ← 0^N   (atomic, 1 cycle)
@@ -109,25 +112,33 @@ RELEASE addr     ; status: 1 → 0,  data ← 0^N   (atomic, 1 cycle)
 - **Effect:** the status bit resets to 0 **and** all data bits are forced to zero **in the same cycle**.
 - **Memory ordering:** RELEASE acts as a **release barrier** — a subsequent allocation is guaranteed to see the freshly-wiped block.
 - **Triggers (the only paths):**
-  - `GC_SWEEP` ISA opcode — operates **exclusively on the caller actor's own heap** (per-core SRAM isolation); releases unreached sealed blocks
-  - `hot_code_loader` actor — when unloading a CODE region
-- **From CIL applications:** also not directly. An actor may only invoke `GC_SWEEP` on its own heap, which only releases already-unreachable blocks of its own. Other actors' blocks are **physically unreachable** (shared-nothing).
+  - **GC_SWEEP** — operates **exclusively on the caller actor's own heap** (per-core SRAM isolation); releases unreachable blocks.
+  - **hot_code_loader** — when unloading a CODE region.
+  - **Swap-in** — when loading data back from external QRAM. RELEASE atomically wipes the old content, then the data is copied into Core SRAM as **mutable** (it is NOT sealed, because within the Core the CIL type system provides protection).
+- **From CIL applications:** not directly reachable. An actor may only trigger `GC_SWEEP` on its own heap, which only releases already-unreachable blocks of its own. Other actors' blocks are **physically unreachable** (shared-nothing).
 
-### Why this way
+### The principle: SEAL at the Core boundary
 
-The previous version (v1.0) described SEAL and RELEASE as **direct CIL opcodes**, which opened an attack vector: a malicious actor that somehow acquired caps to another actor's sealed block could have RELEASED it, rewritten it, and SEALED it again — leaving the "sealed" status seemingly untouched. In the new model, this is **physically impossible**: SEAL and RELEASE are unreachable from arbitrary context, only the well-defined trigger events invoke them.
+SEAL protection is needed where data **leaves the Core's isolated SRAM**:
 
-### No separate `WIPE` primitive
+| Direction | SEAL/RELEASE | Why |
+|-----------|-------------|-----|
+| Core → mailbox (SEND) | **SEAL** | payload leaves the Core, traverses the network |
+| Core → external QRAM (swap-out) | **SEAL** | data is bus-accessible, could be manipulated |
+| Seal Core → CODE region (boot/hot load) | **SEAL** | verified code remains immutable |
+| External QRAM → Core (swap-in) | **RELEASE** | old content wiped, data loaded as mutable |
+| GC sweep (within Core) | **RELEASE** | unreachable block reclamation |
+| CODE region unload | **RELEASE** | old code wiped |
 
-Earlier drafts proposed a separate `WIPE` primitive for "pre-release sanitization". The current model **does not need this**, because RELEASE performs the wipe atomically. Two benefits: (1) no awkward "sealed-but-cleaned" intermediate state; (2) two primitives instead of three, easing formal verification.
+Within the Core, there is **no SEAL on data** — the CIL type system ensures integrity (TypeToken, CapabilityTag etc. are `readonly` fields), and other actors physically cannot access the Core's SRAM.
 
 ## Trust boundary <a name="trust-boundary"></a>
 
 Quench-RAM security is **not based on privilege separation** (no kernel mode vs. user mode — Neuron OS explicitly rejects this, see [`vision-en.md#2-not-a-monolithic-kernel----instead-an-actor-hierarchy`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#2-not-a-monolithic-kernel----instead-an-actor-hierarchy)). It rests instead on **the combination of two existing mechanisms**:
 
-### 1. Microcode-only primitives (SEAL, RELEASE)
+### 1. Hardware-only state-machine operations (SEAL, RELEASE)
 
-Since these are not callable from CIL application level, a malicious actor **cannot directly** trigger them. Only the runtime (microcode) invokes them, reacting to the well-defined trigger events.
+Since these are not callable from CIL application level, a malicious actor **cannot directly** trigger them. The hardware automatically executes them, reacting to the well-defined trigger events.
 
 ### 2. Per-actor heap isolation (shared-nothing)
 
@@ -140,7 +151,7 @@ This **already exists** in Neuron OS (lines 366-369). Every actor lives in its o
 | Malicious actor writes code calling SEAL or RELEASE | the linker (`cli-cpu-link`) rejects it — no such CIL opcode exists |
 | Malicious actor compromises `hot_code_loader` | `hot_code_loader` is itself a **signed, verified actor** (AuthCode), its code cannot be tampered with |
 
-**Result:** the trust boundary is **the runtime itself** (a few thousand lines of microcode), not application code (potentially millions of lines of CIL). This is seL4 / CHERI-style minimized TCB (Trusted Computing Base).
+**Result:** the trust boundary is **the hardware state machine itself** (a few thousand gates of HW FSM), not application code (potentially millions of lines of CIL). This is seL4 / CHERI-style minimized TCB (Trusted Computing Base).
 
 ## Hardware implementation <a name="hardware"></a>
 
@@ -154,13 +165,15 @@ RELEASE(addr):
   └─ commit clock edge
 ```
 
-The key is a single extra hardware signal: a **"broadcast clear"** line from the row decoder that, instead of the normal `wordline + bitline_input` mechanism, **pulls all bitlines to ground** for the selected row. This technique **already exists in most modern SRAMs** for built-in self-test (BIST) — it just needs to be exposed to the ISA.
+The key is a single extra hardware signal: a **"row-selective clear"** line from the row decoder that, instead of the normal `wordline + bitline_input` mechanism, **pulls all bitlines to ground** for the selected row.
+
+> **Important distinction from BIST broadcast:** The broadcast-clear found in modern SRAMs for Built-In Self-Test (BIST) wipes the **entire SRAM bank** at once — this is not the same as the **row-selective** clear that Quench-RAM requires, where a single block is zeroed independently of all others. Quench-RAM is therefore **not a reuse of existing BIST circuitry**, but a **finer-granularity variant** of it: the row decoder selectively activates the clear signal on a single row (or row group) while leaving all other rows untouched. This **requires custom SRAM design** — standard SRAM macros (e.g., OpenRAM-generated blocks) do not support this feature out of the box.
 
 ### Memory technology mapping
 
 | Technology | RELEASE realization | Notes |
 |-----------|---------------------|-------|
-| 6T SRAM | broadcast bitline-clear, 1 cycle | BIST hardware typically already present |
+| 6T SRAM | row-selective bitline-clear, 1 cycle | custom SRAM cell required (BIST broadcast-clear is not row-selective) |
 | 8T/10T SRAM | dedicated clear-port | area-positive, but faster |
 | eMRAM | single-step "reset to AP state" | naturally polarity-aware |
 | eFRAM | bipolar pulse, ~5-10 ns | compatible, slower |
@@ -176,9 +189,9 @@ The key is a single extra hardware signal: a **"broadcast clear"** line from the
 | 64 byte cache line | 0.2% | cache-aligned |
 | 16 byte mini-block | 0.8% | fine-grained capability tags |
 
-The broadcast-clear circuit itself is **negligible** — one extra wordline-class wire per row, plus small decoder logic.
+The row-selective clear circuit itself is **negligible** — one extra wordline-class wire per row, plus small decoder logic. The main cost is not the circuit but the **custom SRAM cell design**: adding the status bit and integrating the selective clear logic into the cell-level layout is foundry-specific work that open PDKs (e.g., Sky130 + OpenRAM) do not support out of the box.
 
-**Total:** ~0.5% chip area overhead for full Quench-RAM integration, including status-bit storage and clear-broadcast wiring.
+**Total:** ~0.5% chip area overhead for full Quench-RAM integration, including status-bit storage and row-selective clear wiring.
 
 ## Relationship to ECMA-335 default-init semantics <a name="ecma335"></a>
 
@@ -231,15 +244,15 @@ This is simultaneously a **security** and a **performance** advantage from a sin
 Unchanged: the GC walks the reference graph and marks every reachable object.
 
 ### Sweep phase
-For unmarked objects, the GC **issues a `RELEASE` opcode**. That's it.
+For unmarked objects, the GC **triggers hardware RELEASE via `GC_SWEEP`**. That's it.
 
-```csharp
-// Pseudocode for the per-core GC sweep
+```
+// Per-core GC sweep logic
 foreach (var obj in heap.Blocks)
 {
     if (!obj.IsMarked)
     {
-        Asm.RELEASE(obj.Address);   // 1 cycle, atomic: status=0 + data=0
+        // GC_SWEEP HW FSM automatically RELEASEs: status=0 + data=0, 1 cycle, atomic
     }
 }
 ```
@@ -252,11 +265,11 @@ The bump allocator only dispenses **`status=0 + data=0`** blocks. Since the inva
 
 | Aspect | Traditional GC | Quench-RAM GC |
 |--------|---------------|----------------|
-| Sweep ops per object | mark-clear, freelist update, possible compaction | a single RELEASE opcode |
+| Sweep ops per object | mark-clear, freelist update, possible compaction | a single RELEASE (HW FSM) |
 | Zero-fill after free | software loop | hardware atomic |
 | Forgotten zero-fill GC bug | recurring CVE source | **physically impossible** |
-| GC pause measurability | complex (heap-traversal time) | simple (RELEASE count × 1 cycle) |
-| Per-core parallel GC | hard (lock-free freelist) | **trivial** (only local RELEASEs) |
+| GC pause measurability | complex (heap-traversal time) | simple (RELEASE operation count × 1 cycle) |
+| Per-core parallel GC | hard (lock-free freelist) | **trivial** (only local RELEASE operations) |
 
 ### Pinning for free
 
@@ -319,8 +332,8 @@ Quench-RAM provides physical-level defense against **seven new attack classes** 
 | Attack class | CWE | Traditional CPU | With Quench-RAM |
 |-------------|-----|-----------------|------------------|
 | Use-after-free | CWE-416 | Vulnerable | **Physically eliminated** — re-alloc only from uniform blocks |
-| Double-free | CWE-415 | Vulnerable | **Trap** — second RELEASE no-op trap |
-| Information leak in freed memory | CWE-244, CWE-226 | Heartbleed-class, common | **Constructively eliminated** — RELEASE = wipe |
+| Double-free | CWE-415 | Vulnerable | **Trap** — second RELEASE no-op (idempotent) |
+| Information leak in freed memory | CWE-244, CWE-226 | Heartbleed-class, common | **Constructively eliminated** — RELEASE = atomic wipe |
 | Uninitialized memory read | CWE-457 | Common (legacy C/C++) | **Eliminated** — every alloc provably zero-init |
 | Cold boot key recovery | — | Recoverable from DRAM | **Eliminated** — sealed key only released via RELEASE, which wipes |
 | Sensitive data in swap | CWE-200 | OS-dependent | **Eliminated** — no swap (per-core SRAM) + sealed unswappable |
@@ -330,7 +343,7 @@ Quench-RAM provides physical-level defense against **seven new attack classes** 
 
 For honesty, Quench-RAM **does not** defend against:
 
-- **Side-channel attacks** — a SEAL/RELEASE opcode is timing-detectable; if this is sensitive (e.g., in a cryptographic context), constant-time runtime is required
+- **Side-channel attacks** — a SEAL/RELEASE operation is timing-detectable; if this is sensitive (e.g., in a cryptographic context), constant-time runtime is required
 - **Physical attacks** (FIB, probing) — tamper resistance is a separate design layer; see `docs/secure-element-en.md`
 - **Spoofing the wake-up signal** — the status bit can fall victim to an SEU (single-event upset); ECC protection is required around it
 - **GC-overrun DoS** — an actor can intentionally cycle SEAL-RELEASE rapidly to load the GC; rate limiting is required
@@ -348,7 +361,7 @@ SEAL b:       pre:  status(b) = 0
               pre:  status(b) = 1
               post: no-op (idempotent)
 
-RELEASE b:    pre:  status(b) = 1  ∧  hold(release_cap, b)
+RELEASE b:    pre:  status(b) = 1  ∧  triggered_by(GC_SWEEP ∨ hot_code_unload)
               post: status(b) = 0  ∧  ∀ bit i. data(b, i) = 0
 ```
 
@@ -411,44 +424,10 @@ Quench-RAM is **not the first attempt** at these problems; the following systems
 Quench-RAM's **unique combination**:
 
 - Hardware-enforced
-- ISA primitives directly accessible
+- Bound to ISA-level trigger events (not arbitrarily callable)
 - Atomic RELEASE = wipe + free in one cycle
 - Constructive zero-init guarantee for every allocation
 - Minimal semantics suited for formal verification
-
-## Open questions <a name="open"></a>
-
-This document records the **architectural direction**; the following details are to be finalized during F5 RTL design:
-
-### 1. SEAL idempotency
-**Current proposal:** idempotent (second SEAL is no-op).
-**Alternative:** trap on second SEAL so programmer errors surface earlier.
-**Decision:** after F5 RTL prototype, based on measurement.
-
-### 2. Granularity configurability
-**Current proposal:** fixed granularity per region (see section 11).
-**Alternative:** runtime-configurable per actor.
-**Decision:** likely fixed, because runtime configurability would add significant complexity to the router.
-
-### 3. Release-cap delegability
-**Current proposal:** at SEAL time, release-cap is routed to the owning actor and its supervisor.
-**Alternative:** owner can delegate to a temporary "cleaner" actor (e.g., a timed GC trigger).
-**Decision:** delegable, but the delegate **cannot** further delegate — single-step.
-
-### 4. ECC integration with the status bit
-**Current proposal:** the status bit lives in the same ECC word as its data.
-**Alternative:** separate ECC-protected small status array.
-**Decision:** combined ECC, because a status-bit flip + data-bit flip combination is then detectable.
-
-### 5. Cache coherence on F6+ Rich cores
-**Current proposal:** sealed blocks **never** evict — they can live in the read-only cache forever.
-**Alternative:** standard LRU, periodic re-fetch.
-**Decision:** sealed = no-evict, because this is a free optimization and simplifies cache coherence.
-
-### 6. Power-loss recovery for NVRAM
-**Current proposal:** if RELEASE is interrupted, the status remains at 1 → safe default (sealed = data preserved).
-**Alternative:** transactional journal in the sealed region.
-**Decision:** safe-default suffices for typical usage; transactional journal only in F7+ enterprise variant.
 
 ## Phase introduction <a name="phases"></a>
 
@@ -457,10 +436,10 @@ Quench-RAM is **not a prerequisite** for F0-F4; these continue to operate on the
 | Phase | Quench-RAM role |
 |-------|-----------------|
 | F0–F2 (simulator) | software emulation in `TCpu`: extra status bit per block, RELEASE wipes in software; optional, switch-enabled |
-| F3 (Tiny Tapeout) | no hardware Quench-RAM (area limit), but the CIL-T0 ISA spec **already includes** SEAL/RELEASE opcodes, emulated in microcode |
+| F3 (Tiny Tapeout) | no hardware Quench-RAM (area limit), but the simulator **already includes** SEAL/RELEASE HW FSM logic in software emulation |
 | F4 (multi-core sim) | software emulation on every core; we collect measurements on typical SEAL/RELEASE ratio |
-| **F5 (RTL prototype)** | **first hardware implementation** on a 64-byte cache-line granularity Quench-RAM array; we measure area overhead and power cost |
-| F6 (ChipIgnite tape-out) | **mandatory hardware feature** in every DATA and MAILBOX region; F6 Cognitive Fabric One is the first real Quench-RAM chip |
+| **F5 (RTL prototype)** | **FPGA demonstration**: Quench-RAM logic implemented in FPGA BRAM (status bit + selective clear is straightforward in FPGA fabric, no PDK-specific SRAM cell limitation); on ASIC target (Sky130), SEAL/RELEASE **remains software-emulated**, because custom SRAM cell design is not yet available in the open PDK |
+| **F6 (ChipIgnite tape-out)** | **first silicon implementation**: the ChipIgnite/Efabless flow supports custom SRAM cell design; **mandatory hardware feature** in every DATA and MAILBOX region; F6 Cognitive Fabric One is the first real Quench-RAM chip |
 | F6.5 (Secure Edition) | finer granularity (16 byte) for the capability registry attached |
 | F7 (silicon iter 2) | possible NVRAM integration (eMRAM/eFRAM), transactional journal options |
 
@@ -475,5 +454,7 @@ Quench-RAM is **not a prerequisite** for F0-F4; these continue to operate on the
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 1.0 | 2026-04-16 | Initial versioned release. Two-opcode model (SEAL + RELEASE), atomic wipe-on-release, ECMA-335 default-init compatibility, integration with per-core GC and actor-capability system. |
-| 1.1 | 2026-04-16 | **Security fix:** SEAL and RELEASE are NOT CIL opcodes but microcode primitives, invokable only via well-defined trigger events (`SEND`, `newobj`, `GC_SWEEP`, `hot_code_loader`). New section: [Trust boundary](#trust-boundary). The mechanism builds on per-actor heap isolation (shared-nothing), not a new privilege bit. |
+| 1.3 | 2026-04-19 | SEAL triggers refined: within Core, only CODE region needs SEAL (data protected by CIL type system). Swap-out SEAL and swap-in RELEASE added. Primary motivation rewritten (CODE immutability + external QRAM protection). |
+| 1.2 | 2026-04-19 | Row-selective clear clarification (not BIST broadcast). F5: FPGA demo, F6: first silicon. |
+| 1.1 | 2026-04-16 | Trust boundary section. SEAL/RELEASE defined as HW FSM operations, per-actor heap isolation. |
+| 1.0 | 2026-04-16 | Initial release. SEAL + RELEASE model, ECMA-335 default-init, per-core GC integration. |

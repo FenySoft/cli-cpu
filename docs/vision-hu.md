@@ -53,7 +53,8 @@ A mai szoftver-architektúra nem természeti törvény — egy adott hardver kor
 
 A kernel azért kell, mert valakinek ŐRKÖDNIE kell
 a shared memory felett. Ez 50+ év komplexitás.
-Linux kernel: ~30 millió sor kód.
+Linux kernel: ~40 millió sor kód (2025, v6.14).
+(Forrás: https://www.stackscale.com/blog/linux-kernel-surpasses-40-million-lines-code/)
 ```
 
 ### Neuron OS: egyenrangú aktorok, hardveres izoláció
@@ -80,12 +81,12 @@ Az izoláció nem szoftveres (MMU + page table) → HARDVERES.
 |---|---|---|
 | Syscall overhead | ~1-5 µs (mode switch) | **~5-20 ns** (mailbox üzenet) |
 | Kernel bug hatása | Rendszerösszeomlás | Supervisor **újraindítja** a hibás aktort |
-| Kernel méret | ~30M sor (Linux) | **~5K sor** Neuron OS core |
+| Kernel méret | ~40M sor (Linux) | **~5K sor** Neuron OS core |
 | Izoláció típusa | Szoftveres (MMU + page table) | **Hardveres** (fizikai SRAM) |
 | Hot code reload | Lehetetlen (kernel újraindítás) | **Natív** — aktor kód futás közben cserélhető |
 | Boot idő | ~1-30 másodperc | **~1-10 µs** (nincs init, nincs driver scan) |
 
-**A Linux kernel 30 millió sora azért létezik, mert a shared memory-t szoftveresen kell védeni.** Ha a hardver garantálja az izolációt, a kernel **feladata eltűnik**.
+**A Linux kernel 40 millió sora azért létezik, mert a shared memory-t szoftveresen kell védeni.** Ha a hardver garantálja az izolációt, a kernel **feladata eltűnik**.
 
 Részletek: [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md).
 

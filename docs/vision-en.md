@@ -53,7 +53,8 @@ Modern software architecture is not a law of nature — it is a consequence of s
 
 The kernel exists because someone has to GUARD
 the shared memory. That is 50+ years of complexity.
-Linux kernel: ~30 million lines of code.
+Linux kernel: ~40 million lines of code (2025, v6.14).
+(Source: https://www.stackscale.com/blog/linux-kernel-surpasses-40-million-lines-code/)
 ```
 
 ### Neuron OS: peer actors, hardware isolation
@@ -80,12 +81,12 @@ Isolation is not software-based (MMU + page table) — it is HARDWARE-BASED.
 |---|---|---|
 | Syscall overhead | ~1-5 us (mode switch) | **~5-20 ns** (mailbox message) |
 | Kernel bug impact | System crash | Supervisor **restarts** the faulty actor |
-| Kernel size | ~30M lines (Linux) | **~5K lines** Neuron OS core |
+| Kernel size | ~40M lines (Linux) | **~5K lines** Neuron OS core |
 | Isolation type | Software (MMU + page table) | **Hardware** (physical SRAM) |
 | Hot code reload | Impossible (kernel restart) | **Native** — actor code is swappable at runtime |
 | Boot time | ~1-30 seconds | **~1-10 us** (no init, no driver scan) |
 
-**The 30 million lines of the Linux kernel exist because shared memory must be protected in software.** If the hardware guarantees isolation, the kernel's **purpose disappears**.
+**The 40 million lines of the Linux kernel exist because shared memory must be protected in software.** If the hardware guarantees isolation, the kernel's **purpose disappears**.
 
 Details: [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md).
 

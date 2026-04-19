@@ -159,17 +159,17 @@ Mas allapot-atmenet **nem letezik**.
 
 > **Forras:** [`quench-ram-hu.md`](../quench-ram-hu.md) SS trust-boundary
 
-**Kovetelmeny:** A `SEAL` es `RELEASE` **microcode-primitivek**, amelyeket **kizarolag** jol-meghatarozott trigger-esemenyek hivhatnak meg:
+**Kovetelmeny:** A `SEAL` es `RELEASE` **hardveres allapotgep-muveletek (HW FSM)**, amelyeket **kizarolag** jol-meghatarozott trigger-esemenyek hivhatnak meg:
 
 | Primitiv | Engedelyezett triggerek |
 |----------|------------------------|
-| `SEAL` | `newobj`/`newarr` microcode, `SEND` microcode, `hot_code_loader` (Seal Core) |
-| `RELEASE` | `GC_SWEEP` (csak a hivo aktor sajat heap-jen), `hot_code_loader` unload |
+| `SEAL` | CODE regio (Seal Core boot / `hot_code_loader`), `SEND` (payload kilep a Core-bol), Swap-out (DMA evict kulso QRAM-ba) |
+| `RELEASE` | `GC_SWEEP` (csak a hivo aktor sajat heap-jen), `hot_code_loader` unload, Swap-in (kulso QRAM-bol visszatoltes) |
 
 CIL alkalmazas-szintrol **semmilyen uton** nem erheto el sem SEAL, sem RELEASE.
 
 **Verifikacio:**
-- CIL kod, ami megprobal SEAL/RELEASE-szeru opkodot hivni -> linker reject vagy `INVALID_OPCODE` trap
+- SEAL/RELEASE kizarolag HW FSM trigger-esemenyre aktivizalodik, CIL-bol nem erheto el
 - Egy aktor `GC_SWEEP`-je **csak** a sajat heap-jen hat, mas aktor blokkjait nem erinti
 
 **Indoklas:** Ha egy rosszindulatú aktor tetszolegesen SEAL-elhetne vagy RELEASE-elhetne blokkokat, a Quench-RAM biztonsagi garanciai ervenytelenek lennenek.
@@ -381,7 +381,7 @@ A konformancia-tesztsuite **automatizalt, reprodukalhato** tesztekbol all. Minde
 | TH-4.2 | Sealed blokk irasi kiserlete | trap vagy no-op |
 | TH-4.3 | Frissen allokalt blokk tartalma | minden bit = 0 |
 | TH-4.4 | RELEASE atomicitas (timing) | 1 ciklus, nincs koztes allapot |
-| TH-4.5 | CIL kod SEAL hivas kiserlet | linker reject vagy `INVALID_OPCODE` |
+| TH-4.5 | SEAL/RELEASE csak HW FSM triggerekre aktivizalodik | CIL-bol nem erheto el, nincs ilyen opkod |
 | TH-4.6 | GC_SWEEP mas aktor heap-jen | `INVALID_MEMORY_ACCESS` trap |
 
 #### TH-5: Izolacio es CFI (S8, S9, S10)

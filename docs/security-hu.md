@@ -151,7 +151,7 @@ A CLI-CPU in-order, nem-speculative pipeline. **Nincs branch prediction bypass, 
 | Stateful signature key reuse | — | Könnyű szoftveres signer-nél | **Kizárva** ([Neuron OS HSM Card](authcode-hu.md#neuroncard): single-use NVRAM) |
 | Quantum break of signature | — | Shor töri ECDSA/Ed25519-et | **Kizárva** ([BitIce](authcode-hu.md): WOTS+/LMS hash-alapú PQC) |
 | Hot code loader tamper | — | Kernel-szintű támadás esetén exponált | **Kizárva** ([Seal Core](sealcore-hu.md) firmware: mask ROM / eFuse immutable) |
-| Memory controller write-path bypass | — | Szoftveres check kerülhető | **Kizárva** ([Seal Core](sealcore-hu.md): pre-QRAM WE-routing / QRAM SEAL microcode-trigger) |
+| Memory controller write-path bypass | — | Szoftveres check kerülhető | **Kizárva** ([Seal Core](sealcore-hu.md): pre-QRAM WE-routing / QRAM SEAL HW-trigger) |
 | Supply chain at hardware level | — | Ellenőrizhetetlen | **Ellenőrizhető** (nyílt HDL, reprodukálható build) |
 | Supply chain at code level | — | Kevés rendszerben van védelem | **Ellenőrizhető** ([AuthCode](authcode-hu.md) trust chain: eFuse → CA → vendor → card → binary) |
 

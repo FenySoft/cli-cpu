@@ -1242,5 +1242,5 @@ A FAQ **konceptuális horgonyokat** ad, nem dokumentáció-duplikációt.
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
-| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
 | 1.1 | 2026-04-15 | FAQ 8-10: AMD összehasonlítás, fogyasztás, órajel stratégia |
+| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

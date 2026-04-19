@@ -2,7 +2,7 @@
 
 > Magyar verzió: [architecture-hu.md](architecture-hu.md)
 
-> Version: 1.1
+> Version: 1.3
 
 This document describes the **Cognitive Fabric Processing Unit (CFPU)** **microarchitecture** at a high level: the stack machine model, the pipeline, the memory map, the decoding strategy, hardware support for GC and exception handling, and the techniques adopted from predecessor projects (picoJava, Jazelle, Transmeta).
 
@@ -766,6 +766,76 @@ There is no superscalar, no out-of-order execution (F0-F6). This is a deliberate
 
 The **uop cache**, however, significantly reduces decoding overhead on hot loops, so the effective IPC stays at ~1, but at low energy.
 
+### Pipeline hazard management
+
+A stack machine pipeline has a unique hazard profile compared to a register machine. On a RISC CPU, data hazards arise only when two instructions reference the **same register** — a situation the compiler can often avoid by choosing different registers. On a stack machine, **every instruction** reads from and writes to the top of the stack, so RAW (Read After Write) hazards are the default, not the exception.
+
+The CLI-CPU addresses this with three mechanisms:
+
+#### 1. TOS cache as register file
+
+The 8×32-bit TOS cache is **not a memory cache** — it is a register file. The stack pointer (`SP_CACHE`, range 0–7) determines which physical register is TOS, TOS-1, etc. When an ALU operation writes its result to TOS-1, it writes to a **physical register** — exactly like a RISC ALU writing to `rd`.
+
+This converts the stack machine's implicit data dependencies into **register-file dependencies**, which are solved by standard forwarding (bypass) logic.
+
+#### 2. EX→EX forwarding (bypass path)
+
+The pipeline implements a single-cycle forwarding path from the EX stage output back to the EX stage input:
+
+```
+ Cycle N:   add   (EX stage: TOS-1 ← TOS-1 + TOS, result in bypass latch)
+ Cycle N+1: mul   (EX stage: reads TOS-1 from bypass latch, not from WB)
+```
+
+Because the TOS cache uses physical register indices, the hazard detection logic is identical to a RISC pipeline's:
+
+```
+ if (EX_WB.dst == ID_EX.src1 || EX_WB.dst == ID_EX.src2)
+     → forward EX_WB.result instead of register file read
+```
+
+**Stall cases** (1-cycle bubble):
+- **MEM→EX dependency** — when a memory-read instruction (`ldind.i4`, `ldelem.i4`, `ldarg` from spilled frame) is immediately followed by an instruction that consumes the loaded value. The data is not available until the end of the MEM stage, so the EX stage must wait 1 cycle.
+- **TOS cache spill/fill** — when the stack depth crosses the 8-element boundary and a spill (write to SRAM) or fill (read from SRAM) is needed. This costs 1 cycle per spilled/filled slot (hardware manages this transparently).
+
+All other ALU→ALU sequences execute at **1 instruction per cycle** with no stalls.
+
+#### 3. Microcode vs. picoJava stack folding
+
+Sun picoJava (1997) introduced **stack folding**: the decoder combines multiple CIL-like stack operations (e.g., `load; load; add; store`) into a single ALU operation in the decode stage. ARM Jazelle (2000) used a similar approach.
+
+The CFPU achieves **the same effective result** through its microcode system, but with a different mechanism:
+
+| Aspect | picoJava stack folding | CFPU microcode |
+|--------|----------------------|----------------|
+| **Where** | Decode stage | Microcode ROM → uop issue |
+| **How** | Pattern matcher recognizes foldable groups | Each CIL opcode maps to 1+ uops with explicit register operands |
+| **Example** | `ldloc.0; ldloc.1; add` → 1 ALU op | `add` = 1 uop (`OP=TOS_ADD, DST=TOS-1, SRC1=TOS-1, SRC2=TOS`) — operands already in TOS cache |
+| **Complexity** | High — N-wide pattern matcher, folding groups | Low — fixed uop mapping, no runtime pattern matching |
+| **Area cost** | ~15-20% of decode logic | ~5% (microcode ROM is shared with complex opcodes) |
+
+The key difference: picoJava stack folding compensates for the lack of a TOS cache register file — it must fold because otherwise every operation would hit memory. The CFPU **already has** the operands in registers (TOS cache), so the folding benefit is captured by the register file + forwarding, without a complex pattern matcher in the decoder.
+
+#### 4. Determinism guarantee
+
+All stall events are **deterministic and data-independent**:
+- Forwarding latency: 0 cycles (bypass)
+- MEM→EX stall: exactly 1 cycle
+- TOS spill/fill: exactly 1 cycle per slot
+- Branch taken: exactly 1 cycle flush
+
+There is no speculation, no variable-latency prediction. This preserves the CFPU's **timing-channel resistance** — the execution time of a code sequence is a function of the instruction sequence alone, not of the data values.
+
+#### 5. Why this is sufficient for the CFPU
+
+On a conventional single-core CPU, IPC is the primary performance metric. On the CFPU, performance scales through **core count**, not single-core IPC:
+
+- **Nano core tight loops** (FIR filter, neuron simulation): the TOS cache + forwarding delivers ~1 IPC, with occasional 1-cycle MEM stalls. This is comparable to picoJava's folded throughput, at a fraction of the area.
+- **Actor message processing**: the dominant latency is the mailbox read (~10-20 cycles), not the ALU pipeline. A 1-cycle stall on a MEM→EX hazard is negligible.
+- **Rich core complex logic**: the same mechanism applies; the Rich core's extra pipeline stages (FPU, GC) do not change the hazard model for integer operations.
+
+The CFPU trades single-core IPC heroics for **area-efficient many-core scaling** — the area saved by not implementing a picoJava-style pattern matcher pays for additional cores.
+
 ## Memory model
 
 ### Address space
@@ -1104,7 +1174,7 @@ The CLI-CPU is not the first bytecode-native CPU, and it is worth learning from 
 
 - **OpenLane2 / Sky130 / Caravel tooling** — we learn this from the RISC-V community
 - **Open source spirit** — all RTL, documentation, tests will be public
-- **Custom extension pattern** — If we ever need a RISC-V core alongside the CLI-CPU (e.g., for the GC coprocessor or bootloader), a minimal RV32I core is a good choice
+- **Custom extension pattern** — design methodology inspiration (but no RISC-V core in the CFPU — all cores run CIL or CIL-derived ISA)
 
 ## Power management
 
@@ -1116,6 +1186,156 @@ The CLI-CPU is divided into **four power domains** (F6 target):
 4. **I/O domain** — QSPI controllers, UART, GPIO. Scales down during WFI (wait-for-interrupt).
 
 Clock-gating in every domain, power-gating in domains 2, 3, and 4.
+
+## Actor Scheduling Pipeline
+
+When a core runs multiple actors, it needs a **zero-stall context switch** mechanism. The key insight: the on-chip SRAM is a **cache**, not the actor's permanent home — code, stack, and data live in external PSRAM (OPI bus), and only the "hot context" resides in SRAM at any moment. The actor scheduling pipeline orchestrates prefetch, execution, and eviction so that the core never stalls waiting for an actor's state.
+
+### Hot Context — what must be in SRAM
+
+Not the entire actor state needs to be in SRAM for execution — only the **minimum working set**:
+
+| Component | Size | Required for execution? |
+|-----------|------|------------------------|
+| TOS cache (4–8 registers) | 16–32 B | Always (hardware registers) |
+| PC, SP, frame pointer, actor ID | ~16 B | Always |
+| Active frame (locals + args) | ~64–256 B | Active frame only |
+| Mailbox (incoming cell) | 128 B | The trigger that starts execution |
+| Previous stack frames | 0 – 16 KB | No — stays in PSRAM (cache-fetched on demand) |
+| DATA/heap | 0 – 256 KB | No — on-demand cache |
+
+**Minimal hot context per actor:** ~200–512 B. This is what the DMA engine must transfer for a zero-stall context switch.
+
+### DMA Double-Buffer Strategy
+
+The core maintains **two SRAM regions** for actor contexts: an **active buffer** (currently executing actor) and a **shadow buffer** (next actor being prefetched). The DMA engine fills the shadow buffer in the background while the active actor runs:
+
+```
+Time →
+         ┌─────────────┐
+Actor A:  │██ EXECUTING█│── evict ──→ PSRAM (encrypted)
+         └─────────────┘
+         ┌── prefetch ──┐─────────────┐
+Actor B:  │  PSRAM→SRAM  │██ EXECUTING█│── evict ──→
+         └──────────────┘─────────────┘
+                        ┌── prefetch ──┐─────────────┐
+Actor C:                │  PSRAM→SRAM  │██ EXECUTING█│
+                        └──────────────┘─────────────┘
+```
+
+**Condition for zero-stall switching:** `T_swap ≤ T_exec` — the prefetch must complete before the active actor yields or blocks.
+
+### Message Arrival = Prefetch Trigger
+
+The network provides the **earliest possible signal** that an actor will need to run: the arrival of a message in its mailbox. The mailbox interrupt triggers the DMA prefetch **immediately**, not at context-switch time:
+
+```
+1. Cell arrives for Actor B → mailbox interrupt
+2. Core HW: DMA start → Actor B hot context: PSRAM → decrypt → SRAM shadow buffer
+3. Actor A continues executing (uninterrupted)
+4. Actor A blocks / yields → instant switch to B (already in SRAM)
+5. Background: Actor A context → encrypt → PSRAM (evict)
+```
+
+**Prefetch window:** network latency (29–229 cycles) + DMA transfer (~1,250 cycles for 512 B @ OPI 50 MB/s) = ~1,300–1,500 cycles (slightly higher with 144-byte cells). If Actor A's execution time exceeds this, the switch is zero-stall.
+
+### Timing Budget
+
+Three times must be balanced:
+
+| Parameter | Symbol | Typical values |
+|-----------|--------|---------------|
+| Actor execution time (until block/yield) | T_exec | ~500–10,000 cycles |
+| Hot context DMA transfer (PSRAM ↔ SRAM) | T_swap | ~1,250–5,000 cycles (depends on context size) |
+| Network message delivery | T_net | 29–229 cycles ([interconnect](interconnect-en.md)) |
+
+**OPI PSRAM transfer rates** (shared OPI bus @ 50 MB/s):
+
+| Context size | Transfer time | Core cycles @ 500 MHz |
+|-------------|---------------|----------------------|
+| 256 B | ~5 µs | ~2,500 |
+| 512 B | ~10 µs | ~5,000 |
+| 2 KB | ~40 µs | ~20,000 |
+
+**Design rule:** if actors are expected to process messages quickly (T_exec < T_swap), the scheduler should keep more actors' contexts resident in SRAM simultaneously (fewer actors, larger SRAM partitions). If actors are compute-heavy (T_exec >> T_swap), more actors can time-share the SRAM through prefetch.
+
+### Code Sharing
+
+When N actors of the **same type** run on a core (e.g., N identical LIF neurons), the CODE region is loaded **once** into SRAM and shared read-only. Only per-actor state (stack + data + mailbox) is swapped. This drastically reduces the hot context size:
+
+| Scenario | Per-actor swap size | Max actors on 64 KB Actor Core |
+|----------|--------------------|---------------------------------|
+| Unique code per actor | ~2–4 KB (code + state + stack) | ~16–32 |
+| Shared code (N identical actors) | ~200–500 B (state + stack + mailbox only) | **~128–320** |
+
+Code sharing is the common case in cognitive fabric workloads (SNN neurons, IoT handlers, worker actors).
+
+### QRAM External Extension — Secure Off-Chip Storage
+
+The [Quench-RAM](quench-ram-en.md) security guarantees must **extend to external PSRAM**. When an actor's context is evicted from on-chip SRAM to external PSRAM, it must remain **confidential** and **tamper-proof** — no other core, no external probe, and no bus snooper may read or modify it.
+
+```
+SRAM (on-chip, QRAM-protected)
+  │
+  │ evict (actor swap-out)
+  ▼
+┌─────────────────────────────────┐
+│ AES-128-CTR encrypt + CMAC tag  │ ← per-core hardware key
+└─────────────────────────────────┘
+  │
+  ▼
+PSRAM (external, encrypted + authenticated)
+  │
+  │ load (actor swap-in / prefetch)
+  ▼
+┌─────────────────────────────────┐
+│ verify CMAC + AES-128-CTR decrypt│ ← MAC mismatch → TRAP
+└─────────────────────────────────┘
+  │
+  ▼
+SRAM (on-chip, QRAM-protected)
+```
+
+**Security guarantees:**
+
+| Property | Mechanism | Guarantee |
+|----------|-----------|-----------|
+| **Confidentiality** | AES-128-CTR encryption | External PSRAM contents are ciphertext — physical probing yields nothing |
+| **Integrity** | CMAC authentication tag | Any modification (bit flip, bus fault, attack) is detected → `QRAM_INTEGRITY_TRAP` |
+| **Isolation** | Per-core key (derived from core ID + PUF) | Core A cannot decrypt Core B's evicted state |
+| **Replay protection** | Monotonic counter per eviction | Replaying an old ciphertext is detected |
+
+**Hardware cost:** AES-128 + CMAC engine per core ≈ 15,000–25,000 GE (~0.004–0.006 mm²). For Actor Core (0.036 mm²) this is ~11–17% overhead; for Rich Core (0.083 mm²) it is ~5–7%. For Nano Core (0.014 mm²), the crypto engine would dominate (~30–40%) — Nano cores with limited SRAM (4 KB) may opt out if multi-actor is not required.
+
+**Relationship with on-chip QRAM:** the on-chip QRAM SEAL/RELEASE invariants remain unchanged. The external extension adds a **transport encryption layer** — data is SEAL-ed in QRAM, encrypted for PSRAM transit, and re-SEAL-ed upon return. The two mechanisms are complementary:
+
+- **QRAM** protects against software-level tampering (capability tags, immutability)
+- **QRAM External Extension** protects against physical-level tampering (bus probing, PSRAM modification)
+
+### Actor Address — Software Dispatch
+
+The [interconnect](interconnect-en.md) 24-bit hardware address routes cells to a **core**, not to an individual actor:
+
+```
+HW address: [region:4-6].[tile:3-4].[cluster:3-4].[core:4] = 18 bits (of 24)
+Actor ID:   payload first 1–2 bytes (software dispatch on the destination core)
+```
+
+**Rationale:**
+- The maximum actor count per core varies by core type, SRAM size, and workload — a fixed HW bit field would be either too narrow (4-bit = 16 actors) or wasteful
+- The core already has a single mailbox interrupt (see [Power Domains](#power-management)) — the network delivers to the core, not to an actor
+- The on-core dispatcher is trivial: read actor ID from the cell payload, lookup in a local table → route to the actor's context. Cost: ~1–5 cycles, negligible vs. 27–215 cycle network transit
+- The 6 remaining bits (24 − 18) are reserved for future addressing extensions (more regions, larger clusters)
+
+### Phase Availability
+
+| Component | Phase | Notes |
+|-----------|-------|-------|
+| Single-actor per core (no scheduling needed) | **F3–F4** | Current model |
+| Multi-actor scheduling + DMA prefetch | **F5+** | DMA engine required |
+| QRAM External Extension (encrypt/MAC) | **F5+** | Per-core AES+CMAC engine |
+| Code sharing (identical actor types) | **F5+** | Neuron OS scheduler feature |
+| Actor migration between cores | **F6+** | Cross-core state transfer via Seal Core |
 
 ## Silicon-grade security
 
@@ -1205,4 +1425,7 @@ The `ISA-CIL-T0.md` document provides the complete opcode specification for the 
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.3 | 2026-04-19 | Actor Scheduling Pipeline section — hot context, DMA double-buffer, message-triggered prefetch, QRAM External Extension (AES+CMAC for off-chip PSRAM), code sharing, software actor dispatch, timing budget |
+| 1.2 | 2026-04-19 | Pipeline hazard management section — TOS cache bypass, forwarding, microcode vs. picoJava stack folding, stall catalogue, determinism guarantee |
+| 1.1 | 2026-04-16 | Core types, interconnect, Cognitive Fabric One |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

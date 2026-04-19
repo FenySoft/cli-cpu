@@ -2,7 +2,7 @@
 
 > English version: [architecture-en.md](architecture-en.md)
 
-> Version: 1.1
+> Version: 1.3
 
 Ez a dokumentum a **Cognitive Fabric Processing Unit (CFPU)** **mikroarchitektúráját** írja le magas szinten: a stack-gép modellt, a pipeline-t, a memória térképet, a dekódolási stratégiát, a GC és kivételkezelés hardveres támogatását, valamint az elődprojektek (picoJava, Jazelle, Transmeta) közül átvett technikákat.
 
@@ -766,6 +766,76 @@ Nincs superscalar, nincs out-of-order végrehajtás (F0–F6). Ez két okból tu
 
 A **μop cache** viszont jelentősen csökkenti a dekódolási overhead-et a forró loopokon, tehát az effektív IPC ~1 marad, de alacsony energián.
 
+### Pipeline hazard kezelés
+
+Egy stack-gép pipeline-nak egyedi hazard profilja van a regiszter-géphez képest. Egy RISC CPU-n az adat-hazard csak akkor lép fel, ha két utasítás **ugyanarra a regiszterre** hivatkozik — ezt a fordító gyakran elkerülheti más regiszter választásával. Stack-gépen **minden utasítás** a stack tetejéről olvas és oda ír, tehát a RAW (Read After Write) hazard az alapeset, nem a kivétel.
+
+A CLI-CPU ezt három mechanizmussal kezeli:
+
+#### 1. TOS cache mint regiszter fájl
+
+A 8×32-bit TOS cache **nem memória-cache** — regiszter fájl. A stack pointer (`SP_CACHE`, tartomány 0–7) határozza meg, melyik fizikai regiszter a TOS, TOS-1 stb. Amikor egy ALU művelet eredményt ír TOS-1-be, az egy **fizikai regiszterbe** ír — pontosan úgy, mint egy RISC ALU az `rd`-be.
+
+Ez a stack-gép implicit adatfüggőségeit **regiszter-fájl függőségekké** alakítja, amelyeket standard forwarding (bypass) logikával oldunk meg.
+
+#### 2. EX→EX forwarding (bypass útvonal)
+
+A pipeline egyetlen ciklusos forwarding útvonalat valósít meg az EX fokozat kimenetétől az EX fokozat bemenetéig:
+
+```
+ N. ciklus:   add   (EX fokozat: TOS-1 ← TOS-1 + TOS, eredmény a bypass latch-ben)
+ N+1. ciklus: mul   (EX fokozat: TOS-1-et a bypass latch-ből olvassa, nem a WB-ből)
+```
+
+Mivel a TOS cache fizikai regiszter-indexeket használ, a hazard-detektáló logika azonos a RISC pipeline-éval:
+
+```
+ if (EX_WB.dst == ID_EX.src1 || EX_WB.dst == ID_EX.src2)
+     → EX_WB.result forwarding a regiszter fájl olvasás helyett
+```
+
+**Stall esetek** (1 ciklusos buborék):
+- **MEM→EX függőség** — amikor egy memória-olvasó utasítás (`ldind.i4`, `ldelem.i4`, spillt frame-ből `ldarg`) közvetlenül olyan utasítás előtt áll, amely az olvasott értéket felhasználja. Az adat a MEM fokozat végéig nem áll rendelkezésre, ezért az EX fokozatnak 1 ciklust kell várnia.
+- **TOS cache spill/fill** — amikor a stack mélység átlépi a 8 elemű határt, és spill (írás SRAM-ba) vagy fill (olvasás SRAM-ból) szükséges. Ez slottonként 1 ciklusba kerül (a hardver ezt transzparensen kezeli).
+
+Minden más ALU→ALU szekvencia **1 utasítás/ciklus** sebességgel, stall nélkül fut.
+
+#### 3. Mikrokód vs. picoJava stack folding
+
+A Sun picoJava (1997) vezette be a **stack folding-ot**: a dekóder több CIL-szerű stack-műveletet (pl. `load; load; add; store`) egyetlen ALU műveletté kombinál a dekódolási fokozatban. Az ARM Jazelle (2000) hasonló megközelítést használt.
+
+A CFPU **ugyanazt az effektív eredményt** éri el a mikrokód rendszeren keresztül, de eltérő mechanizmussal:
+
+| Szempont | picoJava stack folding | CFPU mikrokód |
+|----------|----------------------|---------------|
+| **Hol** | Dekóder fokozat | Mikrokód ROM → μop kiadás |
+| **Hogyan** | Minta-illesztő felismeri az összehajtható csoportokat | Minden CIL opkód 1+ μop-ra képződik le explicit regiszter-operandusokkal |
+| **Példa** | `ldloc.0; ldloc.1; add` → 1 ALU művelet | `add` = 1 μop (`OP=TOS_ADD, DST=TOS-1, SRC1=TOS-1, SRC2=TOS`) — operandusok már a TOS cache-ben |
+| **Komplexitás** | Magas — N-széles minta-illesztő, folding csoportok | Alacsony — fix μop leképezés, nincs futásidejű mintaillesztés |
+| **Terület-költség** | ~15-20% a dekóder logikából | ~5% (a mikrokód ROM megosztott a komplex opkódokkal) |
+
+A kulcs különbség: a picoJava stack folding a TOS cache regiszter fájl **hiányát** kompenzálja — azért kell folding, mert egyébként minden művelet memóriát érne. A CFPU-ban az operandusok **már regiszterben vannak** (TOS cache), tehát a folding előnyét a regiszter fájl + forwarding nyújtja, komplex minta-illesztő nélkül a dekóderben.
+
+#### 4. Determinizmus garancia
+
+Minden stall-esemény **determinisztikus és adatfüggetlen**:
+- Forwarding késleltetés: 0 ciklus (bypass)
+- MEM→EX stall: pontosan 1 ciklus
+- TOS spill/fill: pontosan 1 ciklus slotonként
+- Branch taken: pontosan 1 ciklus flush
+
+Nincs spekuláció, nincs változó késleltetésű predikció. Ez megőrzi a CFPU **időzítési csatornákkal szembeni ellenállását** — egy kódszekvencia végrehajtási ideje kizárólag az utasítás-szekvencia függvénye, nem az adatértékeké.
+
+#### 5. Miért elegendő ez a CFPU-nak
+
+Egy hagyományos egymagos CPU-n az IPC a fő teljesítmény-metrika. A CFPU-n a teljesítmény **magszámon** keresztül skálázódik, nem az egymagos IPC-n:
+
+- **Nano core szoros hurkok** (FIR szűrő, neuron szimuláció): a TOS cache + forwarding ~1 IPC-t ad, alkalmi 1 ciklusos MEM stall-okkal. Ez összevethető a picoJava folded áteresztőképességével, a terület töredékéért.
+- **Aktor üzenet-feldolgozás**: a domináns késleltetés a mailbox olvasás (~10-20 ciklus), nem az ALU pipeline. Egy 1 ciklusos MEM→EX hazard stall elhanyagolható.
+- **Rich core komplex logika**: ugyanez a mechanizmus érvényes; a Rich core extra pipeline fokozatai (FPU, GC) nem változtatják meg az egész-számos műveletek hazard modelljét.
+
+A CFPU az egymagos IPC-heroizmust **terület-hatékony sokmagos skálázásra** cseréli — a picoJava-stílusú minta-illesztő elhagyásával megtakarított terület további magokra fordítható.
+
 ## Memória modell
 
 ### Cím tér
@@ -1104,7 +1174,7 @@ A CLI-CPU nem az első bytecode-natív CPU, és érdemes megtanulni mindegyik el
 
 - **OpenLane2 / Sky130 / Caravel tooling** — ezt a RISC-V közösségtől tanuljuk
 - **Nyílt forrású szellem** — minden RTL, doksi, teszt public lesz
-- **Custom extension pattern** — Ha valaha kellene egy RISC-V mag a CLI-CPU mellé (pl. a GC koprocesszornak vagy a boot-loadernek), ott egy minimális RV32I mag jó választás
+- **Custom extension pattern** — tervezési módszertan inspiráció (de RISC-V mag nincs a CFPU-ban — minden core CIL vagy CIL-származékú ISA-t futtat)
 
 ## Power management
 
@@ -1116,6 +1186,156 @@ A CLI-CPU **négy power domain**-re osztott (F6 cél):
 4. **I/O domain** — QSPI kontrollerek, UART, GPIO. WFI (wait-for-interrupt) alatt lehalkul.
 
 Clock-gating minden domainben, power-gating a 2., 3., 4. domainben.
+
+## Actor Scheduling Pipeline
+
+Amikor egy core több actort futtat, **nulla-stall context switch** mechanizmusra van szüksége. A kulcs felismerés: az on-chip SRAM **cache**, nem az actor állandó otthona — a kód, a stack és az adatok a külső PSRAM-ban (OPI buszon) élnek, és csak a „hot context" tartózkodik az SRAM-ban adott pillanatban. Az actor scheduling pipeline a prefetch-et, a futtatást és az evict-et úgy hangolja össze, hogy a core soha ne álljon meg egy actor állapotára várva.
+
+### Hot Context — mi kell az SRAM-ban
+
+Az actor teljes állapotából nem kell minden az SRAM-ban a futáshoz — csak a **minimális working set**:
+
+| Komponens | Méret | Kell a futáshoz? |
+|-----------|-------|------------------|
+| TOS cache (4–8 regiszter) | 16–32 B | Mindig (hardver regiszterek) |
+| PC, SP, frame pointer, actor ID | ~16 B | Mindig |
+| Aktív frame (locals + args) | ~64–256 B | Csak az aktív frame |
+| Mailbox (bejövő cella) | 128 B | A trigger, ami elindítja a futást |
+| Korábbi stack frame-ek | 0 – 16 KB | Nem — PSRAM-ban marad (cache-elt igény szerint) |
+| DATA/heap | 0 – 256 KB | Nem — on-demand cache |
+
+**Minimális hot context actoronként:** ~200–512 B. Ezt kell a DMA engine-nek áttöltenie a nulla-stall context switch-hez.
+
+### DMA Double-Buffer stratégia
+
+A core **két SRAM régiót** tart fenn actor kontextusoknak: egy **aktív buffert** (jelenleg futó actor) és egy **shadow buffert** (következő actor, prefetch alatt). A DMA engine a shadow buffert a háttérben tölti, miközben az aktív actor fut:
+
+```
+Idő →
+         ┌─────────────┐
+Actor A:  │██ FUTÁS █████│── evict ──→ PSRAM (titkosítva)
+         └─────────────┘
+         ┌── prefetch ──┐─────────────┐
+Actor B:  │  PSRAM→SRAM  │██ FUTÁS █████│── evict ──→
+         └──────────────┘─────────────┘
+                        ┌── prefetch ──┐─────────────┐
+Actor C:                │  PSRAM→SRAM  │██ FUTÁS █████│
+                        └──────────────┘─────────────┘
+```
+
+**A nulla-stall váltás feltétele:** `T_swap ≤ T_exec` — a prefetch-nek be kell fejeződnie, mielőtt az aktív actor yield-el vagy blokkolna.
+
+### Üzenet érkezés = Prefetch trigger
+
+A hálózat adja a **legkorábbi lehetséges jelzést**, hogy egy actor hamarosan futni fog: az üzenet megérkezése a mailbox-ába. A mailbox interrupt **azonnal** elindítja a DMA prefetch-et, nem a context-switch pillanatában:
+
+```
+1. Cella érkezik Actor B-nek → mailbox interrupt
+2. Core HW: DMA start → Actor B hot context: PSRAM → decrypt → SRAM shadow buffer
+3. Actor A tovább fut (zavartalanul)
+4. Actor A blokkol / yield → azonnali váltás B-re (már SRAM-ban van)
+5. Háttérben: Actor A context → encrypt → PSRAM (evict)
+```
+
+**Prefetch ablak:** hálózati latencia (29–229 ciklus) + DMA áttöltés (~1 250 ciklus 512 B-hoz @ OPI 50 MB/s) = ~1 300–1 500 ciklus (144 byte-os cellákkal valamivel több). Ha Actor A futási ideje ezt meghaladja, a váltás nulla-stall.
+
+### Timing Budget
+
+Három időt kell összehangolni:
+
+| Paraméter | Jelölés | Tipikus értékek |
+|-----------|---------|----------------|
+| Actor futási idő (blokkig / yield-ig) | T_exec | ~500–10 000 ciklus |
+| Hot context DMA transfer (PSRAM ↔ SRAM) | T_swap | ~1 250–5 000 ciklus (context mérettől függ) |
+| Hálózati üzenet kézbesítés | T_net | 29–229 ciklus ([interconnect](interconnect-hu.md)) |
+
+**OPI PSRAM átviteli sebességek** (közös OPI busz @ 50 MB/s):
+
+| Context méret | Átviteli idő | Core ciklus @ 500 MHz |
+|--------------|-------------|----------------------|
+| 256 B | ~5 µs | ~2 500 |
+| 512 B | ~10 µs | ~5 000 |
+| 2 KB | ~40 µs | ~20 000 |
+
+**Tervezési szabály:** ha az actorok gyorsan dolgozzák fel az üzeneteket (T_exec < T_swap), a scheduler több actor kontextusát tartsa rezidensen az SRAM-ban (kevesebb actor, nagyobb SRAM partíciók). Ha az actorok számításigényesek (T_exec >> T_swap), több actor oszthatja időben az SRAM-ot prefetch-csel.
+
+### Kódmegosztás
+
+Ha N **azonos típusú** actor fut egy core-on (pl. N azonos LIF neuron), a CODE régiót **egyszer** töltjük be az SRAM-ba, és read-only megosztjuk. Csak a per-actor state (stack + data + mailbox) cserélődik. Ez drasztikusan csökkenti a hot context méretet:
+
+| Forgatókönyv | Per-actor swap méret | Max actor 64 KB Actor Core-on |
+|-------------|---------------------|---------------------------------|
+| Egyedi kód actoronként | ~2–4 KB (kód + state + stack) | ~16–32 |
+| Megosztott kód (N azonos actor) | ~200–500 B (csak state + stack + mailbox) | **~128–320** |
+
+A kódmegosztás az általános eset a cognitive fabric workload-oknál (SNN neuronok, IoT handlerek, worker actorok).
+
+### QRAM External Extension — biztonságos off-chip tárolás
+
+A [Quench-RAM](quench-ram-hu.md) biztonsági garanciáknak **ki kell terjesztődniük a külső PSRAM-ra**. Amikor egy actor kontextusa kikerül az on-chip SRAM-ból a külső PSRAM-ba, **bizalmasnak** és **manipulálhatatlannak** kell maradnia — sem másik core, sem külső szonda, sem busz-lehallgató nem olvashatja vagy módosíthatja.
+
+```
+SRAM (on-chip, QRAM-védett)
+  │
+  │ evict (actor swap-out)
+  ▼
+┌─────────────────────────────────┐
+│ AES-128-CTR encrypt + CMAC tag  │ ← per-core hardver kulcs
+└─────────────────────────────────┘
+  │
+  ▼
+PSRAM (külső, titkosított + hitelesített)
+  │
+  │ load (actor swap-in / prefetch)
+  ▼
+┌─────────────────────────────────┐
+│ CMAC verify + AES-128-CTR decrypt│ ← MAC eltérés → TRAP
+└─────────────────────────────────┘
+  │
+  ▼
+SRAM (on-chip, QRAM-védett)
+```
+
+**Biztonsági garanciák:**
+
+| Tulajdonság | Mechanizmus | Garancia |
+|------------|------------|----------|
+| **Bizalmasság** | AES-128-CTR titkosítás | A külső PSRAM tartalma titkosított szöveg — fizikai lehallgatás nem ad olvasható adatot |
+| **Integritás** | CMAC hitelesítési tag | Bármilyen módosítás (bitflip, buszhibás, támadás) detektálható → `QRAM_INTEGRITY_TRAP` |
+| **Izoláció** | Per-core kulcs (core ID + PUF-ból származtatva) | A core nem tudja B core eviktált állapotát dekódolni |
+| **Replay-védelem** | Monoton számláló evikciónként | Régi titkosított szöveg visszajátszása detektálható |
+
+**Hardver költség:** AES-128 + CMAC engine core-onként ≈ 15 000–25 000 GE (~0,004–0,006 mm²). Actor Core-nál (0,036 mm²) ez ~11–17% overhead; Rich Core-nál (0,083 mm²) ~5–7%. Nano Core-nál (0,014 mm²) a crypto engine dominálna (~30–40%) — a korlátozott SRAM-ú (4 KB) Nano core-ok kimaradhatnak, ha multi-actor nem szükséges.
+
+**Kapcsolat az on-chip QRAM-mal:** az on-chip QRAM SEAL/RELEASE invariánsok változatlanok maradnak. A külső kiterjesztés egy **transport titkosítási réteget** ad hozzá — az adat SEAL-elve van a QRAM-ban, titkosítva a PSRAM tranzithoz, és visszatöltéskor újra SEAL-elve. A két mechanizmus komplementer:
+
+- **QRAM** véd a szoftver-szintű manipuláció ellen (capability tagek, immutability)
+- **QRAM External Extension** véd a fizikai szintű manipuláció ellen (busz-lehallgatás, PSRAM-módosítás)
+
+### Actor címzés — szoftveres dispatch
+
+Az [interconnect](interconnect-hu.md) 24 bites hardveres cím a cellát egy **core-hoz** irányítja, nem egy egyedi actorhoz:
+
+```
+HW cím: [régió:4-6].[tile:3-4].[cluster:3-4].[core:4] = 18 bit (a 24-ből)
+Actor ID: a payload első 1–2 bájtja (szoftveres dispatch a célcore-on)
+```
+
+**Indoklás:**
+- A maximális actor szám core-onként változik core típus, SRAM méret és workload szerint — egy fix HW bitmező vagy túl szűk (4-bit = 16 actor), vagy pazarló lenne
+- A core-nak egyetlen mailbox interruptja van (lásd [Power domain-ek](#power-management)) — a hálózat a core-nak kézbesít, nem az actornak
+- A core-on belüli dispatcher triviális: actor ID olvasása a cella payload-ból, lookup egy lokális táblában → route az actor kontextusához. Költség: ~1–5 ciklus, elhanyagolható a 29–229 ciklusos hálózati tranzithoz képest
+- A maradék 6 bit (24 − 18) jövőbeli címzési bővítésekre van fenntartva (több régió, nagyobb klaszterek)
+
+### Fázis-elérhetőség
+
+| Komponens | Fázis | Megjegyzés |
+|-----------|-------|-----------|
+| Egyetlen actor / core (nincs ütemezés) | **F3–F4** | Jelenlegi modell |
+| Multi-actor ütemezés + DMA prefetch | **F5+** | DMA engine szükséges |
+| QRAM External Extension (encrypt/MAC) | **F5+** | Per-core AES+CMAC engine |
+| Kódmegosztás (azonos actor típusok) | **F5+** | Neuron OS scheduler funkció |
+| Actor migráció core-ok között | **F6+** | Cross-core state transfer Seal Core-on át |
 
 ## Silicon-grade security
 
@@ -1205,4 +1425,7 @@ A `ISA-CIL-T0-hu.md` dokumentum adja a konkrét CIL-T0 subset teljes opkód-spec
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.3 | 2026-04-19 | Actor Scheduling Pipeline szekció — hot context, DMA double-buffer, üzenet-triggerelt prefetch, QRAM External Extension (AES+CMAC külső PSRAM-hoz), kódmegosztás, szoftveres actor dispatch, timing budget |
+| 1.2 | 2026-04-19 | Pipeline hazard kezelés szekció — TOS cache bypass, forwarding, mikrokód vs. picoJava stack folding, stall katalógus, determinizmus garancia |
+| 1.1 | 2026-04-16 | Core típusok, interconnect, Cognitive Fabric One |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

@@ -150,7 +150,7 @@ The CLI-CPU uses an in-order, non-speculative pipeline. **There is no branch pre
 | Stateful signature key reuse | — | Easy with software signer | **Eliminated** ([Neuron OS HSM Card](authcode-en.md#neuroncard): single-use NVRAM) |
 | Quantum break of signature | — | Shor breaks ECDSA/Ed25519 | **Eliminated** ([BitIce](authcode-en.md): WOTS+/LMS hash-based PQC) |
 | Hot code loader tamper | — | Exposed by kernel-level attack | **Eliminated** ([Seal Core](sealcore-en.md) firmware: mask ROM / eFuse immutable) |
-| Memory controller write-path bypass | — | Software check bypassable | **Eliminated** ([Seal Core](sealcore-en.md): pre-QRAM WE routing / QRAM SEAL microcode trigger) |
+| Memory controller write-path bypass | — | Software check bypassable | **Eliminated** ([Seal Core](sealcore-en.md): pre-QRAM WE routing / QRAM SEAL HW trigger) |
 | Supply chain at hardware level | — | Unverifiable | **Verifiable** (open HDL, reproducible build) |
 | Supply chain at code level | — | Few systems defend | **Verifiable** ([AuthCode](authcode-en.md) trust chain: eFuse → CA → vendor → card → binary) |
 

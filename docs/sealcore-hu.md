@@ -79,7 +79,7 @@ A Seal Core beilleszkedik a CFPU komplementer biztonsági mechanizmusok családj
 A Seal Core az a **fizikai komponens**, amelyik a többi mechanizmust **gyakorlatilag aktiválja**:
 - Az **AuthCode** verifikációs flow itt fut
 - A **CodeLock** W⊕X kényszerítés (pre-QRAM érában) itt származik a WE-pin routing-ból
-- A **Quench-RAM** CODE régió SEAL microcode-triggerét itt indítják
+- A **Quench-RAM** CODE régió SEAL HW-triggerét itt indítják
 
 ## Általános architektúra <a name="architektura"></a>
 
@@ -98,7 +98,7 @@ A Seal Core belső komponensei (bármelyik fázisban azonos):
 │           │                             │                │
 │           ▼                             ▼                │
 │  ┌──────────────────────────────────────────────────┐    │
-│  │    Simple CPU core (RISC-V or custom, small)     │    │
+│  │    Simple CPU core (CIL-Seal ISA — F5)           │    │
 │  │    - 5-stage in-order pipeline                   │    │
 │  │    - 16 register file                            │    │
 │  └────────────┬─────────────────────────────────────┘    │
@@ -233,11 +233,11 @@ A több-Seal-Core redundancia pre-QRAM érában **ugyanolyan olcsó**, mint QRAM
 
 ## Seal Core a QRAM érában (F5+) <a name="qram"></a>
 
-A QRAM éra az F5 RTL prototípus késői fázisában kezdődik, és a F6 ChipIgnite-tól teljes. Ebben a fázisban a CODE **on-chip Quench-RAM tömb**, aminek a védelmét a **per-block status-bit** biztosítja (SEAL/RELEASE microcode-primitivek, lásd `docs/quench-ram-hu.md`).
+A QRAM éra az F5 RTL prototípus késői fázisában kezdődik, és a F6 ChipIgnite-tól teljes. Ebben a fázisban a CODE **on-chip Quench-RAM tömb**, aminek a védelmét a **per-block status-bit** biztosítja (SEAL/RELEASE hardveres állapotgép-műveletek, lásd `docs/quench-ram-hu.md`).
 
 ### Az alapelv — gatekeeper a verifikációra
 
-> **A Seal Core itt NEM fizikai pin-routing-ot véd.** A CODE védelmet a Quench-RAM status-bit adja. A Seal Core szerepe kizárólag az **AuthCode verifikáció** futtatása — ő dönti el, hogy egy bejövő `.acode` konténer hiteles-e, és ő triggereli a Quench-RAM SEAL microcode-ját a CODE régió lezárására.
+> **A Seal Core itt NEM fizikai pin-routing-ot véd.** A CODE védelmet a Quench-RAM status-bit adja. A Seal Core szerepe kizárólag az **AuthCode verifikáció** futtatása — ő dönti el, hogy egy bejövő `.acode` konténer hiteles-e, és ő triggereli a Quench-RAM SEAL HW-állapotgépét a CODE régió lezárására.
 
 Ez egy **fundamentálisan más szerep**, mint a pre-QRAM érában. A védelem forrása más mechanizmus, a Seal Core csak a verifikációs pipeline-t hajtja.
 
@@ -253,12 +253,12 @@ Ez egy **fundamentálisan más szerep**, mint a pre-QRAM érában. A védelem fo
 4. Ha mind OK:
       - Seal Core normál write-op-okkal beírja a bytecode-ot
         egy mutable (status=0) Quench-RAM régióba
-      - Seal Core hívja a SEAL microcode-primitivet a régió lezárására
+      - Seal Core hívja a SEAL hardveres állapotgép-műveletet a régió lezárására
       - Quench-RAM HW: status=1, a bytecode innentől immutable
 5. Seal Core értesíti a Neuron OS scheduler-t: "új aktor betöltve, indulhat"
 ```
 
-A **4. lépésben** a Seal Core nem használ speciális WE-pint. Egyszerű memória-írást végez a Quench-RAM mutable régiójára (amit a capability rendszer neki biztosít), majd SEAL-lel lezárja. A védelem attól jön, hogy **csak a Seal Core firmware-e képes a `SEAL` microcode-primitivet triggerelni az AuthCode verify kontextusában** — más core-on futó aktor esetleg írhat mutable blokkot, de SEAL-t nem tud hívni (a SEAL triggerek listája zárt: `SEND`, `newobj`, `newarr`, `GC_SWEEP`, vagy Seal Core hot_code_loader).
+A **4. lépésben** a Seal Core nem használ speciális WE-pint. Egyszerű memória-írást végez a Quench-RAM mutable régiójára (amit a capability rendszer neki biztosít), majd SEAL-lel lezárja. A védelem attól jön, hogy **csak a Seal Core firmware-e képes a `SEAL` hardveres állapotgép-műveletet triggerelni az AuthCode verify kontextusában** — a SEAL triggerek listája zárt: CODE régió (Seal Core boot / hot_code_loader), SEND (payload kilép a Core-ból), swap-out (DMA evict külső QRAM-ba).
 
 ### Redundancia — verifikációs throughput szempontjából
 
@@ -276,7 +276,7 @@ A ring/mesh topológia a **hot_code_loader aktor host-váltáshoz** kell (ha a S
 
 - **Nem** fizikai gatekeeper a WE-pin felett (nincs külön CODE chip sem)
 - **IGEN** logikai gatekeeper az AuthCode flow-n
-- **IGEN** SEAL microcode-trigger forrás
+- **IGEN** SEAL HW-trigger forrás
 - Több Seal Core = **párhuzamos verify + redundancia**
 - A CODE memória védelme **teljes mértékben** a Quench-RAM status-bit mechanizmusa
 
@@ -432,7 +432,7 @@ A Seal Core mint komponens **egyedi hozzájárulása** a CFPU biztonsági modell
 
 | Támadás-osztály | Hagyományos rendszer | Seal Core-os CFPU |
 |----------------|----------------------|-------------------|
-| Memory controller write-path bypass | szoftveres check kerülhető | **Kizárva** (pre-QRAM: fizikai WE-routing; QRAM: SEAL microcode-trigger csak Seal Core firmware-ből) |
+| Memory controller write-path bypass | szoftveres check kerülhető | **Kizárva** (pre-QRAM: fizikai WE-routing; QRAM: SEAL HW FSM-trigger csak Seal Core firmware-ből) |
 | Hot code loader tamper | kernel-szintű támadás | **Kizárva** (Seal Core firmware immutable, mask ROM / eFuse) |
 | Unsigned code introduction | ring-0 exploit | **Kizárva** (minden code-load Seal Core-on megy át) |
 | DoS a hitelesítőn | egyetlen signing service | **Redundáns** (több Seal Core, graceful degradation) |
@@ -444,7 +444,7 @@ Ez a v1.0 doksi a vízió-szintű architektúrát rögzíti. A részletek a megf
 
 ### F4-F5 (szim + RTL)
 
-1. **Seal Core CPU-architektúra** — RISC-V subset, saját egyedi ISA, vagy CIL-T0 trimmed variant?
+1. **Seal Core CPU-architektúra** — CIL-Seal ISA: mely CIL-T0 opkódok maradnak, milyen crypto opkódok jönnek hozzá?
 2. **Firmware tároló** — mask ROM vs. eFuse vs. flash+integrity check
 3. **Heartbeat frekvencia és timeout** — mekkora N, mennyi az "elfogadható válaszidő"
 
@@ -495,4 +495,4 @@ Ez a v1.0 doksi a vízió-szintű architektúrát rögzíti. A részletek a megf
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
-| 1.0 | 2026-04-16 | Kezdeti vízió-szintű kiadás. A Seal Core két különálló mechanizmusként: (1) pre-QRAM érában fizikai WE-pin routing a CODE RAM chipre; (2) QRAM érában AuthCode verifikációs gatekeeper a SEAL microcode-trigger forrással. Explicit szeparáció a két érá között, nincs cross-contamination. Ring és 2D mesh failover topológiák, graceful degradation. Firmware immutability mask ROM / eFuse alapon. |
+| 1.0 | 2026-04-16 | Kezdeti vízió-szintű kiadás. A Seal Core két különálló mechanizmusként: (1) pre-QRAM érában fizikai WE-pin routing a CODE RAM chipre; (2) QRAM érában AuthCode verifikációs gatekeeper a SEAL HW-trigger forrással. Explicit szeparáció a két érá között, nincs cross-contamination. Ring és 2D mesh failover topológiák, graceful degradation. Firmware immutability mask ROM / eFuse alapon. |
