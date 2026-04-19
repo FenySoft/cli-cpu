@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Five Cores, One Chip &mdash; The CFPU core family: Nano, Actor, Rich, Matrix, Seal &mdash; CLI-CPU Blog</title>
+  <meta name="description" content="The five processor core types of the CFPU: Nano, Actor, Rich, Matrix, and Seal. Two evolutionary directions, one chip. Why Matrix Core is Nano-based, not Rich-based, and how 25,000 ML cores fit on a single 800 mm&sup2; die.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .nav {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      line-height: 1.25;
+    }
+
+    header .subtitle {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    header .meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 16px;
+      font-family: var(--mono);
+    }
+
+    article {
+      flex: 1;
+      padding: 48px 0;
+    }
+
+    article h2 {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: #f0f6fc;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    article h2:first-child { margin-top: 0; }
+
+    article h3 {
+      font-size: 1.1rem;
+      color: #f0f6fc;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    article p {
+      margin-bottom: 16px;
+      font-size: 1.02rem;
+    }
+
+    article blockquote {
+      border-left: 3px solid var(--green);
+      padding: 12px 20px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    article ul, article ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+
+    article li {
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+
+    article strong { color: #f0f6fc; }
+
+    article code {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: #f0f6fc;
+    }
+
+    .comparison-table td { color: var(--text-dim); }
+
+    .highlight-box {
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .highlight-box strong { color: var(--accent); }
+
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 28px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta h3 {
+      font-family: var(--mono);
+      color: var(--green);
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      header { padding: 32px 0 24px; }
+      article h2 { font-size: 1.1rem; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <a href="../../hu/blog/core-types.html" style="color:var(--text-dim);padding:4px 12px;margin-right:4px;">Magyar</a>
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">English</span>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>Five Cores, One Chip</h1>
+    <div class="subtitle">The CFPU core family: Nano, Actor, Rich, Matrix, Seal</div>
+    <div class="meta">April 18, 2026 &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <img src="../../img/blog/seal-core.png" alt="Seal Core — the security core at the center of the CFPU chip" style="width:100%;margin-bottom:40px;border-radius:8px;">
+
+    <h2>Dual specialization</h2>
+
+    <p>
+      The CFPU is not a single core multiplied by thousands. Different workloads demand different processor geometries &mdash; which is why the CFPU core family branches in two directions from a single common base: the <strong>Nano Core</strong>.
+    </p>
+
+    <p>
+      The first branch grows toward <strong>actor processing</strong>: Nano &rarr; Actor &rarr; Rich. Each step adds more SRAM, more registers, and a richer ISA &mdash; Actor is optimized for general-purpose CIL execution, Rich for floating-point computation and GC-managed object handling.
+    </p>
+
+    <p>
+      The second branch diverges toward <strong>ML/SNN compute</strong>: Nano &rarr; Matrix. The Matrix Core is not a scaled-down Actor or Rich &mdash; it is a direct descendant of Nano, extended with MAC+SFU units. Small, massively parallel, streamable.
+    </p>
+
+<pre>Nano Core (base)
+  ├── Actor Core  (general actor, 64 KB SRAM)
+  │     └── Rich Core   (FP + GC + Obj, 256 KB SRAM)
+  └── Matrix Core (ML/SNN compute, 8 KB SRAM + MAC+SFU)
+
+Seal Core (security core, independent lineage)</pre>
+
+    <p>
+      This dual branching is deliberate: <strong>the Rich Core is expensive</strong> (256 KB SRAM, GC, FPU), while the Matrix Core's goal is to maximize the number of cores per die. Direct descent from Nano keeps the area footprint low.
+    </p>
+
+    <h2>The five core types</h2>
+
+    <h3>Nano Core &mdash; spike / sensor</h3>
+    <p>
+      The smallest and most numerous core. Integer arithmetic only, 4 KB SRAM, minimal ISA, mailbox-based messaging. Designed for sensors, edge processing, and SNN spike propagation &mdash; where precision is less important than speed and energy efficiency.
+    </p>
+
+    <h3>Actor Core &mdash; general actor</h3>
+    <p>
+      The CFPU's primary workhorse. Full CIL ISA with GC and object support, 64 KB SRAM, mailbox-based messaging. Neuron OS actors, server logic, general-purpose parallel processing. In most CFPU configurations, this is the dominant core type.
+    </p>
+
+    <h3>Rich Core &mdash; FP actor</h3>
+    <p>
+      An extension of the Actor Core with a floating-point unit (FPU). 256 KB SRAM. Numerical computation, scientific workloads, complex business logic. The baseline for all external CPU comparisons.
+    </p>
+
+    <h3>Matrix Core &mdash; ML/SNN compute</h3>
+    <p>
+      A Nano descendant extended with MAC+SFU (Multiply-Accumulate + Special Function Unit). 8 KB SRAM, streaming dataflow. Optimized for matrix multiplication, convolution, and Spiking Neural Network propagation. Massively parallel: at 7nm, ~20,500 cores fit on a single 800 mm&sup2; die (including Turbo router and infrastructure overhead).
+    </p>
+
+    <h3>Seal Core &mdash; authentication</h3>
+    <p>
+      A security core placed at the center of the chip, integrated with the L3 crossbar. All cross-region traffic naturally passes through it. Code authentication, key management, isolation boundary enforcement. Not a compute core &mdash; a security gatekeeper.
+    </p>
+
+    <h2>Core comparison table</h2>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Property</th>
+        <th>Nano</th>
+        <th>Actor</th>
+        <th>Rich</th>
+        <th>Matrix</th>
+        <th>Seal</th>
+      </tr>
+      <tr>
+        <td>ISA</td>
+        <td>CIL-T0 (int)</td>
+        <td>Full CIL (int)</td>
+        <td>Full CIL (int+fp)</td>
+        <td>CIL-T0 + MAC</td>
+        <td>CIL-Seal</td>
+      </tr>
+      <tr>
+        <td>FPU</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&#10003; (IEEE 754)</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>MAC + SFU</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&#10003; (streaming)</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>GC + Obj</td>
+        <td>&mdash;</td>
+        <td>&#10003;</td>
+        <td>&#10003;</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>Mailbox</td>
+        <td>&#10003;</td>
+        <td>&#10003;</td>
+        <td>&#10003;</td>
+        <td>&#10003;</td>
+        <td>dedicated inbox</td>
+      </tr>
+      <tr>
+        <td>Crypto HW</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&#10003; (SHA-256, WOTS+)</td>
+      </tr>
+      <tr>
+        <td>SRAM</td>
+        <td>4 KB</td>
+        <td>64 KB</td>
+        <td>256 KB</td>
+        <td>8 KB</td>
+        <td>32 KB</td>
+      </tr>
+      <tr>
+        <td>Logic area (7nm)</td>
+        <td>~18,000 gate</td>
+        <td>~46,000 gate</td>
+        <td>~107,000 gate</td>
+        <td>~32,000 gate</td>
+        <td>~60,000 gate</td>
+      </tr>
+    </table>
+
+    <h2>Matrix Core: Nano on steroids</h2>
+
+    <p>
+      The first question that arises: why not derive the Matrix Core from the Rich Core? Rich has an FPU, large SRAM &mdash; isn't that exactly what ML needs?
+    </p>
+
+    <p>
+      The answer is <strong>area efficiency</strong>. A Rich Core with 256 KB SRAM and GC is ~107,000 gates. In the same silicon area, you can fit <strong>three times as many Matrix Cores</strong> &mdash; and ML/SNN workloads depend not on the speed of one large core, but on the <strong>number of parallel MAC operations</strong>.
+    </p>
+
+    <p>
+      The Matrix Core's 8 KB SRAM is not a limitation &mdash; it is the <strong>streaming sweet spot</strong>. A convolutional layer or SNN propagation pass typically fits in a small local buffer, then passes the result forward. 8 KB is exactly enough to process one tile. More SRAM would be waste.
+    </p>
+
+    <blockquote>
+      Matrix Core is not Rich Core minus the FPU. It is Nano Core plus MAC+SFU &mdash; and that difference means 3&times; more cores on the same die.
+    </blockquote>
+
+    <p>
+      The MAC+SFU unit (multiply-accumulate + sigmoid/tanh/ReLU hardware) slots directly into the CIL pipeline. Keeping the integer Nano ISA ensures that control logic (loops, branches, message passing) remains equally efficient.
+    </p>
+
+    <h2>Core count comparison (7nm, 800 mm&sup2;)</h2>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Core type</th>
+        <th>SRAM / core</th>
+        <th>Core count (7nm, 800 mm&sup2;)</th>
+        <th>Primary use</th>
+      </tr>
+      <tr>
+        <td><strong>Nano</strong></td>
+        <td>4 KB</td>
+        <td><strong>~32,000</strong></td>
+        <td>Spike / sensor / edge</td>
+      </tr>
+      <tr>
+        <td><strong>Matrix</strong></td>
+        <td>8 KB</td>
+        <td><strong>~20,500</strong></td>
+        <td>ML / SNN / MAC array</td>
+      </tr>
+      <tr>
+        <td><strong>Actor</strong></td>
+        <td>64 KB</td>
+        <td><strong>~17,000</strong></td>
+        <td>General actor / Neuron OS</td>
+      </tr>
+      <tr>
+        <td><strong>Rich</strong></td>
+        <td>256 KB</td>
+        <td><strong>~8,250</strong></td>
+        <td>FP compute / scientific code</td>
+      </tr>
+    </table>
+
+    <p>
+      The Seal Core is present as a single instance per chip (at the center of the L3 crossbar) and is therefore not included in the core count table. Core counts include L0 router area and L1&ndash;L3 infrastructure overhead (~20%).
+    </p>
+
+    <h2>CFPU product family</h2>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Variant</th>
+        <th>Primary core type</th>
+        <th>Target platform</th>
+        <th>Notes</th>
+      </tr>
+      <tr>
+        <td><strong>CFPU-N</strong></td>
+        <td>Nano</td>
+        <td>IoT / edge sensor</td>
+        <td>Maximum core count, minimum power</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-A</strong></td>
+        <td>Actor</td>
+        <td>Server / cloud</td>
+        <td>Neuron OS reference platform</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-R</strong></td>
+        <td>Rich</td>
+        <td>Scientific / HPC</td>
+        <td>FPU + GC, competes with discrete CPUs</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-ML</strong></td>
+        <td>Matrix + Actor</td>
+        <td>ML/SNN chip</td>
+        <td>Matrix compute + Actor supervisor</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-H</strong></td>
+        <td>Actor + Rich</td>
+        <td>Hybrid server</td>
+        <td>Mixed workload, general purpose</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-X</strong></td>
+        <td>All five</td>
+        <td>Research / prototype</td>
+        <td>Every core type on one die</td>
+      </tr>
+    </table>
+
+    <h2>CFPU-ML: the ML/SNN chip</h2>
+
+    <div class="highlight-box">
+      <strong>CFPU-ML configuration (7nm, 800 mm&sup2;, estimated):</strong><br><br>
+      <strong>~19,500 Matrix Cores</strong> &mdash; MAC+SFU streaming array (8 KB SRAM, Turbo router)<br>
+      <strong>~1,000 Actor Cores</strong> &mdash; supervisor, scheduler, coordination (64 KB SRAM)<br>
+      <strong>1 Seal Core</strong> &mdash; model authentication, isolation<br><br>
+      <strong>Peak throughput:</strong> ~312 INT8 TOPS* &mdash; theoretical maximum, every MAC busy every cycle<br>
+      <strong>Sustained throughput:</strong> ~49&ndash;176 INT8 TOPS* &mdash; realistic range depending on optimization strategy<br><br>
+      <strong>Key advantage:</strong> Every Matrix Core is an independent actor &mdash; no shared memory, no driver stack, directly programmable from Neuron OS via CIL messages.<br><br>
+      <em style="font-size: 0.9em;">* Peak = core count &times; MAC units &times; clock. Sustained range depends on SRAM sizing and data-feeding strategy (weight reuse, systolic chaining, post-MAC processing). The MAC array is ~6&times; faster than the network can feed it &mdash; sustained throughput is network-limited, not compute-limited. No RTL simulation or silicon measurement exists yet.</em>
+    </div>
+
+    <p>
+      The CFPU-ML is not a GPU competitor &mdash; it is a different paradigm. Where a GPU is one massive, monolithic shader array, the CFPU-ML is <strong>~20,000 independent ML actors</strong> communicating via messages. Partial failures leave healthy cores running; there is no global memory, no pointer manipulation, no CUDA/ROCm driver stack.
+    </p>
+
+    <h2>Why CFPU-ML?</h2>
+
+    <p>
+      The CFPU-ML's value lies not in raw TOPS but in a <strong>combination of architectural properties</strong> that no existing chip offers together: programmable neuron model (arbitrary CIL), event-driven operation (0W idle), isolated cores without shared memory, open-source hardware (CERN-OHL-S), and native .NET CIL execution.
+    </p>
+
+    <p>
+      The CFPU-ML-Max variant &mdash; with Systolic Wide router, post-MAC pipeline, and 1 GHz clock &mdash; achieves <strong>90&ndash;95% sustained MAC utilization</strong> and delivers 2&ndash;3.7&times; better sustained TOPS than NVIDIA RTX 4060/4090 at the same die size.
+    </p>
+
+    <p>
+      Detailed competitive comparison, die variants, and target models: <a href="cfpu-ml-max.html"><strong>CFPU-ML-Max: ML/SNN Inference Accelerator &rarr;</strong></a>
+    </p>
+
+    <div class="cta">
+      <h3>Open source</h3>
+      <p>The CLI-CPU project is fully open source. The complete design process, every decision and rationale, is publicly available.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="https://github.com/FenySoft/NeuronOS">GitHub &rarr; NeuronOS</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      The CFPU is not a single core &mdash; it is five specialized core types operating on the same chip, over the same message network. Specialization does not fragment the system: it <strong>unifies</strong> it.
+    </p>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

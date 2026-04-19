@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>&Ouml;t mag, egy chip &mdash; A CFPU core csal&aacute;d: Nano, Actor, Rich, Matrix, Seal &mdash; CLI-CPU Blog</title>
+  <meta name="description" content="A CFPU &ouml;t processzormag-t&iacute;pusa: Nano, Actor, Rich, Matrix &eacute;s Seal. K&eacute;t fejl&odblac;d&eacute;si ir&aacute;ny, egy chip. Mi&eacute;rt nem Rich-alap&uacute; a Matrix Core, &eacute;s hogyan f&eacute;r 25 000 ML mag egyetlen 800 mm&sup2;-es chipen.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .nav {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      line-height: 1.25;
+    }
+
+    header .subtitle {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    header .meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 16px;
+      font-family: var(--mono);
+    }
+
+    article {
+      flex: 1;
+      padding: 48px 0;
+    }
+
+    article h2 {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: #f0f6fc;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    article h2:first-child { margin-top: 0; }
+
+    article h3 {
+      font-size: 1.1rem;
+      color: #f0f6fc;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    article p {
+      margin-bottom: 16px;
+      font-size: 1.02rem;
+    }
+
+    article blockquote {
+      border-left: 3px solid var(--green);
+      padding: 12px 20px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    article ul, article ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+
+    article li {
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+
+    article strong { color: #f0f6fc; }
+
+    article code {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: #f0f6fc;
+    }
+
+    .comparison-table td { color: var(--text-dim); }
+
+    .highlight-box {
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .highlight-box strong { color: var(--accent); }
+
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 28px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta h3 {
+      font-family: var(--mono);
+      color: var(--green);
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      header { padding: 32px 0 24px; }
+      article h2 { font-size: 1.1rem; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">Magyar</span>
+  <a href="../../en/blog/core-types.html" style="color:var(--text-dim);padding:4px 12px;margin-left:4px;">English</a>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>&Ouml;t mag, egy chip</h1>
+    <div class="subtitle">A CFPU core csal&aacute;d: Nano, Actor, Rich, Matrix, Seal</div>
+    <div class="meta">2026. &aacute;prilis 18. &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <img src="../../img/blog/seal-core.png" alt="Seal Core — a CFPU chip biztonsági magja a chip közepén" style="width:100%;margin-bottom:40px;border-radius:8px;">
+
+    <h2>Kett&odblac;s specializáció</h2>
+
+    <p>
+      A CFPU nem egyetlen mag milliósszorosítása. Különböz&odblac; feladatok különböz&odblac; processzor-geometriát igényelnek &mdash; ezért a CFPU core csal&aacute;d k&eacute;t irányban ágazik el egyetlen közös alapból, a <strong>Nano Core</strong>-ból.
+    </p>
+
+    <p>
+      Az els&odblac; ág az <strong>aktor-feldolgozás</strong> irányába nő: Nano &rarr; Actor &rarr; Rich. Minden lépés nagyobb SRAM-ot, több regisztert és gazdagabb ISA-t jelent &mdash; az Actor általános célú CIL végrehajtásra, a Rich lebeg&odblac;pontos számításra és GC-vel felügyelt objektumkezelésre optimalizált.
+    </p>
+
+    <p>
+      A második ág az <strong>ML/SNN compute</strong> irányába ágazik: Nano &rarr; Matrix. A Matrix Core nem az Actor vagy a Rich méretezett változata &mdash; hanem a Nano egyenes leszármazottja, MAC+SFU egységekkel b&odblac;vítve. Kis, tömeges, streamelhet&odblac;.
+    </p>
+
+<pre>Nano Core (alap)
+  ├── Actor Core  (általános aktor, 64 KB SRAM)
+  │     └── Rich Core   (FP + GC + Obj, 256 KB SRAM)
+  └── Matrix Core (ML/SNN compute, 8 KB SRAM + MAC+SFU)
+
+Seal Core (biztonsági mag, különálló fejl&odblac;d&eacute;si ág)</pre>
+
+    <p>
+      Ez a kettős elágazás nem véletlen: <strong>a Rich Core drága</strong> (256 KB SRAM, GC, FPU), míg a Matrix Core célja, hogy minél több férjen egy chipre. A Nano-tól való közvetlen leszármazás tartja alacsonyan a területigényt.
+    </p>
+
+    <h2>Az öt core típus</h2>
+
+    <h3>Nano Core &mdash; spike / érzékel&odblac;</h3>
+    <p>
+      A legkisebb &eacute;s legt&ouml;megesebb mag. Csak eg&eacute;sz aritmetika, 4 KB SRAM, minim&aacute;lis ISA, mailbox-alap&uacute; &uuml;zenetkezel&eacute;s. &Eacute;rz&eacute;kel&odblac;kh&ouml;z, edge-feldolgoz&aacute;shoz &eacute;s SNN spike-propag&aacute;ci&oacute;hoz tervezve &mdash; ahol nem lebeg&odblac;pontos precízi&oacute; kell, hanem sebess&eacute;g &eacute;s energiahat&eacute;konys&aacute;g.
+    </p>
+
+    <h3>Actor Core &mdash; általános aktor</h3>
+    <p>
+      A CFPU f&odblac; munk&aacute;sa. Teljes CIL ISA, GC-vel &eacute;s objektumkezel&eacute;ssel, 64 KB SRAM, mailbox-alap&uacute; &uuml;zenetkezel&eacute;s. Neuron OS aktorok, szerver logika, &aacute;ltal&aacute;nos c&eacute;l&uacute; p&aacute;rhuzamos feldolgoz&aacute;s. Ez a legt&ouml;bb CFPU-konfigur&aacute;ci&oacute;ban a domin&aacute;ns magt&iacute;pus.
+    </p>
+
+    <h3>Rich Core &mdash; FP aktor</h3>
+    <p>
+      Az Actor Core kiterjeszt&eacute;se lebeg&odblac;pontos egys&eacute;ggel (FPU). 256 KB SRAM. Numerikus sz&aacute;m&iacute;t&aacute;s, tudom&aacute;nyos k&oacute;dok, &ouml;sszetett &uuml;zleti logika. Az &ouml;sszehasonl&iacute;t&aacute;si alap minden k&uuml;lső CPU-val szemben.
+    </p>
+
+    <h3>Matrix Core &mdash; ML/SNN compute</h3>
+    <p>
+      MAC+SFU (Multiply-Accumulate + Special Function Unit) kiegészítéssel bíró Nano-leszármazott. 8 KB SRAM, streaming adatfolyam. Mátrix szorzásra, konvolúcióra és Spiking Neural Network propagációra optimalizált. Tömeges párhuzamosság: 7nm-en ~19 000 mag fér egy 800 mm²-es chipre (routerrel és infrastruktúra overhead-del együtt).
+    </p>
+
+    <h3>Seal Core &mdash; hitelesítés</h3>
+    <p>
+      Biztonsági mag, a chip közepén, az L3 crossbar-ral egybeépítve. Minden kereszt-régió forgalom természetesen áthalad rajta. Kódhitelesítés, kulcskezelés, izolációs határ-ellenőrzés. Nem számítási mag &mdash; biztonsági kapuőr.
+    </p>
+
+    <h2>Core összehasonlító táblázat</h2>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Tulajdonság</th>
+        <th>Nano</th>
+        <th>Actor</th>
+        <th>Rich</th>
+        <th>Matrix</th>
+        <th>Seal</th>
+      </tr>
+      <tr>
+        <td>ISA</td>
+        <td>CIL-T0 (int)</td>
+        <td>Teljes CIL (int)</td>
+        <td>Teljes CIL (int+fp)</td>
+        <td>CIL-T0 + MAC</td>
+        <td>CIL-Seal</td>
+      </tr>
+      <tr>
+        <td>FPU</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&#10003; (IEEE 754)</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>MAC + SFU</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&#10003; (streaming)</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>GC + Obj</td>
+        <td>&mdash;</td>
+        <td>&#10003;</td>
+        <td>&#10003;</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>Mailbox</td>
+        <td>&#10003;</td>
+        <td>&#10003;</td>
+        <td>&#10003;</td>
+        <td>&#10003;</td>
+        <td>dedik&aacute;lt inbox</td>
+      </tr>
+      <tr>
+        <td>Crypto HW</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td>&#10003; (SHA-256, WOTS+)</td>
+      </tr>
+      <tr>
+        <td>SRAM</td>
+        <td>4 KB</td>
+        <td>64 KB</td>
+        <td>256 KB</td>
+        <td>8 KB</td>
+        <td>32 KB</td>
+      </tr>
+      <tr>
+        <td>Logika ter&uuml;let (7nm)</td>
+        <td>~18 000 gate</td>
+        <td>~46 000 gate</td>
+        <td>~107 000 gate</td>
+        <td>~32 000 gate</td>
+        <td>~60 000 gate</td>
+      </tr>
+    </table>
+
+    <h2>Matrix Core: a Nano steroidokon</h2>
+
+    <p>
+      Az els&odblac; kérdés, ami felmerül: miért nem a Rich Core-ból fejlesztettük ki a Matrix Core-t? A Rich-nek van FPU-ja, nagy SRAM-ja &mdash; nem ez kell ML-hez?
+    </p>
+
+    <p>
+      A válasz a <strong>területhatékonyság</strong>. Egy Rich Core 256 KB SRAM-mal és GC-vel ~107 000 gate. Ugyanezen a területen <strong>háromszor annyi Matrix Core fér el</strong> &mdash; és a ML/SNN workload nem egyetlen nagy mag gyorsaságától, hanem a <strong>párhuzamos MAC-műveletek számától</strong> függ.
+    </p>
+
+    <p>
+      A Matrix Core 8 KB SRAM-ja nem hátránya &mdash; a <strong>streaming feldolgozás édespontja</strong>. Egy konvolúciós réteg vagy SNN propagáció tipikusan kis lokális bufferben fut, majd tovább adja az eredményt. A 8 KB pont elegend&odblac; egy tile feldolgozásához. Nagyobb SRAM = pazarlás.
+    </p>
+
+    <blockquote>
+      A Matrix Core nem a Rich Core FPU n&eacute;lk&uuml;li v&aacute;ltozata, hanem a Nano Core MAC+SFU-val kieg&eacute;sz&iacute;tve &mdash; &eacute;s ez a k&uuml;l&ouml;nbs&eacute;g 3&times; t&ouml;bb magot jelent ugyanazon a chipen.
+    </blockquote>
+
+    <p>
+      A MAC+SFU egység (szorzás-összeadás + sigmoid/tanh/ReLU hardver) közvetlenül a CIL pipeline-ba illeszkedik. Az integer Nano ISA megtartása biztosítja, hogy a vezérlési logika (loopok, feltételek, üzenetküldés) ugyanolyan hatékony marad.
+    </p>
+
+    <h2>Magszám összehasonlítás (7nm, 800 mm²)</h2>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Core típus</th>
+        <th>SRAM / mag</th>
+        <th>Magszám (7nm, 800 mm²)</th>
+        <th>F&odblac; felhasználás</th>
+      </tr>
+      <tr>
+        <td><strong>Nano</strong></td>
+        <td>4 KB</td>
+        <td><strong>~32 000</strong></td>
+        <td>Spike / érzékel&odblac; / edge</td>
+      </tr>
+      <tr>
+        <td><strong>Matrix</strong></td>
+        <td>8 KB</td>
+        <td><strong>~20 500</strong></td>
+        <td>ML / SNN / MAC tömb</td>
+      </tr>
+      <tr>
+        <td><strong>Actor</strong></td>
+        <td>64 KB</td>
+        <td><strong>~17 000</strong></td>
+        <td>Általános aktor / Neuron OS</td>
+      </tr>
+      <tr>
+        <td><strong>Rich</strong></td>
+        <td>256 KB</td>
+        <td><strong>~8 250</strong></td>
+        <td>FP számítás / tudományos kód</td>
+      </tr>
+    </table>
+
+    <p>
+      A Seal Core egyetlen példányban van jelen chipe&aacute;nként (L3 crossbar közepén), ezért nem szerepel a magszám-táblában. A magszámok tartalmazzák az L0 router területet és az L1&ndash;L3 infrastruktúra overhead-et (~20%).
+    </p>
+
+    <h2>CFPU termékcsalád</h2>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Változat</th>
+        <th>F&odblac; magtípus</th>
+        <th>Célplatform</th>
+        <th>Megjegyzés</th>
+      </tr>
+      <tr>
+        <td><strong>CFPU-N</strong></td>
+        <td>Nano</td>
+        <td>IoT / edge érzékel&odblac;</td>
+        <td>Maximális magszám, minimális fogyasztás</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-A</strong></td>
+        <td>Actor</td>
+        <td>Szerver / cloud</td>
+        <td>Neuron OS referencia platform</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-R</strong></td>
+        <td>Rich</td>
+        <td>Tudományos / HPC</td>
+        <td>FPU + GC, külön CPU-kkal versenyez</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-ML</strong></td>
+        <td>Matrix + Actor</td>
+        <td>ML/SNN chip</td>
+        <td>Matrix compute + Actor supervisor</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-H</strong></td>
+        <td>Actor + Rich</td>
+        <td>Hibrid szerver</td>
+        <td>Vegyes workload, általános célú</td>
+      </tr>
+      <tr>
+        <td><strong>CFPU-X</strong></td>
+        <td>Mind az öt</td>
+        <td>Kutatás / prototípus</td>
+        <td>Minden magtípus egy chipen</td>
+      </tr>
+    </table>
+
+    <h2>CFPU-ML: az ML/SNN chip</h2>
+
+    <div class="highlight-box">
+      <strong>CFPU-ML konfigur&aacute;ci&oacute; (7nm, 800 mm&sup2;, becs&uuml;lt):</strong><br><br>
+      <strong>~19 500 Matrix Core</strong> &mdash; MAC+SFU streaming tömb (8 KB SRAM, Turbo router)<br>
+      <strong>~1 000 Actor Core</strong> &mdash; supervisor, scheduler, koordináció (64 KB SRAM)<br>
+      <strong>1 Seal Core</strong> &mdash; modell hitelesítés, izol&aacute;ci&oacute;<br><br>
+      <strong>Peak throughput (csúcsteljesítmény):</strong> ~312 INT8 TOPS* &mdash; elméleti maximum, minden MAC minden ciklusban dolgozik<br>
+      <strong>Sustained throughput (tartós teljesítmény):</strong> ~49&ndash;176 INT8 TOPS* &mdash; reális tartomány az optimalizálási stratégiától függően<br><br>
+      <strong>F&odblac; el&odblac;ny:</strong> Minden Matrix Core önálló aktor &mdash; nincs shared memory, nincs driver stack, Neuron OS-r&odblac;l közvetlenül programozható CIL üzenetekkel.<br><br>
+      <em style="font-size: 0.9em;">* Peak = core szám &times; MAC egységek &times; órajel. A sustained tartomány az SRAM mérettől és az adatbetáplálási stratégiától függ (weight reuse, systolic láncolás, post-MAC feldolgozás). A MAC tömb ~6&times;-osan gyorsabb, mint amennyit a hálózat táplálni tud &mdash; a sustained throughput hálózat-korlátozott, nem compute-korlátozott. RTL szimuláció vagy szilícium mérés még nem áll rendelkezésre.</em>
+    </div>
+
+    <p>
+      A CFPU-ML nem GPU-versenytárs &mdash; hanem más paradigma. Ahol a GPU egy hatalmas, monolitikus shader-tömb, a CFPU-ML <strong>~20 000 független ML-aktor</strong>, amelyek üzenetekkel kommunikálnak. Részleges hibák esetén az egészséges magok tovább futnak; nincs globális memória, nincs pointer-manipuláció, nincs CUDA/ROCm driver stack.
+    </p>
+
+    <h2>Miért CFPU-ML?</h2>
+
+    <p>
+      A CFPU-ML értéke nem a nyers TOPS-ban rejlik, hanem olyan <strong>architekturális tulajdonságok kombinációjában</strong>, amelyet egyetlen meglévő chip sem kínál együtt: programozható neuron modell (tetszőleges CIL), event-driven működés (0W idle), shared memory nélküli izolált core-ok, nyílt forráskódú hardver (CERN-OHL-S), és natív .NET CIL végrehajtás.
+    </p>
+
+    <p>
+      A CFPU-ML-Max variáns &mdash; Systolic Wide routerrel, post-MAC pipeline-nal és 1 GHz órajellel &mdash; <strong>90&ndash;95% sustained MAC kihasználtságot</strong> ér el, és azonos die méret mellett 2&ndash;3,7&times; jobb sustained TOPS-t ad, mint az NVIDIA RTX 4060/4090.
+    </p>
+
+    <p>
+      Részletes versenytárs-összehasonlítás, die variánsok és célmodellek: <a href="cfpu-ml-max.html"><strong>CFPU-ML-Max: ML/SNN Inference Accelerator &rarr;</strong></a>
+    </p>
+
+    <div class="cta">
+      <h3>Nyílt forrás&aacute;sk&oacute;d</h3>
+      <p>A CLI-CPU projekt teljes eg&eacute;sz&eacute;ben nyílt forrásk&oacute;d&uacute;. A teljes tervez&eacute;si folyamat, minden d&ouml;nt&eacute;s és indokl&aacute;s publikusan el&eacute;rhet&odblac;.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="https://github.com/FenySoft/NeuronOS">GitHub &rarr; NeuronOS</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      A CFPU nem egyetlen mag &mdash; hanem &ouml;t specializált magtípus, amelyek ugyanazon a chipen, ugyanazon az üzenethálózaton keresztül m&uuml;k&ouml;dnek. A specializáció nem szétdarabolja a rendszert: <strong>egységesíti</strong>.
+    </p>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

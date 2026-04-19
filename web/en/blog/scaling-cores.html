@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>From 130nm to 5nm — How the CFPU Scales from 600 to 10,000+ Cores — CLI-CPU Blog</title>
+  <meta name="description" content="The CFPU architecture is built from a single parameterizable RTL: chip size and manufacturing technology determine the core count, not the other way around. From 576 cores at 130nm to 10,000+ at 5nm.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.8; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 24px; width: 100%; }
+    header { padding: 48px 0 32px; border-bottom: 1px solid var(--border); }
+    header .nav { font-family: var(--mono); font-size: 0.85rem; margin-bottom: 24px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: #f0f6fc; line-height: 1.25; }
+    header .subtitle { font-family: var(--mono); font-size: 1rem; color: var(--green); margin-top: 12px; }
+    header .meta { font-size: 0.85rem; color: var(--text-dim); margin-top: 16px; font-family: var(--mono); }
+    article { flex: 1; padding: 48px 0; }
+    article h2 { font-family: var(--mono); font-size: 1.3rem; color: #f0f6fc; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    article h2:first-child { margin-top: 0; }
+    article h3 { font-size: 1.1rem; color: #f0f6fc; margin-top: 32px; margin-bottom: 12px; }
+    article p { margin-bottom: 16px; font-size: 1.02rem; }
+    article blockquote { border-left: 3px solid var(--green); padding: 12px 20px; margin: 24px 0; background: var(--bg-card); border-radius: 0 6px 6px 0; font-style: italic; }
+    article ul, article ol { margin: 16px 0; padding-left: 24px; }
+    article li { margin-bottom: 8px; font-size: 1.02rem; }
+    article strong { color: #f0f6fc; }
+    article code { font-family: var(--mono); background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 24px 0; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.6; }
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.9rem; }
+    .comparison-table th, .comparison-table td { padding: 10px 14px; border: 1px solid var(--border); text-align: left; }
+    .comparison-table th { background: var(--bg-card); font-family: var(--mono); font-size: 0.85rem; color: #f0f6fc; }
+    .comparison-table td { color: var(--text-dim); }
+    .highlight-box { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 16px 20px; margin: 24px 0; border-radius: 0 6px 6px 0; }
+    .highlight-box strong { color: var(--accent); }
+    .bar-chart { margin: 24px 0; }
+    .bar-row { display: flex; align-items: center; margin-bottom: 8px; }
+    .bar-label { width: 80px; font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); text-align: right; padding-right: 12px; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 28px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 10px; font-size: 0.8rem; font-weight: 600; color: #fff; transition: width 0.5s ease; }
+    .cta { background: var(--bg-card); border: 1px solid var(--green); border-radius: 8px; padding: 28px; margin-top: 48px; text-align: center; }
+    .cta h3 { font-family: var(--mono); color: var(--green); margin-bottom: 12px; }
+    .cta p { margin-bottom: 16px; font-size: 0.95rem; }
+    .cta-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-family: var(--mono); font-size: 0.9rem; }
+    footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; font-size: 0.85rem; color: var(--text-dim); }
+    footer a { color: var(--text-dim); } footer a:hover { color: var(--accent); }
+    .footer-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+    @media (max-width: 600px) { header h1 { font-size: 1.5rem; } header { padding: 32px 0 24px; } article h2 { font-size: 1.1rem; } .comparison-table { font-size: 0.8rem; } .comparison-table th, .comparison-table td { padding: 6px 8px; } }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <a href="../../hu/blog/scaling-cores.html" style="color:var(--text-dim);padding:4px 12px;margin-right:4px;">Magyar</a>
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">English</span>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>From 130nm to 5nm</h1>
+    <div class="subtitle">How the CFPU scales from 600 to 10,000+ cores</div>
+    <div class="meta">April 18, 2026 &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <img src="../../img/blog/seal-core.png" alt="Seal Core — the security core at the center of the CFPU chip" style="width:100%;margin-bottom:40px;border-radius:8px;">
+
+    <h2>One RTL, every chip</h2>
+
+    <p>
+      Most processor architectures are designed for a specific manufacturing node and chip size. When the node changes, the chip is redesigned. The CFPU works differently: <strong>a single parameterizable RTL</strong> where chip size and manufacturing technology determine the core count.
+    </p>
+
+    <blockquote>
+      The core count adapts to the chip, not the other way around.
+    </blockquote>
+
+    <p>
+      This is possible because the CFPU's <a href="internet-on-chip.html">4-level hierarchical architecture</a> is parameterizable: the cluster size is fixed (4&times;4 = 16 cores, physical optimum), but the number of clusters, tiles, and regions is configurable. Same Verilog code, different parameters.
+    </p>
+
+<pre>module cfpu_chip #(
+    parameter CORES_PER_CLUSTER  = 16,    // fixed: 4&times;4 mesh
+    parameter CLUSTERS_PER_TILE  = 12,    // node-dependent: 4-12
+    parameter TILES_PER_REGION   = 12,    // node-dependent: 4-12
+    parameter REGIONS            = 24,    // chip-size-dependent: 4-24
+    parameter SRAM_KB_PER_CORE   = 1024   // node-dependent: 16-1024
+);
+
+// 7nm, 800 mm&sup2;:  16 &times; 8 &times; 8 &times; 8  =  8,192 cores, 256 KB/core
+// 5nm, 800 mm&sup2;:  16 &times; 8 &times; 8 &times; 10 = 10,240 cores, 256 KB/core</pre>
+
+    <h2>Why does it scale?</h2>
+
+    <p>
+      The key: <strong>SRAM dominates core area</strong> (55-75%), not logic. SRAM scales worse than logic &mdash; which is why the actual core density increase is <strong>slower</strong> than logic density alone would suggest. To compensate: <strong>we increase SRAM at every node step</strong>.
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Node</th><th>Logic density</th><th>SRAM cell</th><th>Scaling factor</th></tr>
+      <tr><td><strong>130nm</strong> (Sky130)</td><td>~2.5 MTr/mm&sup2;</td><td>~1.0 &mu;m&sup2;</td><td>1&times;</td></tr>
+      <tr><td><strong>28nm</strong></td><td>~20 MTr/mm&sup2;</td><td>~0.12 &mu;m&sup2;</td><td>~8&times;</td></tr>
+      <tr><td><strong>7nm</strong></td><td>~91 MTr/mm&sup2;</td><td>~0.027 &mu;m&sup2;</td><td>~37&times;</td></tr>
+      <tr><td><strong>5nm</strong></td><td>~171 MTr/mm&sup2;</td><td>~0.021 &mu;m&sup2;</td><td>~48&times;</td></tr>
+    </table>
+
+    <h2>Core size per node</h2>
+
+    <h3>A) Growing SRAM &mdash; richer actors, fewer cores</h3>
+    <p>If we increase SRAM with each technology step, each core can run <strong>more actors, larger working sets, richer programs</strong>:</p>
+    <table class="comparison-table">
+      <tr><th>Node</th><th>Core logic</th><th>SRAM/core</th><th>SRAM area</th><th>Core total</th></tr>
+      <tr><td><strong>130nm</strong></td><td>0.80 mm&sup2;</td><td>16 KB</td><td>0.13 mm&sup2;</td><td><strong>~1.06 mm&sup2;</strong></td></tr>
+      <tr><td><strong>28nm</strong></td><td>0.10 mm&sup2;</td><td>64 KB</td><td>0.06 mm&sup2;</td><td><strong>~0.18 mm&sup2;</strong></td></tr>
+      <tr><td><strong>7nm</strong></td><td>0.022 mm&sup2;</td><td>256 KB</td><td>0.057 mm&sup2;</td><td><strong>~0.083 mm&sup2;</strong></td></tr>
+      <tr><td><strong>5nm</strong></td><td>0.012 mm&sup2;</td><td>512 KB</td><td>0.088 mm&sup2;</td><td><strong>~0.103 mm&sup2;</strong></td></tr>
+    </table>
+
+    <h3>B) Fixed 256 KB SRAM &mdash; maximum core count</h3>
+    <p>If we keep SRAM at 256 KB on every node, the freed area translates to <strong>more cores</strong> &mdash; greater parallelism, more simultaneous actors:</p>
+    <table class="comparison-table">
+      <tr><th>Node</th><th>Core logic</th><th>SRAM/core</th><th>SRAM area</th><th>Core total</th></tr>
+      <tr><td><strong>130nm</strong></td><td>0.80 mm&sup2;</td><td>256 KB</td><td>2.10 mm&sup2;</td><td><strong>~2.93 mm&sup2;</strong></td></tr>
+      <tr><td><strong>28nm</strong></td><td>0.10 mm&sup2;</td><td>256 KB</td><td>0.25 mm&sup2;</td><td><strong>~0.37 mm&sup2;</strong></td></tr>
+      <tr><td><strong>7nm</strong></td><td>0.022 mm&sup2;</td><td>256 KB</td><td>0.057 mm&sup2;</td><td><strong>~0.083 mm&sup2;</strong></td></tr>
+      <tr><td><strong>5nm</strong></td><td>0.012 mm&sup2;</td><td>256 KB</td><td>0.044 mm&sup2;</td><td><strong>~0.059 mm&sup2;</strong></td></tr>
+    </table>
+
+    <p>
+      The choice between the two strategies depends on the <strong>workload</strong>: maximum parallelism (SNN, many small actors) &rarr; fixed 256 KB with more cores. Richer actors (ML inference, large object graphs) &rarr; growing SRAM. The parameterizable RTL supports both &mdash; <code>SRAM_KB_PER_CORE</code> is set at fabrication time.
+    </p>
+
+    <h2>How many cores fit on a chip?</h2>
+
+    <p>
+      Usable area = chip size &times; 0.78 (subtracting: I/O pads, Seal Core, crossbars, routing channels, peripherals).
+    </p>
+
+    <h3>A) Growing SRAM (16 KB &rarr; 512 KB)</h3>
+    <table class="comparison-table">
+      <tr><th>Node</th><th>SRAM/core</th><th>Core size</th><th>100 mm&sup2;</th><th>400 mm&sup2;</th><th>800 mm&sup2;</th><th>1&nbsp;400 mm&sup2;</th></tr>
+      <tr><td><strong>130nm</strong></td><td>16 KB</td><td>1.06 mm&sup2;</td><td>74</td><td>294</td><td><strong>588</strong></td><td>1 030</td></tr>
+      <tr><td><strong>28nm</strong></td><td>64 KB</td><td>0.18 mm&sup2;</td><td>433</td><td>1 733</td><td><strong>3 467</strong></td><td>6 067</td></tr>
+      <tr><td><strong>7nm</strong></td><td>256 KB</td><td>0.083 mm&sup2;</td><td>940</td><td>3 759</td><td><strong>7 518</strong></td><td>13 157</td></tr>
+      <tr><td><strong>5nm</strong></td><td>512 KB</td><td>0.103 mm&sup2;</td><td>757</td><td>3 029</td><td><strong>6 058</strong></td><td>10 602</td></tr>
+    </table>
+
+    <h3>B) Fixed 256 KB SRAM &mdash; maximum parallelism</h3>
+    <table class="comparison-table">
+      <tr><th>Node</th><th>SRAM/core</th><th>Core size</th><th>100 mm&sup2;</th><th>400 mm&sup2;</th><th>800 mm&sup2;</th><th>1&nbsp;400 mm&sup2;</th></tr>
+      <tr><td><strong>130nm</strong></td><td>256 KB</td><td>2.93 mm&sup2;</td><td>27</td><td>107</td><td><strong>213</strong></td><td>373</td></tr>
+      <tr><td><strong>28nm</strong></td><td>256 KB</td><td>0.37 mm&sup2;</td><td>211</td><td>843</td><td><strong>1 686</strong></td><td>2 951</td></tr>
+      <tr><td><strong>7nm</strong></td><td>256 KB</td><td>0.083 mm&sup2;</td><td>940</td><td>3 759</td><td><strong>7 518</strong></td><td>13 157</td></tr>
+      <tr><td><strong>5nm</strong></td><td>256 KB</td><td>0.059 mm&sup2;</td><td>1 322</td><td>5 288</td><td><strong>10 576</strong></td><td>18 508</td></tr>
+    </table>
+
+    <p style="font-size:0.9rem;color:var(--text-dim);">Core count (800 mm&sup2; die, fixed 256 KB):</p>
+    <div class="bar-chart">
+      <div class="bar-row"><span class="bar-label">130nm</span><div class="bar-track"><div class="bar-fill" style="width:2%;background:linear-gradient(90deg,#2a4a2a,#3fb950);">213</div></div></div>
+      <div class="bar-row"><span class="bar-label">28nm</span><div class="bar-track"><div class="bar-fill" style="width:16%;background:linear-gradient(90deg,#1a3a5a,#58a6ff);">1 686</div></div></div>
+      <div class="bar-row"><span class="bar-label">7nm</span><div class="bar-track"><div class="bar-fill" style="width:71%;background:linear-gradient(90deg,#3a1a5a,#a371f7);">7 518</div></div></div>
+      <div class="bar-row"><span class="bar-label">5nm</span><div class="bar-track"><div class="bar-fill" style="width:100%;background:linear-gradient(90deg,#5a1a2a,#f85149);">10 576</div></div></div>
+    </div>
+
+    <div class="highlight-box">
+      <strong>At 5nm, the 256 KB variant yields ~75% more cores</strong> than 512 KB (10,576 vs 6,058). The decision depends on the workload: maximum parallelism (SNN, many small actors) &rarr; 256 KB. Richer actors (ML, large objects) &rarr; 512 KB. The RTL is parameterizable.
+    </div>
+
+    <h2>The hierarchy adapts</h2>
+
+    <p>
+      The 4-level architecture is not rigid &mdash; the number of levels follows from the core count:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Core count</th><th>Levels</th><th>Configuration</th></tr>
+      <tr><td>&lt; 256</td><td><strong>2</strong> (mesh + 1 crossbar)</td><td>IoT, Secure Element</td></tr>
+      <tr><td>256 &ndash; 2,000</td><td><strong>3</strong> (mesh + 2 crossbars)</td><td>Edge, microcontroller</td></tr>
+      <tr><td>2,000 &ndash; 20,000</td><td><strong>4</strong> (mesh + 3 crossbars)</td><td>Compute target</td></tr>
+      <tr><td>20,000+</td><td><strong>4-5</strong></td><td>Wafer-scale</td></tr>
+    </table>
+
+    <h2>Five core types</h2>
+
+<p>The CFPU does not manufacture a single core type &mdash; five core types exist, and the choice depends on the application domain:</p>
+
+<table class="comparison-table">
+  <tr><th>Core</th><th>ISA</th><th>FPU</th><th>GC + Obj.</th><th>SRAM</th><th>Role</th></tr>
+  <tr><td><strong>Nano</strong></td><td>CIL-T0 (48 opcodes)</td><td>None</td><td>None</td><td>4-64 KB</td><td>Spike, sensor, simple actor</td></tr>
+  <tr><td><strong>Actor</strong></td><td>Full CIL</td><td>None</td><td><strong>Yes</strong></td><td>64-256 KB</td><td>Actor-native: objects, GC, exceptions</td></tr>
+  <tr><td><strong>Rich</strong></td><td>Full CIL + FPU</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>128-512 KB</td><td>ML inference, FP-intensive</td></tr>
+  <tr><td><strong>Matrix</strong></td><td>CIL-T0 + FP</td><td><strong>Yes</strong> + 4&times;4 MAC + SFU (power-gated)</td><td>&mdash;</td><td>4-64 KB</td><td>ML inference, SNN neuron models &mdash; no GC, no object model</td></tr>
+  <tr><td><strong>Seal</strong></td><td>AuthCode, hash</td><td>Crypto HW</td><td>&mdash;</td><td>~32 KB</td><td>Code authentication &mdash; always exactly 1</td></tr>
+</table>
+
+<h3>Core count comparison (7nm, 800 mm&sup2;)</h3>
+
+<table class="comparison-table">
+  <tr><th>Core + SRAM</th><th>Node size</th><th>Core count</th></tr>
+  <tr><td>Nano + 4 KB</td><td>0.025 mm&sup2;</td><td><strong>~32,000</strong></td></tr>
+  <tr><td>Actor + 64 KB</td><td>0.047 mm&sup2;</td><td><strong>~17,000</strong></td></tr>
+  <tr><td>Rich + 256 KB</td><td>0.097 mm&sup2;</td><td><strong>~8,250</strong></td></tr>
+  <tr><td><strong>Matrix Turbo + 8 KB</strong></td><td><strong>0.039 mm&sup2;</strong></td><td><strong>~20,500</strong></td></tr>
+  <tr><td><strong>Matrix Systolic + 8 KB</strong></td><td><strong>0.033 mm&sup2;</strong></td><td><strong>~24,200</strong></td></tr>
+</table>
+
+<p>The <strong>optimal SRAM for the Matrix Core is 8 KB</strong> &mdash; the MAC array works in streaming mode, fed by the network. At 8 KB, the code + stack + MAC buffer fits comfortably with ~2 KB left for local cache. Node sizes include L0 router area and L1&ndash;L3 infrastructure per-core share (~0.007 mm&sup2;). The Systolic router variant enables +18% more Matrix cores.</p>
+
+<h3>CFPU product family</h3>
+
+<table class="comparison-table">
+  <tr><th>Variant</th><th>Seal</th><th>Cores</th><th>Target market</th></tr>
+  <tr><td><strong>CFPU-N</strong></td><td>1 Seal</td><td>Nano only</td><td>IoT, massive SNN</td></tr>
+  <tr><td><strong>CFPU-A</strong></td><td>1 Seal</td><td>Actor only</td><td>Actor cluster, streaming</td></tr>
+  <tr><td><strong>CFPU-R</strong></td><td>1 Seal</td><td>Rich only</td><td>ML inference, FP</td></tr>
+  <tr><td><strong>CFPU-ML</strong></td><td>1 Seal</td><td>Matrix + Actor</td><td>ML/SNN optimized</td></tr>
+  <tr><td><strong>CFPU-H</strong></td><td>1 Seal</td><td>Actor + Nano</td><td>Heterogeneous supervisor+worker</td></tr>
+  <tr><td><strong>CFPU-X</strong></td><td>1 Seal</td><td>Mixed (any combination)</td><td>Application-specific</td></tr>
+</table>
+
+<p>Same RTL, the <code>CORE_TYPE</code> parameter determines the fabricated core type. On a heterogeneous chip, multiple types can coexist on a single die.</p>
+
+    <div class="highlight-box">
+      <strong>CFPU-ML (7nm, 800 mm&sup2;):</strong> ~19,500 Matrix Cores (8 KB, Turbo) + ~1,000 Actor Cores (64 KB) = <strong>~312,000 parallel MAC units</strong>, ~312 TOPS INT8 @ 500 MHz (theoretical peak*). Details: <a href="core-types.html">Core Types blog</a>, <a href="cfpu-ml-max.html">CFPU-ML-Max blog</a>.<br><br>
+      <em style="font-size: 0.9em;">* Theoretical peak calculated as core count &times; MAC units &times; clock. No RTL simulation or silicon measurement exists yet. Actual TDP will be significantly higher than the arithmetic estimate.</em>
+    </div>
+
+    <h2>Node-specific configurations</h2>
+
+    <h3>130nm (Sky130) &mdash; first silicon</h3>
+<pre>L0: 16 cores, 4&times;4 mesh, 16 KB SRAM/core
+L1: 6 clusters, 6&times;6 crossbar
+L2: 6 tiles, 6&times;6 crossbar + Seal Core
+
+16 &times; 6 &times; 6 = 576 Rich Cores
+Total SRAM: 9 MB</pre>
+    <p>This is the "small CFPU" &mdash; the first real silicon, where the full hierarchy and the Seal Core are <strong>already present</strong>, just at smaller scale. The RTL is <strong>identical</strong> to later chips.</p>
+
+    <h3>28nm &mdash; commercial target</h3>
+<pre>L0: 16 cores, 4&times;4 mesh, 64 KB SRAM/core
+L1: 6 clusters, 6&times;6 crossbar
+L2: 6 tiles, 6&times;6 crossbar
+L3: 6 regions, 6&times;6 crossbar + Seal Core
+
+16 &times; 6 &times; 6 &times; 6 = 3,456 Rich Cores
+Total SRAM: 216 MB</pre>
+
+    <h3>7nm &mdash; high performance</h3>
+<pre>L0: 16 cores, 4&times;4 mesh, 256 KB SRAM/core
+L1: 8 clusters, 8&times;8 crossbar
+L2: 8 tiles, 8&times;8 crossbar
+L3: 8 regions, 8&times;8 crossbar + Seal Core
+
+16 &times; 8 &times; 8 &times; 8 = 8,192 Rich Cores
+Total SRAM: 2 GB</pre>
+
+    <h3>5nm &mdash; target configuration</h3>
+<pre>L0: 16 cores, 4&times;4 mesh, 256 KB SRAM/core
+L1: 8 clusters, 8&times;8 crossbar
+L2: 8 tiles, 8&times;8 crossbar
+L3: 10 regions, 10&times;10 crossbar + Seal Core
+
+16 &times; 8 &times; 8 &times; 10 = 10,240 Rich Core
+Total SRAM: 2.5 GB
+
+(On 1,400 mm² die: 18 regions, 18,432 cores, 4.5/9.2 GB SRAM)</pre>
+
+    <h2>Latency remains constant</h2>
+
+    <p>
+      Worst-case latency <strong>ranges from ~99 to ~139 cycles</strong> depending on the node and hierarchy depth. At 7nm, the cross-region worst case is ~139 cycles (~278 ns @ 500 MHz). For context: this is competitive with software actor messaging (Erlang/BEAM: ~0.5&ndash;2 &micro;s).
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Node</th><th>Core count (800 mm&sup2;)</th><th>SRAM/core</th><th>Levels</th><th>L0 cluster size</th><th>Worst-case latency</th></tr>
+      <tr><td><strong>130nm</strong></td><td>576</td><td>16 KB</td><td>2</td><td>~5.3 mm</td><td><strong>~99 cyc</strong></td></tr>
+      <tr><td><strong>28nm</strong></td><td>3,456</td><td>64 KB</td><td>3</td><td>~2.7 mm</td><td><strong>~119 cyc</strong></td></tr>
+      <tr><td><strong>7nm</strong></td><td>8,192</td><td>256 KB</td><td>4</td><td>~1.4 mm</td><td><strong>~139 cyc</strong></td></tr>
+      <tr><td><strong>5nm</strong></td><td>10,240</td><td>256 KB</td><td>4</td><td>~1.1 mm</td><td><strong>~139 cyc</strong></td></tr>
+    </table>
+
+    <div class="highlight-box">
+      <strong>Same RTL, from 130nm to 5nm.</strong> The 130nm 576-core first silicon runs exactly the same code as the 5nm 10,000+-core chip &mdash; only the parameters differ. The router design validated at F3 remains unchanged through F7. Worst-case cross-region latency is ~139 cycles (~278 ns @ 500 MHz), competitive with software actor frameworks.
+    </div>
+
+    <h2>The Seal Core always at the center</h2>
+
+    <p>
+      Regardless of node or core count, the <strong>Seal Core is always at the geometric center of the chip</strong> &mdash; co-located with the L3 crossbar. This is a <strong>communication topology</strong> decision: the star center minimizes maximum wire length to any region, and all cross-region traffic naturally passes through it &mdash; enabling security inspection without extra routing.
+    </p>
+
+    <p>
+      In every chip variant, from 576 cores to 10,000+, <strong>the same network architecture</strong>: the Seal Core sees all cross-region traffic by design.
+    </p>
+
+    <div class="cta">
+      <h3>Open Source</h3>
+      <p>The entire design process, the scaling model, and the parameterizable RTL are publicly available.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="internet-on-chip.html">Blog &rarr; Internet on a Chip</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      The CFPU is not a chip &mdash; it is a <strong>chip family</strong>. One RTL that grows with the technology, from the 130nm first silicon to the 5nm 10,000+ core target configuration.
+    </p>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

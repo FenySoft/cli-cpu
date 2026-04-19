@@ -1,0 +1,362 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 405" width="720" height="405">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#0f1923"/>
+      <stop offset="100%" stop-color="#080c12"/>
+    </radialGradient>
+    <filter id="nodeGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="nodeGlowSm" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="3" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="lineGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="sealGlow" x="-150%" y="-150%" width="400%" height="400%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <radialGradient id="warmNode" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#7ee8fa"/>
+      <stop offset="40%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#1a5cb0"/>
+    </radialGradient>
+    <radialGradient id="hotNode" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="30%" stop-color="#a5d8ff"/>
+      <stop offset="70%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#1a5cb0"/>
+    </radialGradient>
+    <radialGradient id="greenNode" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#a5ffb8"/>
+      <stop offset="40%" stop-color="#3fb950"/>
+      <stop offset="100%" stop-color="#1a6b2d"/>
+    </radialGradient>
+    <radialGradient id="sealNode" cx="50%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#fffbe0"/>
+      <stop offset="30%" stop-color="#ffd700"/>
+      <stop offset="70%" stop-color="#e6a817"/>
+      <stop offset="100%" stop-color="#8b6914"/>
+    </radialGradient>
+    <radialGradient id="dimNode" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#263040"/>
+      <stop offset="100%" stop-color="#151d28"/>
+    </radialGradient>
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffd70015"/>
+      <stop offset="60%" stop-color="#ffd70008"/>
+      <stop offset="100%" stop-color="#ffd70000"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="720" height="405" fill="url(#bg)"/>
+
+  <!-- Subtle center glow -->
+  <circle cx="360" cy="202" r="160" fill="url(#centerGlow)"/>
+
+  <!-- Mesh lines - 20 cols x 11 rows, spacing 32x32, origin at (52, 26) -->
+  <!-- Horizontal lines -->
+  <g stroke="#1a2940" stroke-width="0.5" opacity="0.6">
+    <line x1="52" y1="26" x2="660" y2="26"/><line x1="52" y1="58" x2="660" y2="58"/>
+    <line x1="52" y1="90" x2="660" y2="90"/><line x1="52" y1="122" x2="660" y2="122"/>
+    <line x1="52" y1="154" x2="660" y2="154"/><line x1="52" y1="186" x2="660" y2="186"/>
+    <line x1="52" y1="218" x2="660" y2="218"/><line x1="52" y1="250" x2="660" y2="250"/>
+    <line x1="52" y1="282" x2="660" y2="282"/><line x1="52" y1="314" x2="660" y2="314"/>
+    <line x1="52" y1="346" x2="660" y2="346"/><line x1="52" y1="378" x2="660" y2="378"/>
+  </g>
+  <!-- Vertical lines -->
+  <g stroke="#1a2940" stroke-width="0.5" opacity="0.6">
+    <line x1="52" y1="26" x2="52" y2="378"/><line x1="84" y1="26" x2="84" y2="378"/>
+    <line x1="116" y1="26" x2="116" y2="378"/><line x1="148" y1="26" x2="148" y2="378"/>
+    <line x1="180" y1="26" x2="180" y2="378"/><line x1="212" y1="26" x2="212" y2="378"/>
+    <line x1="244" y1="26" x2="244" y2="378"/><line x1="276" y1="26" x2="276" y2="378"/>
+    <line x1="308" y1="26" x2="308" y2="378"/><line x1="340" y1="26" x2="340" y2="378"/>
+    <line x1="372" y1="26" x2="372" y2="378"/><line x1="404" y1="26" x2="404" y2="378"/>
+    <line x1="436" y1="26" x2="436" y2="378"/><line x1="468" y1="26" x2="468" y2="378"/>
+    <line x1="500" y1="26" x2="500" y2="378"/><line x1="532" y1="26" x2="532" y2="378"/>
+    <line x1="564" y1="26" x2="564" y2="378"/><line x1="596" y1="26" x2="596" y2="378"/>
+    <line x1="628" y1="26" x2="628" y2="378"/><line x1="660" y1="26" x2="660" y2="378"/>
+  </g>
+
+  <!-- Glowing active lines - organic paths radiating from center -->
+  <g filter="url(#lineGlow)">
+    <!-- Radial burst from Seal Core -->
+    <line x1="356" y1="202" x2="308" y2="202" stroke="#58a6ff" stroke-width="1.2" opacity="0.7"/>
+    <line x1="356" y1="202" x2="404" y2="202" stroke="#58a6ff" stroke-width="1.2" opacity="0.7"/>
+    <line x1="356" y1="202" x2="356" y2="154" stroke="#58a6ff" stroke-width="1.2" opacity="0.7"/>
+    <line x1="356" y1="202" x2="356" y2="250" stroke="#58a6ff" stroke-width="1.2" opacity="0.7"/>
+
+    <!-- NW path -->
+    <line x1="308" y1="202" x2="276" y2="202" stroke="#58a6ff" stroke-width="1" opacity="0.55"/>
+    <line x1="276" y1="202" x2="276" y2="170" stroke="#58a6ff" stroke-width="0.9" opacity="0.45"/>
+    <line x1="276" y1="170" x2="244" y2="170" stroke="#58a6ff" stroke-width="0.8" opacity="0.4"/>
+    <line x1="244" y1="170" x2="244" y2="138" stroke="#58a6ff" stroke-width="0.7" opacity="0.35"/>
+    <line x1="244" y1="138" x2="212" y2="138" stroke="#58a6ff" stroke-width="0.6" opacity="0.3"/>
+    <line x1="212" y1="138" x2="180" y2="138" stroke="#58a6ff" stroke-width="0.5" opacity="0.25"/>
+    <line x1="180" y1="138" x2="180" y2="106" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
+
+    <!-- SE path (green) -->
+    <line x1="404" y1="202" x2="436" y2="202" stroke="#3fb950" stroke-width="1" opacity="0.55"/>
+    <line x1="436" y1="202" x2="436" y2="234" stroke="#3fb950" stroke-width="0.9" opacity="0.45"/>
+    <line x1="436" y1="234" x2="468" y2="234" stroke="#3fb950" stroke-width="0.8" opacity="0.4"/>
+    <line x1="468" y1="234" x2="468" y2="266" stroke="#3fb950" stroke-width="0.7" opacity="0.35"/>
+    <line x1="468" y1="266" x2="500" y2="266" stroke="#3fb950" stroke-width="0.6" opacity="0.3"/>
+    <line x1="500" y1="266" x2="532" y2="266" stroke="#3fb950" stroke-width="0.5" opacity="0.25"/>
+
+    <!-- N path -->
+    <line x1="356" y1="154" x2="356" y2="122" stroke="#58a6ff" stroke-width="0.9" opacity="0.5"/>
+    <line x1="356" y1="122" x2="356" y2="90" stroke="#58a6ff" stroke-width="0.7" opacity="0.4"/>
+    <line x1="356" y1="90" x2="388" y2="90" stroke="#58a6ff" stroke-width="0.6" opacity="0.3"/>
+
+    <!-- S path (green) -->
+    <line x1="356" y1="250" x2="356" y2="282" stroke="#3fb950" stroke-width="0.9" opacity="0.5"/>
+    <line x1="356" y1="282" x2="324" y2="282" stroke="#3fb950" stroke-width="0.7" opacity="0.4"/>
+    <line x1="324" y1="282" x2="324" y2="314" stroke="#3fb950" stroke-width="0.6" opacity="0.3"/>
+
+    <!-- E path -->
+    <line x1="404" y1="202" x2="436" y2="202" stroke="#58a6ff" stroke-width="0.8" opacity="0.4"/>
+    <line x1="436" y1="202" x2="468" y2="202" stroke="#58a6ff" stroke-width="0.6" opacity="0.3"/>
+    <line x1="468" y1="202" x2="468" y2="170" stroke="#58a6ff" stroke-width="0.5" opacity="0.25"/>
+    <line x1="468" y1="170" x2="500" y2="170" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
+
+    <!-- W path (green) -->
+    <line x1="308" y1="202" x2="276" y2="202" stroke="#3fb950" stroke-width="0.8" opacity="0.4"/>
+    <line x1="276" y1="202" x2="244" y2="202" stroke="#3fb950" stroke-width="0.6" opacity="0.3"/>
+    <line x1="244" y1="202" x2="244" y2="234" stroke="#3fb950" stroke-width="0.5" opacity="0.25"/>
+    <line x1="244" y1="234" x2="212" y2="234" stroke="#3fb950" stroke-width="0.5" opacity="0.2"/>
+
+    <!-- Scattered independent short paths -->
+    <line x1="116" y1="58" x2="148" y2="58" stroke="#58a6ff" stroke-width="0.6" opacity="0.25"/>
+    <line x1="148" y1="58" x2="148" y2="90" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
+
+    <line x1="564" y1="314" x2="596" y2="314" stroke="#3fb950" stroke-width="0.6" opacity="0.25"/>
+    <line x1="596" y1="314" x2="596" y2="346" stroke="#3fb950" stroke-width="0.5" opacity="0.2"/>
+
+    <line x1="596" y1="58" x2="596" y2="90" stroke="#58a6ff" stroke-width="0.5" opacity="0.2"/>
+    <line x1="116" y1="314" x2="116" y2="346" stroke="#3fb950" stroke-width="0.5" opacity="0.2"/>
+  </g>
+
+  <!-- Animated message pulses -->
+  <g>
+    <circle r="2" fill="#a5d8ff" opacity="0.9" filter="url(#nodeGlowSm)">
+      <animateMotion dur="4s" repeatCount="indefinite" path="M356,202 L308,202 L276,202 L276,170 L244,170 L244,138 L212,138 L180,138 L180,106"/>
+    </circle>
+    <circle r="2" fill="#7ee8fa" opacity="0.85" filter="url(#nodeGlowSm)">
+      <animateMotion dur="3s" repeatCount="indefinite" path="M356,202 L356,154 L356,122 L356,90 L388,90"/>
+    </circle>
+    <circle r="2" fill="#56d364" opacity="0.9" filter="url(#nodeGlowSm)">
+      <animateMotion dur="4.5s" repeatCount="indefinite" path="M356,202 L404,202 L436,202 L436,234 L468,234 L468,266 L500,266 L532,266"/>
+    </circle>
+    <circle r="2" fill="#56d364" opacity="0.85" filter="url(#nodeGlowSm)">
+      <animateMotion dur="3.2s" repeatCount="indefinite" path="M356,202 L356,250 L356,282 L324,282 L324,314"/>
+    </circle>
+  </g>
+
+  <!-- Dim nodes - all intersections -->
+  <g>
+    <!-- Rows 0-11, Cols 0-19 — bulk dim nodes -->
+    <!-- Row 0 (y=26) -->
+    <circle cx="52" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="596" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="26" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="26" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 1 (y=58) -->
+    <circle cx="52" cy="58" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="58" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="58" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="58" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="58" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="58" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="58" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="58" r="2.2" fill="url(#dimNode)"/><circle cx="628" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="660" cy="58" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 2 (y=90) -->
+    <circle cx="52" cy="90" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="90" r="2.2" fill="url(#dimNode)"/><circle cx="180" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="212" cy="90" r="2.2" fill="url(#dimNode)"/><circle cx="244" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="276" cy="90" r="2.2" fill="url(#dimNode)"/><circle cx="308" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="340" cy="90" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="90" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="90" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="90" r="2.2" fill="url(#dimNode)"/><circle cx="628" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="660" cy="90" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 3 (y=122) -->
+    <circle cx="52" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="596" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="122" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="122" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 4 (y=154) -->
+    <circle cx="52" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="596" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="154" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="154" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 5 (y=186) -->
+    <circle cx="52" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="596" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="186" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="186" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 6 (y=218) -->
+    <circle cx="52" cy="218" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="218" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="218" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="276" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="218" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="218" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="468" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="218" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="218" r="2.2" fill="url(#dimNode)"/><circle cx="596" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="218" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="218" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 7 (y=250) -->
+    <circle cx="52" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="596" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="250" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="250" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 8 (y=282) -->
+    <circle cx="52" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="596" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="282" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="282" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 9 (y=314) -->
+    <circle cx="52" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="314" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="314" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 10 (y=346) -->
+    <circle cx="52" cy="346" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="148" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="346" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="346" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="346" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="346" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="346" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="346" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="346" r="2.2" fill="url(#dimNode)"/><circle cx="628" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="660" cy="346" r="2.2" fill="url(#dimNode)"/>
+    <!-- Row 11 (y=378) -->
+    <circle cx="52" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="84" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="116" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="148" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="180" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="212" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="244" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="276" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="308" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="340" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="372" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="404" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="436" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="468" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="500" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="532" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="564" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="596" cy="378" r="2.2" fill="url(#dimNode)"/>
+    <circle cx="628" cy="378" r="2.2" fill="url(#dimNode)"/><circle cx="660" cy="378" r="2.2" fill="url(#dimNode)"/>
+  </g>
+
+  <!-- Active glowing nodes along paths -->
+  <g filter="url(#nodeGlowSm)">
+    <!-- Blue path nodes (NW from center) -->
+    <circle cx="308" cy="202" r="3.5" fill="url(#warmNode)" opacity="0.85"/>
+    <circle cx="276" cy="202" r="3" fill="url(#warmNode)" opacity="0.7"/>
+    <circle cx="276" cy="170" r="2.8" fill="url(#warmNode)" opacity="0.55"/>
+    <circle cx="244" cy="170" r="2.5" fill="url(#warmNode)" opacity="0.45"/>
+    <circle cx="244" cy="138" r="2.5" fill="url(#warmNode)" opacity="0.35"/>
+    <circle cx="212" cy="138" r="2.3" fill="url(#warmNode)" opacity="0.3"/>
+    <circle cx="180" cy="138" r="2.3" fill="url(#warmNode)" opacity="0.25"/>
+    <circle cx="180" cy="106" r="2.3" fill="url(#warmNode)" opacity="0.2"/>
+
+    <!-- Blue path nodes (N from center) -->
+    <circle cx="356" cy="154" r="3.5" fill="url(#warmNode)" opacity="0.8"/>
+    <circle cx="356" cy="122" r="3" fill="url(#warmNode)" opacity="0.6"/>
+    <circle cx="356" cy="90" r="2.8" fill="url(#warmNode)" opacity="0.45"/>
+    <circle cx="388" cy="90" r="2.5" fill="url(#warmNode)" opacity="0.35"/>
+
+    <!-- Blue path (E) -->
+    <circle cx="404" cy="202" r="3.5" fill="url(#warmNode)" opacity="0.85"/>
+    <circle cx="436" cy="202" r="3" fill="url(#warmNode)" opacity="0.6"/>
+    <circle cx="468" cy="202" r="2.8" fill="url(#warmNode)" opacity="0.4"/>
+    <circle cx="468" cy="170" r="2.5" fill="url(#warmNode)" opacity="0.3"/>
+    <circle cx="500" cy="170" r="2.3" fill="url(#warmNode)" opacity="0.25"/>
+
+    <!-- Green path nodes (SE from center) -->
+    <circle cx="436" cy="234" r="3" fill="url(#greenNode)" opacity="0.65"/>
+    <circle cx="468" cy="234" r="2.8" fill="url(#greenNode)" opacity="0.5"/>
+    <circle cx="468" cy="266" r="2.5" fill="url(#greenNode)" opacity="0.4"/>
+    <circle cx="500" cy="266" r="2.5" fill="url(#greenNode)" opacity="0.35"/>
+    <circle cx="532" cy="266" r="2.3" fill="url(#greenNode)" opacity="0.3"/>
+
+    <!-- Green path (S from center) -->
+    <circle cx="356" cy="250" r="3.5" fill="url(#greenNode)" opacity="0.75"/>
+    <circle cx="356" cy="282" r="3" fill="url(#greenNode)" opacity="0.55"/>
+    <circle cx="324" cy="282" r="2.8" fill="url(#greenNode)" opacity="0.4"/>
+    <circle cx="324" cy="314" r="2.5" fill="url(#greenNode)" opacity="0.3"/>
+
+    <!-- Green path (W) -->
+    <circle cx="244" cy="202" r="2.8" fill="url(#greenNode)" opacity="0.45"/>
+    <circle cx="244" cy="234" r="2.5" fill="url(#greenNode)" opacity="0.35"/>
+    <circle cx="212" cy="234" r="2.3" fill="url(#greenNode)" opacity="0.25"/>
+
+    <!-- Scattered edge glows -->
+    <circle cx="116" cy="58" r="2.5" fill="url(#warmNode)" opacity="0.3"/>
+    <circle cx="148" cy="58" r="2.5" fill="url(#warmNode)" opacity="0.25"/>
+    <circle cx="148" cy="90" r="2.3" fill="url(#warmNode)" opacity="0.2"/>
+    <circle cx="564" cy="314" r="2.5" fill="url(#greenNode)" opacity="0.3"/>
+    <circle cx="596" cy="314" r="2.5" fill="url(#greenNode)" opacity="0.25"/>
+    <circle cx="596" cy="346" r="2.3" fill="url(#greenNode)" opacity="0.2"/>
+    <circle cx="596" cy="58" r="2.3" fill="url(#warmNode)" opacity="0.2"/>
+    <circle cx="596" cy="90" r="2.3" fill="url(#warmNode)" opacity="0.18"/>
+    <circle cx="116" cy="314" r="2.3" fill="url(#greenNode)" opacity="0.2"/>
+    <circle cx="116" cy="346" r="2.3" fill="url(#greenNode)" opacity="0.18"/>
+  </g>
+
+  <!-- Seal Core - center, golden, prominent -->
+  <g filter="url(#sealGlow)">
+    <circle cx="356" cy="202" r="6.5" fill="url(#sealNode)"/>
+  </g>
+  <circle cx="356" cy="202" r="10" fill="none" stroke="#ffd700" stroke-width="0.6" opacity="0.35">
+    <animate attributeName="r" values="10;14;10" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.35;0.15;0.35" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="356" cy="202" r="16" fill="none" stroke="#ffd700" stroke-width="0.3" opacity="0.15">
+    <animate attributeName="r" values="16;22;16" dur="4s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.15;0.05;0.15" dur="4s" repeatCount="indefinite"/>
+  </circle>
+</svg>

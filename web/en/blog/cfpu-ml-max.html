@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFPU-ML-Max: How We Optimized an ML Inference Chip &mdash; CLI-CPU Blog</title>
+  <meta name="description" content="The CFPU-ML-Max optimization story: from 128-byte cells to 90-95% MAC utilization. Systolic router, post-MAC pipeline, SRAM sweet spot reversal, NVIDIA comparison.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .nav {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      line-height: 1.25;
+    }
+
+    header .subtitle {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    header .meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 16px;
+      font-family: var(--mono);
+    }
+
+    article {
+      flex: 1;
+      padding: 48px 0;
+    }
+
+    article h2 {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: #f0f6fc;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    article h2:first-child { margin-top: 0; }
+
+    article h3 {
+      font-size: 1.1rem;
+      color: #f0f6fc;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    article p {
+      margin-bottom: 16px;
+      font-size: 1.02rem;
+    }
+
+    article blockquote {
+      border-left: 3px solid var(--green);
+      padding: 12px 20px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    article ul, article ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+
+    article li {
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+
+    article strong { color: #f0f6fc; }
+
+    article code {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: #f0f6fc;
+    }
+
+    .comparison-table td { color: var(--text-dim); }
+
+    .highlight-box {
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .highlight-box strong { color: var(--accent); }
+
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 28px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta h3 {
+      font-family: var(--mono);
+      color: var(--green);
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      header { padding: 32px 0 24px; }
+      article h2 { font-size: 1.1rem; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <a href="../../hu/blog/cfpu-ml-max.html" style="color:var(--text-dim);padding:4px 12px;margin-right:4px;">Magyar</a>
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">English</span>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>CFPU-ML-Max</h1>
+    <div class="subtitle">How We Optimized an ML Inference Chip</div>
+    <div class="meta">April 19, 2026 &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <img src="../../img/blog/seal-core.png" alt="Seal Core — the security core at the center of the CFPU chip" style="width:100%;margin-bottom:40px;border-radius:8px;">
+
+    <h2>The starting point</h2>
+
+    <p>
+      The CFPU many-core architecture is an obvious candidate for ML inference: thousands of Matrix Cores, each with a 4&times;4 INT8 MAC array, mailbox-based messaging, streaming dataflow. On paper: 328 TOPS (7nm, 500 MHz, ~20,500 cores). But analysis showed that the network bottleneck would limit sustained throughput to <strong>~15% MAC utilization</strong>.
+    </p>
+
+    <p>
+      The problem was not the MAC array &mdash; it was the <strong>data feeding</strong>. The Turbo router's 42-bit wormhole link delivered ~5.2 bytes/cycle. The MAC consumed 32 bytes/cycle. A six-fold bottleneck. The MAC sat idle 85% of the time, waiting for data.
+    </p>
+
+    <p>
+      What we needed was to rethink the entire communication layer &mdash; not slow down the MAC, but speed up the network.
+    </p>
+
+    <h2>Step 1: Cell size reduction</h2>
+
+    <p>
+      The original interconnect cell payload was 128 bytes. This makes sense for the general-purpose CFPU: actor messages, serialized objects, GC data. But a Matrix Core's 4&times;4 tile is just 32 bytes of input &mdash; the cell was four times oversized.
+    </p>
+
+    <p>
+      Switching to a 64-byte cell <strong>reduced latency by 39%</strong> and <strong>router area by 24%</strong>. The power-of-two size was preserved, alignment stays simple. This doesn't sound revolutionary, but the freed area and wire budget became the foundation for the next steps.
+    </p>
+
+    <h2>Step 2: Systolic Wide router</h2>
+
+    <p>
+      This was the key insight: <strong>in ML inference, data flows in one direction</strong>. Activations from west to east, weights from north to south. There is no need for XY routing, VOQ, or iSLIP &mdash; these are general-purpose networking primitives that are unnecessary luxury for a Matrix Core.
+    </p>
+
+    <p>
+      We replaced the Turbo router with <strong>two 128-bit unidirectional links</strong>: W&rarr;E activation, N&rarr;S weight. The router shrank from 42,000 GE (Turbo) to <strong>~5,000 GE</strong> &mdash; an 81% reduction. Its area: 0.001 mm&sup2;.
+    </p>
+
+    <p>
+      But the size reduction is a side effect. The real win: the 128 bit/cc link delivers <strong>16 bytes/cc</strong> in each direction. The MAC's 32 bytes/cc consumption: 16 bytes activation + 16 bytes weight. <strong>The link delivers exactly as much data as the MAC can consume.</strong>
+    </p>
+
+    <blockquote>
+      With the Turbo router, the MAC sat idle 85% of the time. With the Systolic Wide router, it runs at 90&ndash;95%.
+    </blockquote>
+
+    <h2>Step 3: Wider link &mdash; reallocating the wire budget</h2>
+
+    <p>
+      Where did the 128-bit link come from? The Turbo router's 42-bit link was <strong>bidirectional</strong>: N, S, E, W + local &mdash; 5 ports, each 42 bits, bidirectional. That is ~340 wires/core. The Systolic Wide router uses two 128-bit unidirectional links plus ~10 control wires: <strong>~274 wires/core</strong> &mdash; fewer wires, more bandwidth.
+    </p>
+
+    <p>
+      The trick: removing XY routing, VOQ, and iSLIP saves not just logic but <strong>wires</strong>. No more address decoding, no arbitration signaling, no multi-port crossbar. The freed wire budget goes to the two main data paths.
+    </p>
+
+    <h2>Step 4: Post-MAC pipeline</h2>
+
+    <p>
+      Previously, MAC output was sent raw to the network: 16 INT32 values per tile = 64 bytes. But most ML layers are followed by ReLU, quantization, and pooling anyway. Why not do this <strong>in hardware, at the MAC output</strong>?
+    </p>
+
+    <p>
+      We integrated three units:
+    </p>
+
+    <ul>
+      <li><strong>ReLU</strong> &mdash; a single comparator, 160 GE. If the value is negative, zero it.</li>
+      <li><strong>Quantize INT32&rarr;INT8</strong> &mdash; 300 GE. Quantizes the 32-bit MAC result to 8 bits.</li>
+      <li><strong>Max-Pool 2&times;2</strong> &mdash; 200 GE. Selects the maximum from four values.</li>
+    </ul>
+
+    <p>
+      Total: <strong>660 GE</strong> (~0.0001 mm&sup2;). Output traffic: 64 bytes &rarr; 4 bytes. <strong>16x reduction.</strong>
+    </p>
+
+    <p>
+      This is not just about offloading the network &mdash; the freed output link bandwidth becomes available for more input data. The post-MAC pipeline delivers dramatic network efficiency for effectively zero area cost.
+    </p>
+
+    <h2>Step 5: SRAM sweet spot reversal</h2>
+
+    <p>
+      The earlier analysis recommended 32 KB SRAM as optimal: enough for weight caching, with weight reuse compensating for lost cores. But the Systolic Wide router <strong>reversed this logic</strong>.
+    </p>
+
+    <p>
+      If the link bandwidth alone is sufficient to feed the MAC (128 bit/cc = 16 bytes/cc), then the weight cache advantage is minimal. Larger SRAM takes more area, fewer cores fit, and sustained TOPS drops &mdash; despite barely improving MAC utilization.
+    </p>
+
+    <p>
+      <strong>8 KB SRAM</strong> became the new optimum: enough for code, stack, and MAC buffer, and it enables <strong>+18% more cores</strong> compared to the 32 KB variant.
+    </p>
+
+    <h2>Step 6: Clock optimization</h2>
+
+    <p>
+      The final step was choosing the clock frequency. TOPS scales linearly with clock, but power scales supra-linearly. Analysis:
+    </p>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Clock</th>
+        <th>TOPS (609 mm&sup2;)</th>
+        <th>TDP (est.)</th>
+        <th>TOPS/W</th>
+      </tr>
+      <tr>
+        <td>500 MHz</td>
+        <td>~512</td>
+        <td>~70 W</td>
+        <td>~7.3</td>
+      </tr>
+      <tr>
+        <td><strong>1 GHz</strong></td>
+        <td><strong>~1,024</strong></td>
+        <td><strong>~210 W</strong></td>
+        <td><strong>~4.9</strong></td>
+      </tr>
+      <tr>
+        <td>2 GHz</td>
+        <td>~2,048</td>
+        <td>~800 W</td>
+        <td>~2.6</td>
+      </tr>
+    </table>
+
+    <p>
+      <strong>1 GHz</strong> is the best compromise: 2x TOPS over 500 MHz, at still-acceptable TOPS/W. 2 GHz is not worth it &mdash; power goes up 4x while TOPS only doubles.
+    </p>
+
+    <div class="highlight-box" style="border-left-color:var(--green);">
+      <strong>&#9888; Arithmetic projections</strong> &mdash; CFPU-ML-Max figures are pre-synthesis, pre-RTL estimates. They indicate design directions, not measured performance data.
+    </div>
+
+    <h2>Final result: CFPU-ML-Max vs NVIDIA (projected)</h2>
+
+    <p>
+      After the five optimization steps, CFPU-ML-Max achieves <strong>90&ndash;95% sustained MAC utilization</strong> &mdash; up from ~15%. How does this look compared to NVIDIA?
+    </p>
+
+    <p>
+      The table below compares at the same die size, same process node (~5nm/4nm), dense INT8 (without sparsity):
+    </p>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Comparison</th>
+        <th>CFPU-ML-Max (sust.)</th>
+        <th>NVIDIA (sust.)</th>
+        <th>Projected advantage</th>
+        <th>Projected TOPS/W</th>
+      </tr>
+      <tr>
+        <td>vs RTX 4060 (159 mm&sup2;)</td>
+        <td>242&ndash;256 TOPS</td>
+        <td>70&ndash;122 TOPS</td>
+        <td><strong>2.0&ndash;3.7x</strong></td>
+        <td><strong>4&ndash;7x</strong></td>
+      </tr>
+      <tr>
+        <td>vs RTX 4090 (609 mm&sup2;)</td>
+        <td>922&ndash;973 TOPS</td>
+        <td>264&ndash;462 TOPS</td>
+        <td><strong>2.0&ndash;3.7x</strong></td>
+        <td><strong>4&ndash;7x</strong></td>
+      </tr>
+      <tr>
+        <td>vs H100 (814 mm&sup2;)</td>
+        <td>1,233&ndash;1,301 TOPS</td>
+        <td>792&ndash;1,385 TOPS</td>
+        <td><strong>0.9&ndash;1.6x</strong></td>
+        <td><strong>2&ndash;4x</strong></td>
+      </tr>
+    </table>
+
+    <p>
+      The numbers are honest. For RTX 4060 and 4090, CFPU-ML-Max delivers <strong>2&ndash;3.7x better sustained TOPS</strong> because only ~30&ndash;35% of the GPU die is ML hardware. For H100, the picture is more balanced: H100 is almost entirely ML-dedicated with HBM, while CFPU-ML-Max is SRAM-only.
+    </p>
+
+    <div class="highlight-box">
+      <strong>Why is NVIDIA sustained low?</strong><br><br>
+      <strong>1. Die area sharing</strong> &mdash; the RTX 4060/4090 die is ~30&ndash;35% Tensor Cores. The rest is rasterization, RT cores, video, display engine. CFPU-ML-Max: 100% ML.<br>
+      <strong>2. GDDR bottleneck</strong> &mdash; Tensor Cores consume data faster than GDDR6X can deliver.<br>
+      <strong>3. Non-ML hardware consumes power</strong> &mdash; GPU TDP includes rasterization, video decoder, display engine.
+    </div>
+
+    <h2>Die variants</h2>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Die</th>
+        <th>Cores</th>
+        <th>Sustained TOPS</th>
+        <th>SRAM</th>
+        <th>TDP</th>
+        <th>Target model</th>
+      </tr>
+      <tr>
+        <td>80 mm&sup2;</td>
+        <td>~4,200</td>
+        <td>~121&ndash;128</td>
+        <td>34 MB</td>
+        <td>~28 W</td>
+        <td>MobileNet v2</td>
+      </tr>
+      <tr>
+        <td>159 mm&sup2;</td>
+        <td>~8,400</td>
+        <td>~242&ndash;256</td>
+        <td>67 MB</td>
+        <td>~55 W</td>
+        <td>ResNet-50</td>
+      </tr>
+      <tr>
+        <td>200 mm&sup2;</td>
+        <td>~10,500</td>
+        <td>~302&ndash;319</td>
+        <td>84 MB</td>
+        <td>~69 W</td>
+        <td>YOLOv8-S</td>
+      </tr>
+      <tr>
+        <td>400 mm&sup2;</td>
+        <td>~21,000</td>
+        <td>~605&ndash;638</td>
+        <td>168 MB</td>
+        <td>~138 W</td>
+        <td>EfficientNet-B4</td>
+      </tr>
+      <tr>
+        <td>609 mm&sup2;</td>
+        <td>~32,000</td>
+        <td>~922&ndash;973</td>
+        <td>256 MB</td>
+        <td>~210 W</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>814 mm&sup2;</td>
+        <td>~42,800</td>
+        <td>~1,233&ndash;1,301</td>
+        <td>342 MB</td>
+        <td>~280 W</td>
+        <td>BERT-Base</td>
+      </tr>
+    </table>
+
+    <p>
+      CFPU-ML-Max is <strong>not an LLM accelerator</strong>. It is optimized for small and medium inference models (MobileNet, ResNet, YOLOv8, BERT-Base) where the entire model fits in distributed on-chip SRAM. LLaMA-7B (7 GB) does not fit &mdash; that would require a DRAM controller, which is not part of the current architecture.
+    </p>
+
+    <p>
+      TDP estimates are pre-synthesis. The TOPS/W advantage is promising, but validated power figures require at minimum RTL-level power analysis.
+    </p>
+
+    <div class="cta">
+      <h3>Open source</h3>
+      <p>The CLI-CPU project is fully open source. The complete optimization process, every decision and rationale, is publicly available.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="https://github.com/FenySoft/NeuronOS">GitHub &rarr; NeuronOS</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      The optimization was not a single flash of genius &mdash; it was six straightforward steps, each <strong>focused on eliminating the bottleneck</strong>. The result: MAC utilization went from ~15% to 90&ndash;95%. The lesson: hardware design is iteration, not inspiration.
+    </p>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

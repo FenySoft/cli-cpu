@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 220" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <rect width="900" height="220" fill="#0d1117" rx="12"/>
+  <text x="450" y="28" fill="#f0f6fc" font-size="16" font-weight="700" text-anchor="middle">Router belső felépítés — telefonközponti modell</text>
+
+  <!-- Pipeline stages -->
+  <!-- Stage 1: Input + VOQ -->
+  <g transform="translate(30, 50)">
+    <rect width="180" height="140" fill="#161b22" stroke="#58a6ff" rx="8"/>
+    <text x="90" y="24" fill="#58a6ff" font-size="13" font-weight="600" text-anchor="middle">VOQ Input Buffer</text>
+    <!-- 6 input ports -->
+    <g font-size="9" fill="#8b949e">
+      <text x="15" y="48">N →</text><rect x="35" y="38" width="60" height="12" fill="#1a2a4a" rx="2"/><rect x="100" y="38" width="60" height="12" fill="#1a2a4a" rx="2"/>
+      <text x="15" y="65">S →</text><rect x="35" y="55" width="60" height="12" fill="#1a2a4a" rx="2"/><rect x="100" y="55" width="60" height="12" fill="#1a2a4a" rx="2"/>
+      <text x="15" y="82">E →</text><rect x="35" y="72" width="60" height="12" fill="#1a2a4a" rx="2"/><rect x="100" y="72" width="60" height="12" fill="#1a2a4a" rx="2"/>
+      <text x="15" y="99">W →</text><rect x="35" y="89" width="60" height="12" fill="#1a2a4a" rx="2"/><rect x="100" y="89" width="60" height="12" fill="#1a2a4a" rx="2"/>
+      <text x="15" y="116">U →</text><rect x="35" y="106" width="60" height="12" fill="#1a2a4a" rx="2"/><rect x="100" y="106" width="60" height="12" fill="#1a2a4a" rx="2"/>
+      <text x="15" y="133">L →</text><rect x="35" y="123" width="60" height="12" fill="#1a2a4a" rx="2"/><rect x="100" y="123" width="60" height="12" fill="#1a2a4a" rx="2"/>
+    </g>
+    <text x="90" y="-5" fill="#8b949e" font-size="9" text-anchor="middle">6 port × VOQ sorok</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M215,120 L240,120" stroke="#58a6ff" stroke-width="2" fill="none" marker-end="url(#arrB)"/>
+
+  <!-- Stage 2: iSLIP -->
+  <g transform="translate(245, 50)">
+    <rect width="140" height="140" fill="#161b22" stroke="#e07aff" rx="8"/>
+    <text x="70" y="24" fill="#e07aff" font-size="13" font-weight="600" text-anchor="middle">iSLIP</text>
+    <text x="70" y="55" fill="#c9d1d9" font-size="10" text-anchor="middle">1. REQUEST</text>
+    <text x="70" y="72" fill="#c9d1d9" font-size="10" text-anchor="middle">2. GRANT</text>
+    <text x="70" y="89" fill="#c9d1d9" font-size="10" text-anchor="middle">3. ACCEPT</text>
+    <rect x="20" y="100" width="100" height="28" fill="#2a1a3a" stroke="#e07aff" rx="4" stroke-dasharray="3,2"/>
+    <text x="70" y="118" fill="#e07aff" font-size="10" font-weight="600" text-anchor="middle">1 CIKLUS</text>
+    <text x="70" y="-5" fill="#8b949e" font-size="9" text-anchor="middle">~3000 gate</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M390,120 L415,120" stroke="#e07aff" stroke-width="2" fill="none" marker-end="url(#arrP)"/>
+
+  <!-- Stage 3: Crossbar -->
+  <g transform="translate(420, 50)">
+    <rect width="140" height="140" fill="#161b22" stroke="#3fb950" rx="8"/>
+    <text x="70" y="24" fill="#3fb950" font-size="13" font-weight="600" text-anchor="middle">6×6 Crossbar</text>
+    <!-- Crossbar lines -->
+    <g stroke="#3fb95040" stroke-width="1">
+      <!-- Horizontal -->
+      <line x1="20" y1="50" x2="120" y2="50"/><line x1="20" y1="65" x2="120" y2="65"/>
+      <line x1="20" y1="80" x2="120" y2="80"/><line x1="20" y1="95" x2="120" y2="95"/>
+      <line x1="20" y1="110" x2="120" y2="110"/><line x1="20" y1="125" x2="120" y2="125"/>
+      <!-- Vertical -->
+      <line x1="30" y1="40" x2="30" y2="135"/><line x1="48" y1="40" x2="48" y2="135"/>
+      <line x1="66" y1="40" x2="66" y2="135"/><line x1="84" y1="40" x2="84" y2="135"/>
+      <line x1="102" y1="40" x2="102" y2="135"/><line x1="120" y1="40" x2="120" y2="135"/>
+    </g>
+    <!-- Active connections -->
+    <circle cx="30" cy="50" r="4" fill="#3fb950"/><circle cx="84" cy="65" r="4" fill="#3fb950"/>
+    <circle cx="48" cy="80" r="4" fill="#3fb950"/><circle cx="102" cy="95" r="4" fill="#3fb950"/>
+    <circle cx="120" cy="110" r="4" fill="#3fb950"/><circle cx="66" cy="125" r="4" fill="#3fb950"/>
+    <text x="70" y="-5" fill="#8b949e" font-size="9" text-anchor="middle">128 bit, non-blocking</text>
+  </g>
+
+  <!-- Arrow -->
+  <path d="M565,120 L590,120" stroke="#3fb950" stroke-width="2" fill="none" marker-end="url(#arrG)"/>
+
+  <!-- Stage 4: Credit TX -->
+  <g transform="translate(595, 50)">
+    <rect width="140" height="140" fill="#161b22" stroke="#f0883e" rx="8"/>
+    <text x="70" y="24" fill="#f0883e" font-size="13" font-weight="600" text-anchor="middle">Credit TX</text>
+    <g font-size="9" fill="#8b949e">
+      <text x="70" y="52" text-anchor="middle">→ N (credit: 3/4)</text>
+      <text x="70" y="69" text-anchor="middle">→ S (credit: 4/4)</text>
+      <text x="70" y="86" text-anchor="middle">→ E (credit: 2/4)</text>
+      <text x="70" y="103" text-anchor="middle">→ W (credit: 4/4)</text>
+      <text x="70" y="120" text-anchor="middle">→ U (credit: 1/4)</text>
+      <text x="70" y="137" text-anchor="middle">→ L (credit: 4/4)</text>
+    </g>
+    <text x="70" y="-5" fill="#8b949e" font-size="9" text-anchor="middle">4 credit / csatorna</text>
+  </g>
+
+  <!-- Result box -->
+  <g transform="translate(750, 50)">
+    <rect width="130" height="140" fill="#1a2a1a" stroke="#3fb950" rx="8" stroke-dasharray="4,3"/>
+    <text x="65" y="28" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">DEADLOCK</text>
+    <text x="65" y="45" fill="#3fb950" font-size="11" font-weight="700" text-anchor="middle">FREE</text>
+    <line x1="20" y1="55" x2="110" y2="55" stroke="#30363d"/>
+    <text x="65" y="75" fill="#c9d1d9" font-size="10" text-anchor="middle">~60k gate</text>
+    <text x="65" y="93" fill="#c9d1d9" font-size="10" text-anchor="middle">~99% thru</text>
+    <text x="65" y="111" fill="#c9d1d9" font-size="10" text-anchor="middle">~20% chip</text>
+    <text x="65" y="133" fill="#f0883e" font-size="9" text-anchor="middle">by construction</text>
+  </g>
+
+  <defs>
+    <marker id="arrB" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#58a6ff"/></marker>
+    <marker id="arrP" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#e07aff"/></marker>
+    <marker id="arrG" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#3fb950"/></marker>
+  </defs>
+</svg>

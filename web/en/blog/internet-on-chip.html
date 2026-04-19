@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Internet on a Chip — How We Designed a Network for 10,000+ Processor Cores — CLI-CPU Blog</title>
+  <meta name="description" content="How we designed a packet-switched network for 10,000+ Rich Cores inside a single chip. ATM inspiration, telephone exchange VOQ, iSLIP, store-and-forward deadlock freedom.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .nav {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      line-height: 1.25;
+    }
+
+    header .subtitle {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    header .meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 16px;
+      font-family: var(--mono);
+    }
+
+    article {
+      flex: 1;
+      padding: 48px 0;
+    }
+
+    article h2 {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: #f0f6fc;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    article h2:first-child { margin-top: 0; }
+
+    article h3 {
+      font-size: 1.1rem;
+      color: #f0f6fc;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    article p {
+      margin-bottom: 16px;
+      font-size: 1.02rem;
+    }
+
+    article blockquote {
+      border-left: 3px solid var(--green);
+      padding: 12px 20px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    article ul, article ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+
+    article li {
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+
+    article strong { color: #f0f6fc; }
+
+    article code {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: #f0f6fc;
+    }
+
+    .comparison-table td { color: var(--text-dim); }
+
+    .highlight-box {
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .highlight-box strong { color: var(--accent); }
+
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 28px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta h3 {
+      font-family: var(--mono);
+      color: var(--green);
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      header { padding: 32px 0 24px; }
+      article h2 { font-size: 1.1rem; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <a href="../../hu/blog/internet-on-chip.html" style="color:var(--text-dim);padding:4px 12px;margin-right:4px;">Magyar</a>
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">English</span>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>Internet on a Chip</h1>
+    <div class="subtitle">How we designed a network for 10,000+ processor cores</div>
+    <div class="meta">April 18, 2026 &middot; Jozsef Szabolcs Hocza</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <img src="../../img/blog/seal-core.png" alt="Seal Core — the security core at the center of the CFPU chip" style="width:100%;margin-bottom:40px;border-radius:8px;">
+
+    <h2>The Question We Had to Answer</h2>
+
+    <p>
+      The Cognitive Fabric Processing Unit (CFPU) is not a conventional processor. We're not building a single large, fast core &mdash; we're building <strong>thousands of small, independent CIL-native cores</strong> that communicate through messages, share no memory, and each run their own actor program. Think of it as an Akka.NET cluster cast in silicon.
+    </p>
+
+    <p>
+      But when we started designing the <a href="https://github.com/FenySoft/NeuronOS">Neuron OS</a> &mdash; the operating system for this chip &mdash; we discovered that our architecture document <strong>had no answer</strong> to the biggest challenge of all.
+    </p>
+
+    <p>
+      <strong>How do 10,000+ processor cores talk to each other inside a single chip?</strong>
+    </p>
+
+    <h2>What the Textbook Says &mdash; and What It Doesn't</h2>
+
+    <p>
+      The Network-on-Chip (NoC) literature has known the fundamental topologies for decades. We evaluated every one of them at the 10,000+ Rich Core / chip scale:
+    </p>
+
+    <p>
+      <strong>Flat mesh</strong> (2D grid) &mdash; the simplest. Every core talks to its four neighbors. The Cerebras wafer-scale chip uses this. But at 10,000 cores the grid is 100&times;100, and the most distant cores are <strong>~200 hops</strong> apart. Unacceptable latency.
+    </p>
+
+    <p>
+      <strong>Fat tree</strong> (Clos network) &mdash; the darling of data centers. Any two points are <strong>~6 hops</strong> apart. A pure fat tree's root switch is a bottleneck and single point of failure &mdash; but these can be solved with multiple roots and horizontal links between levels. However, when you add horizontal links to a fat tree, the topology <strong>converges to a hierarchical mesh</strong> &mdash; and we can do better there.
+    </p>
+
+    <p>
+      <strong>3D torus</strong> &mdash; the Fugaku supercomputer's topology. Wrap-around links halve the diameter, but the wires running from one chip edge to the other are physically problematic.
+    </p>
+
+    <p>
+      <strong>Dragonfly</strong> &mdash; the Frontier supercomputer's choice. All-to-all connections within groups, sparser links between groups. Excellent between supercomputer cabinets. But <strong>on-chip, the all-to-all wiring requires ~12&times; more wires</strong> than a mesh. Not realistic.
+    </p>
+
+    <p>None of them were convincing.</p>
+
+    <img src="../../img/blog/topology-comparison_en.svg" alt="Topology comparison — mesh, fat tree, torus, dragonfly vs hierarchical mesh" style="width:100%;margin:32px 0;border-radius:8px;">
+
+    <h2>The Turning Point: Telecom Already Solved This</h2>
+
+    <p>
+      The solution came not from chip design, but from <strong>telecommunications</strong>.
+    </p>
+
+    <p>
+      ATM (Asynchronous Transfer Mode) networks in the 1990s were built on a simple but deep insight:
+    </p>
+
+    <blockquote>
+      If every packet is the same size, the switching hardware becomes dramatically simpler.
+    </blockquote>
+
+    <p>
+      ATM used fixed 53-byte cells. We chose 64-byte payload (16-byte header + 64-byte payload = 80 bytes) &mdash; but the principle is the same. Fixed cell = deterministic timing = simple hardware = fewer transistors = <strong>more processor cores fit on the chip</strong>.
+    </p>
+
+    <p>
+      Then came the second insight from telephone exchanges: <strong>Virtual Output Queuing (VOQ)</strong>. In a conventional router, when one packet is blocked, everything behind it stalls too &mdash; this is Head-of-Line (HOL) blocking. VOQ maintains a separate queue for each output port. If we're blocked toward port A, packets heading for port B <strong>continue unimpeded</strong>. This single technique raises throughput from ~58% to <strong>~99%</strong>.
+    </p>
+
+    <p>
+      The third element: the <strong>iSLIP scheduler</strong> (Nick McKeown, Stanford, 1999). It schedules the maximum number of parallel transfers every cycle, with round-robin fairness, in <strong>a single clock cycle</strong>. ~3,000 gates &mdash; negligible cost.
+    </p>
+
+    <h2>The Deadlock That Doesn't Exist</h2>
+
+    <p>
+      One of the greatest fears in on-chip networks is <strong>deadlock</strong> &mdash; when packets circularly wait for each other and the entire system freezes. The traditional solution: complex routing constraints, Virtual Channels, formal proofs.
+    </p>
+
+    <p>In our system, deadlock <strong>doesn't exist</strong>. We didn't solve it &mdash; we eliminated it.</p>
+
+    <p>
+      The CFPU uses a <strong>hybrid switching</strong> model, optimized per level. At the <strong>L0 mesh, wormhole routing</strong> is used: the header flit is forwarded immediately, body flits follow in a pipeline. <strong>XY dimension-ordered routing</strong> (Dally &amp; Seitz, 1987) creates a total ordering on channels &mdash; cyclic dependencies cannot form.
+    </p>
+
+    <p>
+      At the <strong>L1&ndash;L3 crossbars, Virtual Cut-Through (VCT)</strong> is used: the cell is fully received into the input buffer before switching. No chained buffer allocation across hops. VOQ prevents HOL-blocking from spreading, and credit-based flow control prevents buffer overflow.
+    </p>
+
+    <div class="highlight-box">
+      <strong>Wormhole (L0, XY routing) + VCT (L1&ndash;L3) + VOQ + credit-based flow control = deadlock-free by construction.</strong> No proof needed &mdash; the structure excludes it.
+    </div>
+
+    <img src="../../img/blog/deadlock-comparison_en.svg" alt="Wormhole routing deadlock freedom with XY routing" style="width:100%;margin:32px 0;border-radius:8px;">
+
+    <h2>The Three Design Principles</h2>
+
+    <h3>1. Security &mdash; Non-Negotiable</h3>
+    <p>
+      The CFPU's shared-nothing architecture is not a performance optimization &mdash; it's a <strong>security guarantee</strong>. No shared memory means no pointer manipulation, no side-channel attacks on a neighbor's data, no isolation violation.
+    </p>
+    <p>
+      Any proposal that introduces shared memory &mdash; whether a chip-wide cell pool, zero-copy pointer sharing, or shared buffers &mdash; <strong>is automatically rejected</strong>. Cores send messages by copying, not by passing pointers. Slower? Yes. But secure.
+    </p>
+
+    <h3>2. Core Count &mdash; Computational Power</h3>
+    <p>
+      Every gate spent on the router is a gate missing from a processor core. Making the interconnect &ldquo;smarter&rdquo; increases router size &mdash; and decreases core count.
+    </p>
+    <p>
+      The math is simple: with adaptive routers, ~9,700 cores fit on the chip; with XY routing, ~10,500. Adaptive routing improves latency, but the 800 lost cores <strong>represent more computational capacity</strong> than the better latency recovers.
+    </p>
+
+    <h3>3. Message Speed &mdash; But Simply</h3>
+    <p>
+      The network must be fast &mdash; but not &ldquo;smart.&rdquo; Smart routers are large; large routers leave room for fewer cores. The solution: <strong>simple but proven</strong> techniques from telecommunications.
+    </p>
+
+    <h2>The Final Architecture</h2>
+
+    <p>The final design decision emerged from two key insights. First: <strong>mesh is optimal at the core level</strong> (physically adjacent, short wires), but at higher levels a <strong>crossbar is more efficient</strong> &mdash; deterministic 1 hop, small port count (8&ndash;12), telecom-style VOQ+iSLIP. Second: the <strong>Seal Core at the chip center</strong>, co-located with the L3 crossbar, means every cross-region packet naturally passes through it &mdash; enabling security inspection without extra routing.</p>
+
+<pre>10,000+ Rich Cores / chip (parameterizable, adapts to die size)
+
+4-level hierarchy:
+  L3: Chip ── 8 regions, star topology, Seal Core + crossbar at center
+   └── L2: Region ── 8 tiles, 8&times;8 crossbar (region center), serial link
+        └── L1: Tile ── 8 clusters, 8&times;8 crossbar (tile center)
+             └── L0: Cluster ── 16 Rich Cores, 4&times;4 mesh
+
+16 × 8 × 8 × 8 = 8,192 cores (ref. config, 7nm, 800 mm²)</pre>
+
+    <p>Every crossbar sits at the <strong>geometric center</strong> of its level &mdash; equal maximum distance to all ports, fair and deterministic latency. At L3, <strong>star topology</strong>: every region connects directly to the central Seal Core + crossbar &mdash; cross-region traffic is always exactly <strong>2 hops</strong>.</p>
+
+    <table class="comparison-table">
+      <tr><th>Level</th><th>Topology</th><th>Ports</th><th>Link type</th><th>Why?</th></tr>
+      <tr><td>L0: Core</td><td><strong>4&times;4 mesh</strong></td><td>16</td><td>Parallel</td><td>Physically adjacent, short wires</td></tr>
+      <tr><td>L1: Cluster</td><td><strong>8&times;8 crossbar</strong></td><td>8</td><td>Parallel</td><td>Few ports, fixed 1 hop, VOQ+iSLIP</td></tr>
+      <tr><td>L2: Tile</td><td><strong>8&times;8 crossbar</strong></td><td>8</td><td>Serial 10&times;</td><td>Medium distance, serial link</td></tr>
+      <tr><td>L3: Region</td><td><strong>Star (Seal Core center)</strong></td><td>8</td><td>Serial 10&times;</td><td>Seal Core sees all traffic</td></tr>
+    </table>
+
+    <table class="comparison-table">
+      <tr><th>Element</th><th>Choice</th><th>Origin</th></tr>
+      <tr><td>Cell</td><td><strong>16 + 64-byte fixed (80 B)</strong></td><td>ATM (1985)</td></tr>
+      <tr><td>Buffers</td><td><strong>Virtual Output Queuing</strong></td><td>Telecom switches (1990s)</td></tr>
+      <tr><td>Scheduler</td><td><strong>iSLIP</strong></td><td>Stanford (1999)</td></tr>
+      <tr><td>Flow control</td><td><strong>Credit-based</strong></td><td>Telecom switches</td></tr>
+      <tr><td>Routing</td><td><strong>XY (L0 mesh) + crossbar (L1&ndash;L3)</strong></td><td>NoC + telecom</td></tr>
+      <tr><td>Switching</td><td><strong>Wormhole (L0) + VCT (L1&ndash;L3)</strong></td><td>NoC + telecom</td></tr>
+    </table>
+
+    <div class="highlight-box">
+      <strong>Router size:</strong> Turbo ~26,000 GE (0.007 mm&sup2;), Compact ~14,500 GE (0.004 mm&sup2;) &mdash; depends on core type.<br>
+      <strong>Throughput:</strong> ~98% (Turbo, VOQ + iSLIP), ~75% (Compact).<br>
+      <strong>Max hops:</strong> 18 (worst-case, cross-region).<br>
+      <strong>Max latency:</strong> ~139 cycles worst-case (~278 ns @ 500 MHz).<br>
+      <strong>Deadlock:</strong> impossible (Wormhole + XY + VCT + VOQ + credit).<br>
+      <strong>Seal Core:</strong> chip center, sees all cross-region traffic.<br>
+      <strong>Security compromise:</strong> zero.
+    </div>
+
+    <img src="../../img/blog/router-internals_en.svg" alt="Router internals — VOQ, iSLIP, Crossbar, Credit" style="width:100%;margin:32px 0;border-radius:8px;">
+
+    <h2>What We Learned</h2>
+
+    <p>
+      From the <strong>NVIDIA GPU</strong> we learned <strong>hierarchical aggregation</strong> &mdash; their 24,000 CUDA cores share a single 12-port crossbar because SMs aggregate traffic. We do the same: 10,000+ cores, but the chip-level mesh is only 16 ports.
+    </p>
+    <p>
+      From the <strong>Apple M-series</strong> we learned <strong>cluster-based organization</strong> and <strong>independent power domains</strong> &mdash; a sleeping cluster draws zero power.
+    </p>
+    <p>
+      From <strong>telephone exchanges</strong> we learned <strong>VOQ, iSLIP, and credit-based flow control</strong>. These techniques have been proven for decades in systems with millions of ports.
+    </p>
+
+    <h3>What We Rejected</h3>
+    <ul>
+      <li><strong>Zero-copy / shared memory</strong> &mdash; security vulnerability</li>
+      <li><strong>Adaptive routing</strong> &mdash; not worth the core loss</li>
+      <li><strong>In-network computation</strong> &mdash; 44% router area, half the cores disappear</li>
+      <li><strong>Fat tree</strong> &mdash; with horizontal links converges to hierarchical mesh; crossbar solution is better</li>
+      <li><strong>Dragonfly</strong> &mdash; on-chip all-to-all wiring is unrealistic</li>
+    </ul>
+
+    <h3>The Seal Core Is Not a Bottleneck</h3>
+    <p>
+      The Seal Core serves two functions: <strong>code authentication</strong> (rare but heavy) and <strong>L3 crossbar routing</strong> (the crossbar handles this independently, the crypto engine is not involved). At boot, authenticating all core code takes ~256 ms (8,192 cores, 7nm). Runtime hot code loading: <strong>&lt;0.1% utilization</strong>. The L3 crossbar runs at ~25% load with 8k cores &mdash; it scales to ~30,000 cores without saturation. Both the Seal Core and the L3 crossbar are <strong>power-gated</strong> &mdash; when there is no cross-region traffic and no code loading, everything at the chip center sleeps.
+    </p>
+
+    <h3>The Deepest Insight</h3>
+    <p>
+      Processor design and network design are <strong>the same problem</strong> &mdash; many independent units that need to communicate quickly, reliably, and securely. Telecommunications <strong>solved this problem decades ago</strong>. We just transplanted it to silicon.
+    </p>
+
+    <div class="cta">
+      <h3>Open Source</h3>
+      <p>The CLI-CPU project is fully open source. The entire design process, every decision and rationale, is publicly available.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="https://github.com/FenySoft/NeuronOS">GitHub &rarr; NeuronOS</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      The CFPU is not a conventional processor. It doesn't aim to be faster on a single thread &mdash; it aims to run <strong>thousands of threads</strong> in parallel, securely, deterministically. The interconnect is the foundation of that vision.
+    </p>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFPU-ML-Max: Hogyan optimaliz&aacute;ltunk egy ML inference chipet &mdash; CLI-CPU Blog</title>
+  <meta name="description" content="A CFPU-ML-Max optimaliz&aacute;ci&oacute;s t&ouml;rt&eacute;nete: 128 byte-os cell&aacute;t&oacute;l a 90-95% MAC kihasználtságig. Systolic router, post-MAC pipeline, SRAM sweet spot megfordulás, NVIDIA összehasonlítás.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .nav {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      line-height: 1.25;
+    }
+
+    header .subtitle {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    header .meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 16px;
+      font-family: var(--mono);
+    }
+
+    article {
+      flex: 1;
+      padding: 48px 0;
+    }
+
+    article h2 {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: #f0f6fc;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    article h2:first-child { margin-top: 0; }
+
+    article h3 {
+      font-size: 1.1rem;
+      color: #f0f6fc;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    article p {
+      margin-bottom: 16px;
+      font-size: 1.02rem;
+    }
+
+    article blockquote {
+      border-left: 3px solid var(--green);
+      padding: 12px 20px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    article ul, article ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+
+    article li {
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+
+    article strong { color: #f0f6fc; }
+
+    article code {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: #f0f6fc;
+    }
+
+    .comparison-table td { color: var(--text-dim); }
+
+    .highlight-box {
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .highlight-box strong { color: var(--accent); }
+
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 28px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta h3 {
+      font-family: var(--mono);
+      color: var(--green);
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      header { padding: 32px 0 24px; }
+      article h2 { font-size: 1.1rem; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">Magyar</span>
+  <a href="../../en/blog/cfpu-ml-max.html" style="color:var(--text-dim);padding:4px 12px;margin-left:4px;">English</a>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>CFPU-ML-Max</h1>
+    <div class="subtitle">Hogyan optimaliz&aacute;ltunk egy ML inference chipet</div>
+    <div class="meta">2026. &aacute;prilis 19. &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <img src="../../img/blog/seal-core.png" alt="Seal Core — a CFPU chip biztonsági magja a chip közepén" style="width:100%;margin-bottom:40px;border-radius:8px;">
+
+    <h2>A kiindul&oacute;pont</h2>
+
+    <p>
+      A CFPU many-core architekt&uacute;r&aacute;ja egy&eacute;rtelm&uuml; jelölt ML inference-re: ezer sz&aacute;m&uacute; Matrix Core, mindegyik 4&times;4 INT8 MAC array-jal, mailbox-alap&uacute; &uuml;zenetkezel&eacute;ssel, streaming adatfolyammal. Pap&iacute;ron 328 TOPS (7nm, 500 MHz, ~20 500 core). De az elemz&eacute;s kimutatta: a h&aacute;l&oacute;zati sz&udblac;k keresztmetszet miatt <strong>csak ~15% MAC kihasználtság</strong> lenne tarthat&oacute;.
+    </p>
+
+    <p>
+      A probl&eacute;ma nem a MAC t&ouml;mb volt, hanem az <strong>adatbet&aacute;pl&aacute;l&aacute;s</strong>. A Turbo router 42-bites wormhole linkje ~5,2 byte/ciklust sz&aacute;ll&iacute;tott. A MAC 32 byte/ciklust fogyasztott. Hat&ndash;szoros sz&aacute;k&iacute;t&aacute;s. A MAC a ciklusok 85%-&aacute;ban &uuml;resen &aacute;llt, v&aacute;rta az adatot.
+    </p>
+
+    <p>
+      Arra volt sz&uuml;ks&eacute;g, hogy a teljes kommunik&aacute;ci&oacute;s r&eacute;teget &uacute;jra gondoljuk &mdash; nem a MAC-ot kell lassítani, hanem a h&aacute;l&oacute;zatot kell felgyorsítani.
+    </p>
+
+    <h2>1. l&eacute;p&eacute;s: Cella m&eacute;ret cs&ouml;kkent&eacute;s</h2>
+
+    <p>
+      Az interconnect cell&aacute;k eredeti payload m&eacute;rete 128 byte volt. Ez az &aacute;ltal&aacute;nos c&eacute;l&uacute; CFPU-nak val&oacute;: aktor &uuml;zenetek, szeriáliz&aacute;lt objektumok, GC adatok. De a Matrix Core 4&times;4-es tile-ja csak 32 byte input &mdash; a cella n&eacute;gyszer t&uacute;lm&eacute;retezett.
+    </p>
+
+    <p>
+      A 64 byte-os cell&aacute;ra v&aacute;lt&aacute;s <strong>39%-kal cs&ouml;kkentette a latenci&aacute;t</strong> &eacute;s <strong>24%-kal a router ter&uuml;let&eacute;t</strong>. A 2-hatv&aacute;ny megmaradt, az illeszt&eacute;s egyszerű. Ez nem hangzik forradalmian, de a felszabadul&oacute; ter&uuml;let &eacute;s vezet&eacute;k-b&uuml;dzs&eacute; lett a k&ouml;vetkez&odblac; l&eacute;p&eacute;sek alapja.
+    </p>
+
+    <h2>2. l&eacute;p&eacute;s: Systolic Wide router</h2>
+
+    <p>
+      Ez volt a kulcs felismer&eacute;s: <strong>az ML inference-ben az adat egy ir&aacute;nyba folyik</strong>. Az aktiv&aacute;ci&oacute; nyugatr&oacute;l keletre, a s&uacute;lyok &eacute;szakr&oacute;l d&eacute;lre. Nincs sz&uuml;ks&eacute;g XY routing-ra, VOQ-ra, iSLIP-re &mdash; ezek &aacute;ltal&aacute;nos c&eacute;l&uacute; h&aacute;l&oacute;zati eszk&ouml;z&ouml;k, amelyek a Matrix Core-nak felesleges luxus.
+    </p>
+
+    <p>
+      A Turbo routert lecser&eacute;lt&uuml;k <strong>k&eacute;t 128-bites egyir&aacute;ny&uacute; linkre</strong>: W&rarr;E aktiv&aacute;ci&oacute;, N&rarr;S s&uacute;ly. A router 42 000 GE-r&odblac;l (Turbo) <strong>~5 000 GE-re zsugorodott</strong> &mdash; 81%-os csökken&eacute;s. A ter&uuml;lete 0,001 mm&sup2;.
+    </p>
+
+    <p>
+      De a m&eacute;ret cs&ouml;kken&eacute;s csak mell&eacute;khat&aacute;s. Az igazi nyeremény: a 128 bit/cc link <strong>16 byte/cc</strong>-t sz&aacute;ll&iacute;t mindk&eacute;t ir&aacute;nyban. A MAC 32 byte/cc fogyaszt&aacute;sa: 16 byte aktiv&aacute;ci&oacute; + 16 byte s&uacute;ly. <strong>A link pontosan annyi adatot sz&aacute;ll&iacute;t, amennyit a MAC meg tud enni.</strong>
+    </p>
+
+    <blockquote>
+      A Turbo routerrel a MAC az id&odblac; 85%-&aacute;ban &uuml;resen &aacute;llt. A Systolic Wide routerrel 90&ndash;95%-on dolgozik.
+    </blockquote>
+
+    <h2>3. l&eacute;p&eacute;s: Sz&eacute;lesebb link &mdash; a vezet&eacute;k-b&uuml;dzs&eacute; &aacute;tcsoportos&iacute;t&aacute;sa</h2>
+
+    <p>
+      Honnan j&ouml;tt a 128-bit link? A Turbo router 42-bites linkje <strong>k&eacute;tir&aacute;ny&uacute; volt</strong>: &Eacute;, D, K, Ny + lok&aacute;lis &mdash; 5 port, mindegyik 42 bit, k&eacute;tir&aacute;ny&uacute;. Ez ~340 vezet&eacute;k/core. A Systolic Wide router k&eacute;t 128-bites egyir&aacute;ny&uacute; linkkel &eacute;s ~10 control vezet&eacute;kkel <strong>~274 vezet&eacute;k/core</strong> &mdash; kevesebb vezet&eacute;k, nagyobb s&aacute;vsz&eacute;less&eacute;g.
+    </p>
+
+    <p>
+      A trükk: az XY routing, VOQ &eacute;s iSLIP elhagy&aacute;sa nemcsak logik&aacute;t takar&iacute;t meg, hanem <strong>vezet&eacute;keket is</strong>. Nincs t&ouml;bb c&iacute;m-dekódol&aacute;s, nincs arbitr&aacute;ci&oacute;s jelz&eacute;s, nincs t&ouml;bb port. A felszabadult vezet&eacute;k-b&uuml;dzs&eacute;t a k&eacute;t f&odblac; adat&uacute;tvonalra ford&iacute;tottuk.
+    </p>
+
+    <h2>4. l&eacute;p&eacute;s: Post-MAC pipeline</h2>
+
+    <p>
+      A MAC kimenet&eacute;t eddig nyersen k&uuml;ldt&uuml;k a h&aacute;l&oacute;zatra: 16 INT32 &eacute;rt&eacute;k tile-onk&eacute;nt = 64 byte. De a legt&ouml;bb ML r&eacute;teg ut&aacute;n &uacute;gyis j&ouml;n ReLU, kvant&aacute;l&aacute;s &eacute;s pooling. Mi&eacute;rt ne csin&aacute;ln&aacute;nk ezt <strong>hardverben, a MAC kimeneten</strong>?
+    </p>
+
+    <p>
+      H&aacute;rom egys&eacute;get integr&aacute;ltunk:
+    </p>
+
+    <ul>
+      <li><strong>ReLU</strong> &mdash; egyetlen kompar&aacute;tor, 160 GE. Ha az &eacute;rt&eacute;k negat&iacute;v, null&aacute;zza.</li>
+      <li><strong>Quantize INT32&rarr;INT8</strong> &mdash; 300 GE. A 32-bites MAC eredm&eacute;nyt 8-bitre kvant&aacute;lja.</li>
+      <li><strong>Max-Pool 2&times;2</strong> &mdash; 200 GE. N&eacute;gy &eacute;rt&eacute;kb&odblac;l a maximumot v&aacute;lasztja.</li>
+    </ul>
+
+    <p>
+      &Ouml;sszesen: <strong>660 GE</strong> (~0,0001 mm&sup2;). A kimeneti forgalom: 64 byte &rarr; 4 byte. <strong>16&times; cs&ouml;kken&eacute;s.</strong>
+    </p>
+
+    <p>
+      Ez nem csak a h&aacute;l&oacute;zat terh&eacute;t cs&ouml;kkenti &mdash; a kimeneti link s&aacute;vsz&eacute;less&eacute;ge felszabadul a bemeneti adatforgalom sz&aacute;m&aacute;ra. A post-MAC pipeline gyakorlatilag nulla ter&uuml;letk&ouml;lts&eacute;ggel jelent&odblac;s h&aacute;l&oacute;zati hat&eacute;konys&aacute;got ad.
+    </p>
+
+    <h2>5. l&eacute;p&eacute;s: SRAM sweet spot megfordul&aacute;s</h2>
+
+    <p>
+      A kor&aacute;bbi elemz&eacute;s 32 KB SRAM-ot javasolt optim&aacute;lisnak: el&eacute;g a s&uacute;ly-cache-hez, a weight reuse kompenz&aacute;lja az elvesztett core-okat. De a Systolic Wide router <strong>megfordította ezt a logik&aacute;t</strong>.
+    </p>
+
+    <p>
+      Ha a link s&aacute;vsz&eacute;less&eacute;ge &ouml;nmag&aacute;ban el&eacute;g a MAC t&aacute;pl&aacute;l&aacute;s&aacute;hoz (128 bit/cc = 16 byte/cc), akkor a weight cache el&odblac;nye minim&aacute;lis. A nagyobb SRAM t&ouml;bb ter&uuml;letet foglal, kevesebb core f&eacute;r el, &eacute;s a sustained TOPS cs&ouml;kken &mdash; annak ellen&eacute;re, hogy a MAC kihasználtság alig javul.
+    </p>
+
+    <p>
+      A <strong>8 KB-os SRAM</strong> lett az &uacute;j optimum: el&eacute;g a k&oacute;dhoz, a stack-hez &eacute;s a MAC bufferhez, &eacute;s <strong>+18% core-t</strong> tesz lehetőv&eacute; a 32 KB-os vari&aacute;nshoz k&eacute;pest.
+    </p>
+
+    <h2>6. l&eacute;p&eacute;s: &Oacute;rajel optimaliz&aacute;l&aacute;s</h2>
+
+    <p>
+      Az utols&oacute; l&eacute;p&eacute;s az &oacute;rajel megv&aacute;laszt&aacute;sa volt. A TOPS line&aacute;risan n&odblac; az &oacute;rajellel, de a fogyaszt&aacute;s szupra-line&aacute;risan. Elemz&eacute;s:
+    </p>
+
+    <table class="comparison-table">
+      <tr>
+        <th>&Oacute;rajel</th>
+        <th>TOPS (609 mm&sup2;)</th>
+        <th>TDP (becs.)</th>
+        <th>TOPS/W</th>
+      </tr>
+      <tr>
+        <td>500 MHz</td>
+        <td>~512</td>
+        <td>~70 W</td>
+        <td>~7,3</td>
+      </tr>
+      <tr>
+        <td><strong>1 GHz</strong></td>
+        <td><strong>~1 024</strong></td>
+        <td><strong>~210 W</strong></td>
+        <td><strong>~4,9</strong></td>
+      </tr>
+      <tr>
+        <td>2 GHz</td>
+        <td>~2 048</td>
+        <td>~800 W</td>
+        <td>~2,6</td>
+      </tr>
+    </table>
+
+    <p>
+      Az <strong>1 GHz</strong> a legjobb kompromisszum: 2&times; TOPS az 500 MHz-hez k&eacute;pest, m&eacute;g elfogadhat&oacute; TOPS/W mellett. A 2 GHz m&aacute;r nem &eacute;r meg &mdash; a fogyaszt&aacute;s 4&times; n&odblac;, a TOPS csak 2&times;.
+    </p>
+
+    <div class="highlight-box" style="border-left-color:var(--green);">
+      <strong>&#9888; Aritmetikai projekci&oacute;k</strong> &mdash; a CFPU-ML-Max sz&aacute;mai szint&eacute;zis &eacute;s RTL-szint&udblac; valid&aacute;ci&oacute; el&odblac;tti becsl&eacute;sek. A tervez&eacute;si ir&aacute;nyokat jelzik, nem m&eacute;rt teljesítm&eacute;nyadatokat.
+    </div>
+
+    <h2>V&eacute;geredm&eacute;ny: CFPU-ML-Max vs NVIDIA (becsl&eacute;s)</h2>
+
+    <p>
+      Az &ouml;t optimaliz&aacute;ci&oacute;s l&eacute;p&eacute;s ut&aacute;n a CFPU-ML-Max <strong>90&ndash;95% sustained MAC kihasználtságot</strong> &eacute;r el &mdash; a kor&aacute;bbi ~15%-r&oacute;l. Hogyan n&eacute;z ki ez NVIDIA-val &ouml;sszehasonl&iacute;tva?
+    </p>
+
+    <p>
+      Az al&aacute;bbi t&aacute;bla azonos die m&eacute;reten, azonos gy&aacute;rt&aacute;si csom&oacute;ponton (~5nm/4nm) hasonl&iacute;t, dense INT8 (sparsity n&eacute;lk&uuml;l):
+    </p>
+
+    <table class="comparison-table">
+      <tr>
+        <th>&Ouml;sszehasonl&iacute;t&aacute;s</th>
+        <th>CFPU-ML-Max (sust.)</th>
+        <th>NVIDIA (sust.)</th>
+        <th>Becs&uuml;lt el&odblac;ny</th>
+        <th>Becs&uuml;lt TOPS/W</th>
+      </tr>
+      <tr>
+        <td>vs RTX 4060 (159 mm&sup2;)</td>
+        <td>242&ndash;256 TOPS</td>
+        <td>70&ndash;122 TOPS</td>
+        <td><strong>2,0&ndash;3,7&times;</strong></td>
+        <td><strong>4&ndash;7&times;</strong></td>
+      </tr>
+      <tr>
+        <td>vs RTX 4090 (609 mm&sup2;)</td>
+        <td>922&ndash;973 TOPS</td>
+        <td>264&ndash;462 TOPS</td>
+        <td><strong>2,0&ndash;3,7&times;</strong></td>
+        <td><strong>4&ndash;7&times;</strong></td>
+      </tr>
+      <tr>
+        <td>vs H100 (814 mm&sup2;)</td>
+        <td>1 233&ndash;1 301 TOPS</td>
+        <td>792&ndash;1 385 TOPS</td>
+        <td><strong>0,9&ndash;1,6&times;</strong></td>
+        <td><strong>2&ndash;4&times;</strong></td>
+      </tr>
+    </table>
+
+    <p>
+      A sz&aacute;mok &odblac;szint&eacute;k. Az RTX 4060 &eacute;s 4090 eset&eacute;n a CFPU-ML-Max <strong>2&ndash;3,7&times; jobb sustained TOPS-t</strong> ad, mert a GPU die-j&aacute;nak csak ~30&ndash;35%-a ML hardver. Az H100 eset&eacute;n a k&eacute;p kiegyenl&iacute;tettebb: az H100 csaknem teljes eg&eacute;sz&eacute;ben ML-re tervezett, HBM-mel, a CFPU-ML-Max SRAM-only.
+    </p>
+
+    <div class="highlight-box">
+      <strong>Mi&eacute;rt alacsony az NVIDIA sustained?</strong><br><br>
+      <strong>1. Die ter&uuml;let megoszt&aacute;s</strong> &mdash; az RTX 4060/4090 die-jának ~30&ndash;35%-a Tensor Core. A t&ouml;bbi raszteriz&aacute;ci&oacute;, RT core, vid&eacute;o, display engine. A CFPU-ML-Max: 100% ML.<br>
+      <strong>2. GDDR sz&uuml;k keresztmetszet</strong> &mdash; a Tensor Core-ok gyorsabban fogyasztj&aacute;k az adatot, mint a GDDR6X sz&aacute;ll&iacute;tani tudja.<br>
+      <strong>3. Nem-ML hardver fogyaszt</strong> &mdash; a GPU TDP-j&eacute;be a raszteriz&aacute;ci&oacute;, vid&eacute;o dek&oacute;der &eacute;s display engine is belesz&aacute;m&iacute;t.
+    </div>
+
+    <h2>Die vari&aacute;nsok</h2>
+
+    <table class="comparison-table">
+      <tr>
+        <th>Die</th>
+        <th>Core</th>
+        <th>Sustained TOPS</th>
+        <th>SRAM</th>
+        <th>TDP</th>
+        <th>C&eacute;lmodell</th>
+      </tr>
+      <tr>
+        <td>80 mm&sup2;</td>
+        <td>~4 200</td>
+        <td>~121&ndash;128</td>
+        <td>34 MB</td>
+        <td>~28 W</td>
+        <td>MobileNet v2</td>
+      </tr>
+      <tr>
+        <td>159 mm&sup2;</td>
+        <td>~8 400</td>
+        <td>~242&ndash;256</td>
+        <td>67 MB</td>
+        <td>~55 W</td>
+        <td>ResNet-50</td>
+      </tr>
+      <tr>
+        <td>200 mm&sup2;</td>
+        <td>~10 500</td>
+        <td>~302&ndash;319</td>
+        <td>84 MB</td>
+        <td>~69 W</td>
+        <td>YOLOv8-S</td>
+      </tr>
+      <tr>
+        <td>400 mm&sup2;</td>
+        <td>~21 000</td>
+        <td>~605&ndash;638</td>
+        <td>168 MB</td>
+        <td>~138 W</td>
+        <td>EfficientNet-B4</td>
+      </tr>
+      <tr>
+        <td>609 mm&sup2;</td>
+        <td>~32 000</td>
+        <td>~922&ndash;973</td>
+        <td>256 MB</td>
+        <td>~210 W</td>
+        <td>&mdash;</td>
+      </tr>
+      <tr>
+        <td>814 mm&sup2;</td>
+        <td>~42 800</td>
+        <td>~1 233&ndash;1 301</td>
+        <td>342 MB</td>
+        <td>~280 W</td>
+        <td>BERT-Base</td>
+      </tr>
+    </table>
+
+    <p>
+      A CFPU-ML-Max <strong>nem LLM accelerator</strong>. Kis &eacute;s közepes inference modellekre optimaliz&aacute;lt (MobileNet, ResNet, YOLOv8, BERT-Base), ahol a teljes modell elf&eacute;r az elosztott SRAM-ban. A LLaMA-7B (7 GB) m&aacute;r nem f&eacute;r el &mdash; ahhoz DRAM controller kellene, ami a jelenlegi architekt&uacute;r&aacute;ban nincs.
+    </p>
+
+    <p>
+      A TDP becsl&eacute;sek szint&eacute;zis el&odblac;ttiek. A TOPS/W el&odblac;ny &iacute;g&eacute;retes, de igazolt fogyaszt&aacute;si adatokhoz legal&aacute;bb RTL-szint&udblac; power anal&iacute;zis sz&uuml;ks&eacute;ges.
+    </p>
+
+    <div class="cta">
+      <h3>Ny&iacute;lt forr&aacute;sk&oacute;d</h3>
+      <p>A CLI-CPU projekt teljes eg&eacute;sz&eacute;ben ny&iacute;lt forr&aacute;sk&oacute;d&uacute;. A teljes optimaliz&aacute;ci&oacute;s folyamat, minden d&ouml;nt&eacute;s &eacute;s indokl&aacute;s publikusan elérhető.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="https://github.com/FenySoft/NeuronOS">GitHub &rarr; NeuronOS</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      Az optimaliz&aacute;ci&oacute; nem egyetlen zsenialis &ouml;tlet volt &mdash; hanem hat egyszerű l&eacute;p&eacute;s, amelyek mindegyike <strong>a sz&uuml;k keresztmetszet kik&uuml;sz&ouml;b&ouml;l&eacute;s&eacute;re</strong> f&oacute;kusz&aacute;lt. A v&eacute;geredm&eacute;ny: a MAC kihasználtság ~15%-r&oacute;l 90&ndash;95%-ra nőtt. A tanuls&aacute;g: a j&oacute; hardvertervez&eacute;s iterat&iacute;v folyamat, nem villanyszer&eacute;sz pillanat.
+    </p>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>130nm-től 5nm-ig — Hogyan skálázódik a CFPU 600-tól 18 000 magig — CLI-CPU Blog</title>
+  <meta name="description" content="A CFPU architektúra egyetlen paraméterezhető RTL-ből épül: a chipméret és a gyártási technológia határozza meg a core számot, nem fordítva.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.8; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 24px; width: 100%; }
+    header { padding: 48px 0 32px; border-bottom: 1px solid var(--border); }
+    header .nav { font-family: var(--mono); font-size: 0.85rem; margin-bottom: 24px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: #f0f6fc; line-height: 1.25; }
+    header .subtitle { font-family: var(--mono); font-size: 1rem; color: var(--green); margin-top: 12px; }
+    header .meta { font-size: 0.85rem; color: var(--text-dim); margin-top: 16px; font-family: var(--mono); }
+    article { flex: 1; padding: 48px 0; }
+    article h2 { font-family: var(--mono); font-size: 1.3rem; color: #f0f6fc; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    article h2:first-child { margin-top: 0; }
+    article h3 { font-size: 1.1rem; color: #f0f6fc; margin-top: 32px; margin-bottom: 12px; }
+    article p { margin-bottom: 16px; font-size: 1.02rem; }
+    article blockquote { border-left: 3px solid var(--green); padding: 12px 20px; margin: 24px 0; background: var(--bg-card); border-radius: 0 6px 6px 0; font-style: italic; }
+    article ul, article ol { margin: 16px 0; padding-left: 24px; }
+    article li { margin-bottom: 8px; font-size: 1.02rem; }
+    article strong { color: #f0f6fc; }
+    article code { font-family: var(--mono); background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 24px 0; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.6; }
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.9rem; }
+    .comparison-table th, .comparison-table td { padding: 10px 14px; border: 1px solid var(--border); text-align: left; }
+    .comparison-table th { background: var(--bg-card); font-family: var(--mono); font-size: 0.85rem; color: #f0f6fc; }
+    .comparison-table td { color: var(--text-dim); }
+    .highlight-box { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 16px 20px; margin: 24px 0; border-radius: 0 6px 6px 0; }
+    .highlight-box strong { color: var(--accent); }
+    .bar-chart { margin: 24px 0; }
+    .bar-row { display: flex; align-items: center; margin-bottom: 8px; }
+    .bar-label { width: 80px; font-family: var(--mono); font-size: 0.85rem; color: var(--text-dim); text-align: right; padding-right: 12px; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 28px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 10px; font-size: 0.8rem; font-weight: 600; color: #fff; transition: width 0.5s ease; }
+    .cta { background: var(--bg-card); border: 1px solid var(--green); border-radius: 8px; padding: 28px; margin-top: 48px; text-align: center; }
+    .cta h3 { font-family: var(--mono); color: var(--green); margin-bottom: 12px; }
+    .cta p { margin-bottom: 16px; font-size: 0.95rem; }
+    .cta-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-family: var(--mono); font-size: 0.9rem; }
+    footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; font-size: 0.85rem; color: var(--text-dim); }
+    footer a { color: var(--text-dim); } footer a:hover { color: var(--accent); }
+    .footer-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+    @media (max-width: 600px) { header h1 { font-size: 1.5rem; } header { padding: 32px 0 24px; } article h2 { font-size: 1.1rem; } .comparison-table { font-size: 0.8rem; } .comparison-table th, .comparison-table td { padding: 6px 8px; } }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">Magyar</span>
+  <a href="../../en/blog/scaling-cores.html" style="color:var(--text-dim);padding:4px 12px;margin-left:4px;">English</a>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>130nm-t&odblac;l 5nm-ig</h1>
+    <div class="subtitle">Hogyan sk&aacute;l&aacute;z&oacute;dik a CFPU 600-t&oacute;l 18&nbsp;000 magig</div>
+    <div class="meta">2026. &aacute;prilis 18. &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <img src="../../img/blog/seal-core.png" alt="Seal Core — a CFPU chip biztonsági magja a chip közepén" style="width:100%;margin-bottom:40px;border-radius:8px;">
+
+    <h2>Egy RTL, minden chipre</h2>
+
+    <p>
+      A legt&ouml;bb processzor-architekt&uacute;ra egy konkr&eacute;t gy&aacute;rt&aacute;si node-ra &eacute;s chipm&eacute;retre van tervezve. Ha v&aacute;ltozik a node, &uacute;jratervezik a chipet. A CFPU m&aacute;sk&eacute;pp m&udblac;k&ouml;dik: <strong>egyetlen param&eacute;terezhet&odblac; RTL</strong>, amelyb&odblac;l a chipméret és a gyártási technológia határozza meg a core számot.
+    </p>
+
+    <blockquote>
+      A core sz&aacute;m a chiphez igazodik, nem ford&iacute;tva.
+    </blockquote>
+
+    <p>
+      Ez az&eacute;rt lehets&eacute;ges, mert a CFPU <a href="internet-on-chip.html">4-szint&udblac; hierarchikus architekt&uacute;r&aacute;ja</a> param&eacute;terezhet&odblac;: a cluster m&eacute;ret fix (4&times;4 = 16 core, fizikai optimum), de a cluster-ek, tile-ok &eacute;s r&eacute;gi&oacute;k sz&aacute;ma &aacute;ll&iacute;that&oacute;. Ugyanaz a Verilog k&oacute;d, m&aacute;s param&eacute;terekkel.
+    </p>
+
+<pre>module cfpu_chip #(
+    parameter CORES_PER_CLUSTER  = 16,    // fix: 4&times;4 mesh
+    parameter CLUSTERS_PER_TILE  = 12,    // node-f&uuml;gg&odblac;: 4-12
+    parameter TILES_PER_REGION   = 12,    // node-f&uuml;gg&odblac;: 4-12
+    parameter REGIONS            = 24,    // chipm&eacute;ret-f&uuml;gg&odblac;: 4-24
+    parameter SRAM_KB_PER_CORE   = 1024   // node-f&uuml;gg&odblac;: 16-1024
+);
+
+// 7nm, 800 mm&sup2;:  16 &times; 8 &times; 8 &times; 8  =  8 192 core, 256 KB/core
+// 5nm, 800 mm&sup2;:  16 &times; 8 &times; 8 &times; 10 = 10 240 core, 256 KB/core</pre>
+
+    <h2>Miért skálázódik?</h2>
+
+    <p>
+      A kulcs: a <strong>SRAM domin&aacute;lja a core ter&uuml;let&eacute;t</strong> (55-75%), nem a logika. Az SRAM rosszabbul sk&aacute;l&aacute;z&oacute;dik, mint a logika &mdash; ez&eacute;rt a t&eacute;nyleges core-s&udblac;r&udblac;s&eacute;g n&ouml;veked&eacute;s <strong>lassabb</strong>, mint a logika-s&udblac;r&udblac;s&eacute;g sugarln&aacute;. De kompenz&aacute;l&aacute;sk&eacute;nt: <strong>minden node-l&eacute;p&eacute;sn&eacute;l az SRAM-ot is n&ouml;velj&uuml;k</strong>.
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Node</th><th>Logika s&udblac;r&udblac;s&eacute;g</th><th>SRAM cella</th><th>Sk&aacute;l&aacute;z&aacute;si faktor</th></tr>
+      <tr><td><strong>130nm</strong> (Sky130)</td><td>~2.5 MTr/mm&sup2;</td><td>~1.0 &mu;m&sup2;</td><td>1&times;</td></tr>
+      <tr><td><strong>28nm</strong></td><td>~20 MTr/mm&sup2;</td><td>~0.12 &mu;m&sup2;</td><td>~8&times;</td></tr>
+      <tr><td><strong>7nm</strong></td><td>~91 MTr/mm&sup2;</td><td>~0.027 &mu;m&sup2;</td><td>~37&times;</td></tr>
+      <tr><td><strong>5nm</strong></td><td>~171 MTr/mm&sup2;</td><td>~0.021 &mu;m&sup2;</td><td>~48&times;</td></tr>
+    </table>
+
+    <h2>Core méret csomópontonként</h2>
+
+    <h3>A) N&ouml;vekv&odblac; SRAM &mdash; gazdagabb aktor, kevesebb core</h3>
+    <p>Ha a technol&oacute;gia fejl&odblac;d&eacute;s&eacute;vel az SRAM-ot is n&ouml;velj&uuml;k, minden core <strong>t&ouml;bb aktort, nagyobb working set-et, gazdagabb programokat</strong> futtathat:</p>
+    <table class="comparison-table">
+      <tr><th>Node</th><th>Core logika</th><th>SRAM/core</th><th>SRAM ter&uuml;let</th><th>Core &ouml;sszesen</th></tr>
+      <tr><td><strong>130nm</strong></td><td>0.80 mm&sup2;</td><td>16 KB</td><td>0.13 mm&sup2;</td><td><strong>~1.06 mm&sup2;</strong></td></tr>
+      <tr><td><strong>28nm</strong></td><td>0.10 mm&sup2;</td><td>64 KB</td><td>0.06 mm&sup2;</td><td><strong>~0.18 mm&sup2;</strong></td></tr>
+      <tr><td><strong>7nm</strong></td><td>0.022 mm&sup2;</td><td>256 KB</td><td>0.057 mm&sup2;</td><td><strong>~0.083 mm&sup2;</strong></td></tr>
+      <tr><td><strong>5nm</strong></td><td>0.012 mm&sup2;</td><td>512 KB</td><td>0.088 mm&sup2;</td><td><strong>~0.103 mm&sup2;</strong></td></tr>
+    </table>
+
+    <h3>B) Fix 256 KB SRAM &mdash; maxim&aacute;lis core sz&aacute;m</h3>
+    <p>Ha az SRAM-ot 256 KB-on tartjuk minden node-on, a felszabadul&oacute; ter&uuml;let <strong>t&ouml;bb core-t</strong> jelent &mdash; nagyobb p&aacute;rhuzamoss&aacute;g, t&ouml;bb egyidejű aktor:</p>
+    <table class="comparison-table">
+      <tr><th>Node</th><th>Core logika</th><th>SRAM/core</th><th>SRAM ter&uuml;let</th><th>Core &ouml;sszesen</th></tr>
+      <tr><td><strong>130nm</strong></td><td>0.80 mm&sup2;</td><td>256 KB</td><td>2.10 mm&sup2;</td><td><strong>~2.93 mm&sup2;</strong></td></tr>
+      <tr><td><strong>28nm</strong></td><td>0.10 mm&sup2;</td><td>256 KB</td><td>0.25 mm&sup2;</td><td><strong>~0.37 mm&sup2;</strong></td></tr>
+      <tr><td><strong>7nm</strong></td><td>0.022 mm&sup2;</td><td>256 KB</td><td>0.057 mm&sup2;</td><td><strong>~0.083 mm&sup2;</strong></td></tr>
+      <tr><td><strong>5nm</strong></td><td>0.012 mm&sup2;</td><td>256 KB</td><td>0.044 mm&sup2;</td><td><strong>~0.059 mm&sup2;</strong></td></tr>
+    </table>
+
+    <p>
+      A k&eacute;t strat&eacute;gia k&ouml;z&ouml;tt a <strong>workload d&ouml;nt</strong>: ha maxim&aacute;lis p&aacute;rhuzamoss&aacute;g kell (SNN, sok kis aktor), a fix 256 KB &eacute;s t&ouml;bb core a jobb v&aacute;laszt&aacute;s. Ha gazdagabb aktorok kellenek (ML inference, nagy objektumgr&aacute;fok), a n&ouml;vekv&odblac; SRAM &eacute;ri meg. A param&eacute;terezhet&odblac; RTL mindkettőt t&aacute;mogatja &mdash; a <code>SRAM_KB_PER_CORE</code> param&eacute;ter a gy&aacute;rt&aacute;skor &aacute;ll&iacute;that&oacute;.
+    </p>
+
+    <h2>H&aacute;ny core f&eacute;r a chipre?</h2>
+
+    <p>
+      Kihasználható terület = chipméret &times; 0.78 (levonva: I/O pad, Seal Core, crossbar-ok, routing csatornák, perifériák).
+    </p>
+
+    <h3>A) N&ouml;vekv&odblac; SRAM (16 KB &rarr; 512 KB)</h3>
+    <table class="comparison-table">
+      <tr><th>Node</th><th>SRAM/core</th><th>Core m&eacute;ret</th><th>100 mm&sup2;</th><th>400 mm&sup2;</th><th>800 mm&sup2;</th><th>1&nbsp;400 mm&sup2;</th></tr>
+      <tr><td><strong>130nm</strong></td><td>16 KB</td><td>1.06 mm&sup2;</td><td>74</td><td>294</td><td><strong>588</strong></td><td>1 030</td></tr>
+      <tr><td><strong>28nm</strong></td><td>64 KB</td><td>0.18 mm&sup2;</td><td>433</td><td>1 733</td><td><strong>3 467</strong></td><td>6 067</td></tr>
+      <tr><td><strong>7nm</strong></td><td>256 KB</td><td>0.083 mm&sup2;</td><td>940</td><td>3 759</td><td><strong>7 518</strong></td><td>13 157</td></tr>
+      <tr><td><strong>5nm</strong></td><td>512 KB</td><td>0.103 mm&sup2;</td><td>757</td><td>3 029</td><td><strong>6 058</strong></td><td>10 602</td></tr>
+    </table>
+
+    <h3>B) Fix 256 KB SRAM &mdash; maxim&aacute;lis p&aacute;rhuzamoss&aacute;g</h3>
+    <table class="comparison-table">
+      <tr><th>Node</th><th>SRAM/core</th><th>Core m&eacute;ret</th><th>100 mm&sup2;</th><th>400 mm&sup2;</th><th>800 mm&sup2;</th><th>1&nbsp;400 mm&sup2;</th></tr>
+      <tr><td><strong>130nm</strong></td><td>256 KB</td><td>2.93 mm&sup2;</td><td>27</td><td>107</td><td><strong>213</strong></td><td>373</td></tr>
+      <tr><td><strong>28nm</strong></td><td>256 KB</td><td>0.37 mm&sup2;</td><td>211</td><td>843</td><td><strong>1 686</strong></td><td>2 951</td></tr>
+      <tr><td><strong>7nm</strong></td><td>256 KB</td><td>0.083 mm&sup2;</td><td>940</td><td>3 759</td><td><strong>7 518</strong></td><td>13 157</td></tr>
+      <tr><td><strong>5nm</strong></td><td>256 KB</td><td>0.059 mm&sup2;</td><td>1 322</td><td>5 288</td><td><strong>10 576</strong></td><td>18 508</td></tr>
+    </table>
+
+    <p style="font-size:0.9rem;color:var(--text-dim);">Core sz&aacute;m (800 mm&sup2; die, fix 256 KB):</p>
+    <div class="bar-chart">
+      <div class="bar-row"><span class="bar-label">130nm</span><div class="bar-track"><div class="bar-fill" style="width:2%;background:linear-gradient(90deg,#2a4a2a,#3fb950);">213</div></div></div>
+      <div class="bar-row"><span class="bar-label">28nm</span><div class="bar-track"><div class="bar-fill" style="width:16%;background:linear-gradient(90deg,#1a3a5a,#58a6ff);">1 686</div></div></div>
+      <div class="bar-row"><span class="bar-label">7nm</span><div class="bar-track"><div class="bar-fill" style="width:71%;background:linear-gradient(90deg,#3a1a5a,#a371f7);">7 518</div></div></div>
+      <div class="bar-row"><span class="bar-label">5nm</span><div class="bar-track"><div class="bar-fill" style="width:100%;background:linear-gradient(90deg,#5a1a2a,#f85149);">10 576</div></div></div>
+    </div>
+
+    <div class="highlight-box">
+      <strong>5nm-en a 256 KB v&aacute;ltozat ~75%-kal t&ouml;bb core-t</strong> ad, mint az 512 KB (10 576 vs 6 058). A d&ouml;nt&eacute;s a workload-t&oacute;l f&uuml;gg: maxim&aacute;lis p&aacute;rhuzamoss&aacute;g (SNN, sok kis aktor) &rarr; 256 KB. Gazdagabb aktorok (ML, nagy objektumok) &rarr; 512 KB. Az RTL param&eacute;terezhet&odblac;.
+    </div>
+
+    <h2>A hierarchia alkalmazkodik</h2>
+
+    <p>
+      A 4-szint&udblac; architekt&uacute;ra nem merev &mdash; a szintek sz&aacute;ma a core sz&aacute;mb&oacute;l k&ouml;vetkezik:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Core sz&aacute;m</th><th>Szintek</th><th>Konfigur&aacute;ci&oacute;</th></tr>
+      <tr><td>&lt; 256</td><td><strong>2</strong> (mesh + 1 crossbar)</td><td>IoT, Secure Element</td></tr>
+      <tr><td>256 &ndash; 2 000</td><td><strong>3</strong> (mesh + 2 crossbar)</td><td>Edge, mikrokontroller</td></tr>
+      <tr><td>2 000 &ndash; 20 000</td><td><strong>4</strong> (mesh + 3 crossbar)</td><td>Sz&aacute;m&iacute;t&aacute;si c&eacute;l</td></tr>
+      <tr><td>20 000+</td><td><strong>4-5</strong></td><td>Wafer-scale</td></tr>
+    </table>
+
+    <h2>&Ouml;t core t&iacute;pus</h2>
+
+<p>A CFPU nem egyf&eacute;le core-t gy&aacute;rt &mdash; &ouml;t core t&iacute;pus l&eacute;tezik, &eacute;s a v&aacute;laszt&aacute;s az alkalmaz&aacute;si ter&uuml;lettől f&uuml;gg:</p>
+
+<table class="comparison-table">
+  <tr><th>Core</th><th>ISA</th><th>FPU</th><th>GC + Obj.</th><th>SRAM</th><th>Szerep</th></tr>
+  <tr><td><strong>Nano</strong></td><td>CIL-T0 (48 opk&oacute;d)</td><td>Nincs</td><td>Nincs</td><td>4-64 KB</td><td>Spike, szenzor, egyszerű aktor</td></tr>
+  <tr><td><strong>Actor</strong></td><td>Teljes CIL</td><td>Nincs</td><td><strong>Van</strong></td><td>64-256 KB</td><td>Aktor-nat&iacute;v: objektumok, GC, kiv&eacute;telek</td></tr>
+  <tr><td><strong>Rich</strong></td><td>Teljes CIL + FPU</td><td><strong>Van</strong></td><td><strong>Van</strong></td><td>128-512 KB</td><td>ML inference, FP-ig&eacute;nyes</td></tr>
+  <tr><td><strong>Matrix</strong></td><td>CIL-T0 + FP</td><td><strong>Van</strong> + 4&times;4 MAC + SFU (power-gated)</td><td>&mdash;</td><td>4-64 KB</td><td>ML inference, SNN neuron modellek &mdash; nincs GC, nincs objektummodell</td></tr>
+  <tr><td><strong>Seal</strong></td><td>AuthCode, hash</td><td>Crypto HW</td><td>&mdash;</td><td>~32 KB</td><td>K&oacute;d hiteles&iacute;t&eacute;s &mdash; mindig 1 db</td></tr>
+</table>
+
+<h3>Core sz&aacute;m &ouml;sszehasonl&iacute;t&aacute;s (7nm, 800 mm&sup2;)</h3>
+
+<table class="comparison-table">
+  <tr><th>Core + SRAM</th><th>Node m&eacute;ret</th><th>Core sz&aacute;m</th></tr>
+  <tr><td>Nano + 4 KB</td><td>0.025 mm&sup2;</td><td><strong>~32 000</strong></td></tr>
+  <tr><td>Actor + 64 KB</td><td>0.047 mm&sup2;</td><td><strong>~17 000</strong></td></tr>
+  <tr><td>Rich + 256 KB</td><td>0.097 mm&sup2;</td><td><strong>~8 250</strong></td></tr>
+  <tr><td><strong>Matrix Turbo + 8 KB</strong></td><td><strong>0.039 mm&sup2;</strong></td><td><strong>~20 500</strong></td></tr>
+  <tr><td><strong>Matrix Systolic + 8 KB</strong></td><td><strong>0.033 mm&sup2;</strong></td><td><strong>~24 200</strong></td></tr>
+</table>
+
+<p>A <strong>Matrix Core optim&aacute;lis SRAM-ja 8 KB</strong> &mdash; a MAC array streaming m&oacute;dban dolgozik, a h&aacute;l&oacute;zat t&aacute;pl&aacute;lja adattal. 8 KB-ban a k&oacute;d + stack + MAC buffer k&eacute;nyelmesen elf&eacute;r, &eacute;s marad ~2 KB lok&aacute;lis cache. A node m&eacute;retek tartalmazz&aacute;k az L0 router ter&uuml;letet &eacute;s az L1&ndash;L3 infrastrukt&uacute;ra per-core r&eacute;sz&eacute;t (~0,007 mm&sup2;). A Systolic router vari&aacute;ns +18%-kal t&ouml;bb Matrix core-t tesz lehető&eacute;.</p>
+
+<h3>CFPU term&eacute;kcsalád</h3>
+
+<table class="comparison-table">
+  <tr><th>Variáns</th><th>Seal</th><th>Core-ok</th><th>C&eacute;lpiac</th></tr>
+  <tr><td><strong>CFPU-N</strong></td><td>1 Seal</td><td>Nano only</td><td>IoT, massz&iacute;v SNN</td></tr>
+  <tr><td><strong>CFPU-A</strong></td><td>1 Seal</td><td>Actor only</td><td>Actor cluster, stream</td></tr>
+  <tr><td><strong>CFPU-R</strong></td><td>1 Seal</td><td>Rich only</td><td>ML inference, FP</td></tr>
+  <tr><td><strong>CFPU-ML</strong></td><td>1 Seal</td><td>Matrix + Actor</td><td>ML/SNN optimalizált</td></tr>
+  <tr><td><strong>CFPU-H</strong></td><td>1 Seal</td><td>Actor + Nano</td><td>Heterog&eacute;n supervisor+worker</td></tr>
+  <tr><td><strong>CFPU-X</strong></td><td>1 Seal</td><td>Vegyes (b&aacute;rmely kombin&aacute;ci&oacute;)</td><td>Alkalmaz&aacute;s-specifikus</td></tr>
+</table>
+
+<p>Ugyanaz az RTL, a <code>CORE_TYPE</code> param&eacute;ter hat&aacute;rozza meg a gy&aacute;rtott core t&iacute;pust. Heterog&eacute;n chipen egy chipen bel&uuml;l is t&ouml;bb t&iacute;pus lehet.</p>
+
+    <div class="highlight-box">
+      <strong>CFPU-ML (7nm, 800 mm&sup2;):</strong> ~19 500 Matrix Core (8 KB, Turbo) + ~1 000 Actor Core (64 KB) = <strong>~312 000 p&aacute;rhuzamos MAC egys&eacute;g</strong>, ~312 TOPS INT8 @ 500 MHz (elm&eacute;leti cs&uacute;cs&eacute;rt&eacute;k*). R&eacute;szletek: <a href="core-types.html">Core t&iacute;pusok blog</a>, <a href="cfpu-ml-max.html">CFPU-ML-Max blog</a>.<br><br>
+      <em style="font-size: 0.9em;">* Elm&eacute;leti cs&uacute;cs&eacute;rt&eacute;k: core sz&aacute;m &times; MAC egys&eacute;gek &times; &oacute;rajel alapj&aacute;n sz&aacute;molva. RTL szimul&aacute;ci&oacute; vagy szil&iacute;cium m&eacute;r&eacute;s m&eacute;g nem &aacute;ll rendelkez&eacute;sre. A val&oacute;s TDP jelent&odblac;sen magasabb lesz az aritmetikai becsl&eacute;sn&eacute;l.</em>
+    </div>
+
+    <h2>Node-specifikus konfigur&aacute;ci&oacute;k</h2>
+
+    <h3>130nm (Sky130) &mdash; az első szil&iacute;cium</h3>
+<pre>L0: 16 core, 4&times;4 mesh, 16 KB SRAM/core
+L1: 6 cluster, 6&times;6 crossbar
+L2: 6 tile, 6&times;6 crossbar + Seal Core
+
+16 &times; 6 &times; 6 = 576 Rich Core
+&Ouml;ssz SRAM: 9 MB</pre>
+    <p>Ez a &bdquo;kis CFPU&rdquo; &mdash; az első val&oacute;di szil&iacute;cium, ahol a teljes hierarchia &eacute;s a Seal Core <strong>m&aacute;r jelen van</strong>, csak kisebb sk&aacute;l&aacute;n. Az RTL <strong>ugyanaz</strong>, mint a k&eacute;sőbbi chipeken.</p>
+
+    <h3>28nm &mdash; kereskedelmi c&eacute;l&uacute;</h3>
+<pre>L0: 16 core, 4&times;4 mesh, 64 KB SRAM/core
+L1: 6 cluster, 6&times;6 crossbar
+L2: 6 tile, 6&times;6 crossbar
+L3: 6 r&eacute;gi&oacute;, 6&times;6 crossbar + Seal Core
+
+16 &times; 6 &times; 6 &times; 6 = 3 456 Rich Core
+&Ouml;ssz SRAM: 216 MB</pre>
+
+    <h3>7nm &mdash; nagy teljes&iacute;tm&eacute;ny</h3>
+<pre>L0: 16 core, 4&times;4 mesh, 256 KB SRAM/core
+L1: 8 cluster, 8&times;8 crossbar
+L2: 8 tile, 8&times;8 crossbar
+L3: 8 r&eacute;gi&oacute;, 8&times;8 crossbar + Seal Core
+
+16 &times; 8 &times; 8 &times; 8 = 8 192 Rich Core
+&Ouml;ssz SRAM: 2 GB</pre>
+
+    <h3>5nm &mdash; c&eacute;l konfigur&aacute;ci&oacute; (800 mm&sup2;, 256 KB SRAM)</h3>
+<pre>L0: 16 core, 4&times;4 mesh, 256 KB SRAM/core
+L1: 8 cluster, 8&times;8 crossbar
+L2: 8 tile, 8&times;8 crossbar
+L3: 10 r&eacute;gi&oacute;, 10&times;10 crossbar + Seal Core
+
+16 &times; 8 &times; 8 &times; 10 = 10 240 Rich Core
+&Ouml;ssz SRAM: 2.5 GB
+
+(1 400 mm&sup2;-es die-on: 18 r&eacute;gi&oacute;, 18 432 core, 4.5/9.2 GB SRAM)</pre>
+
+    <h2>A latencia &aacute;lland&oacute; marad</h2>
+
+    <p>
+      A worst-case latencia <strong>~99&ndash;139 ciklus tartom&aacute;nyban</strong> mozog a node-t&oacute;l &eacute;s a hierarchia m&eacute;lys&eacute;g&eacute;t&odblac;l f&uuml;gg&odblac;en. 7nm-en a cross-r&eacute;gi&oacute; worst-case ~139 ciklus (~278 ns @ 500 MHz). A kontextus: ez versenyképes a szoftveres aktor &uuml;zenetk&uuml;ld&eacute;ssel (Erlang/BEAM: ~0,5&ndash;2 &micro;s).
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Node</th><th>Core sz&aacute;m (800 mm&sup2;)</th><th>SRAM/core</th><th>Szintek</th><th>L0 cluster m&eacute;ret</th><th>Worst-case latencia</th></tr>
+      <tr><td><strong>130nm</strong></td><td>576</td><td>16 KB</td><td>2</td><td>~5.3 mm</td><td><strong>~99 cyc</strong></td></tr>
+      <tr><td><strong>28nm</strong></td><td>3 456</td><td>64 KB</td><td>3</td><td>~2.7 mm</td><td><strong>~119 cyc</strong></td></tr>
+      <tr><td><strong>7nm</strong></td><td>8 192</td><td>256 KB</td><td>4</td><td>~1.4 mm</td><td><strong>~139 cyc</strong></td></tr>
+      <tr><td><strong>5nm</strong></td><td>10 240</td><td>256 KB</td><td>4</td><td>~1.1 mm</td><td><strong>~139 cyc</strong></td></tr>
+    </table>
+
+    <div class="highlight-box">
+      <strong>Ugyanaz az RTL, 130nm-t&odblac;l 5nm-ig.</strong> A 130nm-es 576 core-os első szil&iacute;cium pontosan ugyanazt a k&oacute;dot futtatja, mint az 5nm-es 10 000+ core-os &mdash; csak a param&eacute;terek m&aacute;sok. Az F3-on valid&aacute;lt router design F7-ig v&aacute;ltozatlan marad. A worst-case cross-r&eacute;gi&oacute; latencia ~139 ciklus (~278 ns @ 500 MHz), ami versenyképes a szoftveres aktor keretrendszerekkel.
+    </div>
+
+    <h2>A Seal Core mindig a k&ouml;z&eacute;pen</h2>
+
+    <p>
+      F&uuml;ggetlen&uuml;l a node-t&oacute;l &eacute;s a core sz&aacute;mt&oacute;l, a <strong>Seal Core mindig a chip geometriai k&ouml;zep&eacute;n</strong> van &mdash; az L3 crossbar-ral egybe&eacute;p&iacute;tve. Ez <strong>kommunik&aacute;ci&oacute;s topol&oacute;giai</strong> d&ouml;nt&eacute;s: a csillag k&ouml;z&eacute;ppontja minimaliz&aacute;lja a maxim&aacute;lis vezet&eacute;khosszt b&aacute;rmelyik r&eacute;gi&oacute;hoz, &eacute;s minden cross-r&eacute;gi&oacute; forgalom term&eacute;szetesen &aacute;thalad rajta &mdash; biztons&aacute;gi ellen&odblac;rz&eacute;s extra routing n&eacute;lk&uuml;l.
+    </p>
+
+    <p>
+      Minden chipv&aacute;ltozatban, 576 core-t&oacute;l 18 432-ig, <strong>ugyanaz a h&aacute;l&oacute;zati architekt&uacute;ra</strong>: a Seal Core design-b&oacute;l l&aacute;t minden cross-r&eacute;gi&oacute; forgalmat.
+    </p>
+
+    <div class="cta">
+      <h3>Ny&iacute;lt forr&aacute;sk&oacute;d</h3>
+      <p>Az eg&eacute;sz tervez&eacute;si folyamat, a sk&aacute;l&aacute;z&aacute;si modell &eacute;s a param&eacute;terezhet&odblac; RTL publikusan el&eacute;rhető.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="internet-on-chip.html">Blog &rarr; Internet on a Chip</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      A CFPU nem egy chip &mdash; hanem egy <strong>chipcsalád</strong>. Egy RTL, amely a technológiával együtt növekszik, a 130nm-es első szilíciumtól az 5nm-es 18 000+ magos célkonfigurációig.
+    </p>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

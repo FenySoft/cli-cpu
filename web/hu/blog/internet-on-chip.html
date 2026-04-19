@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Internet on a Chip — Hogyan terveztünk hálózatot 10 000+ processzormagnak — CLI-CPU Blog</title>
+  <meta name="description" content="Hogyan terveztünk packet-switched hálózatot 10 000+ Rich Core-nak egyetlen chipen belül. ATM-inspiráció, telefonközponti VOQ, iSLIP, store-and-forward deadlock-mentesség.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+      width: 100%;
+    }
+
+    header {
+      padding: 48px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    header .nav {
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f0f6fc;
+      line-height: 1.25;
+    }
+
+    header .subtitle {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--green);
+      margin-top: 12px;
+    }
+
+    header .meta {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      margin-top: 16px;
+      font-family: var(--mono);
+    }
+
+    article {
+      flex: 1;
+      padding: 48px 0;
+    }
+
+    article h2 {
+      font-family: var(--mono);
+      font-size: 1.3rem;
+      color: #f0f6fc;
+      margin-top: 48px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    article h2:first-child { margin-top: 0; }
+
+    article h3 {
+      font-size: 1.1rem;
+      color: #f0f6fc;
+      margin-top: 32px;
+      margin-bottom: 12px;
+    }
+
+    article p {
+      margin-bottom: 16px;
+      font-size: 1.02rem;
+    }
+
+    article blockquote {
+      border-left: 3px solid var(--green);
+      padding: 12px 20px;
+      margin: 24px 0;
+      background: var(--bg-card);
+      border-radius: 0 6px 6px 0;
+      font-style: italic;
+      color: var(--text);
+    }
+
+    article ul, article ol {
+      margin: 16px 0;
+      padding-left: 24px;
+    }
+
+    article li {
+      margin-bottom: 8px;
+      font-size: 1.02rem;
+    }
+
+    article strong { color: #f0f6fc; }
+
+    article code {
+      font-family: var(--mono);
+      background: var(--bg-card);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 24px 0;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th,
+    .comparison-table td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--bg-card);
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      color: #f0f6fc;
+    }
+
+    .comparison-table td { color: var(--text-dim); }
+
+    .highlight-box {
+      background: var(--bg-card);
+      border-left: 3px solid var(--accent);
+      padding: 16px 20px;
+      margin: 24px 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .highlight-box strong { color: var(--accent); }
+
+    .cta {
+      background: var(--bg-card);
+      border: 1px solid var(--green);
+      border-radius: 8px;
+      padding: 28px;
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta h3 {
+      font-family: var(--mono);
+      color: var(--green);
+      margin-bottom: 12px;
+    }
+
+    .cta p {
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+
+    .cta-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-dim);
+    }
+
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--accent); }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.5rem; }
+      header { padding: 32px 0 24px; }
+      article h2 { font-size: 1.1rem; }
+      .comparison-table { font-size: 0.8rem; }
+      .comparison-table th, .comparison-table td { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">Magyar</span>
+  <a href="../../en/blog/internet-on-chip.html" style="color:var(--text-dim);padding:4px 12px;margin-left:4px;">English</a>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>Internet on a Chip</h1>
+    <div class="subtitle">Hogyan tervezt&uuml;nk h&aacute;l&oacute;zatot 10&nbsp;000+ processzormagnak</div>
+    <div class="meta">2026. &aacute;prilis 18. &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <img src="../../img/blog/seal-core.png" alt="Seal Core — a CFPU chip biztonsági magja a chip közepén" style="width:100%;margin-bottom:40px;border-radius:8px;">
+
+    <h2>A k&eacute;rd&eacute;s, amire v&aacute;laszolnunk kellett</h2>
+
+    <p>
+      A Cognitive Fabric Processing Unit (CFPU) nem hagyom&aacute;nyos processzor. Nem egyetlen nagy, gyors magot &eacute;p&iacute;t&uuml;nk &mdash; hanem <strong>t&ouml;bb ezer kis, &ouml;n&aacute;ll&oacute; CIL-nat&iacute;v magot</strong>, amelyek &uuml;zenetekkel kommunik&aacute;lnak, nincs k&ouml;z&ouml;s mem&oacute;ri&aacute;juk, &eacute;s mindegyik a saj&aacute;t aktor-programj&aacute;t futtatja. Mint egy hardverbe &ouml;nt&ouml;tt Akka.NET cluster.
+    </p>
+
+    <p>
+      De amikor a <a href="https://github.com/FenySoft/NeuronOS">Neuron OS</a> fejleszt&eacute;se sor&aacute;n elkezdtük tervezni az oper&aacute;ci&oacute;s rendszert ehhez a chiphez, kider&uuml;lt: az architekt&uacute;ra dokumentumunk <strong>nem ad v&aacute;laszt</strong> arra a k&eacute;rd&eacute;sre, ami a legnagyobb kih&iacute;v&aacute;s.
+    </p>
+
+    <p>
+      <strong>Hogyan besz&eacute;lget egym&aacute;ssal 10&nbsp;000+ processzormag egyetlen chipen bel&uuml;l?</strong>
+    </p>
+
+    <h2>Amit a tank&ouml;nyv mond &mdash; &eacute;s amit nem</h2>
+
+    <p>
+      A Network-on-Chip (NoC) irodalom &eacute;vtizedek &oacute;ta ismeri az alapvető topol&oacute;gi&aacute;kat. Mindegyiket v&eacute;gigvizsg&aacute;ltuk 10&nbsp;000+ Rich Core / chip sk&aacute;l&aacute;n:
+    </p>
+
+    <p>
+      <strong>Flat mesh</strong> (2D r&aacute;cs) &mdash; a legegyszerűbb. Minden mag a n&eacute;gy szomsz&eacute;dj&aacute;val besz&eacute;l. A Cerebras wafer-scale chip is ezt haszn&aacute;lja. De 10&nbsp;000 magn&aacute;l a r&aacute;cs 100&times;100-as, a legt&aacute;volabbi magok <strong>~200 hop-ra</strong> vannak egym&aacute;st&oacute;l. Elfogadhatatlan latencia.
+    </p>
+
+    <p>
+      <strong>Fat tree</strong> (Clos h&aacute;l&oacute;zat) &mdash; az adatk&ouml;zpontok kedvence. B&aacute;rmely k&eacute;t pont <strong>~6 hop-ra</strong> van. A tiszta fat tree gy&ouml;k&eacute;r switch-e bottleneck &eacute;s single point of failure &mdash; de ezek megoldhat&oacute;k t&ouml;bb gy&ouml;k&eacute;rrel &eacute;s a szintek k&ouml;z&ouml;tti horizont&aacute;lis linkekkel. Csakhogy ha a fa szintjeit horizont&aacute;lisan &ouml;sszek&ouml;tj&uuml;k, a topol&oacute;gia <strong>konverg&aacute;l a hierarchikus mesh-hez</strong> &mdash; &eacute;s ott jobbat tudunk csin&aacute;lni.
+    </p>
+
+    <p>
+      <strong>3D torus</strong> &mdash; a Fugaku szuperg&eacute;p topol&oacute;gi&aacute;ja. A wrap-around linkek felezik az &aacute;tm&eacute;rőt, de a chip sz&eacute;l&eacute;tőt a m&aacute;sik sz&eacute;l&eacute;ig h&uacute;z&oacute;d&oacute; vezet&eacute;kek fizikailag probl&eacute;m&aacute;sak.
+    </p>
+
+    <p>
+      <strong>Dragonfly</strong> &mdash; a Frontier szuperg&eacute;p v&aacute;laszt&aacute;sa. Csoportokon bel&uuml;l all-to-all &ouml;sszek&ouml;t&eacute;s, csoportok k&ouml;z&ouml;tt ritk&aacute;bb linkek. Szupersz&aacute;m&iacute;t&oacute;g&eacute;pek k&ouml;z&ouml;tt kiv&aacute;l&oacute;. De <strong>chip-en bel&uuml;l az all-to-all vezet&eacute;kig&eacute;ny ~12&times; annyi</strong>, mint a mesh. Nem re&aacute;lis.
+    </p>
+
+    <p>Egyik sem volt meggyőző.</p>
+
+    <img src="../../img/blog/topology-comparison.svg" alt="Topológia összehasonlítás — mesh, fat tree, torus, dragonfly vs hierarchikus mesh" style="width:100%;margin:32px 0;border-radius:8px;">
+
+    <h2>A fordul&oacute;pont: a telekommunik&aacute;ci&oacute; m&aacute;r megoldotta</h2>
+
+    <p>
+      A megold&aacute;s nem a chip-tervez&eacute;s, hanem a <strong>telekommunik&aacute;ci&oacute;</strong> felől j&ouml;tt.
+    </p>
+
+    <p>
+      Az ATM (Asynchronous Transfer Mode) h&aacute;l&oacute;zatok az 1990-es &eacute;vekben egy egyszerű, de m&eacute;ly felismer&eacute;sre &eacute;p&uuml;ltek:
+    </p>
+
+    <blockquote>
+      Ha minden csomag azonos m&eacute;retű, a kapcsol&oacute; hardver drasztikusan egyszerűs&ouml;dik.
+    </blockquote>
+
+    <p>
+      Az ATM 53 byte-os fix cell&aacute;kat haszn&aacute;lt. Mi 64 byte hasznos adatot v&aacute;lasztottunk (16 byte header + 64 byte payload = 80 byte) &mdash; de az elv ugyanaz. Fix cella = determinisztikus időz&iacute;t&eacute;s = egyszerű hardver = kevesebb tranzisztor = <strong>t&ouml;bb processzormag f&eacute;r a chipre</strong>.
+    </p>
+
+    <p>
+      Azt&aacute;n j&ouml;tt a m&aacute;sodik felismer&eacute;s a telefonk&ouml;zpontokb&oacute;l: a <strong>Virtual Output Queuing (VOQ)</strong>. A hagyom&aacute;nyos router-ben, ha egy csomag blokkolva van, m&ouml;g&ouml;tte minden m&aacute;s is &aacute;ll &mdash; ezt h&iacute;vj&aacute;k Head-of-Line (HOL) blocking-nak. A VOQ minden kimenő port fel&eacute; k&uuml;l&ouml;n sort tart. Ha az A port fel&eacute; blokkolva vagyunk, a B port fel&eacute; menő csomagok <strong>zavartalanul haladnak tov&aacute;bb</strong>. Ez egyetlen l&eacute;p&eacute;sben ~58%-r&oacute;l <strong>~99%-ra emeli a throughput-ot</strong>.
+    </p>
+
+    <p>
+      A harmadik elem: az <strong>iSLIP scheduler</strong> (Nick McKeown, Stanford, 1999). Minden ciklusban maxim&aacute;lis sz&aacute;m&uacute; p&aacute;rhuzamos &aacute;tvitelt &uuml;temez, round-robin fairness-szel, <strong>egyetlen &oacute;rajelciklus</strong> alatt. ~3&nbsp;000 gate &mdash; eleny&eacute;sző k&ouml;lts&eacute;g.
+    </p>
+
+    <h2>A deadlock, ami nem létezik</h2>
+
+    <p>
+      A chip-beli h&aacute;l&oacute;zatok egyik legnagyobb r&eacute;me a <strong>deadlock</strong> &mdash; amikor a csomagok k&ouml;rk&ouml;r&ouml;sen egym&aacute;sra v&aacute;rnak, &eacute;s az eg&eacute;sz rendszer lefagy. A hagyom&aacute;nyos megold&aacute;s: bonyolult routing korl&aacute;tok, Virtual Channel-ek, form&aacute;lis bizony&iacute;t&aacute;sok.
+    </p>
+
+    <p>A mi rendszer&uuml;nkben a deadlock <strong>nem l&eacute;tezik</strong>. Nem megoldottuk &mdash; megsz&uuml;ntett&uuml;k.</p>
+
+    <p>
+      A CFPU <strong>hibrid switching</strong> modellt haszn&aacute;l, szintenk&eacute;nt optimaliz&aacute;lva. Az <strong>L0 mesh-en wormhole routing</strong> fut: a header flit azonnal tov&aacute;bb&iacute;t&oacute;dik, a body flitek pipeline-ban k&ouml;vetik. Az <strong>XY dimension-ordered routing</strong> (Dally &amp; Seitz, 1987) teljes rendez&eacute;st hoz l&eacute;tre a csatorn&aacute;kon &mdash; ciklikus f&uuml;gg&odblac;s&eacute;g nem alakulhat ki.
+    </p>
+
+    <p>
+      Az <strong>L1&ndash;L3 crossbar-okon Virtual Cut-Through (VCT)</strong>: a cella teljesen be&eacute;rkezik az input bufferbe a switching el&odblac;tt. Nincs l&aacute;ncos buffer-foglal&aacute;s a hop-ok k&ouml;z&ouml;tt. A VOQ megakad&aacute;lyozza a HOL-blocking sz&eacute;tterjedését, a credit-based flow control a buffer t&uacute;lcsordulást.
+    </p>
+
+    <div class="highlight-box">
+      <strong>Wormhole (L0, XY routing) + VCT (L1&ndash;L3) + VOQ + credit-based flow control = deadlock-mentes by construction.</strong> Nem kell bizony&iacute;tani &mdash; a strukt&uacute;ra kiz&aacute;rja.
+    </div>
+
+    <img src="../../img/blog/deadlock-comparison.svg" alt="Wormhole routing deadlock-mentesség XY routing-gal" style="width:100%;margin:32px 0;border-radius:8px;">
+
+    <h2>A három döntési elv</h2>
+
+    <h3>1. Biztonság — nem alku tárgya</h3>
+    <p>
+      A CFPU shared-nothing architekt&uacute;r&aacute;ja nem teljes&iacute;tm&eacute;ny-optimaliz&aacute;ci&oacute; &mdash; <strong>biztons&aacute;gi garancia</strong>. Ha nincs k&ouml;z&ouml;s mem&oacute;ria, nincs pointer-manipul&aacute;ci&oacute;, nincs side-channel t&aacute;mad&aacute;s a szomsz&eacute;d mag adat&aacute;ra, nincs isolation-s&eacute;rt&eacute;s.
+    </p>
+    <p>
+      Minden javaslat, ami k&ouml;z&ouml;s mem&oacute;ri&aacute;t vezetne be &mdash; legyen az chip-szintű cell pool, zero-copy pointer sharing, vagy shared buffer &mdash; <strong>automatikusan kiesik</strong>. A magok m&aacute;sol&aacute;ssal k&uuml;ldenek &uuml;zenetet, nem pointer-&aacute;tad&aacute;ssal. Ez lassabb? Igen. De biztons&aacute;gos.
+    </p>
+
+    <h3>2. Core szám — a számítási teljesítmény</h3>
+    <p>
+      Minden gate, amit a routerre k&ouml;lt&uuml;nk, az egy processzormagb&oacute;l hi&aacute;nyzik. Az interconnect h&aacute;l&oacute;zat &bdquo;intelligensebb&eacute;&rdquo; t&eacute;tele n&ouml;veli a router m&eacute;retet &mdash; &eacute;s cs&ouml;kkenti a magok sz&aacute;m&aacute;t.
+    </p>
+    <p>
+      A sz&aacute;m&iacute;t&aacute;s egyszerű: egy adapt&iacute;v router-rel ~9&nbsp;700 mag f&eacute;r a chipre, XY routing-gal ~10&nbsp;500. Az adapt&iacute;v routing jav&iacute;tja a latenci&aacute;t, de a 800 elvesztett mag <strong>t&ouml;bb sz&aacute;m&iacute;t&aacute;si kapacit&aacute;st jelent</strong>, mint amennyit a jobb latencia visszaad.
+    </p>
+
+    <h3>3. Üzenet sebesség — de egyszerűen</h3>
+    <p>
+      A h&aacute;l&oacute;zatnak gyorsnak kell lennie &mdash; de nem &bdquo;okosnak&rdquo;. Az okos router nagy, a nagy router kevesebb magot hagy. A megold&aacute;s: <strong>egyszerű, de bizony&iacute;tottan hat&eacute;kony</strong> technik&aacute;k a telekommunik&aacute;ci&oacute;b&oacute;l.
+    </p>
+
+    <h2>A v&eacute;gső architekt&uacute;ra</h2>
+
+    <p>A v&eacute;gső tervez&eacute;si d&ouml;nt&eacute;s k&eacute;t kulcsfelismer&eacute;sb&odblac;l sz&uuml;letett. Az első: <strong>a mesh a core szinten optim&aacute;lis</strong> (fizikailag szomsz&eacute;dos, r&ouml;vid vezet&eacute;kek), de a felsőbb szinteken a <strong>crossbar hat&eacute;konyabb</strong> &mdash; determinisztikus 1 hop, kis portszám (8-12), telefonk&ouml;zponti VOQ+iSLIP. A m&aacute;sodik: a <strong>Seal Core a chip k&ouml;zep&eacute;n</strong>, az L3 crossbar-ral egybe&eacute;p&iacute;tve, minden cross-r&eacute;gi&oacute; forgalom term&eacute;szetesen &aacute;thalad rajta &mdash; biztons&aacute;gi ellen&odblac;rz&eacute;s extra routing n&eacute;lk&uuml;l.</p>
+
+<pre>10 000+ Rich Core / chip (param&eacute;terezhet&odblac;, chipmérethez igazodik)
+
+4 szintű hierarchia:
+  L3: Chip ── 8 r&eacute;gi&oacute;, csillag topol&oacute;gia, k&ouml;z&eacute;pen Seal Core + crossbar
+   └── L2: R&eacute;gi&oacute; ── 8 tile, 8&times;8 crossbar (r&eacute;gi&oacute; k&ouml;zepe), soros link
+        └── L1: Tile ── 8 cluster, 8&times;8 crossbar (tile k&ouml;zepe)
+             └── L0: Cluster ── 16 Rich Core, 4&times;4 mesh
+
+16 &times; 8 &times; 8 &times; 8 = 8 192 core (refer. konfigur&aacute;ci&oacute;, 7nm, 800 mm&sup2;)</pre>
+
+    <p>Minden crossbar a saj&aacute;t szintj&eacute;nek <strong>geometriai k&ouml;zep&eacute;n</strong> van &mdash; &iacute;gy minden porthoz egyforma max t&aacute;vols&aacute;g, fair &eacute;s determinisztikus latencia. Az L3 szinten <strong>csillag topol&oacute;gia</strong>: minden r&eacute;gi&oacute; k&ouml;zvetlen&uuml;l a k&ouml;zponti Seal Core + crossbar-hoz csatlakozik &mdash; cross-r&eacute;gi&oacute; forgalom mindig pontosan <strong>2 hop</strong>.</p>
+
+    <table class="comparison-table">
+      <tr><th>Szint</th><th>Topol&oacute;gia</th><th>Portok</th><th>Link t&iacute;pus</th><th>Mi&eacute;rt?</th></tr>
+      <tr><td>L0: Core</td><td><strong>4&times;4 mesh</strong></td><td>16</td><td>P&aacute;rhuzamos</td><td>Fizikailag szomsz&eacute;dos, r&ouml;vid vezet&eacute;kek</td></tr>
+      <tr><td>L1: Cluster</td><td><strong>8&times;8 crossbar</strong></td><td>8</td><td>P&aacute;rhuzamos</td><td>Kev&eacute;s port, fix 1 hop, VOQ+iSLIP</td></tr>
+      <tr><td>L2: Tile</td><td><strong>8&times;8 crossbar</strong></td><td>8</td><td>Soros 10&times;</td><td>K&ouml;zepes t&aacute;vols&aacute;g, soros link</td></tr>
+      <tr><td>L3: R&eacute;gi&oacute;</td><td><strong>Csillag (Seal Core k&ouml;z&eacute;p)</strong></td><td>8</td><td>Soros 10&times;</td><td>Seal Core l&aacute;t minden forgalmat</td></tr>
+    </table>
+
+    <table class="comparison-table">
+      <tr><th>Elem</th><th>V&aacute;laszt&aacute;s</th><th>Eredet</th></tr>
+      <tr><td>Cella</td><td><strong>16 + 64 byte fix (80 B)</strong></td><td>ATM (1985)</td></tr>
+      <tr><td>Buffer</td><td><strong>Virtual Output Queuing</strong></td><td>Telefonk&ouml;zpont (1990-es &eacute;vek)</td></tr>
+      <tr><td>Scheduler</td><td><strong>iSLIP</strong></td><td>Stanford (1999)</td></tr>
+      <tr><td>Flow control</td><td><strong>Credit-based</strong></td><td>Telefonk&ouml;zpont</td></tr>
+      <tr><td>Routing</td><td><strong>XY (L0 mesh) + crossbar (L1-L3)</strong></td><td>NoC + telekommunik&aacute;ci&oacute;</td></tr>
+      <tr><td>Kapcsol&aacute;s</td><td><strong>Wormhole (L0) + VCT (L1&ndash;L3)</strong></td><td>NoC + telefonk&ouml;zpont</td></tr>
+    </table>
+
+    <div class="highlight-box">
+      <strong>Router m&eacute;ret:</strong> Turbo ~26 000 GE (0,007 mm&sup2;), Compact ~14 500 GE (0,004 mm&sup2;) &mdash; core t&iacute;pust&oacute;l f&uuml;gg&odblac;.<br>
+      <strong>Throughput:</strong> ~98% (Turbo, VOQ + iSLIP), ~75% (Compact).<br>
+      <strong>Max hop:</strong> 18 (worst-case, cross-r&eacute;gi&oacute;).<br>
+      <strong>Max latencia:</strong> ~139 ciklus worst-case (~278 ns @ 500 MHz).<br>
+      <strong>Deadlock:</strong> lehetetlen (Wormhole + XY + VCT + VOQ + credit).<br>
+      <strong>Seal Core:</strong> chip k&ouml;zepe, l&aacute;t minden cross-r&eacute;gi&oacute; forgalmat.<br>
+      <strong>Biztons&aacute;gi kompromisszum:</strong> nulla.
+    </div>
+
+    <img src="../../img/blog/router-internals.svg" alt="Router belső felépítés — VOQ, iSLIP, Crossbar, Credit" style="width:100%;margin:32px 0;border-radius:8px;">
+
+    <h2>Mit tanultunk?</h2>
+
+    <p>
+      Az <strong>NVIDIA GPU</strong>-b&oacute;l tanultuk a hierarchikus aggreg&aacute;l&aacute;st &mdash; 24&nbsp;000 CUDA core-juk egyetlen 12-port&uacute; crossbar-on osztozik. Mi is ezt csin&aacute;ljuk: 10&nbsp;000+ mag, de a chip-szintű mesh csak 16 port&uacute;.
+    </p>
+    <p>
+      Az <strong>Apple M-sorozat</strong>b&oacute;l tanultuk a cluster-alap&uacute; szervez&eacute;st &eacute;s a f&uuml;ggetlen power domain-eket &mdash; alv&oacute; cluster = nulla fogyaszt&aacute;s.
+    </p>
+    <p>
+      A <strong>telefonk&ouml;zpontok</strong>b&oacute;l tanultuk a VOQ-t, az iSLIP-et, &eacute;s a store-and-forward deadlock-mentess&eacute;get. Ezek a technik&aacute;k &eacute;vtizedek &oacute;ta bizony&iacute;tottak milli&oacute;s port-sz&aacute;m&uacute; rendszerekben.
+    </p>
+
+    <h3>Amit elvetettünk</h3>
+    <ul>
+      <li><strong>Zero-copy / shared memory</strong> &mdash; biztons&aacute;gi r&eacute;s</li>
+      <li><strong>Adapt&iacute;v routing</strong> &mdash; nem &eacute;ri meg a core-veszt&eacute;st</li>
+      <li><strong>In-network computation</strong> &mdash; 44% router ter&uuml;let, a magok fele eltűnik</li>
+      <li><strong>Fat tree</strong> &mdash; horizont&aacute;lis linkekkel konverg&aacute;l a hierarchikus mesh-hez; a crossbar-os megold&aacute;s jobb</li>
+      <li><strong>Dragonfly</strong> &mdash; on-chip all-to-all vezet&eacute;kig&eacute;ny irre&aacute;lis</li>
+    </ul>
+
+    <h3>A Seal Core nem bottleneck</h3>
+    <p>
+      A Seal Core k&eacute;t funkci&oacute;t l&aacute;t el: <strong>k&oacute;d hiteles&iacute;t&eacute;s</strong> (ritka, de neh&eacute;z) &eacute;s <strong>L3 crossbar routing</strong> (a crossbar &ouml;n&aacute;ll&oacute;an v&eacute;gzi, a crypto engine nem dolgozik rajta). Boot-kor ~256 ms az &ouml;sszes core k&oacute;dj&aacute;nak hiteles&iacute;t&eacute;se (8 192 core, 7nm). Runtime hot code loading: <strong>&lt;0.1% kihasznált&aacute;g</strong>. Az L3 crossbar ~25%-on &uuml;zemel 8k core-n&aacute;l &mdash; ~30 000 core-ig sk&aacute;l&aacute;z&oacute;dik szatur&aacute;ci&oacute; n&eacute;lk&uuml;l. Mind a Seal Core, mind az L3 crossbar <strong>power-gated</strong> &mdash; ha nincs cross-r&eacute;gi&oacute; forgalom &eacute;s nincs k&oacute;d bet&ouml;lt&eacute;s, a chip k&ouml;zep&eacute;n minden alszik.
+    </p>
+
+    <h3>A legmélyebb felismerés</h3>
+    <p>
+      A processzor-tervez&eacute;s &eacute;s a h&aacute;l&oacute;zat-tervez&eacute;s <strong>ugyanaz a probl&eacute;ma</strong> &mdash; sok f&uuml;ggetlen egys&eacute;g, amelyeknek gyorsan, megb&iacute;zhat&oacute;an, biztons&aacute;gosan kell kommunik&aacute;lniuk. A telekommunik&aacute;ci&oacute; ezt a probl&eacute;m&aacute;t <strong>&eacute;vtizedekkel ezelőtt megoldotta</strong>. Mi csak &aacute;t&uuml;ltett&uuml;k szil&iacute;ciumra.
+    </p>
+
+    <div class="cta">
+      <h3>Nyílt forráskód</h3>
+      <p>A CLI-CPU projekt teljes eg&eacute;sz&eacute;ben ny&iacute;lt forr&aacute;sk&oacute;d&uacute;. A teljes tervez&eacute;si folyamat, minden d&ouml;nt&eacute;s &eacute;s indokl&aacute;s publikusan el&eacute;rhető.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="https://github.com/FenySoft/NeuronOS">GitHub &rarr; NeuronOS</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      A CFPU nem hagyom&aacute;nyos processzor. Nem gyorsabb akar lenni egyetlen sz&aacute;lon &mdash; hanem <strong>t&ouml;bb ezer sz&aacute;lat</strong> akar p&aacute;rhuzamosan, biztons&aacute;gosan, determinisztikusan futtatni. Az interconnect ennek a v&iacute;zi&oacute;nak az alapja.
+    </p>
+
+  </div>
+</article>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>
