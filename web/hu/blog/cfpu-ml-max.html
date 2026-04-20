@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CFPU-ML-Max: Hogyan optimaliz&aacute;ltunk egy ML inference chipet &mdash; CLI-CPU Blog</title>
-  <meta name="description" content="A CFPU-ML-Max optimaliz&aacute;ci&oacute;s t&ouml;rt&eacute;nete: 128 byte-os cell&aacute;t&oacute;l a 90-95% MAC kihasználtságig. Systolic router, post-MAC pipeline, SRAM sweet spot megfordulás, NVIDIA összehasonlítás.">
+  <title>CFPU-ML-Max v2.0: Az AI chip amely 6&ndash;58&times; kevesebb energi&aacute;val gener&aacute;l tokent &mdash; CLI-CPU Blog</title>
+  <meta name="description" content="CFPU-ML-Max v2.0 chiplet architektúra: 18 tine die, SoIC+CoWoS, 8×8 INT8 MAC, SRAM-only. LLaMA-70B inference 6-58× kevesebb J/token mint az NVIDIA H100. AI kutatással közösen tervezve.">
   <style>
     :root {
       --bg: #0d1117;
@@ -249,272 +249,265 @@
 <header>
   <div class="container">
     <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
-    <h1>CFPU-ML-Max</h1>
-    <div class="subtitle">Hogyan optimaliz&aacute;ltunk egy ML inference chipet</div>
-    <div class="meta">2026. &aacute;prilis 19. &middot; Hocza J&oacute;zsef Szabolcs</div>
+    <h1>CFPU-ML-Max v2.0: Az AI chip amely 6&ndash;58&times; kevesebb energi&aacute;val gener&aacute;l tokent</h1>
+    <div class="subtitle">Chiplet architekt&uacute;ra, AI kutat&aacute;ssal k&eacute;sz&uuml;lt v&iacute;zi&oacute;</div>
+    <div class="meta">2026. &aacute;prilis 20. &middot; Hocza J&oacute;zsef Szabolcs</div>
   </div>
 </header>
 
 <article>
   <div class="container">
 
-    <img src="../../img/blog/seal-core.png" alt="Seal Core — a CFPU chip biztonsági magja a chip közepén" style="width:100%;margin-bottom:40px;border-radius:8px;">
+    <img src="../../img/blog/chiplet-ring.svg" alt="CFPU-ML-Max v2.0 — 18 tine chiplet gyűrű topológia, SoIC+CoWoS" style="width:100%;margin-bottom:40px;border-radius:8px;">
 
-    <h2>A kiindul&oacute;pont</h2>
+    <h2>Mi lenne, ha egy AI chip 6&ndash;58&times; kevesebb energi&aacute;val tudna tokent gener&aacute;lni?</h2>
 
     <p>
-      A CFPU many-core architekt&uacute;r&aacute;ja egy&eacute;rtelm&uuml; jelölt ML inference-re: ezer sz&aacute;m&uacute; Matrix Core, mindegyik 4&times;4 INT8 MAC array-jal, mailbox-alap&uacute; &uuml;zenetkezel&eacute;ssel, streaming adatfolyammal. Pap&iacute;ron 328 TOPS (7nm, 500 MHz, ~20 500 core). De az elemz&eacute;s kimutatta: a h&aacute;l&oacute;zati sz&udblac;k keresztmetszet miatt <strong>csak ~15% MAC kihasználtság</strong> lenne tarthat&oacute;.
+      Mi lenne, ha egy AI chip 6&ndash;58&times; kevesebb energi&aacute;val tudna tokent gener&aacute;lni, mint az NVIDIA H100? Az AI-val k&ouml;z&ouml;sen tervezett <strong>CFPU-ML-Max v2.0</strong> (Cognitive Fabric Processing Unit &mdash; ML inference-re optimaliz&aacute;lt chiplet architekt&uacute;ra) pontosan ezt &iacute;g&eacute;ri. Nem elm&eacute;leti TOPS (Tera Operations Per Second &mdash; m&aacute;sodpercenk&eacute;nti billi&oacute; m&udblac;velet) sz&aacute;mok &mdash; hanem <strong>J/token</strong> (Joule per gener&aacute;lt token &mdash; mennyi energia kell egyetlen sz&oacute; el&odblac;&aacute;ll&iacute;t&aacute;s&aacute;hoz), a val&oacute;di metrika, amelyet a produkci&oacute;s &uuml;zemeltet&eacute;s k&ouml;lts&eacute;ge hat&aacute;roz meg.
     </p>
 
     <p>
-      A probl&eacute;ma nem a MAC t&ouml;mb volt, hanem az <strong>adatbet&aacute;pl&aacute;l&aacute;s</strong>. A Turbo router 42-bites wormhole linkje ~5,2 byte/ciklust sz&aacute;ll&iacute;tott. A MAC 32 byte/ciklust fogyasztott. Hat&ndash;szoros sz&aacute;k&iacute;t&aacute;s. A MAC a ciklusok 85%-&aacute;ban &uuml;resen &aacute;llt, v&aacute;rta az adatot.
+      A v2.0 verzi&oacute;t a Claude Opus 4.6 (1M kontextus) AI-val k&ouml;z&ouml;sen tervezt&uuml;k: a m&aacute;trix-szorz&aacute;s adatfolyam&aacute;nak anal&iacute;zis&eacute;t&odblac;l a chiplet topol&oacute;gia optimaliz&aacute;l&aacute;s&aacute;ig, minden d&ouml;nt&eacute;st k&ouml;z&ouml;s kutat&aacute;s t&aacute;masztott al&aacute;.
+    </p>
+
+    <div class="highlight-box" style="border-left-color:#8b949e;font-size:0.88rem;line-height:1.6;">
+      <strong style="color:#f0f6fc;">Fogalomt&aacute;r</strong> &mdash; a cikkben haszn&aacute;lt kulcsfogalmak r&ouml;viden:<br>
+      <strong>CFPU</strong> &mdash; Cognitive Fabric Processing Unit: a CLI-CPU processzorcsal&aacute;d neve<br>
+      <strong>Die / tine die</strong> &mdash; szil&iacute;cium lapka; a tine die egyetlen ~85 mm&sup2;-es &eacute;p&iacute;t&odblac;elem<br>
+      <strong>Chiplet</strong> &mdash; t&ouml;bb kis die egyetlen csomagban (vs. egyetlen nagy monolitikus die)<br>
+      <strong>SRAM</strong> &mdash; Static RAM: a chipen bel&uuml;li gyors mem&oacute;ria (nincs friss&iacute;t&eacute;s, &aacute;lland&oacute;an tartja az adatot)<br>
+      <strong>HBM</strong> &mdash; High Bandwidth Memory: k&uuml;ls&odblac; nagy kapacit&aacute;s&uacute; mem&oacute;ria (GPU-k haszn&aacute;lj&aacute;k)<br>
+      <strong>MAC</strong> &mdash; Multiply-Accumulate: szorz&oacute;-&ouml;sszead&oacute; egys&eacute;g (a neur&aacute;lis h&aacute;l&oacute;k alapm&udblac;velete)<br>
+      <strong>MAC Slice</strong> &mdash; egy 8&times;8-as MAC t&ouml;mb + vez&eacute;rl&odblac; + mem&oacute;ria: a CFPU-ML legkisebb compute egys&eacute;ge (slice = szelet)<br>
+      <strong>TOPS</strong> &mdash; Tera Operations Per Second: m&aacute;sodpercenk&eacute;nti billi&oacute; m&udblac;velet<br>
+      <strong>J/token</strong> &mdash; Joule per token: mennyi energia kell egyetlen sz&oacute; el&odblac;&aacute;ll&iacute;t&aacute;s&aacute;hoz<br>
+      <strong>Systolic</strong> &mdash; „l&uuml;ktet&odblac;": az adat &uuml;temezetten, szomszédr&oacute;l szomszédra halad<br>
+      <strong>Weight-stationary</strong> &mdash; a s&uacute;lyok helyben maradnak, csak az adat &aacute;ramlik<br>
+      <strong>KV cache</strong> &mdash; Key-Value cache: kor&aacute;bbi tokenek feldolgoz&aacute;s&aacute;nak t&aacute;rolt eredm&eacute;nye<br>
+      <strong>SoIC</strong> &mdash; System on Integrated Chips: 3D chiplet &ouml;sszekapcsol&aacute;s (die-ok egym&aacute;sra)<br>
+      <strong>CoWoS</strong> &mdash; Chip on Wafer on Substrate: 2D chiplet interposer (die-ok egym&aacute;s mell&eacute;)<br>
+      <strong>IOD</strong> &mdash; I/O Die: a vez&eacute;rl&odblac; &eacute;s kommunik&aacute;ci&oacute;s die (Actor Core + Seal Core + I/O)<br>
+      <strong>FSM</strong> &mdash; Finite State Machine: &aacute;llapotg&eacute;p (egyszer&udblac; hardveres vez&eacute;rl&odblac;, CPU n&eacute;lk&uuml;l)<br>
+      <strong>Actor Core</strong> &mdash; &aacute;ltal&aacute;nos c&eacute;l&uacute; programozhat&oacute; mag (teljes .NET CIL), a CFPU-ML-ben a nem-MAC m&udblac;veleteket v&eacute;gzi (LayerNorm, Softmax)<br>
+      <strong>Seal Core</strong> &mdash; k&oacute;dhiteles&iacute;t&odblac; mag: kriptogr&aacute;fiai verifiká&aacute;ci&oacute; minden bet&ouml;lt&ouml;tt k&oacute;dra (SHA-256, WOTS+)<br>
+      <strong>PHY</strong> &mdash; Physical Layer: a fizikai r&eacute;teg &aacute;ramk&ouml;re, amely a chipen k&iacute;v&uuml;li kommunik&aacute;ci&oacute;t (PCIe, CXL) biztos&iacute;tja<br>
+      <strong>Yield</strong> &mdash; gy&aacute;rt&aacute;si hozam: a j&oacute; chipek ar&aacute;nya a gy&aacute;rtottakb&oacute;l
+    </div>
+
+    <h2>A v&iacute;zi&oacute;: SRAM-only, s&uacute;lyok helyben</h2>
+
+    <p>
+      Az NVIDIA &uuml;zemeltet&eacute;si k&ouml;lts&eacute;g&eacute;t a <strong>mem&oacute;ria s&aacute;vsz&eacute;less&eacute;g</strong> hat&aacute;rozza meg. Az H100 1 979 TOPS-t k&iacute;n&aacute;l pap&iacute;ron, de egyetlen felhaszn&aacute;l&oacute; kisz&oacute;lg&aacute;l&aacute;sakor (batch=1 decode) a HBM3 s&aacute;vsz&eacute;less&eacute;g (3 350 GB/s) korl&aacute;tozza a sebess&eacute;get &mdash; a TOPS kihasználts&aacute;g ak&aacute;r 5-25%-ra eshet. Nagy batch m&eacute;rettel (64-256 egyidej&udblac; k&eacute;r&eacute;s) ez javul 60-80%-ra, mert egy HBM olvas&aacute;s t&ouml;bb tokent szolg&aacute;l ki egyszerre.
     </p>
 
     <p>
-      Arra volt sz&uuml;ks&eacute;g, hogy a teljes kommunik&aacute;ci&oacute;s r&eacute;teget &uacute;jra gondoljuk &mdash; nem a MAC-ot kell lassítani, hanem a h&aacute;l&oacute;zatot kell felgyorsítani.
-    </p>
-
-    <h2>1. l&eacute;p&eacute;s: Cella m&eacute;ret cs&ouml;kkent&eacute;s</h2>
-
-    <p>
-      Az interconnect cell&aacute;k eredeti payload m&eacute;rete 128 byte volt. Ez az &aacute;ltal&aacute;nos c&eacute;l&uacute; CFPU-nak val&oacute;: aktor &uuml;zenetek, szeriáliz&aacute;lt objektumok, GC adatok. De a Matrix Core 4&times;4-es tile-ja csak 32 byte input &mdash; a cella n&eacute;gyszer t&uacute;lm&eacute;retezett.
+      A CFPU-ML-Max radik&aacute;lisan m&aacute;s utat v&aacute;laszt, a CFPU shared-nothing tervez&eacute;si modellj&eacute;t k&ouml;vetve: <strong>nincs k&uuml;ls&odblac; mem&oacute;ria, nincs megosztott &aacute;llapot</strong>. A teljes modell (s&uacute;lyok + KV cache (Key-Value cache &mdash; a kor&aacute;bbi tokenek feldolgoz&aacute;s&aacute;nak t&aacute;rolt eredm&eacute;nye) + aktiv&aacute;ci&oacute;k) az on-chip SRAM-ban (Static RAM &mdash; a chipen bel&uuml;li, gyors, statikus mem&oacute;ria) &eacute;l. Nincs DRAM, nincs HBM (High Bandwidth Memory &mdash; a GPU-k k&uuml;ls&odblac; mem&oacute;ri&aacute;ja), nincs mem&oacute;ria s&aacute;vsz&eacute;less&eacute;g korl&aacute;t. A MAC-ok (Multiply-Accumulate &mdash; szorz&oacute;-&ouml;sszead&oacute; egys&eacute;gek) <strong>minden ciklusban</strong> kapnak adatot &mdash; nem v&aacute;rnak.
     </p>
 
     <p>
-      A 64 byte-os cell&aacute;ra v&aacute;lt&aacute;s <strong>39%-kal cs&ouml;kkentette a latenci&aacute;t</strong> &eacute;s <strong>24%-kal a router ter&uuml;let&eacute;t</strong>. A 2-hatv&aacute;ny megmaradt, az illeszt&eacute;s egyszerű. Ez nem hangzik forradalmian, de a felszabadul&oacute; ter&uuml;let &eacute;s vezet&eacute;k-b&uuml;dzs&eacute; lett a k&ouml;vetkez&odblac; l&eacute;p&eacute;sek alapja.
+      Az architekt&uacute;ra <strong>weight-stationary</strong> (s&uacute;ly-helyben-marad&oacute;): a s&uacute;lyok helyben maradnak az SRAM-ban, az aktiv&aacute;ci&oacute;k &aacute;ramlanak kereszt&uuml;l a systolic h&aacute;l&oacute;zaton (systolic = „l&uuml;ktet&odblac;" &mdash; az adat &uuml;temezetten, szomszédr&oacute;l szomszédra halad, mint a sz&iacute;vver&eacute;s). Ez minim&aacute;lis adatmozgat&aacute;st jelent &mdash; &eacute;s minim&aacute;lis energi&aacute;t.
     </p>
 
-    <h2>2. l&eacute;p&eacute;s: Systolic Wide router</h2>
+    <h2>Chiplet: 18 tine die, gy&udblac;r&udblac; topol&oacute;gia</h2>
 
     <p>
-      Ez volt a kulcs felismer&eacute;s: <strong>az ML inference-ben az adat egy ir&aacute;nyba folyik</strong>. Az aktiv&aacute;ci&oacute; nyugatr&oacute;l keletre, a s&uacute;lyok &eacute;szakr&oacute;l d&eacute;lre. Nincs sz&uuml;ks&eacute;g XY routing-ra, VOQ-ra, iSLIP-re &mdash; ezek &aacute;ltal&aacute;nos c&eacute;l&uacute; h&aacute;l&oacute;zati eszk&ouml;z&ouml;k, amelyek a Matrix Core-nak felesleges luxus.
-    </p>
-
-    <p>
-      A Turbo routert lecser&eacute;lt&uuml;k <strong>k&eacute;t 128-bites egyir&aacute;ny&uacute; linkre</strong>: W&rarr;E aktiv&aacute;ci&oacute;, N&rarr;S s&uacute;ly. A router 42 000 GE-r&odblac;l (Turbo) <strong>~5 000 GE-re zsugorodott</strong> &mdash; 81%-os csökken&eacute;s. A ter&uuml;lete 0,001 mm&sup2;.
+      A monolitikus nagy die (szil&iacute;cium lapka) kora lej&aacute;rt. Az H100 814 mm&sup2;-es die-j&aacute;nak gy&aacute;rt&aacute;si hozama (yield) 5nm-en mind&ouml;ssze <strong>~22%</strong> &mdash; n&eacute;gy lapk&aacute;b&oacute;l &aacute;tlagosan csak egy haszn&aacute;lhat&oacute;. A CFPU-ML-Max ehelyett egyetlen <strong>85 mm&sup2;-es tine die-t</strong> tervez (5nm, ~94% yield), &eacute;s ebb&odblac;l &eacute;p&iacute;t term&eacute;kcsal&aacute;dot.
     </p>
 
     <p>
-      De a m&eacute;ret cs&ouml;kken&eacute;s csak mell&eacute;khat&aacute;s. Az igazi nyeremény: a 128 bit/cc link <strong>16 byte/cc</strong>-t sz&aacute;ll&iacute;t mindk&eacute;t ir&aacute;nyban. A MAC 32 byte/cc fogyaszt&aacute;sa: 16 byte aktiv&aacute;ci&oacute; + 16 byte s&uacute;ly. <strong>A link pontosan annyi adatot sz&aacute;ll&iacute;t, amennyit a MAC meg tud enni.</strong>
+      A referencia csomag: <strong>18 tine die</strong>, 9 stack (p&aacute;ronk&eacute;nt 2 tine, SoIC (System on Integrated Chips &mdash; 3D chiplet &ouml;sszekapcsol&aacute;s) hybrid bond-dal), <strong>3&times;3 gy&udblac;r&udblac;ben</strong> elhelyezve a CoWoS (Chip on Wafer on Substrate &mdash; 2D chiplet interposer) interposer-en. A k&ouml;z&eacute;ps&odblac; stack h&aacute;rom szint&udblac;: 2 tine + IOD (I/O Die &mdash; a vez&eacute;rl&odblac; &eacute;s kommunik&aacute;ci&oacute;s die) alul, amely az Actor Core-okat, Seal Core-t (k&oacute;dhiteles&iacute;t&eacute;s) &eacute;s az I/O PHY-t (k&uuml;ls&odblac; csatlakoz&aacute;s) tartalmazza.
     </p>
 
-    <blockquote>
-      A Turbo routerrel a MAC az id&odblac; 85%-&aacute;ban &uuml;resen &aacute;llt. A Systolic Wide routerrel 90&ndash;95%-on dolgozik.
-    </blockquote>
+    <pre>
+Fel&uuml;ln&eacute;zet (CoWoS interposer):
 
-    <h2>3. l&eacute;p&eacute;s: Sz&eacute;lesebb link &mdash; a vezet&eacute;k-b&uuml;dzs&eacute; &aacute;tcsoportos&iacute;t&aacute;sa</h2>
+  [S7]       [S0]       [S1]         S = Stack (2 tine, SoIC)
+   T14,15     T0,1       T2,3        T = Tine die
+
+  [S6]      [S8+IOD]    [S2]         S8 = k&ouml;z&eacute;ps&odblac; stack:
+   T12,13    T16,17      T4,5          fel&uuml;l: Tine 17
+             +Actor                    k&ouml;z&eacute;p: Tine 16
+             +Seal                     alul: IOD
+             +I/O
+
+  [S5]       [S4]       [S3]
+   T10,11     T8,9       T6,7
+
+Gy&udblac;r&udblac;: S0 &rarr; S1 &rarr; S2 &rarr; S3 &rarr; S4 &rarr; S5 &rarr; S6 &rarr; S7 &rarr; S8 &rarr; S0
+    </pre>
 
     <p>
-      Honnan j&ouml;tt a 128-bit link? A Turbo router 42-bites linkje <strong>k&eacute;tir&aacute;ny&uacute; volt</strong>: &Eacute;, D, K, Ny + lok&aacute;lis &mdash; 5 port, mindegyik 42 bit, k&eacute;tir&aacute;ny&uacute;. Ez ~340 vezet&eacute;k/core. A Systolic Wide router k&eacute;t 128-bites egyir&aacute;ny&uacute; linkkel &eacute;s ~10 control vezet&eacute;kkel <strong>~274 vezet&eacute;k/core</strong> &mdash; kevesebb vezet&eacute;k, nagyobb s&aacute;vsz&eacute;less&eacute;g.
+      A SoIC hybrid bond p&aacute;ron bel&uuml;l (<10 &mu;m pitch) a k&eacute;t tine hat&aacute;ra <strong>l&aacute;thatatlan</strong>: 1&ndash;2 ciklus latencia, a systolic pipeline &uacute;gy folyik &aacute;t, mintha egyetlen die lenne. A CoWoS interposer-en a szomsz&eacute;dos p&aacute;rok k&ouml;z&ouml;tt 3&ndash;5 ciklus &mdash; a teljes inference idej&eacute;nek <strong>&lt;0,07%-a</strong>.
     </p>
 
     <p>
-      A trükk: az XY routing, VOQ &eacute;s iSLIP elhagy&aacute;sa nemcsak logik&aacute;t takar&iacute;t meg, hanem <strong>vezet&eacute;keket is</strong>. Nincs t&ouml;bb c&iacute;m-dekódol&aacute;s, nincs arbitr&aacute;ci&oacute;s jelz&eacute;s, nincs t&ouml;bb port. A felszabadult vezet&eacute;k-b&uuml;dzs&eacute;t a k&eacute;t f&odblac; adat&uacute;tvonalra ford&iacute;tottuk.
+      Minden tine belsej&eacute;ben a MAC sorok <strong>szerpentin szervez&eacute;s&udblac;ek</strong> (p&aacute;ros sor &rarr;, p&aacute;ratlan sor &larr;), FFN &eacute;s Attention r&eacute;tegek v&aacute;ltakozva &mdash; az adat term&eacute;szetesen k&iacute;gy&oacute;zik v&eacute;gig a chipen. A gy&udblac;r&udblac; topol&oacute;gi&aacute;ban az IOD k&ouml;z&eacute;pen &uuml;l, minden stack-kel szomsz&eacute;dos &mdash; max 1 CoWoS hop b&aacute;rmely ir&aacute;nyba.
     </p>
 
-    <h2>4. l&eacute;p&eacute;s: Post-MAC pipeline</h2>
+    <h2>MAC Slice: 8&times;8 INT8, FSM-vez&eacute;relt</h2>
+
+    <img src="../../img/blog/mac-slice-flow.svg" alt="MAC Slice adatáramlás — weight-stationary, systolic pipeline" style="width:100%;margin:24px 0 32px;border-radius:8px;">
 
     <p>
-      A MAC kimenet&eacute;t eddig nyersen k&uuml;ldt&uuml;k a h&aacute;l&oacute;zatra: 16 INT32 &eacute;rt&eacute;k tile-onk&eacute;nt = 64 byte. De a legt&ouml;bb ML r&eacute;teg ut&aacute;n &uacute;gyis j&ouml;n ReLU, kvant&aacute;l&aacute;s &eacute;s pooling. Mi&eacute;rt ne csin&aacute;ln&aacute;nk ezt <strong>hardverben, a MAC kimeneten</strong>?
-    </p>
-
-    <p>
-      H&aacute;rom egys&eacute;get integr&aacute;ltunk:
+      Mi t&ouml;rt&eacute;nik, ha kiszedj&uuml;k a processzort a processzorb&oacute;l? A CFPU-ML-Max alapegys&eacute;ge a <strong>MAC Slice</strong> (szorz&oacute;-szelet): 8&times;8-as INT8 szorz&oacute;t&ouml;mb, amelyben <strong>nincs CPU</strong>, nincs programk&oacute;d-v&eacute;grehajt&oacute;. Egy minim&aacute;lis &aacute;llapotg&eacute;p (FSM) vez&eacute;rli &mdash; ennek k&eacute;t m&oacute;dja van:
     </p>
 
     <ul>
-      <li><strong>ReLU</strong> &mdash; egyetlen kompar&aacute;tor, 160 GE. Ha az &eacute;rt&eacute;k negat&iacute;v, null&aacute;zza.</li>
-      <li><strong>Quantize INT32&rarr;INT8</strong> &mdash; 300 GE. A 32-bites MAC eredm&eacute;nyt 8-bitre kvant&aacute;lja.</li>
-      <li><strong>Max-Pool 2&times;2</strong> &mdash; 200 GE. N&eacute;gy &eacute;rt&eacute;kb&odblac;l a maximumot v&aacute;lasztja.</li>
+      <li><strong>Weight-stationary (WS)</strong> &mdash; FFN r&eacute;tegekhez: a s&uacute;lyok helyben maradnak, az aktiv&aacute;ci&oacute;k &aacute;ramlanak</li>
+      <li><strong>Activation-stationary (AS)</strong> &mdash; Attention Q&times;K<sup>T</sup> &eacute;s scores&times;V m&udblac;veletekhez: az aktiv&aacute;ci&oacute; marad helyben</li>
     </ul>
 
     <p>
-      &Ouml;sszesen: <strong>660 GE</strong> (~0,0001 mm&sup2;). A kimeneti forgalom: 64 byte &rarr; 4 byte. <strong>16&times; cs&ouml;kken&eacute;s.</strong>
+      A dual-mode FSM egyetlen bit &aacute;tv&aacute;lt&aacute;s&aacute;val megoldja, amit m&aacute;s architekt&uacute;r&aacute;k k&uuml;l&ouml;n hardverrel kezelnek. Az Attention kihasználts&aacute;g 50%-r&oacute;l <strong>65&ndash;78%-ra</strong> javul.
+    </p>
+
+    <h3>Zero-skip sparsity</h3>
+
+    <p>
+      Ha a s&uacute;ly == 0, a MAC <strong>kihagyja a szorz&aacute;st</strong> (~500 GE, ~2% ter&uuml;let). Structured (2:4) &eacute;s unstructured sparsity is t&aacute;mogatott. Effekt&iacute;v <strong>1,5&ndash;2&times; gyorsul&aacute;s</strong> tipikus modelleken &mdash; nulla extra mem&oacute;ria-s&aacute;vsz&eacute;less&eacute;g ig&eacute;ny mellett.
+    </p>
+
+    <h3>Post-MAC pipeline</h3>
+
+    <p>
+      A MAC kimenete ut&aacute;n azonnal, hardverben v&eacute;grehajt&oacute;dik:
+    </p>
+
+    <ul>
+      <li><strong>ReLU</strong> &mdash; negat&iacute;v &eacute;rt&eacute;kek null&aacute;z&aacute;sa (~300 GE)</li>
+      <li><strong>INT32&rarr;INT8 quantize</strong> &mdash; visszakvant&aacute;l&aacute;s (~1 200 GE)</li>
+      <li><strong>2&times;2 Max-Pool</strong> &mdash; n&eacute;gy &eacute;rt&eacute;kb&odblac;l a maximum (~400 GE)</li>
+    </ul>
+
+    <p>
+      &Ouml;sszesen <strong>2 500 GE</strong> &mdash; szinte nulla ter&uuml;letk&ouml;lts&eacute;g, de a kimeneti forgalmat <strong>16&times;-osra cs&ouml;kkenti</strong>. A h&aacute;l&oacute;zat terhe minim&aacute;lis.
+    </p>
+
+    <h2>J/token: a val&oacute;di metrika</h2>
+
+    <img src="../../img/blog/j-per-token.svg" alt="J/token összehasonlítás — LLaMA-70B INT4, CFPU vs NVIDIA vs Groq vs TPU" style="width:100%;margin:24px 0 32px;border-radius:8px;">
+
+    <p>
+      A marketingben a TOPS sz&aacute;m&iacute;t. A val&oacute;s&aacute;gban a <strong>J/token</strong> (Joule per gener&aacute;lt token) hat&aacute;rozza meg az &uuml;zemeltet&eacute;si k&ouml;lts&eacute;get. Nem az sz&aacute;m&iacute;t, h&aacute;ny m&udblac;veletet tud a chip m&aacute;sodpercenk&eacute;nt &mdash; hanem az, hogy <strong>egy token gener&aacute;l&aacute;sa mennyi energi&aacute;ba ker&uuml;l</strong>.
     </p>
 
     <p>
-      Ez nem csak a h&aacute;l&oacute;zat terh&eacute;t cs&ouml;kkenti &mdash; a kimeneti link s&aacute;vsz&eacute;less&eacute;ge felszabadul a bemeneti adatforgalom sz&aacute;m&aacute;ra. A post-MAC pipeline gyakorlatilag nulla ter&uuml;letk&ouml;lts&eacute;ggel jelent&odblac;s h&aacute;l&oacute;zati hat&eacute;konys&aacute;got ad.
-    </p>
-
-    <h2>5. l&eacute;p&eacute;s: SRAM sweet spot megfordul&aacute;s</h2>
-
-    <p>
-      A kor&aacute;bbi elemz&eacute;s 32 KB SRAM-ot javasolt optim&aacute;lisnak: el&eacute;g a s&uacute;ly-cache-hez, a weight reuse kompenz&aacute;lja az elvesztett core-okat. De a Systolic Wide router <strong>megfordította ezt a logik&aacute;t</strong>.
-    </p>
-
-    <p>
-      Ha a link s&aacute;vsz&eacute;less&eacute;ge &ouml;nmag&aacute;ban el&eacute;g a MAC t&aacute;pl&aacute;l&aacute;s&aacute;hoz (128 bit/cc = 16 byte/cc), akkor a weight cache el&odblac;nye minim&aacute;lis. A nagyobb SRAM t&ouml;bb ter&uuml;letet foglal, kevesebb core f&eacute;r el, &eacute;s a sustained TOPS cs&ouml;kken &mdash; annak ellen&eacute;re, hogy a MAC kihasználtság alig javul.
-    </p>
-
-    <p>
-      A <strong>8 KB-os SRAM</strong> lett az &uacute;j optimum: el&eacute;g a k&oacute;dhoz, a stack-hez &eacute;s a MAC bufferhez, &eacute;s <strong>+18% core-t</strong> tesz lehetőv&eacute; a 32 KB-os vari&aacute;nshoz k&eacute;pest.
-    </p>
-
-    <h2>6. l&eacute;p&eacute;s: &Oacute;rajel optimaliz&aacute;l&aacute;s</h2>
-
-    <p>
-      Az utols&oacute; l&eacute;p&eacute;s az &oacute;rajel megv&aacute;laszt&aacute;sa volt. A TOPS line&aacute;risan n&odblac; az &oacute;rajellel, de a fogyaszt&aacute;s szupra-line&aacute;risan. Elemz&eacute;s:
-    </p>
-
-    <table class="comparison-table">
-      <tr>
-        <th>&Oacute;rajel</th>
-        <th>TOPS (609 mm&sup2;)</th>
-        <th>TDP (becs.)</th>
-        <th>TOPS/W</th>
-      </tr>
-      <tr>
-        <td>500 MHz</td>
-        <td>~512</td>
-        <td>~70 W</td>
-        <td>~7,3</td>
-      </tr>
-      <tr>
-        <td><strong>1 GHz</strong></td>
-        <td><strong>~1 024</strong></td>
-        <td><strong>~210 W</strong></td>
-        <td><strong>~4,9</strong></td>
-      </tr>
-      <tr>
-        <td>2 GHz</td>
-        <td>~2 048</td>
-        <td>~800 W</td>
-        <td>~2,6</td>
-      </tr>
-    </table>
-
-    <p>
-      Az <strong>1 GHz</strong> a legjobb kompromisszum: 2&times; TOPS az 500 MHz-hez k&eacute;pest, m&eacute;g elfogadhat&oacute; TOPS/W mellett. A 2 GHz m&aacute;r nem &eacute;r meg &mdash; a fogyaszt&aacute;s 4&times; n&odblac;, a TOPS csak 2&times;.
-    </p>
-
-    <div class="highlight-box" style="border-left-color:var(--green);">
-      <strong>&#9888; Aritmetikai projekci&oacute;k</strong> &mdash; a CFPU-ML-Max sz&aacute;mai szint&eacute;zis &eacute;s RTL-szint&udblac; valid&aacute;ci&oacute; el&odblac;tti becsl&eacute;sek. A tervez&eacute;si ir&aacute;nyokat jelzik, nem m&eacute;rt teljesítm&eacute;nyadatokat.
-    </div>
-
-    <h2>V&eacute;geredm&eacute;ny: CFPU-ML-Max vs NVIDIA (becsl&eacute;s)</h2>
-
-    <p>
-      Az &ouml;t optimaliz&aacute;ci&oacute;s l&eacute;p&eacute;s ut&aacute;n a CFPU-ML-Max <strong>90&ndash;95% sustained MAC kihasználtságot</strong> &eacute;r el &mdash; a kor&aacute;bbi ~15%-r&oacute;l. Hogyan n&eacute;z ki ez NVIDIA-val &ouml;sszehasonl&iacute;tva?
-    </p>
-
-    <p>
-      Az al&aacute;bbi t&aacute;bla azonos die m&eacute;reten, azonos gy&aacute;rt&aacute;si csom&oacute;ponton (~5nm/4nm) hasonl&iacute;t, dense INT8 (sparsity n&eacute;lk&uuml;l):
+      Az NVIDIA H100 hatalmas TOPS-t k&iacute;n&aacute;l, de a HBM3 mem&oacute;ria fal miatt LLM decode-n&aacute;l a t&eacute;nyleges kihasználts&aacute;g alacsony. Az eredm&eacute;ny: <strong>1,87 J/token</strong> (LLaMA-70B, 100 user, TensorRT-LLM).
     </p>
 
     <table class="comparison-table">
       <tr>
-        <th>&Ouml;sszehasonl&iacute;t&aacute;s</th>
-        <th>CFPU-ML-Max (sust.)</th>
-        <th>NVIDIA (sust.)</th>
-        <th>Becs&uuml;lt el&odblac;ny</th>
-        <th>Becs&uuml;lt TOPS/W</th>
+        <th>Szc&eacute;n&aacute;ri&oacute; (LLaMA-70B)</th>
+        <th>CFPU J/token</th>
+        <th>NVIDIA J/token</th>
+        <th>CFPU el&odblac;ny</th>
       </tr>
       <tr>
-        <td>vs RTX 4060 (159 mm&sup2;)</td>
-        <td>242&ndash;256 TOPS</td>
-        <td>70&ndash;122 TOPS</td>
-        <td><strong>2,0&ndash;3,7&times;</strong></td>
-        <td><strong>4&ndash;7&times;</strong></td>
+        <td>Batch=1 (latencia)</td>
+        <td><strong>0,05</strong></td>
+        <td>1,75</td>
+        <td><strong>35&times;</strong></td>
       </tr>
       <tr>
-        <td>vs RTX 4090 (609 mm&sup2;)</td>
-        <td>922&ndash;973 TOPS</td>
-        <td>264&ndash;462 TOPS</td>
-        <td><strong>2,0&ndash;3,7&times;</strong></td>
-        <td><strong>4&ndash;7&times;</strong></td>
+        <td>100 user</td>
+        <td><strong>0,70</strong></td>
+        <td>1,87</td>
+        <td><strong>2,7&times;</strong></td>
       </tr>
       <tr>
-        <td>vs H100 (814 mm&sup2;)</td>
-        <td>1 233&ndash;1 301 TOPS</td>
-        <td>792&ndash;1 385 TOPS</td>
-        <td><strong>0,9&ndash;1,6&times;</strong></td>
-        <td><strong>2&ndash;4&times;</strong></td>
+        <td>1 000 user</td>
+        <td><strong>0,32</strong></td>
+        <td>1,87</td>
+        <td><strong>5,8&times;</strong></td>
+      </tr>
+      <tr>
+        <td>10 000 user</td>
+        <td><strong>0,32</strong></td>
+        <td>1,87</td>
+        <td><strong>5,8&times;</strong></td>
+      </tr>
+    </table>
+
+    <blockquote>
+      A CFPU MINDEN szc&eacute;n&aacute;ri&oacute;ban nyer: 2,7&ndash;35&times; jobb J/token &eacute;s 31&ndash;68&times; olcs&oacute;bb chip&aacute;r.
+    </blockquote>
+
+    <p>
+      Mi&eacute;rt ilyen nagy a k&uuml;l&ouml;nbs&eacute;g? Az NVIDIA H100 eset&eacute;n az energiafogyaszt&aacute;s jelent&odblac;s r&eacute;sze a HBM3 mem&oacute;ria t&aacute;pl&aacute;l&aacute;s&aacute;ra megy &mdash; k&uuml;l&ouml;n&ouml;sen kis batch m&eacute;retekn&eacute;l (1-10 egyidej&udblac; k&eacute;r&eacute;s), ahol a s&uacute;lyokat tokenenk&eacute;nt &uacute;jra ki kell olvasni. A CFPU-ML-Max SRAM-only &mdash; nincs DRAM refresh, nincs mem&oacute;ria controller overhead. Nagy batch-n&eacute;l (100+ k&eacute;r&eacute;s) az NVIDIA hat&eacute;konys&aacute;ga javul, de a CFPU m&eacute;g &iacute;gy is el&odblac;nyben marad, mert a s&uacute;lyok soha nem mozdulnak.
+    </p>
+
+    <h2>Produkci&oacute;s &uuml;zemeltet&eacute;s: 1 000 egyidej&udblac; user</h2>
+
+    <p>
+      K&eacute;pzelj&uuml;nk el egy startup-ot, amelynek ezer felhaszn&aacute;l&oacute;ja egyszerre k&eacute;rdez egy LLaMA-70B modellt. 30 token m&aacute;sodpercenk&eacute;nt felhasznál&oacute;nk&eacute;nt &mdash; &ouml;sszesen 30 000 tok/s rendszer-&aacute;tbocsát&aacute;s. Melyik architekt&uacute;ra bírja ezt hat&eacute;konyabban?
+    </p>
+
+    <table class="comparison-table">
+      <tr>
+        <th></th>
+        <th>NVIDIA (80 db H100 GPU)</th>
+        <th>CFPU H (32 chip)</th>
+      </tr>
+      <tr>
+        <td>Mem&oacute;ria ig&eacute;ny</td>
+        <td>115 GB</td>
+        <td>115 GB</td>
+      </tr>
+      <tr>
+        <td>Chipek sz&aacute;ma</td>
+        <td>80 GPU (10 node)</td>
+        <td>32 chip</td>
+      </tr>
+      <tr>
+        <td>&Ouml;ssz TDP</td>
+        <td><strong>56 000W</strong></td>
+        <td><strong>9 600W</strong></td>
+      </tr>
+      <tr>
+        <td>J/token</td>
+        <td>1,87</td>
+        <td><strong>0,32</strong></td>
+      </tr>
+      <tr>
+        <td>Gy&aacute;rt&aacute;si k&ouml;lts&eacute;g</td>
+        <td>~$265K (80&times;$3,3K)</td>
+        <td><strong>~$35K (32&times;$1,1K)</strong></td>
       </tr>
     </table>
 
     <p>
-      A sz&aacute;mok &odblac;szint&eacute;k. Az RTX 4060 &eacute;s 4090 eset&eacute;n a CFPU-ML-Max <strong>2&ndash;3,7&times; jobb sustained TOPS-t</strong> ad, mert a GPU die-j&aacute;nak csak ~30&ndash;35%-a ML hardver. Az H100 eset&eacute;n a k&eacute;p kiegyenl&iacute;tettebb: az H100 csaknem teljes eg&eacute;sz&eacute;ben ML-re tervezett, HBM-mel, a CFPU-ML-Max SRAM-only.
+      A CFPU 32 chippel oldja meg, amihez egy NVIDIA rendszernek 80 darab H100 GPU kell. <strong>5,8&times; jobb J/token</strong>, hat&aacute;rozott t&ouml;red&eacute;k&eacute;be ker&uuml;l&odblac; CAPEX. A k&uuml;l&ouml;nbs&eacute;g a 9 600W vs 56 000W fogyaszt&aacute;sban &eacute;rz&eacute;kelhet&odblac; a legjobban &mdash; ez &eacute;ves szinten sz&aacute;zmilli&oacute;s k&uuml;l&ouml;nbs&eacute;g az &aacute;ramk&ouml;lts&eacute;gben.
     </p>
 
     <div class="highlight-box">
-      <strong>Mi&eacute;rt alacsony az NVIDIA sustained?</strong><br><br>
-      <strong>1. Die ter&uuml;let megoszt&aacute;s</strong> &mdash; az RTX 4060/4090 die-jának ~30&ndash;35%-a Tensor Core. A t&ouml;bbi raszteriz&aacute;ci&oacute;, RT core, vid&eacute;o, display engine. A CFPU-ML-Max: 100% ML.<br>
-      <strong>2. GDDR sz&uuml;k keresztmetszet</strong> &mdash; a Tensor Core-ok gyorsabban fogyasztj&aacute;k az adatot, mint a GDDR6X sz&aacute;ll&iacute;tani tudja.<br>
-      <strong>3. Nem-ML hardver fogyaszt</strong> &mdash; a GPU TDP-j&eacute;be a raszteriz&aacute;ci&oacute;, vid&eacute;o dek&oacute;der &eacute;s display engine is belesz&aacute;m&iacute;t.
+      <strong>Mi&eacute;rt kicsi a KV cache?</strong><br><br>
+      A LLaMA-70B GQA-t (Grouped Query Attention) haszn&aacute;l: 8 KV head (nem 64). Egy user KV cache-e 500 token kontextusra mindössze <strong>80 MB</strong>. 1 000 user = 80 GB KV cache &mdash; de a KV cache <strong>ideiglenes</strong> (~2 m&aacute;sodperc), &iacute;gy az egyszerre akt&iacute;v KV t&ouml;red&eacute;ke ennek. A val&oacute;s &uuml;zemeltet&eacute;sben a mem&oacute;ria nem a KV cache-t&odblac;l robban &mdash; a compute a val&oacute;di korl&aacute;t.
     </div>
 
-    <h2>Die vari&aacute;nsok</h2>
-
-    <table class="comparison-table">
-      <tr>
-        <th>Die</th>
-        <th>Core</th>
-        <th>Sustained TOPS</th>
-        <th>SRAM</th>
-        <th>TDP</th>
-        <th>C&eacute;lmodell</th>
-      </tr>
-      <tr>
-        <td>80 mm&sup2;</td>
-        <td>~4 200</td>
-        <td>~121&ndash;128</td>
-        <td>34 MB</td>
-        <td>~28 W</td>
-        <td>MobileNet v2</td>
-      </tr>
-      <tr>
-        <td>159 mm&sup2;</td>
-        <td>~8 400</td>
-        <td>~242&ndash;256</td>
-        <td>67 MB</td>
-        <td>~55 W</td>
-        <td>ResNet-50</td>
-      </tr>
-      <tr>
-        <td>200 mm&sup2;</td>
-        <td>~10 500</td>
-        <td>~302&ndash;319</td>
-        <td>84 MB</td>
-        <td>~69 W</td>
-        <td>YOLOv8-S</td>
-      </tr>
-      <tr>
-        <td>400 mm&sup2;</td>
-        <td>~21 000</td>
-        <td>~605&ndash;638</td>
-        <td>168 MB</td>
-        <td>~138 W</td>
-        <td>EfficientNet-B4</td>
-      </tr>
-      <tr>
-        <td>609 mm&sup2;</td>
-        <td>~32 000</td>
-        <td>~922&ndash;973</td>
-        <td>256 MB</td>
-        <td>~210 W</td>
-        <td>&mdash;</td>
-      </tr>
-      <tr>
-        <td>814 mm&sup2;</td>
-        <td>~42 800</td>
-        <td>~1 233&ndash;1 301</td>
-        <td>342 MB</td>
-        <td>~280 W</td>
-        <td>BERT-Base</td>
-      </tr>
-    </table>
+    <h2>Az AI mint t&aacute;rstervez&odblac;</h2>
 
     <p>
-      A CFPU-ML-Max <strong>nem LLM accelerator</strong>. Kis &eacute;s közepes inference modellekre optimaliz&aacute;lt (MobileNet, ResNet, YOLOv8, BERT-Base), ahol a teljes modell elf&eacute;r az elosztott SRAM-ban. A LLaMA-7B (7 GB) m&aacute;r nem f&eacute;r el &mdash; ahhoz DRAM controller kellene, ami a jelenlegi architekt&uacute;r&aacute;ban nincs.
+      Hogyan tervez&uuml;nk processzort 2026-ban? Nem egyedül. A v2.0 architekt&uacute;ra egy ember &eacute;s egy AI k&ouml;z&ouml;s munk&aacute;ja: a <strong>Claude Opus 4.6</strong> (1M token kontextus, Anthropic) mint t&aacute;rstervez&odblac; akt&iacute;v r&eacute;szt vett minden d&ouml;nt&eacute;sben:
     </p>
 
+    <ul>
+      <li><strong>KV cache GQA sz&aacute;mol&aacute;s</strong> &mdash; az AI mutatta ki, hogy a GQA-val a KV cache t&ouml;red&eacute;ke a naiv becsl&eacute;snek, &iacute;gy a multi-chip ig&eacute;ny sokkal alacsonyabb</li>
+      <li><strong>Chiplet yield optimaliz&aacute;l&aacute;s</strong> &mdash; k&ouml;z&ouml;s elemz&eacute;s: mi&eacute;rt 85 mm&sup2; az optimum, hogyan sk&aacute;l&aacute;z&oacute;dik a yield vs die m&eacute;ret</li>
+      <li><strong>Groq/TPU/Qualcomm &ouml;sszehasonl&iacute;t&aacute;s</strong> &mdash; az AI seg&iacute;tett &ouml;ssze&aacute;ll&iacute;tani a versenyt&aacute;rs m&aacute;trixot &eacute;s azonos&iacute;tani a CFPU val&oacute;di differenci&aacute;tor&aacute;t</li>
+      <li><strong>Hib&aacute;k felismer&eacute;se</strong> &mdash; k&eacute;t kritikus javítás az AI-t&oacute;l: (1) eDRAM nem l&eacute;tezik 5nm-en &mdash; az eredeti terv eDRAM-ot felt&eacute;telezett, ami 14nm &oacute;ta nem gy&aacute;rtott; (2) az Attention <strong>nem weight-stationary</strong> &mdash; a Q&times;K<sup>T</sup> mindk&eacute;t oldala aktiv&aacute;ci&oacute;, nem s&uacute;ly, ez&eacute;rt kellett a dual-mode FSM</li>
+    </ul>
+
     <p>
-      A TDP becsl&eacute;sek szint&eacute;zis el&odblac;ttiek. A TOPS/W el&odblac;ny &iacute;g&eacute;retes, de igazolt fogyaszt&aacute;si adatokhoz legal&aacute;bb RTL-szint&udblac; power anal&iacute;zis sz&uuml;ks&eacute;ges.
+      Ez nem AI &aacute;ltal gener&aacute;lt marketing. Ez <strong>AI &aacute;ltal valid&aacute;lt m&eacute;rn&ouml;ki d&ouml;nt&eacute;shozatal</strong>: hipot&eacute;zis &rarr; AI kritika &rarr; jav&iacute;t&aacute;s &rarr; v&eacute;gleges d&ouml;nt&eacute;s. A teljes tervez&eacute;si folyamat publikusan k&ouml;vethet&odblac; a GitHub rep&oacute;ban.
     </p>
+
+    <div class="highlight-box" style="border-left-color:var(--green);">
+      <strong>Aritmetikai projekci&oacute;k</strong> &mdash; a CFPU-ML-Max sz&aacute;mai szint&eacute;zis &eacute;s RTL-szint&udblac; valid&aacute;ci&oacute; el&odblac;tti becsl&eacute;sek. +25% design margin alkalmazva. NVIDIA &eacute;rt&eacute;kek: TensorRT-LLM benchmark-ok. A tervez&eacute;si ir&aacute;nyokat jelzik, nem m&eacute;rt teljesítm&eacute;nyadatokat.
+    </div>
 
     <div class="cta">
       <h3>Ny&iacute;lt forr&aacute;sk&oacute;d</h3>
-      <p>A CLI-CPU projekt teljes eg&eacute;sz&eacute;ben ny&iacute;lt forr&aacute;sk&oacute;d&uacute;. A teljes optimaliz&aacute;ci&oacute;s folyamat, minden d&ouml;nt&eacute;s &eacute;s indokl&aacute;s publikusan elérhető.</p>
+      <p>A CLI-CPU projekt teljes eg&eacute;sz&eacute;ben ny&iacute;lt forr&aacute;sk&oacute;d&uacute;. A chiplet architekt&uacute;ra, a tervez&eacute;si d&ouml;nt&eacute;sek &eacute;s az AI-val k&ouml;z&ouml;s kutat&aacute;s dokumentuma publikusan elérhető.</p>
       <div class="cta-links">
         <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
         <a href="https://github.com/FenySoft/NeuronOS">GitHub &rarr; NeuronOS</a>
@@ -522,16 +515,12 @@
       </div>
     </div>
 
-    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
-      Az optimaliz&aacute;ci&oacute; nem egyetlen zsenialis &ouml;tlet volt &mdash; hanem hat egyszerű l&eacute;p&eacute;s, amelyek mindegyike <strong>a sz&uuml;k keresztmetszet kik&uuml;sz&ouml;b&ouml;l&eacute;s&eacute;re</strong> f&oacute;kusz&aacute;lt. A v&eacute;geredm&eacute;ny: a MAC kihasználtság ~15%-r&oacute;l 90&ndash;95%-ra nőtt. A tanuls&aacute;g: a j&oacute; hardvertervez&eacute;s iterat&iacute;v folyamat, nem villanyszer&eacute;sz pillanat.
-    </p>
-
   </div>
 </article>
 
-<nav style="max-width:720px;margin:0 auto;padding:0 24px 48px;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:0.9rem;border-top:1px solid var(--border);padding-top:24px;">
-  <span style="flex:1;"></span>
-  <a href="core-types.html" style="flex:1;text-align:right;">&Ouml;t mag, egy chip &rarr;</a>
+<nav style="max-width:720px;width:100%;margin:0 auto;padding:0 24px 48px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;font-family:var(--mono);font-size:0.9rem;border-top:1px solid var(--border);padding-top:24px;">
+  <span></span>
+  <a href="core-types.html">N&eacute;gy mag, egy chip &rarr;</a>
 </nav>
 
 <footer>

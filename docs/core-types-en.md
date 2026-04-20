@@ -209,7 +209,7 @@ The three strategies are complementary:
 | **Logic area (7nm)** | ~0.2 mm² (including eFuse, TRNG) |
 | **SRAM** | ~32 KB (key storage, hash buffer) |
 | **Placement** | **Always at the geometric center of the chip**, co-located with the L3 crossbar |
-| **Count** | **1 by default; 2–64 for redundancy and parallel verification on larger chips (F6+)** — see [Seal Core](sealcore-en.md) |
+| **Count** | **1+ (throughput, redundancy, parallel verification)** — see [Seal Core](sealcore-en.md) |
 | **Power** | Power-gated, wake-on-demand (wakes on code load) |
 
 The Seal Core is not a compute unit — it is the chip's **authentication gatekeeper**. All code (boot, hot code loading, actor migration) passes through the Seal Core for AuthCode verification. Co-located with the L3 crossbar at the center of the chip: the hub of the star topology, through which all cross-region traffic naturally passes.
@@ -229,7 +229,7 @@ The Seal Core is not a compute unit — it is the chip's **authentication gateke
 | Actor | 0.018 mm² | 64 KB | 0.036 mm² | Compact | 0.004 mm² | 0.047 mm² | **~17,000** |
 | Matrix | 0.019 mm² | 8 KB | 0.025 mm² | Turbo | 0.007 mm² | 0.039 mm² | **~20,500** |
 | Rich | 0.022 mm² | 256 KB | 0.083 mm² | Turbo | 0.007 mm² | 0.097 mm² | **~8,250** |
-| Seal | 0.200 mm² | 32 KB | 0.210 mm² | — | — | 0.210 mm² | **1** (always) |
+| Seal | 0.200 mm² | 32 KB | 0.210 mm² | — | — | 0.210 mm² | **1+** |
 
 **Note:** Core counts include the recommended L0 router variant area plus per-core share of L1–L3 infrastructure (~0.007 mm²). See [`interconnect-en.md`](interconnect-en.md), L0 Router Variants for details.
 
@@ -271,12 +271,12 @@ The Matrix Core has three **independent** power domains (FPU, MAC, SFU) — if o
 
 | Variant | Seal | Cores | Target market | Example (7nm, 800 mm²) |
 |---------|------|-------|---------------|------------------------|
-| **CFPU-N** | 1 Seal | Nano only | IoT, massive SNN spike network | 1S + ~32,000N (4 KB) |
-| **CFPU-A** | 1 Seal | Actor only | Actor cluster, stream processing | 1S + ~17,000A (64 KB) |
-| **CFPU-R** | 1 Seal | Rich only | Full .NET, FP-intensive | 1S + ~8,250R (256 KB) |
-| **CFPU-ML** | 1 Seal | Matrix + Actor | ML/SNN optimized | 1S + ~19,500M + ~1,000A |
-| **CFPU-H** | 1 Seal | Actor + Nano | Heterogeneous supervisor+worker | 1S + 2,000A + ~24,000N |
-| **CFPU-X** | 1 Seal | Mixed (any combination) | Application-specific | Custom |
+| **CFPU-N** | Seal | Nano only | IoT, massive SNN spike network | 1S + ~32,000N (4 KB) |
+| **CFPU-A** | Seal | Actor only | Actor cluster, stream processing | 1S + ~17,000A (64 KB) |
+| **CFPU-R** | Seal | Rich only | Full .NET, FP-intensive | 1S + ~8,250R (256 KB) |
+| **CFPU-ML** | Seal | Matrix + Actor | ML/SNN optimized | 1S + ~19,500M + ~1,000A |
+| **CFPU-H** | Seal | Actor + Nano | Heterogeneous supervisor+worker | 1S + 2,000A + ~24,000N |
+| **CFPU-X** | Seal | Mixed (any combination) | Application-specific | Custom |
 
 ### CFPU-ML: the ML/SNN-optimized chip
 
@@ -317,11 +317,11 @@ The CFPU-ML's value lies not in raw TOPS but in a **combination of architectural
 
 The CFPU-ML-Max variant — with Systolic Wide router, post-MAC pipeline, and 1 GHz clock — achieves **90–95% sustained MAC utilization** and delivers 2–3.7x better sustained TOPS than NVIDIA RTX 4060/4090 at the same die size (dense INT8, without sparsity).
 
-For detailed competitive comparison, die variants, target models, and positioning, see: **[CFPU-ML-Max: ML/SNN Inference Accelerator](cfpu-ml-max-en.md)**.
+For detailed competitive comparison, die variants, target models, and positioning, see: **[CFPU-ML-Max: ML/SNN Inference Accelerator](cfpu-ml-max-hu.md)**.
 
 ## Related Documents
 
-- [CFPU-ML-Max](cfpu-ml-max-en.md) — ML/SNN inference accelerator: optimization steps, die variants, NVIDIA comparison
+- [CFPU-ML-Max](cfpu-ml-max-hu.md) — ML/SNN inference accelerator: optimization steps, die variants, NVIDIA comparison
 - [Interconnect architecture](interconnect-en.md) — 4-level hierarchy, switching model, router structure
 - [Quench-RAM](quench-ram-en.md) — per-block immutability, QRAM+network symbiosis
 - [ISA-CIL-T0](ISA-CIL-T0-en.md) — the ISA basis of the Nano and Matrix Core
@@ -331,7 +331,7 @@ For detailed competitive comparison, die variants, target models, and positionin
 
 | Version | Date | Summary |
 |---------|------------|----------------------------------------------|
-| 1.6 | 2026-04-19 | "Why CFPU-ML?" section shortened, competitive comparison table and target use cases moved to dedicated [CFPU-ML-Max](cfpu-ml-max-en.md) document |
+| 1.6 | 2026-04-19 | "Why CFPU-ML?" section shortened, competitive comparison table and target use cases moved to dedicated [CFPU-ML-Max](cfpu-ml-max-hu.md) document |
 | 1.5 | 2026-04-19 | Systolic router variant added to Matrix Core section: 128-bit links, MAC ~100% utilization, sustained TOPS table (329–368 TOPS @ 8 KB), 8 KB sweet spot reversal |
 | 1.4 | 2026-04-19 | Cell payload 128→64 bytes: router area reduction (Turbo 0.009→0.007 mm², Compact 0.005→0.004 mm²), infra 0.008→0.007 mm². Core counts, TOPS, and product family metrics recalculated |
 | 1.3 | 2026-04-19 | Peak/sustained terminology explanation. "Why CFPU-ML?" value proposition section with competitive comparison table and target use cases |

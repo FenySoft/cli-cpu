@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="tineGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a3a5c"/>
+      <stop offset="100%" stop-color="#0d2137"/>
+    </linearGradient>
+    <linearGradient id="iodGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2d1a4e"/>
+      <stop offset="100%" stop-color="#1a0d30"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="800" height="600" fill="#0d1117"/>
+  <text x="400" y="40" text-anchor="middle" fill="#f0f6fc" font-size="22" font-weight="700">CFPU-ML-Max v2.0 — Chiplet Ring Topology</text>
+  <text x="400" y="65" text-anchor="middle" fill="#8b949e" font-size="14">18 tine dies + IOD, SoIC + CoWoS, ~850 mm² interposer</text>
+  <rect x="120" y="90" width="560" height="430" rx="16" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+  <text x="680" y="510" text-anchor="end" fill="#30363d" font-size="11">CoWoS-S interposer</text>
+  <rect x="155" y="120" width="140" height="100" rx="8" fill="url(#tineGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="225" y="160" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">T7</text>
+  <text x="225" y="180" text-anchor="middle" fill="#8b949e" font-size="10">Tine 14,15</text>
+  <text x="225" y="195" text-anchor="middle" fill="#3fb950" font-size="9">2 dies SoIC</text>
+  <rect x="330" y="120" width="140" height="100" rx="8" fill="url(#tineGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="400" y="160" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">T0</text>
+  <text x="400" y="180" text-anchor="middle" fill="#8b949e" font-size="10">Tine 0,1</text>
+  <text x="400" y="195" text-anchor="middle" fill="#3fb950" font-size="9">2 dies SoIC</text>
+  <rect x="505" y="120" width="140" height="100" rx="8" fill="url(#tineGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="575" y="160" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">T1</text>
+  <text x="575" y="180" text-anchor="middle" fill="#8b949e" font-size="10">Tine 2,3</text>
+  <text x="575" y="195" text-anchor="middle" fill="#3fb950" font-size="9">2 dies SoIC</text>
+  <rect x="155" y="255" width="140" height="100" rx="8" fill="url(#tineGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="225" y="295" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">T6</text>
+  <text x="225" y="315" text-anchor="middle" fill="#8b949e" font-size="10">Tine 12,13</text>
+  <rect x="330" y="255" width="140" height="100" rx="8" fill="url(#iodGrad)" stroke="#d2a8ff" stroke-width="2"/>
+  <text x="400" y="280" text-anchor="middle" fill="#d2a8ff" font-size="12" font-weight="700">T8 + IOD</text>
+  <text x="400" y="298" text-anchor="middle" fill="#8b949e" font-size="9">Tine 16,17</text>
+  <text x="400" y="313" text-anchor="middle" fill="#8b949e" font-size="9">Actor + Seal</text>
+  <text x="400" y="328" text-anchor="middle" fill="#8b949e" font-size="9">PCIe/CXL</text>
+  <text x="400" y="343" text-anchor="middle" fill="#3fb950" font-size="9">3-level stack</text>
+  <rect x="505" y="255" width="140" height="100" rx="8" fill="url(#tineGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="575" y="295" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">T2</text>
+  <text x="575" y="315" text-anchor="middle" fill="#8b949e" font-size="10">Tine 4,5</text>
+  <rect x="155" y="390" width="140" height="100" rx="8" fill="url(#tineGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="225" y="430" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">T5</text>
+  <text x="225" y="450" text-anchor="middle" fill="#8b949e" font-size="10">Tine 10,11</text>
+  <rect x="330" y="390" width="140" height="100" rx="8" fill="url(#tineGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="400" y="430" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">T4</text>
+  <text x="400" y="450" text-anchor="middle" fill="#8b949e" font-size="10">Tine 8,9</text>
+  <rect x="505" y="390" width="140" height="100" rx="8" fill="url(#tineGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+  <text x="575" y="430" text-anchor="middle" fill="#58a6ff" font-size="13" font-weight="600">T3</text>
+  <text x="575" y="450" text-anchor="middle" fill="#8b949e" font-size="10">Tine 6,7</text>
+  <g stroke="#3fb950" stroke-width="2" fill="none" filter="url(#glow)" marker-end="url(#arrowG)">
+    <defs><marker id="arrowG" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#3fb950"/></marker></defs>
+    <line x1="470" y1="170" x2="500" y2="170"/>
+    <line x1="575" y1="225" x2="575" y2="250"/>
+    <line x1="575" y1="360" x2="575" y2="385"/>
+    <line x1="500" y1="440" x2="475" y2="440"/>
+    <line x1="325" y1="440" x2="300" y2="440"/>
+    <line x1="225" y1="385" x2="225" y2="360"/>
+    <line x1="225" y1="250" x2="225" y2="225"/>
+    <line x1="295" y1="215" x2="340" y2="260"/>
+    <line x1="400" y1="250" x2="400" y2="225"/>
+  </g>
+  <text x="400" y="560" text-anchor="middle" fill="#3fb950" font-size="13" font-weight="600">Ring: T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7 → T8 → T0</text>
+  <text x="400" y="580" text-anchor="middle" fill="#8b949e" font-size="11">Every hop is adjacent — max 3-5 cycles CoWoS, within pairs 1-2 cycles SoIC</text>
+</svg>
