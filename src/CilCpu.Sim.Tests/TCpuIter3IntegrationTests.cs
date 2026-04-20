@@ -1,14 +1,14 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: TCpu iter. 3 integrációs tesztek: olyan kis CIL-T0 programok,
+/// hu: TCpuNano iter. 3 integrációs tesztek: olyan kis CIL-T0 programok,
 /// amelyek több opkód-kategóriát összekapcsolnak — egy számláló cikluson
 /// keresztül összegzés (Sum 1..10), és egy max(a,b) elágazás. Ezek a
 /// tesztek bizonyítják, hogy az aritmetika, az összehasonlítás és a
 /// branch opkódok együttesen, valódi programszerű forgatókönyvekben is
 /// helyesen működnek.
 /// <br />
-/// en: TCpu iter. 3 integration tests: small CIL-T0 programs combining
+/// en: TCpuNano iter. 3 integration tests: small CIL-T0 programs combining
 /// several opcode categories — summation through a counter loop (Sum 1..10)
 /// and a max(a, b) branch. These tests prove that arithmetic, comparison
 /// and branch opcodes work together correctly in realistic, program-like
@@ -36,7 +36,7 @@ public class TCpuIter3IntegrationTests
     [Fact]
     public void Execute_Sum1To10_Returns55()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // local 0 = s (sum), local 1 = i (counter)
         // 0:  ldc.i4.0       (push 0)
         // 1:  stloc.0        (s = 0)
@@ -103,7 +103,7 @@ public class TCpuIter3IntegrationTests
     [Fact]
     public void Execute_MaxAB_FirstSmaller_ReturnsB()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // 0: ldarg.0
         // 1: ldarg.1
         // 2: bgt.s +3 → target = 2+2+3 = 7  (L1)
@@ -135,7 +135,7 @@ public class TCpuIter3IntegrationTests
     [Fact]
     public void Execute_MaxAB_FirstLarger_ReturnsA()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x02,       // 0: ldarg.0

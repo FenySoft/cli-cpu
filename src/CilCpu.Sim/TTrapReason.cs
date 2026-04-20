@@ -119,5 +119,38 @@ public enum TTrapReason : byte
     /// allocate a new frame because SP + frame size would exceed the
     /// per-core SRAM limit (Nano: 16 KB, Rich: 64-256 KB).
     /// </summary>
-    SramOverflow = 0x0D
+    SramOverflow = 0x0D,
+
+    // ------------------------------------------------------------------
+    // hu: CIL-Seal bővítés — a Seal Core tömb- és external call trap-jei.
+    // en: CIL-Seal extension — Seal Core array and external call traps.
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// hu: Null tömb referenciára végrehajtott ldlen/ldelem/stelem.
+    /// <br />
+    /// en: ldlen/ldelem/stelem on a null array reference.
+    /// </summary>
+    NullReference = 0x0E,
+
+    /// <summary>
+    /// hu: Tömb index a határokon kívül (index &lt; 0 vagy index &gt;= length).
+    /// <br />
+    /// en: Array index out of bounds (index &lt; 0 or index &gt;= length).
+    /// </summary>
+    IndexOutOfRange = 0x0F,
+
+    /// <summary>
+    /// hu: newarr negatív mérettel.
+    /// <br />
+    /// en: newarr with negative size.
+    /// </summary>
+    NegativeArraySize = 0x10,
+
+    /// <summary>
+    /// hu: Ismeretlen external call dispatch index.
+    /// <br />
+    /// en: Unknown external call dispatch index.
+    /// </summary>
+    InvalidExternalCall = 0x11
 }

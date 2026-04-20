@@ -16,7 +16,7 @@ namespace CilCpu.Sim;
 /// Internal state is SRAM-based: call frames, arguments, locals and the
 /// eval stack live in a single byte[] array, byte-identical to hardware.
 /// </summary>
-public sealed class TCpu
+public class TCpuNano
 {
     /// <summary>
     /// hu: Az evaluation stack maximális mélysége a CIL-T0 spec szerint.
@@ -92,26 +92,26 @@ public sealed class TCpu
     /// </summary>
     internal const int OffsetLocalCount = 9;
 
-    private readonly byte[] FSram;
+    protected readonly byte[] FSram;
     private readonly byte[]? FDataMemory;
-    private int FSp;
-    private int FFrameBase;
-    private int FArgCount;
-    private int FLocalCount;
-    private int FCallDepth;
-    private int FProgramCounter;
-    private bool FHalted;
+    protected int FSp;
+    protected int FFrameBase;
+    protected int FArgCount;
+    protected int FLocalCount;
+    protected int FCallDepth;
+    protected int FProgramCounter;
+    protected bool FHalted;
 
     /// <summary>
     /// hu: Új CPU példány létrehozása data memory nélkül. Az ldind.i4 és
     /// stind.i4 opkódok ekkor InvalidMemoryAccess trap-et dobnak — használj
-    /// data-memory változatot a <see cref="TCpu(byte[])"/> konstruktorral.
+    /// data-memory változatot a <see cref="TCpuNano(byte[])"/> konstruktorral.
     /// <br />
     /// en: Creates a new CPU instance without data memory. The ldind.i4
     /// and stind.i4 opcodes will raise InvalidMemoryAccess traps — use the
-    /// <see cref="TCpu(byte[])"/> constructor for a data-memory variant.
+    /// <see cref="TCpuNano(byte[])"/> constructor for a data-memory variant.
     /// </summary>
-    public TCpu()
+    public TCpuNano()
         : this(null)
     {
     }
@@ -132,7 +132,7 @@ public sealed class TCpu
     /// <br />
     /// en: The data memory byte array, or <c>null</c> if none.
     /// </param>
-    public TCpu(byte[]? ADataMemory)
+    public TCpuNano(byte[]? ADataMemory)
         : this(ADataMemory, DefaultSramSize)
     {
     }
@@ -156,7 +156,7 @@ public sealed class TCpu
     /// <br />
     /// en: The SRAM size in bytes.
     /// </param>
-    public TCpu(byte[]? ADataMemory, int ASramSize)
+    public TCpuNano(byte[]? ADataMemory, int ASramSize)
     {
         FSram = new byte[ASramSize];
         FDataMemory = ADataMemory;
@@ -418,7 +418,7 @@ public sealed class TCpu
     /// program bounds and at least one frame is on the call stack, decode
     /// and execute the current instruction.
     /// </summary>
-    private void RunLoop(byte[] AProgram)
+    protected virtual void RunLoop(byte[] AProgram)
     {
         while (!FHalted && FCallDepth > 0 && FProgramCounter < AProgram.Length)
         {

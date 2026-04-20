@@ -1,12 +1,12 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: A TCpu iter. 3 aritmetika tesztjei: add, sub, mul, div, rem, neg,
+/// hu: A TCpuNano iter. 3 aritmetika tesztjei: add, sub, mul, div, rem, neg,
 /// not, and, or, xor, shl, shr, shr.un. A teszt-készlet lefedi a happy
 /// path-okat, a határértékeket (wrap, int.MinValue, stb.), a trap ágakat
 /// (StackUnderflow, DivByZero, Overflow) és a shift maszkolási szabályt.
 /// <br />
-/// en: TCpu iter. 3 arithmetic tests: add, sub, mul, div, rem, neg, not,
+/// en: TCpuNano iter. 3 arithmetic tests: add, sub, mul, div, rem, neg, not,
 /// and, or, xor, shl, shr, shr.un. The suite covers happy paths, edge
 /// cases (wrap, int.MinValue, etc.), trap branches (StackUnderflow,
 /// DivByZero, Overflow) and the shift masking rule.
@@ -25,7 +25,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Add_TwoPositives_Sum()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x19, 0x1A, 0x58 }; // ldc.i4.3; ldc.i4.4; add
 
         cpu.Execute(program);
@@ -42,7 +42,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Add_IntMaxPlusOne_WrapsToIntMin()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
@@ -63,7 +63,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Add_EmptyStack_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x58 }; // add
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -80,7 +80,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Add_OneElement_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x17, 0x58 }; // ldc.i4.1; add
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -101,7 +101,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Sub_PositiveMinusPositive()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0x0A, // ldc.i4.s 10
@@ -122,7 +122,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Sub_PositiveMinusNegative()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B,       // ldc.i4.5
@@ -143,7 +143,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Sub_IntMinMinusOne_WrapsToIntMax()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -164,7 +164,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Sub_EmptyStack_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x59 };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -184,7 +184,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Mul_TwoPositives()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1C, 0x1D, 0x5A }; // ldc.i4.6; ldc.i4.7; mul
 
         cpu.Execute(program);
@@ -200,7 +200,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Mul_IntMinByMinusOne_Wraps()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -221,7 +221,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Mul_NegativeResult()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x19,       // ldc.i4.3
@@ -246,7 +246,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Div_Positive()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0x14, // ldc.i4.s 20
@@ -267,7 +267,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Div_NegativeResult()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0xF4, // ldc.i4.s -12
@@ -288,7 +288,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Div_ByZero_RaisesDivByZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1A,       // ldc.i4.4
@@ -310,7 +310,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Div_IntMinByMinusOne_RaisesOverflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -332,7 +332,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Div_EmptyStack_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x5B };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -352,7 +352,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Rem_Positive()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0x11, // ldc.i4.s 17
@@ -373,7 +373,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Rem_ByZero_RaisesDivByZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B,       // ldc.i4.5
@@ -394,7 +394,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Rem_IntMinByMinusOne_ReturnsZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -419,7 +419,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Neg_Positive()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x65 }; // ldc.i4.5; neg
 
         cpu.Execute(program);
@@ -435,7 +435,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Neg_Negative()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1F, 0xFB, 0x65 }; // ldc.i4.s -5; neg
 
         cpu.Execute(program);
@@ -451,7 +451,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Neg_IntMin_WrapsToIntMin()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -471,7 +471,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Neg_EmptyStack_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x65 };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -491,7 +491,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Not_Zero_ReturnsMinusOne()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16, 0x66 }; // ldc.i4.0; not
 
         cpu.Execute(program);
@@ -507,7 +507,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Not_NegativeOne_ReturnsZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x15, 0x66 }; // ldc.i4.m1; not
 
         cpu.Execute(program);
@@ -527,7 +527,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_And_Bitwise()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0x0F, // ldc.i4.s 0x0F
@@ -548,7 +548,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Or_Bitwise()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x1E, 0x60 }; // ldc.i4.5; ldc.i4.8; or
 
         cpu.Execute(program);
@@ -564,7 +564,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Xor_Bitwise()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0x0F, // ldc.i4.s 15
@@ -585,7 +585,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_And_EmptyStack_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x5F };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -605,7 +605,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shl_OneByFour()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x17, 0x1A, 0x62 }; // ldc.i4.1; ldc.i4.4; shl
 
         cpu.Execute(program);
@@ -621,7 +621,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shl_MaskAmountTo31()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x17,       // ldc.i4.1
@@ -642,7 +642,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shr_NegativeValue_SignExtends()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0xF8, // ldc.i4.s -8
@@ -663,7 +663,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_ShrUn_NegativeValue_ZeroExtends()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x15,       // ldc.i4.m1
@@ -684,7 +684,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shr_Positive()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0x10, // ldc.i4.s 16
@@ -709,7 +709,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Add_IntMaxPlusIntMax_Wraps()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
@@ -730,7 +730,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Sub_ZeroMinusIntMin_Wraps()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x16,                         // ldc.i4.0
@@ -751,7 +751,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Mul_IntMaxTimesTwo_Wraps()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
@@ -772,7 +772,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Div_IntMinByOne_ReturnsIntMin()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -793,7 +793,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Div_IntMinByIntMin_ReturnsOne()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -814,7 +814,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Div_OneByIntMax_ReturnsZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x17,                         // ldc.i4.1
@@ -835,7 +835,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Rem_IntMinByOne_ReturnsZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -856,7 +856,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Rem_OneByIntMax_ReturnsOne()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x17,                         // ldc.i4.1
@@ -877,7 +877,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Neg_IntMax_ReturnsMinIntMaxPlus1()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
@@ -897,7 +897,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Not_IntMax_ReturnsIntMin()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0xFF, 0xFF, 0xFF, 0x7F, // ldc.i4 int.MaxValue
@@ -917,7 +917,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Not_IntMin_ReturnsIntMax()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -941,7 +941,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shl_ByZero_Identity()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0x2A, // ldc.i4.s 42
@@ -962,7 +962,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shl_By31_OnlySignBit()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x17,       // ldc.i4.1
@@ -983,7 +983,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shl_By32_MasksToZero_Identity()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x17,       // ldc.i4.1
@@ -1004,7 +1004,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shr_By31_NegativeBecomesMinusOne()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -1025,7 +1025,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shr_ByZero_Identity()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0xD6, // ldc.i4.s -42
@@ -1046,7 +1046,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_ShrUn_By31_ReturnsOne()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue
@@ -1067,7 +1067,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_ShrUn_ByZero_Identity()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // ldc.i4 int.MinValue (0x80000000)
@@ -1088,7 +1088,7 @@ public class TCpuIter3ArithmeticTests
     [Fact]
     public void Execute_Shl_NegativeAmount_MaskedTo31()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x17, // ldc.i4.1

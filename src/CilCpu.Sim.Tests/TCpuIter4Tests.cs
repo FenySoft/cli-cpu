@@ -1,12 +1,12 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: A TCpu iter. 4 opkód-szintű tesztjei: call, ret, ldind.i4, stind.i4,
+/// hu: A TCpuNano iter. 4 opkód-szintű tesztjei: call, ret, ldind.i4, stind.i4,
 /// break. Ezek a tesztek izolált, kis programokon ellenőrzik az iter. 4
 /// opkódok szemantikáját és a hozzájuk tartozó trapeket
 /// (InvalidCallTarget, CallDepthExceeded, DebugBreak).
 /// <br />
-/// en: TCpu iter. 4 opcode-level tests: call, ret, ldind.i4, stind.i4, break.
+/// en: TCpuNano iter. 4 opcode-level tests: call, ret, ldind.i4, stind.i4, break.
 /// These tests verify the semantics of the iter. 4 opcodes with isolated
 /// small programs and the corresponding traps (InvalidCallTarget,
 /// CallDepthExceeded, DebugBreak).
@@ -27,7 +27,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Break_ThrowsDebugBreakTrap()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0xDD };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -46,7 +46,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_BreakAfterValid_TrapsAtBreakOffset()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16, 0xDD }; // ldc.i4.0; break
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -71,7 +71,7 @@ public class TCpuIter4Tests
     public void Execute_LdindI4_ReadsInt32FromDataMemory()
     {
         var data = new byte[] { 0x78, 0x56, 0x34, 0x12 }; // 0x12345678 LE
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4.0 (cím=0); ldind.i4
         var program = new byte[] { 0x16, 0x4A };
 
@@ -90,7 +90,7 @@ public class TCpuIter4Tests
     public void Execute_LdindI4_NegativeValue()
     {
         var data = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF };
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         var program = new byte[] { 0x16, 0x4A };
 
         cpu.Execute(program);
@@ -107,7 +107,7 @@ public class TCpuIter4Tests
     public void Execute_LdindI4_NonZeroAddress()
     {
         var data = new byte[] { 0, 0, 0, 0, 0x01, 0x00, 0x00, 0x00 };
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4.4; ldind.i4
         var program = new byte[] { 0x1A, 0x4A };
 
@@ -124,7 +124,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_LdindI4_NoDataMemory_Traps()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16, 0x4A };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -141,7 +141,7 @@ public class TCpuIter4Tests
     public void Execute_LdindI4_OutOfBounds_Traps()
     {
         var data = new byte[4];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4.s 100; ldind.i4
         var program = new byte[] { 0x1F, 0x64, 0x4A };
 
@@ -165,7 +165,7 @@ public class TCpuIter4Tests
     public void Execute_StindI4_WritesInt32ToDataMemory()
     {
         var data = new byte[8];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4.0 (addr=0); ldc.i4.s 0x42 (value); stind.i4
         var program = new byte[] { 0x16, 0x1F, 0x42, 0x54 };
 
@@ -187,7 +187,7 @@ public class TCpuIter4Tests
     public void Execute_StindI4_WritesAllFourBytesLittleEndian()
     {
         var data = new byte[4];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4.0; ldc.i4 0x12345678; stind.i4
         var program = new byte[] { 0x16, 0x20, 0x78, 0x56, 0x34, 0x12, 0x54 };
 
@@ -207,7 +207,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_StindI4_NoDataMemory_Traps()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16, 0x16, 0x54 };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -224,7 +224,7 @@ public class TCpuIter4Tests
     public void Execute_StindI4_OutOfBounds_Traps()
     {
         var data = new byte[4];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4.s 100; ldc.i4.0; stind.i4
         var program = new byte[] { 0x1F, 0x64, 0x16, 0x54 };
 
@@ -242,7 +242,7 @@ public class TCpuIter4Tests
     public void Execute_StindThenLdind_RoundTrip()
     {
         var data = new byte[4];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4.0; ldc.i4.s 42; stind.i4; ldc.i4.0; ldind.i4
         var program = new byte[] { 0x16, 0x1F, 0x2A, 0x54, 0x16, 0x4A };
 
@@ -266,7 +266,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_HeaderEntry_ReturnsConstant()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // header: magic=0xFE, arg=0, local=0, max_stack=1, code_size=2
         // code: ldc.i4.7; ret
         var program = new byte[]
@@ -291,7 +291,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_HeaderEntry_WithArg_ReturnsArg()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // header: magic, arg=1, local=0, max=1, code_size=2
         // code: ldarg.0; ret
         var program = new byte[]
@@ -316,7 +316,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_VoidArgsReturnsConstant()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // Caller header at 0: magic, arg=0, local=0, max=1, code_size=6
         //   call <RVA=14>; ret           (length: 5+1=6)
         // Callee header at 14: magic, arg=0, local=0, max=1, code_size=2
@@ -349,7 +349,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_WithArg_PassesAndReturns()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // Caller header at 0: arg=0, local=0, max=2, code_size=8
         //   ldc.i4.5; call 16; ret
         // Callee header at 16: arg=1, local=0, max=2, code_size=4
@@ -384,7 +384,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_TwoArgs_Adds()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // caller header: arg=0, local=0, max=2, code_size=9
         //   ldc.i4.3; ldc.i4.4; call 17; ret
         // callee header at 17: arg=2, local=0, max=2, code_size=4
@@ -416,7 +416,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_OutOfBoundsRva_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // caller header: code_size=6, code = call 0xFFFF; ret
         var program = new byte[]
         {
@@ -437,7 +437,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_InvalidHeaderMagic_Traps()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // caller header (8) + caller code (6 = call 14, ret) + 8 byte fake header without 0xFE magic
         var program = new byte[]
         {
@@ -460,7 +460,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_InfiniteRecursion_TrapsCallDepthExceeded()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // header: arg=0, local=0, max=1, code_size=6
         //   call 0; ret  (calls itself forever)
         var program = new byte[]
@@ -482,7 +482,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_NestedCalls_ReturnsCorrectChain()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // f at 0: arg=0, local=0, max=2, code_size=8
         //   call g (rva=16); ldc.i4.1; add; ret
         // g at 16: arg=0, local=0, max=2, code_size=8
@@ -524,7 +524,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_NegativeTargetRva_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
@@ -544,7 +544,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_TargetArgCountExceedsMax_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
@@ -566,7 +566,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_TargetLocalCountExceedsMax_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
@@ -588,7 +588,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_TargetCodePastEnd_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
@@ -612,7 +612,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_RetVoid_NoReturnValuePushed()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             // caller header: arg=0, local=0, max=2, code_size=8
@@ -640,7 +640,7 @@ public class TCpuIter4Tests
     public void Execute_LdindI4_NegativeAddress_TrapsInvalidMemory()
     {
         var data = new byte[8];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         var program = new byte[] { 0x15, 0x4A }; // ldc.i4.m1; ldind.i4
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -657,7 +657,7 @@ public class TCpuIter4Tests
     public void Execute_StindI4_NegativeAddress_TrapsInvalidMemory()
     {
         var data = new byte[8];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         var program = new byte[] { 0x15, 0x16, 0x54 }; // ldc.i4.m1; ldc.i4.0; stind.i4
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -673,7 +673,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Call_SmallSram_TrapsSramOverflow()
     {
-        var cpu = new TCpu(null, 80);
+        var cpu = new TCpuNano(null, 80);
         var program = new byte[]
         {
             0xFE, 0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00,
@@ -705,7 +705,7 @@ public class TCpuIter4Tests
         data[5] = 0x56;
         data[6] = 0x34;
         data[7] = 0x12;
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4 4; ldind.i4
         var program = new byte[] { 0x20, 0x04, 0x00, 0x00, 0x00, 0x4A };
 
@@ -726,7 +726,7 @@ public class TCpuIter4Tests
     public void Execute_LdindI4_FirstInvalidAddress_Traps()
     {
         var data = new byte[8];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4 5; ldind.i4
         var program = new byte[] { 0x20, 0x05, 0x00, 0x00, 0x00, 0x4A };
 
@@ -746,7 +746,7 @@ public class TCpuIter4Tests
     public void Execute_StindI4_LastValidAddress_Succeeds()
     {
         var data = new byte[8];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4 4 (address); ldc.i4 0x12345678 (value); stind.i4
         var program = new byte[]
         {
@@ -775,7 +775,7 @@ public class TCpuIter4Tests
     public void Execute_StindI4_FirstInvalidAddress_Traps()
     {
         var data = new byte[8];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4 5 (address); ldc.i4 0 (value); stind.i4
         var program = new byte[]
         {
@@ -800,7 +800,7 @@ public class TCpuIter4Tests
     public void Execute_LdindI4_AddressIntMax_Traps()
     {
         var data = new byte[8];
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4 INT_MAX (0x7FFFFFFF); ldind.i4
         var program = new byte[] { 0x20, 0xFF, 0xFF, 0xFF, 0x7F, 0x4A };
 
@@ -820,7 +820,7 @@ public class TCpuIter4Tests
     public void Execute_LdindI4_AddressZero_Succeeds()
     {
         var data = new byte[] { 0xAA, 0xBB, 0xCC, 0xDD };
-        var cpu = new TCpu(data);
+        var cpu = new TCpuNano(data);
         // ldc.i4.0; ldind.i4
         var program = new byte[] { 0x16, 0x4A };
 
@@ -843,7 +843,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Push_AtDepth64_Succeeds()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // 64 × ldc.i4.1 (0x17)
         var program = Enumerable.Repeat((byte)0x17, 64).ToArray();
 
@@ -860,7 +860,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Push_AtDepth65_TrapsStackOverflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // 65 × ldc.i4.1 (0x17)
         var program = Enumerable.Repeat((byte)0x17, 65).ToArray();
 
@@ -877,7 +877,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Dup_AtDepth63_Succeeds()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // 63 × ldc.i4.1 + dup
         var program = Enumerable.Repeat((byte)0x17, 63)
             .Append((byte)0x25)
@@ -896,7 +896,7 @@ public class TCpuIter4Tests
     [Fact]
     public void Execute_Dup_AtDepth64_TrapsStackOverflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // 64 × ldc.i4.1 + dup
         var program = Enumerable.Repeat((byte)0x17, 64)
             .Append((byte)0x25)

@@ -1,9 +1,9 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: A TCpu osztály alapvető végrehajtási tesztjei.
+/// hu: A TCpuNano osztály alapvető végrehajtási tesztjei.
 /// <br />
-/// en: Basic execution tests for the TCpu class.
+/// en: Basic execution tests for the TCpuNano class.
 /// </summary>
 public class TCpuTests
 {
@@ -17,7 +17,7 @@ public class TCpuTests
     [Fact]
     public void Execute_Nop_LeavesStackUnchanged()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x00 }; // nop
 
         cpu.Execute(program);
@@ -34,7 +34,7 @@ public class TCpuTests
     [Fact]
     public void Execute_Nop_AdvancesProgramCounterByOne()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x00, 0x00, 0x00 }; // három nop
 
         cpu.Execute(program);
@@ -55,7 +55,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_0_PushesZeroToStack()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16 }; // ldc.i4.0
 
         cpu.Execute(program);
@@ -76,7 +76,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_0_Twice_PushesTwoZeros()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16, 0x16 }; // ldc.i4.0; ldc.i4.0
 
         cpu.Execute(program);
@@ -97,7 +97,7 @@ public class TCpuTests
     [Fact]
     public void Execute_Ldnull_PushesZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x14 }; // ldnull
 
         cpu.Execute(program);
@@ -115,7 +115,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_m1_PushesMinusOne()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x15 }; // ldc.i4.m1
 
         cpu.Execute(program);
@@ -133,7 +133,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_1_PushesOne()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x17 };
 
         cpu.Execute(program);
@@ -151,7 +151,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_2_PushesTwo()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x18 };
 
         cpu.Execute(program);
@@ -169,7 +169,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_3_PushesThree()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x19 };
 
         cpu.Execute(program);
@@ -187,7 +187,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_4_PushesFour()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1A };
 
         cpu.Execute(program);
@@ -205,7 +205,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_5_PushesFive()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B };
 
         cpu.Execute(program);
@@ -223,7 +223,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_6_PushesSix()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1C };
 
         cpu.Execute(program);
@@ -241,7 +241,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_7_PushesSeven()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1D };
 
         cpu.Execute(program);
@@ -259,7 +259,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_8_PushesEight()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1E };
 
         cpu.Execute(program);
@@ -279,7 +279,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_S_Positive_PushesValue()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1F, 0x7F }; // ldc.i4.s 127
 
         cpu.Execute(program);
@@ -299,7 +299,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_S_Negative_PushesSignExtendedValue()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1F, 0xFF, 0x1F, 0x80 }; // ldc.i4.s -1; ldc.i4.s -128
 
         cpu.Execute(program);
@@ -321,7 +321,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_Positive_PushesLittleEndianInt32()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x20, 0x78, 0x56, 0x34, 0x12 };
 
         cpu.Execute(program);
@@ -339,7 +339,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_Negative_PushesNegativeInt32()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x20, 0xFF, 0xFF, 0xFF, 0xFF };
 
         cpu.Execute(program);
@@ -358,7 +358,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_IntMax_Pushes2147483647()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x20, 0xFF, 0xFF, 0xFF, 0x7F };
 
         cpu.Execute(program);
@@ -377,7 +377,7 @@ public class TCpuTests
     [Fact]
     public void Execute_LdcI4_IntMin_PushesMinus2147483648()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x20, 0x00, 0x00, 0x00, 0x80 };
 
         cpu.Execute(program);
@@ -399,7 +399,7 @@ public class TCpuTests
     [Fact]
     public void Execute_StackOverflow_ThrowsTrapException()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[65];
 
         for (var i = 0; i < 65; i++)
@@ -424,7 +424,7 @@ public class TCpuTests
     [Fact]
     public void Execute_AllSingleByteConstants_PushAllInOrder()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x15, // ldc.i4.m1  → -1
@@ -479,7 +479,7 @@ public class TCpuTests
     [Fact]
     public void Execute_UnknownOpcode_ThrowsInvalidOpcodeTrap()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0xFF };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -498,7 +498,7 @@ public class TCpuTests
     [Fact]
     public void Execute_UnknownOpcodeAfterValid_TrapProgramCounterPointsToOffender()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16, 0xFE }; // ldc.i4.0; (ismeretlen 0xFE prefix operand nélkül)
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -522,7 +522,7 @@ public class TCpuTests
     [Fact]
     public void Execute_TruncatedLdcI4_S_ThrowsInvalidOpcodeTrap()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1F }; // ldc.i4.s, operand hiányzik
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -542,7 +542,7 @@ public class TCpuTests
     [Fact]
     public void Execute_TruncatedLdcI4_ThrowsInvalidOpcodeTrap()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x20, 0x78, 0x56 }; // ldc.i4, 3 byte operand (4 helyett)
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -552,11 +552,11 @@ public class TCpuTests
     }
 
     /// <summary>
-    /// hu: <c>Peek</c> hívás új <see cref="TCpu"/> példányon (még
+    /// hu: <c>Peek</c> hívás új <see cref="TCpuNano"/> példányon (még
     /// <c>Execute</c> hívás nélkül) <see cref="InvalidOperationException"/>-t
     /// dob, mert a call stack üres és nincs aktív frame.
     /// <br />
-    /// en: Calling <c>Peek</c> on a fresh <see cref="TCpu"/> instance
+    /// en: Calling <c>Peek</c> on a fresh <see cref="TCpuNano"/> instance
     /// (before any <c>Execute</c>) throws
     /// <see cref="InvalidOperationException"/> because the call stack is
     /// empty and there is no active frame.
@@ -564,7 +564,7 @@ public class TCpuTests
     [Fact]
     public void Peek_OnFreshCpu_ThrowsInvalidOperationException()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         var ex = Assert.Throws<InvalidOperationException>(() => cpu.Peek(0));
 
@@ -572,8 +572,8 @@ public class TCpuTests
     }
 
     // ------------------------------------------------------------------
-    // hu: Lefedetlen ág tesztek — TCpu belső állapot edge case-ek
-    // en: Uncovered branch tests — TCpu internal state edge cases
+    // hu: Lefedetlen ág tesztek — TCpuNano belső állapot edge case-ek
+    // en: Uncovered branch tests — TCpuNano internal state edge cases
     // ------------------------------------------------------------------
 
     /// <summary>
@@ -584,7 +584,7 @@ public class TCpuTests
     [Fact]
     public void StackDepth_EmptyCallStack_ReturnsZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         Assert.Equal(0, cpu.StackDepth);
     }
@@ -597,7 +597,7 @@ public class TCpuTests
     [Fact]
     public void Execute_NegativeEntryRva_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0xFE, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00,
@@ -617,7 +617,7 @@ public class TCpuTests
     [Fact]
     public void Execute_HeaderRvaPastEnd_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0xFE, 0x00, 0x00, 0x01 }; // 4 bytes, header needs 8
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0));
@@ -633,7 +633,7 @@ public class TCpuTests
     [Fact]
     public void Execute_WrongHeaderMagic_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x00, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00,
@@ -653,7 +653,7 @@ public class TCpuTests
     [Fact]
     public void Execute_HeaderArgCountExceedsMax_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0xFE, 0xFF, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00,
@@ -673,7 +673,7 @@ public class TCpuTests
     [Fact]
     public void Execute_HeaderLocalCountExceedsMax_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0xFE, 0x00, 0xFF, 0x01, 0x02, 0x00, 0x00, 0x00,
@@ -693,7 +693,7 @@ public class TCpuTests
     [Fact]
     public void Execute_CodeExtendsPastEnd_TrapsInvalidCallTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0xFE, 0x00, 0x00, 0x01, 0x64, 0x00, 0x00, 0x00,
@@ -720,7 +720,7 @@ public class TCpuTests
     [Fact]
     public void Execute_FePrefixInvalidSecondByte_TrapsInvalidOpcode()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0xFE, 0x99 };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -739,7 +739,7 @@ public class TCpuTests
     [Fact]
     public void Execute_TruncatedLdargS_TrapsInvalidOpcode()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x0E }; // ldarg.s, operand hiányzik
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -758,7 +758,7 @@ public class TCpuTests
     [Fact]
     public void Execute_TruncatedCall_TrapsInvalidOpcode()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x28, 0x01, 0x02 }; // call, csak 3 byte operand (4 helyett)
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -768,8 +768,8 @@ public class TCpuTests
     }
 
     // ------------------------------------------------------------------
-    // hu: TCpu internal metódus tesztek (InternalsVisibleTo)
-    // en: TCpu internal method tests (InternalsVisibleTo)
+    // hu: TCpuNano internal metódus tesztek (InternalsVisibleTo)
+    // en: TCpuNano internal method tests (InternalsVisibleTo)
     // ------------------------------------------------------------------
 
     /// <summary>
@@ -780,7 +780,7 @@ public class TCpuTests
     [Fact]
     public void EvalPeek_NegativeOffset_ThrowsArgumentOutOfRange()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16 }; // ldc.i4.0 — push 0
 
         cpu.Execute(program);
@@ -796,7 +796,7 @@ public class TCpuTests
     [Fact]
     public void EvalPeek_OffsetBeyondDepth_ThrowsArgumentOutOfRange()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x16 }; // ldc.i4.0
 
         cpu.Execute(program);
@@ -813,7 +813,7 @@ public class TCpuTests
     [Fact]
     public void LoadArg_InvalidIndex_TrapsInvalidArg()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(new byte[] { 0x00 }, 1, 0, [42]); // 1 arg
 
         var trap = Assert.Throws<TTrapException>(() => cpu.LoadArg(5, 0));
@@ -829,7 +829,7 @@ public class TCpuTests
     [Fact]
     public void LoadLocal_InvalidIndex_TrapsInvalidLocal()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(new byte[] { 0x00 }, 0, 1); // 1 local
 
         var trap = Assert.Throws<TTrapException>(() => cpu.LoadLocal(5, 0));
@@ -845,7 +845,7 @@ public class TCpuTests
     [Fact]
     public void StoreArg_InvalidIndex_TrapsInvalidArg()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(new byte[] { 0x00 }, 1, 0, [42]); // 1 arg
 
         var trap = Assert.Throws<TTrapException>(() => cpu.StoreArg(5, 99, 0));
@@ -861,7 +861,7 @@ public class TCpuTests
     [Fact]
     public void StoreLocal_InvalidIndex_TrapsInvalidLocal()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(new byte[] { 0x00 }, 0, 1); // 1 local
 
         var trap = Assert.Throws<TTrapException>(() => cpu.StoreLocal(5, 99, 0));
@@ -883,7 +883,7 @@ public class TCpuTests
     [Fact]
     public void PopCallFrame_OnRootFrame_RestoresArgLocalFromSram()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // hu: Inicializáljuk a root frame-et 1 arg, 0 local - ez beírja az SRAM-ba
         // en: Initialize root frame with 1 arg, 0 locals — writes to SRAM
@@ -913,7 +913,7 @@ public class TCpuTests
     [Fact]
     public void TExecutor_Execute_UnknownOpcode_TrapsInvalidOpcode()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(new byte[] { 0x00 }); // inicializálja a root frame-et
 
         var fakeDecoded = new TDecodedOpcode((TOpcode)0xAB, 1, 0);

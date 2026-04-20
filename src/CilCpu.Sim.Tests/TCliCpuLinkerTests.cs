@@ -5,13 +5,13 @@ namespace CilCpu.Sim.Tests;
 /// <summary>
 /// hu: A TCliCpuLinker integrációs tesztjei. A teszt a Roslyn natív
 /// outputjából (egy classlib .dll byte tömbjéből) indul, lefordítja
-/// CIL-T0 .t0 binárisra, majd a TCpu szimulátoron futtatja, és
+/// CIL-T0 .t0 binárisra, majd a TCpuNano szimulátoron futtatja, és
 /// ellenőrzi az eredményt. Ez a teljes pipeline (C# → Roslyn → linker
 /// → szimulátor) end-to-end validációja.
 /// <br />
 /// en: Integration tests for TCliCpuLinker. Each test starts from
 /// Roslyn-native output (a classlib .dll byte array), links it to a
-/// CIL-T0 .t0 binary, runs it on the TCpu simulator, and verifies the
+/// CIL-T0 .t0 binary, runs it on the TCpuNano simulator, and verifies the
 /// result. This is the end-to-end validation of the full pipeline
 /// (C# → Roslyn → linker → simulator).
 /// </summary>
@@ -20,11 +20,11 @@ public class TCliCpuLinkerTests
     /// <summary>
     /// hu: TDD iteráció 1 — minimal pure function. A 'public static int
     /// Add(int a, int b) => a + b;' Roslyn natív output-ja átfordul
-    /// CIL-T0-ra, és a TCpu szimulátoron Add(2, 3) eredménye 5.
+    /// CIL-T0-ra, és a TCpuNano szimulátoron Add(2, 3) eredménye 5.
     /// <br />
     /// en: TDD iteration 1 — minimal pure function. The 'public static
     /// int Add(int a, int b) => a + b;' Roslyn-native output translates
-    /// to CIL-T0, and the TCpu simulator returns 5 for Add(2, 3).
+    /// to CIL-T0, and the TCpuNano simulator returns 5 for Add(2, 3).
     /// </summary>
     [Fact]
     public void Link_AddTwoNumbers_TCpuReturnsSum()
@@ -42,7 +42,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Add");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [2, 3]);
 
         Assert.Equal(5, cpu.Peek(0));
@@ -86,7 +86,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Fibonacci");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [n]);
 
         Assert.Equal(expected, cpu.Peek(0));
@@ -122,7 +122,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "SumOfSquares");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [3, 4]);
 
         Assert.Equal(25, cpu.Peek(0)); // 9 + 16
@@ -165,7 +165,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Gcd");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [a, b]);
 
         Assert.Equal(expected, cpu.Peek(0));
@@ -315,7 +315,7 @@ public class TCliCpuLinkerTests
         var dllBytes = LoadPureMathDll();
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Add");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [2, 3]);
 
         Assert.Equal(5, cpu.Peek(0));
@@ -334,7 +334,7 @@ public class TCliCpuLinkerTests
         var dllBytes = LoadPureMathDll();
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Fibonacci");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [20]);
 
         Assert.Equal(6765, cpu.Peek(0));
@@ -353,7 +353,7 @@ public class TCliCpuLinkerTests
         var dllBytes = LoadPureMathDll();
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Factorial");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [10]);
 
         Assert.Equal(3628800, cpu.Peek(0));
@@ -372,7 +372,7 @@ public class TCliCpuLinkerTests
         var dllBytes = LoadPureMathDll();
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Gcd");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [48, 18]);
 
         Assert.Equal(6, cpu.Peek(0));
@@ -391,7 +391,7 @@ public class TCliCpuLinkerTests
         var dllBytes = LoadPureMathDll();
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "SumOfSquares");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [3, 4]);
 
         Assert.Equal(25, cpu.Peek(0));
@@ -417,7 +417,7 @@ public class TCliCpuLinkerTests
         var dllBytes = LoadPureMathDll();
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "IsPrime");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [n]);
 
         Assert.Equal(expected, cpu.Peek(0));
@@ -435,17 +435,17 @@ public class TCliCpuLinkerTests
     {
         var dllBytes = LoadPureMathDll();
 
-        var cpuMax = new TCpu();
+        var cpuMax = new TCpuNano();
         var t0Max = TCliCpuLinker.Link(dllBytes, "Math", "Max");
         cpuMax.Execute(t0Max, 0, [7, 12]);
         Assert.Equal(12, cpuMax.Peek(0));
 
-        var cpuMin = new TCpu();
+        var cpuMin = new TCpuNano();
         var t0Min = TCliCpuLinker.Link(dllBytes, "Math", "Min");
         cpuMin.Execute(t0Min, 0, [7, 12]);
         Assert.Equal(7, cpuMin.Peek(0));
 
-        var cpuAbs = new TCpu();
+        var cpuAbs = new TCpuNano();
         var t0Abs = TCliCpuLinker.Link(dllBytes, "Math", "Abs");
         cpuAbs.Execute(t0Abs, 0, [-5]);
         Assert.Equal(5, cpuAbs.Peek(0));
@@ -578,7 +578,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Identity");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [42]);
 
         Assert.Equal(42, cpu.Peek(0));
@@ -606,7 +606,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Logic", "IsEqual");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [5, 5]);
 
         Assert.Equal(1, cpu.Peek(0));
@@ -631,7 +631,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Math", "Double");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [7]);
 
         Assert.Equal(14, cpu.Peek(0));
@@ -660,7 +660,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Div");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [10, 2]);
 
         Assert.Equal(5, cpu.Peek(0));
@@ -684,7 +684,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "And");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [12, 10]);
 
         Assert.Equal(8, cpu.Peek(0));
@@ -708,7 +708,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Or");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [12, 10]);
 
         Assert.Equal(14, cpu.Peek(0));
@@ -732,7 +732,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Xor");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [12, 10]);
 
         Assert.Equal(6, cpu.Peek(0));
@@ -756,7 +756,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Shl");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [3, 4]);
 
         Assert.Equal(48, cpu.Peek(0));
@@ -780,7 +780,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Shr");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [48, 4]);
 
         Assert.Equal(3, cpu.Peek(0));
@@ -804,7 +804,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Not");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [0]);
 
         Assert.Equal(-1, cpu.Peek(0));
@@ -833,7 +833,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "Sum5");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [1, 2, 3, 4, 5]);
 
         Assert.Equal(15, cpu.Peek(0));
@@ -865,7 +865,7 @@ public class TCliCpuLinkerTests
         var dllBytes = TRoslynCompiler.CompileToBytes(source);
         var t0Bytes = TCliCpuLinker.Link(dllBytes, "Pure", "IncrParam");
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         cpu.Execute(t0Bytes, 0, [0, 0, 0, 0, 10]);
 
         Assert.Equal(11, cpu.Peek(0));

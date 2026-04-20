@@ -3,12 +3,12 @@
 /// int típussal, statikus metódusokkal, lokális változókkal, és rekurzív /
 /// cross-method hívásokkal. Ez a CLI-CPU projekt első valódi „felhasználói
 /// programja", amelyet a Roslyn natív pipeline-on át (dotnet build → .dll →
-/// TCliCpuLinker → TCpu) futtathatunk.
+/// TCliCpuLinker → TCpuNano) futtathatunk.
 /// <br />
 /// en: CIL-T0 compatible, pure functional C# methods — using only int types,
 /// static methods, local variables, and recursive / cross-method calls. This
 /// is the CLI-CPU project's first real "user program", runnable through the
-/// Roslyn-native pipeline (dotnet build → .dll → TCliCpuLinker → TCpu).
+/// Roslyn-native pipeline (dotnet build → .dll → TCliCpuLinker → TCpuNano).
 /// </summary>
 public static class Math
 {

@@ -108,6 +108,84 @@ In Akka/actor-style systems, the vast majority of messages are small (commands, 
 
 The `CELL_SIZE` RTL parameter serves as a safety net: if a specific CFPU-R configuration's workload demands it, it can be set to 128B at fabrication time.
 
+**Final decision (2026-04-20):** 64B payload is confirmed for the main mesh.
+
+#### Why not 128B? — Detailed analysis
+
+**1. ML-Max does not justify a larger cell.**
+The original 128→64 reduction was partly motivated by the Matrix Core 4×4 tile being oversized for 128B. Since then, CFPU-ML-Max uses its own 128-bit systolic router (intra-cluster on-die link) — tensor data traffic does **not traverse the main mesh**. Neither the original pro- nor contra-ML argument for 128B is relevant anymore.
+
+**2. Aggregate throughput analysis — matrix bisection capacity.**
+
+Single-link throughput (42-bit L0 @ 500 MHz):
+
+| Cell | Flit count | Payload throughput | Link efficiency |
+|------|-----------|-------------------|----------------|
+| 80B (64B payload) | 16 flits | 64B / 16 cc = 4.00 B/cc | 80% |
+| 144B (128B payload) | 28 flits | 128B / 28 cc = 4.57 B/cc | 89% |
+
+**On a single link, 128B is 14% better.** But this is misleading — system-level throughput is determined by **useful data / link-occupancy time**:
+
+Typical actor workload message-size distribution:
+- ~80% messages ≤ 48 byte payload (commands, responses, events, heartbeats)
+- ~15% messages 49–64 byte (medium payload)
+- ~5% messages > 64 byte (code-load, state migration — multi-cell)
+
+Transport cost of a 32-byte actor message:
+
+| Cell | Flits | Useful data | Efficiency (B/flit) |
+|------|-------|------------|---------------------|
+| 80B (64B payload) | 16 | 32B | 2.00 B/flit |
+| 144B (128B payload) | 28 | 32B | 1.14 B/flit ← **43% waste** |
+
+The 128B cell **occupies the link for 28 cycles** to carry a 32-byte message — the 64B cell delivers the same in **16 cycles**. Useful data is identical, but link occupancy is 75% longer.
+
+Weighted aggregate efficiency (B/flit, with workload mix):
+
+```
+64B cell:  0.80×(32/16) + 0.15×(56/16) + 0.05×(64/16) = 2.33 B/flit
+128B cell: 0.80×(32/28) + 0.15×(56/28) + 0.05×(128/28) = 1.44 B/flit
+```
+
+**The 64B cell provides ~38% higher aggregate throughput** on a 10,000-core mesh under typical actor workloads.
+
+**3. Wormhole routing and HOL blocking.**
+
+In wormhole routing, a cell **holds intermediate links** while traversing. Larger cell = longer occupancy = more congestion:
+
+```
+H=50 average hops (100×100 grid):
+  64B cell:  link occupancy = 2H + 15 = 115 cc
+  128B cell: link occupancy = 2H + 27 = 127 cc (+10%)
+```
+
+The 10% longer link occupancy exponentially increases Head-of-Line blocking probability under high load. VOQ mitigates but does not eliminate this. Result: the 128B cell saturates the network sooner.
+
+**4. Code-load throughput — solved by multi-cell streaming.**
+
+Seal Core code-load is <5% of total chip traffic. The throughput question is solved by pipelined multi-cell streaming, not by increasing cell size:
+- 16 KB method = 256 cells (64B payload each), pipelined
+- L0 throughput @ 500 MHz: ~2.6 GB/s
+- Worst-case delivery: ~8 µs @ 500 MHz
+
+**5. Memory and storage hardware native burst sizes — 64B is the natural unit.**
+
+| Memory type | Native burst size | Alignment |
+|-------------|-------------------|-----------|
+| DDR4 | 64 bytes (BL8 × 8B) | **= 64B payload** |
+| DDR5 | 64 bytes (BL16 × 4B, dual sub-channel) | **= 64B payload** |
+| LPDDR5 | 32–64 bytes (BL16 × 2B or BL32 × 2B) | ≤ 64B payload |
+| HBM2e/HBM3 | 32–256 bytes (pseudo-channel, BL4 × 32B typical) | Both 64B and 128B native |
+| QSPI Flash | 64–256 bytes (page: 256B, but 64B burst optimal) | **= 64B payload** |
+| On-chip SRAM | Cache line: 64 bytes (industry standard) | **= 64B payload** |
+| NOR Flash | 64–128 byte burst | ≤ 64B fits |
+
+The 64-byte payload **exactly matches one DDR4/DDR5 burst, one cache line, and one QSPI burst**. This is not coincidental: the industry memory hierarchy standardized on 64B as the fundamental unit (Intel/AMD L1 cache line = 64B, ARM = 64B). The CFPU cell payload aligns perfectly — one cell payload = one memory transaction, no fragmentation, no padding.
+
+128B payload would align better with HBM, but HBM supports 64B sub-bursts natively, while DDR4/DDR5 and QSPI do **not** support 128B natively (they would split it into two transactions).
+
+**Summary:** 64B payload is optimal for the actor mesh. 128B would only win if >50% of traffic carried 65–128 byte payloads — which is not the case in CFPU. Additionally, 64B is the native burst unit of industry-standard memory hardware.
+
 ### Addressing: 24-bit Hierarchical
 
 ```

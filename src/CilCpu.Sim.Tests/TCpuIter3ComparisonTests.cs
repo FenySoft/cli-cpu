@@ -1,12 +1,12 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: A TCpu iter. 3 összehasonlítás tesztjei: ceq, cgt, cgt.un, clt,
+/// hu: A TCpuNano iter. 3 összehasonlítás tesztjei: ceq, cgt, cgt.un, clt,
 /// clt.un. Mind a 0xFE prefix-szel kódolt opkódok. A teszt-készlet
 /// lefedi a takes/doesn't take ágakat, az unsigned/signed különbséget,
 /// a stack underflow trapot, és az érvénytelen 0xFE prefix kombinációt.
 /// <br />
-/// en: TCpu iter. 3 comparison tests: ceq, cgt, cgt.un, clt, clt.un.
+/// en: TCpuNano iter. 3 comparison tests: ceq, cgt, cgt.un, clt, clt.un.
 /// All are 0xFE-prefixed opcodes. The suite covers takes/doesn't-take
 /// branches, signed/unsigned differences, stack underflow trap, and
 /// invalid 0xFE prefix combinations.
@@ -25,7 +25,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Ceq_Equal_Returns1()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x1B, 0xFE, 0x01 }; // ldc.i4.5; ldc.i4.5; ceq
 
         cpu.Execute(program);
@@ -41,7 +41,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Ceq_NotEqual_Returns0()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x1A, 0xFE, 0x01 }; // ldc.i4.5; ldc.i4.4; ceq
 
         cpu.Execute(program);
@@ -61,7 +61,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Cgt_Greater_Returns1()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x19, 0xFE, 0x02 }; // ldc.i4.5; ldc.i4.3; cgt
 
         cpu.Execute(program);
@@ -77,7 +77,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Cgt_NotGreater_Returns0()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x19, 0x1B, 0xFE, 0x02 }; // ldc.i4.3; ldc.i4.5; cgt
 
         cpu.Execute(program);
@@ -93,7 +93,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Cgt_NegativeNotGreaterThanOne_Signed()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x15, 0x17, 0xFE, 0x02 }; // ldc.i4.m1; ldc.i4.1; cgt
 
         cpu.Execute(program);
@@ -113,7 +113,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_CgtUn_NegativeGreaterThanOne_UnsignedCompare()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x15, 0x17, 0xFE, 0x03 }; // ldc.i4.m1; ldc.i4.1; cgt.un
 
         cpu.Execute(program);
@@ -129,7 +129,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_CgtUn_OneNotGreaterThanTwo()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x17, 0x18, 0xFE, 0x03 }; // ldc.i4.1; ldc.i4.2; cgt.un
 
         cpu.Execute(program);
@@ -149,7 +149,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Clt_Less_Returns1()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x19, 0x1B, 0xFE, 0x04 }; // ldc.i4.3; ldc.i4.5; clt
 
         cpu.Execute(program);
@@ -165,7 +165,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Clt_NotLess_Returns0()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x19, 0xFE, 0x04 }; // ldc.i4.5; ldc.i4.3; clt
 
         cpu.Execute(program);
@@ -181,7 +181,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Clt_NegativeLessThanOne_Signed()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x15, 0x17, 0xFE, 0x04 }; // ldc.i4.m1; ldc.i4.1; clt
 
         cpu.Execute(program);
@@ -201,7 +201,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_CltUn_ForNegative_UnsignedCompare()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x15, 0x17, 0xFE, 0x05 }; // ldc.i4.m1; ldc.i4.1; clt.un
 
         cpu.Execute(program);
@@ -217,7 +217,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_CltUn_OneLessThanTwo()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x17, 0x18, 0xFE, 0x05 }; // ldc.i4.1; ldc.i4.2; clt.un
 
         cpu.Execute(program);
@@ -237,7 +237,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Ceq_EmptyStack_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0xFE, 0x01 };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -254,7 +254,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Clt_OneElement_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x17, 0xFE, 0x04 }; // ldc.i4.1; clt
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -279,7 +279,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_InvalidPrefixByte_0xFE_0xFF_RaisesInvalidOpcode()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0xFE, 0xFF };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -299,7 +299,7 @@ public class TCpuIter3ComparisonTests
     [Fact]
     public void Execute_Truncated0xFEPrefix_RaisesInvalidOpcode()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0xFE };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));

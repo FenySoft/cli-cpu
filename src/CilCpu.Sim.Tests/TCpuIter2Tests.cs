@@ -1,12 +1,12 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: A TCpu iter. 2 tesztjei: stack manipuláció (dup, pop), lokális
+/// hu: A TCpuNano iter. 2 tesztjei: stack manipuláció (dup, pop), lokális
 /// változók (ldloc.0..3, ldloc.s, stloc.0..3, stloc.s), és argumentumok
 /// (ldarg.0..3, ldarg.s, starg.s). A trap-tesztek lefedik a StackUnderflow,
 /// InvalidLocal és InvalidArg trap ágakat.
 /// <br />
-/// en: TCpu iter. 2 tests: stack manipulation (dup, pop), locals
+/// en: TCpuNano iter. 2 tests: stack manipulation (dup, pop), locals
 /// (ldloc.0..3, ldloc.s, stloc.0..3, stloc.s), and arguments
 /// (ldarg.0..3, ldarg.s, starg.s). The trap tests cover the
 /// StackUnderflow, InvalidLocal and InvalidArg trap branches.
@@ -27,7 +27,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_Dup_OnNonEmpty_DuplicatesTos_DepthGrows()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x25 }; // ldc.i4.5; dup
 
         cpu.Execute(program);
@@ -48,7 +48,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_Dup_OnEmpty_ThrowsStackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x25 }; // dup
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -65,7 +65,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_Dup_AtMaxDepth_ThrowsStackOverflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // 64 ldc.i4.0 + dup
         var program = new byte[65];
 
@@ -92,7 +92,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_Pop_OnNonEmpty_RemovesTos_DepthShrinks()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x19, 0x26 }; // ldc.i4.3; pop
 
         cpu.Execute(program);
@@ -109,7 +109,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_Pop_OnEmpty_ThrowsStackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x26 }; // pop
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -132,7 +132,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdLoc_0_PushesLocal0()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x0A, 0x06 }; // ldc.i4.5; stloc.0; ldloc.0
 
         cpu.Execute(program, 0, 1);
@@ -149,7 +149,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdLoc_1_PushesLocal1()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1C, 0x0B, 0x07 }; // ldc.i4.6; stloc.1; ldloc.1
 
         cpu.Execute(program, 0, 2);
@@ -166,7 +166,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdLoc_2_PushesLocal2()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1D, 0x0C, 0x08 }; // ldc.i4.7; stloc.2; ldloc.2
 
         cpu.Execute(program, 0, 3);
@@ -183,7 +183,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdLoc_3_PushesLocal3()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1E, 0x0D, 0x09 }; // ldc.i4.8; stloc.3; ldloc.3
 
         cpu.Execute(program, 0, 4);
@@ -204,7 +204,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdLoc_S_Index4_PushesLocal4()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // ldc.i4.s 42; stloc.s 4; ldloc.s 4
         var program = new byte[] { 0x1F, 0x2A, 0x13, 0x04, 0x11, 0x04 };
 
@@ -222,7 +222,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdLoc_S_Index15_PushesLocal15()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // ldc.i4.s 99; stloc.s 15; ldloc.s 15
         var program = new byte[] { 0x1F, 0x63, 0x13, 0x0F, 0x11, 0x0F };
 
@@ -240,7 +240,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdLoc_S_InvalidIndex_ThrowsInvalidLocal()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x11, 0x10 }; // ldloc.s 16
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0, 16));
@@ -259,7 +259,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdLoc_S_IndexBeyondLocalCount_ThrowsInvalidLocal()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x11, 0x04 }; // ldloc.s 4
 
         // hu: LocalCount = 4, index = 4 → index ≥ count
@@ -284,7 +284,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StLoc_0_StoresTosIntoLocal0()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // ldc.i4.s 11; stloc.0; ldloc.0
         var program = new byte[] { 0x1F, 0x0B, 0x0A, 0x06 };
 
@@ -303,7 +303,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StLoc_1_2_3_StoreTosIntoCorrectLocal()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1F, 0x14, // ldc.i4.s 20
@@ -333,7 +333,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StLoc_S_InvalidIndex_ThrowsInvalidLocal()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x13, 0x10 }; // stloc.s 16
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0, 16));
@@ -360,7 +360,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StLoc_S_InvalidIndexAndEmptyStack_InvalidLocalTakesPrecedence()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x13, 0x10 }; // stloc.s 16
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0, 16));
@@ -380,7 +380,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StArg_S_InvalidIndexAndEmptyStack_InvalidArgTakesPrecedence()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x10, 0x10 }; // starg.s 16
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0, 0));
@@ -397,7 +397,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StLoc_S_StackUnderflow_ThrowsStackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x0A }; // stloc.0
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 0, 1));
@@ -418,7 +418,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdArg_0_PushesArg0()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x02 }; // ldarg.0
 
         cpu.Execute(program, 4, 0, new[] { 10, 20, 30, 40 });
@@ -435,7 +435,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdArg_1_2_3_PushCorrectArgs()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x03, 0x04, 0x05 }; // ldarg.1; ldarg.2; ldarg.3
 
         cpu.Execute(program, 4, 0, new[] { 10, 20, 30, 40 });
@@ -458,7 +458,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdArg_S_Index4_PushesArg4()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x0E, 0x04 }; // ldarg.s 4
 
         var initial = new[] { 0, 1, 2, 3, 40, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 };
@@ -476,7 +476,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdArg_S_InvalidIndex_ThrowsInvalidArg()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x0E, 0x10 }; // ldarg.s 16
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 16, 0));
@@ -493,7 +493,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdArg_S_IndexBeyondArgCount_ThrowsInvalidArg()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x0E, 0x03 }; // ldarg.s 3
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 2, 0));
@@ -516,7 +516,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StArg_S_UpdatesArg()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // ldc.i4.s 77; starg.s 0; ldarg.0
         var program = new byte[] { 0x1F, 0x4D, 0x10, 0x00, 0x02 };
 
@@ -534,7 +534,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StArg_S_InvalidIndex_ThrowsInvalidArg()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x10, 0x10 }; // starg.s 16
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 16, 0));
@@ -551,7 +551,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_StArg_S_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x10, 0x00 }; // starg.s 0
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program, 1, 0, new[] { 5 }));
@@ -581,7 +581,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_SwapViaLocals_ResultIsSwapped()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x02, // ldarg.0 → push 100
@@ -609,7 +609,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_LdcDupPopPop_EndsEmpty()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x1B, 0x25, 0x26, 0x26 }; // ldc.i4.5; dup; pop; pop
 
         cpu.Execute(program);
@@ -626,7 +626,7 @@ public class TCpuIter2Tests
     [Fact]
     public void Execute_PushPopCycle_EndsEmpty()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x19, 0x26 }; // ldc.i4.3; pop
 
         cpu.Execute(program);

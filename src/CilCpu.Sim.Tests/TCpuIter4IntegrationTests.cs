@@ -1,13 +1,13 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: TCpu iter. 4 integrációs tesztek: valódi rekurzív és iteratív
+/// hu: TCpuNano iter. 4 integrációs tesztek: valódi rekurzív és iteratív
 /// algoritmusok (Fibonacci, faktoriális, GCD) futtatása a header-vezérelt
 /// Execute overload-on. Ezek a tesztek bizonyítják, hogy a 48 CIL-T0 opkód
 /// teljes együtt-működése helyes — a Fibonacci(20) = 6765 az F1 fázis
 /// "aranypéldája".
 /// <br />
-/// en: TCpu iter. 4 integration tests: real recursive and iterative
+/// en: TCpuNano iter. 4 integration tests: real recursive and iterative
 /// algorithms (Fibonacci, factorial, GCD) running on the header-driven
 /// Execute overload. These prove that the full 48-opcode CIL-T0 set works
 /// together correctly — Fibonacci(20) = 6765 is the F1 phase "golden
@@ -85,7 +85,7 @@ public class TCpuIter4IntegrationTests
     [InlineData(10, 55)]
     public void Execute_Fibonacci_SmallValues(int n, int expected)
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = BuildFibonacciProgram();
 
         cpu.Execute(program, 0, new[] { n });
@@ -104,7 +104,7 @@ public class TCpuIter4IntegrationTests
     [Fact]
     public void Execute_Fibonacci20_Returns6765()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = BuildFibonacciProgram();
 
         cpu.Execute(program, 0, new[] { 20 });
@@ -129,7 +129,7 @@ public class TCpuIter4IntegrationTests
     [InlineData(10, 3628800)]
     public void Execute_FactorialIterative(int n, int expected)
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // Body layout (file offsets, header at 0..7, body starts at 8):
         //  8:  17        ldc.i4.1
         //  9:  0A        stloc.0           ; result = 1
@@ -197,7 +197,7 @@ public class TCpuIter4IntegrationTests
     [InlineData(7, 7, 7)]
     public void Execute_GcdIterative(int a, int b, int expected)
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // Body layout (file offsets, header at 0..7):
         //  8: 03        ldarg.1            ; LOOP
         //  9: 16        ldc.i4.0
@@ -281,7 +281,7 @@ public class TCpuIter4IntegrationTests
     [Fact]
     public void Execute_VoidCalleeNoReturnValue()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // Caller header @ 0: arg=0 local=0 max=0 code=6
         //   call 14; ret      (call=5, ret=1)
         // Callee header @ 14: arg=0 local=0 max=0 code=1

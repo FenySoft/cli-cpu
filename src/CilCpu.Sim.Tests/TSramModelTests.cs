@@ -1,16 +1,16 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: TSramModelTests — a TCpu SRAM-alapú belső állapot modelljének
+/// hu: TSramModelTests — a TCpuNano SRAM-alapú belső állapot modelljének
 /// TDD-Red fázis tesztjei. Ezek a tesztek MOST NEM FORDULNAK LE, mert
-/// a TCpu-ban még nem létezik: Sp, FrameBase, SramSnapshot(), SramSize,
-/// és a TCpu(byte[]?, int) konstruktor. A tesztek a frame layout helyességét
+/// a TCpuNano-ban még nem létezik: Sp, FrameBase, SramSnapshot(), SramSize,
+/// és a TCpuNano(byte[]?, int) konstruktor. A tesztek a frame layout helyességét
 /// ellenőrzik az SRAM byte-tömbön keresztül.
 /// <br />
 /// en: TSramModelTests — TDD-Red phase tests for the SRAM-based internal
-/// state model of TCpu. These tests DO NOT COMPILE YET because TCpu does
+/// state model of TCpuNano. These tests DO NOT COMPILE YET because TCpuNano does
 /// not yet have: Sp, FrameBase, SramSnapshot(), SramSize, and the
-/// TCpu(byte[]?, int) constructor. The tests verify frame layout correctness
+/// TCpuNano(byte[]?, int) constructor. The tests verify frame layout correctness
 /// by inspecting the SRAM byte array.
 /// </summary>
 public class TSramModelTests
@@ -43,7 +43,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_RootFrame_FrameBaseIsZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // header: magic=0xFE, arg=2, local=0, max_stack=2, code_size=3
         // code: ldarg.0, ldarg.1, add
@@ -70,7 +70,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_RootFrame_SramHeaderCorrect()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // header: magic=0xFE, arg=2, local=1, max_stack=2, code_size=3
         // code: ldarg.0, ldarg.1, add
@@ -109,7 +109,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_RootFrame_ArgsInSram()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // header: arg=2, local=0, max_stack=2, code_size=3
         // code: ldarg.0, ldarg.1, add
@@ -142,7 +142,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_RootFrame_LocalsZeroed()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // header: arg=1, local=2, max_stack=1, code_size=2
         // code: ldarg.0, ret
@@ -176,7 +176,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_RootFrame_SpAfterExecution()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // header: arg=2, local=1, max_stack=2, code_size=3
         // code: ldarg.0, ldarg.1, add
@@ -208,7 +208,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_Call_CalleeFrameBaseCorrect()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // Caller at 0: arg=0, local=0, max=1, code_size=6
         //   call 14; ret
@@ -246,7 +246,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_Call_CalleeHeaderInSram()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // hu: Egy "instrumented" program: caller breakpoint-ot szeretnénk
         // a callee visszatérése ELŐtt, de mivel a végrehajtás befejezése
@@ -319,7 +319,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_Call_CalleeArgsInSram()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // hu: Caller arg=0, local=0 → callee FB = 12 + 0 = 12
         // Caller pushes ldc.i4.3 és ldc.i4.4, hívja a callee-t (arg=2)
@@ -361,7 +361,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_Ret_SpRestoredToCallerLevel()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // hu: Caller: arg=0, local=0 → alap frame méret = 12 byte
         // A call visszatér, a caller TOS-ra kerül az eredmény (1 elem).
@@ -397,7 +397,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_Ret_FrameBaseRestoredToCaller()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         var program = new byte[]
         {
@@ -437,7 +437,7 @@ public class TSramModelTests
         // feltölti az SRAM-ot.
         // en: 128-byte SRAM — each frame is at least 12 bytes, so after
         // ~10 levels overflow must occur. Self-recursive call fills SRAM.
-        var cpu = new TCpu(null, 128);
+        var cpu = new TCpuNano(null, 128);
 
         // self-recursive: header code_size=6, call rva=0, ret
         var program = new byte[]
@@ -461,7 +461,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_EvalStackOverflow_StillTraps()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // hu: 65 × ldc.i4.0 push → 65. push-on StackOverflow trap
         // en: 65 × ldc.i4.0 pushes → StackOverflow trap on the 65th push
@@ -501,7 +501,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_PeekStillWorks_AfterSramRefactor()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // header: arg=2, local=0, max=2, code_size=3
         // code: ldarg.0, ldarg.1, add
@@ -526,7 +526,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_StackDepthStillWorks()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // header: arg=0, local=0, max=3, code_size=3
         // code: ldc.i4.1, ldc.i4.2, ldc.i4.3  → depth = 3
@@ -555,7 +555,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_Raw_RootFrameInSram()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // nyers kód, header nélkül: ldarg.0, ldarg.1, add
         var program = new byte[] { 0x02, 0x03, 0x58 };
@@ -593,7 +593,7 @@ public class TSramModelTests
     [Fact]
     public void Execute_RawNoArgs_FrameBaseZero()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // ldc.i4.7
         var program = new byte[] { 0x1D };
@@ -608,29 +608,29 @@ public class TSramModelTests
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// hu: A TCpu(null, ASramSize) konstruktor a megadott SRAM méretet
+    /// hu: A TCpuNano(null, ASramSize) konstruktor a megadott SRAM méretet
     /// hozza létre, és ezt a SramSize property tükrözi.
     /// <br />
-    /// en: The TCpu(null, ASramSize) constructor creates SRAM with the
+    /// en: The TCpuNano(null, ASramSize) constructor creates SRAM with the
     /// specified size, reflected by the SramSize property.
     /// </summary>
     [Fact]
     public void Constructor_CustomSramSize_SramSizeMatchesParameter()
     {
-        var cpu = new TCpu(null, 4096);
+        var cpu = new TCpuNano(null, 4096);
 
         Assert.Equal(4096, cpu.SramSize);
     }
 
     /// <summary>
-    /// hu: Az alapértelmezett TCpu() konstruktor 16384 byte SRAM-ot hoz létre.
+    /// hu: Az alapértelmezett TCpuNano() konstruktor 16384 byte SRAM-ot hoz létre.
     /// <br />
-    /// en: The default TCpu() constructor creates 16384 bytes of SRAM.
+    /// en: The default TCpuNano() constructor creates 16384 bytes of SRAM.
     /// </summary>
     [Fact]
     public void Constructor_Default_SramSizeIs16384()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         Assert.Equal(16384, cpu.SramSize);
     }

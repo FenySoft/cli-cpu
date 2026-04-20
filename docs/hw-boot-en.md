@@ -85,7 +85,67 @@ The Seal Core verifies its own integrity:
 
 This is the root of the trust chain. Detailed trust chain description: [authcode-en.md §7](authcode-en.md#trustchain)
 
-### 2c. QSPI flash read
+### 2c. Boot source selection
+
+The Seal Core can load the binary to verify from **multiple sources**. The boot source is determined by the `BOOT_SRC` configuration (FPGA: synthesis-time parameter; ASIC: eFuse/pin-strap).
+
+#### Boot source table (XC7A200T FPGA prototype)
+
+| # | Source | MMIO base | Speed | Use case |
+|---|--------|-----------|-------|----------|
+| 0 | **QSPI Flash** | `0xF0001000` | ~50 MB/s (Quad) | Normal production boot — reuses on-board configuration flash |
+| 1 | **UART** | `0xF0001100` | ~1 MB/s | Development, debug, recovery — streamed from host |
+| 2 | **BRAM (on-chip)** | `0xF0001200` | Immediate (1 cc) | Firmware baked at synthesis time — test / CI |
+| 3 | **Ethernet** | `0xF0001300` | ~12 MB/s | Remote boot — from network (PXE-like), multi-board cluster |
+| 4 | **JTAG** | — (dedicated) | ~10 MB/s | Debug-boot — directly from OpenOCD / Vivado |
+
+#### Boot device scan order
+
+After POR, the Seal Core firmware **probes** boot sources in a fixed priority order. At each source, it attempts to read a binary header magic. The first source that returns a valid header → boot proceeds from there.
+
+```
+Seal Core firmware (boot device scan):
+
+  for each source in priority order:
+      1. Initialize source (QSPI: config, UART: wait RTS, ETH: PHY link, ...)
+      2. Read header with timeout (magic + size + cert offset)
+      3. If valid magic ("TSCL" or "T0CL") → SELECTED, exit loop
+      4. If timeout or invalid magic → next source
+
+  If none valid → HALT + FAULT signal
+```
+
+**Priority order:**
+
+| Priority | Source | Timeout | Rationale |
+|----------|--------|---------|-----------|
+| 1. | **JTAG** | 10 ms | Debug-boot — if JTAG is active, it always wins (developer intentional) |
+| 2. | **BRAM** | 0 (immediate) | If synthesis-baked firmware exists, it's always valid |
+| 3. | **UART** | 50 ms | Host-initiated — if the host sends RTS within timeout |
+| 4. | **Ethernet** | 100 ms | Remote boot — waits for PHY link-up + magic frame |
+| 5. | **QSPI Flash** | 200 ms | Production default — tried last but is the "safe fallback" |
+
+**Note:** the order is designed so that developer/debug sources (JTAG, BRAM, UART) take precedence over the production source (QSPI). This ensures a "bricked" flash system can always be recovered via JTAG or UART.
+
+**On FPGA:** the presence of each source is a synthesis-time parameter (`HAS_UART_BOOT`, `HAS_ETH_BOOT`, etc.). If a source is not synthesized, the scan skips it.
+
+**On ASIC (F6+):** all sources are present in hardware; individual sources can be disabled via eFuse (production lockdown: only QSPI remains).
+
+#### Boot flow from the discovered source
+
+Once a source is selected, the flow is identical in all cases:
+
+```
+Seal Core firmware (boot load + verify):
+  1. Read binary header (size, cert offset, flags)
+  2. Stream binary + cert → SRAM buffer (64-byte chunks)
+  3. SHA-256 HW verify (streaming, per chunk)
+  4. WOTS+/Merkle verify (on the cert)
+  5. If VALID → SEAL into QRAM CODE region
+  6. If INVALID → ZEROIZATION + HALT
+```
+
+#### QSPI Flash registers (source #0)
 
 The Seal Core reads the external flash via MMIO (`0xF0001000`):
 - Neuron OS CIL binary
@@ -157,14 +217,46 @@ Boot-relevant registers. For the full MMIO map, see: [osreq-002 — MMIO Memory 
 | Quench-RAM CODE base | `0xF0002030` | R/O | 4 bytes | Verified CIL binary start address |
 | Quench-RAM CODE size | `0xF0002034` | R/O | 4 bytes | Verified CIL binary size |
 
-### Flash controller
+### Boot source selector
+
+| Register | Address | Type | Size | Description |
+|----------|---------|------|------|-------------|
+| BOOT_SRC_FOUND | `0xF0000F00` | R/O | 4 bytes | Discovered boot source (0=JTAG, 1=BRAM, 2=UART, 3=ETH, 4=QSPI, 0xFF=none) |
+| BOOT_STATUS | `0xF0000F04` | R/O | 4 bytes | 0=scanning, 1=loading, 2=verifying, 3=done, 0xFF=fail |
+| BOOT_SRC_MASK | `0xF0000F08` | R/O | 4 bytes | Synthesis/eFuse: which sources are present (bit0=JTAG, bit1=BRAM, bit2=UART, bit3=ETH, bit4=QSPI) |
+
+### Flash controller (boot source #0)
 
 | Register | Address | Type | Size | Description |
 |----------|---------|------|------|-------------|
 | QSPI config | `0xF0001000` | R/W | 4 bytes | Enable, SPI mode, clock divider |
 | QSPI flash addr | `0xF0001004` | R/W | 4 bytes | Flash read address |
 | QSPI binary size | `0xF0001008` | R/O | 4 bytes | Binary size (from flash header) |
-| QSPI data | `0xF000100C` | R/O | 1 byte | Next byte from flash |
+| QSPI data | `0xF000100C` | R/O | 64 bytes | Next 64-byte chunk from flash (= cell payload size) |
+
+### UART boot controller (boot source #1)
+
+| Register | Address | Type | Size | Description |
+|----------|---------|------|------|-------------|
+| UART config | `0xF0001100` | R/W | 4 bytes | Baud rate, parity, enable |
+| UART status | `0xF0001104` | R/O | 4 bytes | RX ready, TX empty, error flags |
+| UART data | `0xF0001108` | R/W | 64 bytes | RX/TX buffer (64-byte chunk) |
+
+### BRAM boot (boot source #2)
+
+| Register | Address | Type | Size | Description |
+|----------|---------|------|------|-------------|
+| BRAM base | `0xF0001200` | R/O | 4 bytes | Start address of firmware stored in BRAM |
+| BRAM size | `0xF0001204` | R/O | 4 bytes | Firmware size (fixed at synthesis time) |
+
+### Ethernet boot controller (boot source #3)
+
+| Register | Address | Type | Size | Description |
+|----------|---------|------|------|-------------|
+| ETH config | `0xF0001300` | R/W | 4 bytes | PHY init, MAC address[31:0] |
+| ETH config2 | `0xF0001304` | R/W | 4 bytes | MAC address[47:32], VLAN, enable |
+| ETH status | `0xF0001308` | R/O | 4 bytes | Link up, RX ready, frame count |
+| ETH data | `0xF000130C` | R/O | 64 bytes | Next 64-byte chunk (from Ethernet frame payload) |
 
 ### Core discovery and control
 
@@ -222,4 +314,5 @@ Detailed core description: [core-types-en.md](core-types-en.md)
 
 | Version | Date | Change |
 |---------|------|--------|
+| 1.1 | 2026-04-20 | Boot source selection: 5 sources (QSPI, UART, BRAM, Ethernet, JTAG) aligned to XC7A200T FPGA capabilities. MMIO registers extended for all boot sources. 64-byte chunk data reads (= cell payload size). |
 | 1.0 | 2026-04-19 | Initial version — HW boot separated from NeuronOS boot-sequence-hu.md |

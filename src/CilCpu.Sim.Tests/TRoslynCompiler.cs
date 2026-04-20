@@ -8,11 +8,11 @@ namespace CilCpu.Sim.Tests;
 /// hu: Teszt-segéd, amely egy C# forráskód string-et runtime-ban
 /// lefordít egy memóriabeli .NET assembly byte-tömbbé. Ezt a linker
 /// tesztek használják, hogy a Roslyn natív outputjából tudjanak
-/// CIL-T0-ra fordítani, és onnan a TCpu szimulátor futtatni.
+/// CIL-T0-ra fordítani, és onnan a TCpuNano szimulátor futtatni.
 /// <br />
 /// en: Test helper that compiles a C# source string at runtime to an
 /// in-memory .NET assembly byte array. Used by linker tests to drive
-/// the Roslyn-native output through the linker into the TCpu simulator.
+/// the Roslyn-native output through the linker into the TCpuNano simulator.
 /// </summary>
 public static class TRoslynCompiler
 {

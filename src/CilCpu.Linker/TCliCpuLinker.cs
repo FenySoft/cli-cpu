@@ -7,14 +7,14 @@ namespace CilCpu.Linker;
 /// <summary>
 /// hu: A CIL-CPU linker tool — a Roslyn által generált .NET assembly
 /// (.dll) byte-tömböt CIL-T0 kompatibilis bináris formátumba alakítja,
-/// amelyet a TCpu szimulátor (vagy az F2 RTL hardver) közvetlenül
+/// amelyet a TCpuNano szimulátor (vagy az F2 RTL hardver) közvetlenül
 /// futtatni tud. A tool: tranzitív call-target discovery-t végez,
 /// metaadat tokeneket abszolút RVA-kká old fel, CIL-T0 metódus
 /// header-eket generál, és ellenőrzi az opkód-készlet kompatibilitást.
 /// <br />
 /// en: The CLI-CPU linker tool — converts a Roslyn-generated .NET
 /// assembly (.dll) byte array into a CIL-T0 compatible binary format
-/// directly executable by the TCpu simulator (or F2 RTL hardware).
+/// directly executable by the TCpuNano simulator (or F2 RTL hardware).
 /// The tool performs transitive call-target discovery, resolves
 /// metadata tokens to absolute RVAs, generates CIL-T0 method headers,
 /// and verifies opcode set compatibility.

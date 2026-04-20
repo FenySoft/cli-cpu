@@ -1,14 +1,14 @@
 namespace CilCpu.Sim;
 
 /// <summary>
-/// hu: A CIL-T0 utasítás-végrehajtó. A <see cref="TCpu"/> dekódolás után
+/// hu: A CIL-T0 utasítás-végrehajtó. A <see cref="TCpuNano"/> dekódolás után
 /// ennek az osztálynak adja át a vezérlést egy-egy utasításra. A végrehajtó
 /// felelős a stack manipulációért, az aritmetikáért, összehasonlításokért,
 /// elágazásokért és a lokális/argumentum hozzáférésért. A trap sorrend
 /// (pl. index-ellenőrzés megelőzi a stack-hozzáférést <c>stloc.s</c>-nél,
 /// lásd <c>docs/ISA-CIL-T0.md</c>) itt van rögzítve.
 /// <br />
-/// en: CIL-T0 instruction executor. After decoding, <see cref="TCpu"/>
+/// en: CIL-T0 instruction executor. After decoding, <see cref="TCpuNano"/>
 /// delegates each instruction to this class. The executor is responsible
 /// for stack manipulation, arithmetic, comparisons, branches, and local/
 /// argument access. Trap ordering (e.g. index check precedes stack access
@@ -19,13 +19,13 @@ internal static class TExecutor
     /// <summary>
     /// hu: Egyetlen dekódolt utasítás végrehajtása a megadott CPU állapoton.
     /// A metódus csak a trap feltételeket lehet, hogy dob — minden egyéb
-    /// állapotváltozás a TCpu belső referenciáin keresztül történik.
+    /// állapotváltozás a TCpuNano belső referenciáin keresztül történik.
     /// A PC frissítése itt történik: branch opkódoknál a számolt target
     /// offszet, minden más opkódnál a dekódolt utasítás hossza.
     /// <br />
     /// en: Executes a single decoded instruction on the given CPU state.
     /// The method may only raise trap exceptions — all other state changes
-    /// happen via the TCpu internal references. The PC is updated here:
+    /// happen via the TCpuNano internal references. The PC is updated here:
     /// to the computed target offset for branch opcodes, or advanced by
     /// the decoded instruction length for everything else.
     /// </summary>
@@ -44,7 +44,7 @@ internal static class TExecutor
     /// <br />
     /// en: The decoded instruction (opcode, length, operand).
     /// </param>
-    public static void Execute(TCpu ACpu, byte[] AProgram, TDecodedOpcode ADecoded)
+    public static void Execute(TCpuNano ACpu, byte[] AProgram, TDecodedOpcode ADecoded)
     {
         var pc = ACpu.Pc;
 
@@ -205,7 +205,7 @@ internal static class TExecutor
                 if (ACpu.EvalDepth <= 0)
                     throw new TTrapException(TTrapReason.StackUnderflow, pc);
 
-                if (ACpu.EvalDepth >= TCpu.MaxStackDepth)
+                if (ACpu.EvalDepth >= TCpuNano.MaxStackDepth)
                     throw new TTrapException(TTrapReason.StackOverflow, pc);
 
                 ACpu.EvalPush(ACpu.EvalPeek(0), pc);
@@ -550,7 +550,7 @@ internal static class TExecutor
     /// arg) and push a new SRAM frame. Return PC = offset of the opcode
     /// after the call.
     /// </summary>
-    private static void ExecuteCall(TCpu ACpu, byte[] AProgram, TDecodedOpcode ADecoded, int APc)
+    private static void ExecuteCall(TCpuNano ACpu, byte[] AProgram, TDecodedOpcode ADecoded, int APc)
     {
         var targetRva = ADecoded.Operand;
 
@@ -566,7 +566,7 @@ internal static class TExecutor
         var localCount = AProgram[targetRva + 2];
         var codeSize = (ushort)(AProgram[targetRva + 4] | (AProgram[targetRva + 5] << 8));
 
-        if (argCount > TCpu.MaxArgs || localCount > TCpu.MaxLocals)
+        if (argCount > TCpuNano.MaxArgs || localCount > TCpuNano.MaxLocals)
             throw new TTrapException(TTrapReason.InvalidCallTarget, APc,
                 $"call target RVA=0x{targetRva:X4} has invalid arg/local count at PC=0x{APc:X4}.");
 
@@ -599,7 +599,7 @@ internal static class TExecutor
     /// frame we halt the CPU; otherwise the return value is pushed onto
     /// the caller's eval stack.
     /// </summary>
-    private static void ExecuteRet(TCpu ACpu, int APc)
+    private static void ExecuteRet(TCpuNano ACpu, int APc)
     {
         var hasReturnValue = ACpu.EvalDepth >= 1;
         var returnValue = hasReturnValue ? ACpu.EvalPop(APc) : 0;
@@ -639,7 +639,7 @@ internal static class TExecutor
     /// <see cref="TTrapReason.InvalidMemoryAccess"/> trap. The F2 RTL will
     /// treat this as a memory controller fault.
     /// </summary>
-    private static void ExecuteLdindI4(TCpu ACpu, int APc)
+    private static void ExecuteLdindI4(TCpuNano ACpu, int APc)
     {
         var data = ACpu.DataMemory;
 
@@ -671,7 +671,7 @@ internal static class TExecutor
     /// to data memory. Out-of-bounds or no-memory raises an
     /// <see cref="TTrapReason.InvalidMemoryAccess"/> trap.
     /// </summary>
-    private static void ExecuteStindI4(TCpu ACpu, int APc)
+    private static void ExecuteStindI4(TCpuNano ACpu, int APc)
     {
         var data = ACpu.DataMemory;
 
@@ -726,9 +726,9 @@ internal static class TExecutor
     /// en: Pushes a local variable onto the stack. Invalid index raises
     /// <see cref="TTrapReason.InvalidLocal"/>.
     /// </summary>
-    private static void LoadLocal(TCpu ACpu, int AIndex)
+    private static void LoadLocal(TCpuNano ACpu, int AIndex)
     {
-        if (AIndex < 0 || AIndex >= TCpu.MaxLocals || AIndex >= ACpu.LocalCount)
+        if (AIndex < 0 || AIndex >= TCpuNano.MaxLocals || AIndex >= ACpu.LocalCount)
             throw new TTrapException(TTrapReason.InvalidLocal, ACpu.Pc,
                 $"Invalid local index {AIndex} at PC=0x{ACpu.Pc:X4}");
 
@@ -747,11 +747,11 @@ internal static class TExecutor
     /// (<see cref="TTrapReason.StackUnderflow"/>). An invalid index always
     /// takes precedence over stack underflow — see <c>docs/ISA-CIL-T0.md</c>.
     /// </summary>
-    private static void StoreLocal(TCpu ACpu, int AIndex)
+    private static void StoreLocal(TCpuNano ACpu, int AIndex)
     {
         // hu: Index check BEFORE pop (ISA spec trap sorrend)
         // en: Index check BEFORE pop (ISA spec trap ordering)
-        if (AIndex < 0 || AIndex >= TCpu.MaxLocals || AIndex >= ACpu.LocalCount)
+        if (AIndex < 0 || AIndex >= TCpuNano.MaxLocals || AIndex >= ACpu.LocalCount)
             throw new TTrapException(TTrapReason.InvalidLocal, ACpu.Pc,
                 $"Invalid local index {AIndex} at PC=0x{ACpu.Pc:X4}");
 
@@ -766,9 +766,9 @@ internal static class TExecutor
     /// en: Pushes an argument onto the stack. Invalid index raises
     /// <see cref="TTrapReason.InvalidArg"/>.
     /// </summary>
-    private static void LoadArg(TCpu ACpu, int AIndex)
+    private static void LoadArg(TCpuNano ACpu, int AIndex)
     {
-        if (AIndex < 0 || AIndex >= TCpu.MaxArgs || AIndex >= ACpu.ArgCount)
+        if (AIndex < 0 || AIndex >= TCpuNano.MaxArgs || AIndex >= ACpu.ArgCount)
             throw new TTrapException(TTrapReason.InvalidArg, ACpu.Pc,
                 $"Invalid arg index {AIndex} at PC=0x{ACpu.Pc:X4}");
 
@@ -783,11 +783,11 @@ internal static class TExecutor
     /// en: Pops TOS into an argument. <b>Trap ordering:</b> index check first
     /// (<see cref="TTrapReason.InvalidArg"/>), then pop.
     /// </summary>
-    private static void StoreArg(TCpu ACpu, int AIndex)
+    private static void StoreArg(TCpuNano ACpu, int AIndex)
     {
         // hu: Index check BEFORE pop (ISA spec trap sorrend)
         // en: Index check BEFORE pop (ISA spec trap ordering)
-        if (AIndex < 0 || AIndex >= TCpu.MaxArgs || AIndex >= ACpu.ArgCount)
+        if (AIndex < 0 || AIndex >= TCpuNano.MaxArgs || AIndex >= ACpu.ArgCount)
             throw new TTrapException(TTrapReason.InvalidArg, ACpu.Pc,
                 $"Invalid arg index {AIndex} at PC=0x{ACpu.Pc:X4}");
 

@@ -5,11 +5,11 @@ namespace CilCpu.Sim.Runner;
 
 /// <summary>
 /// hu: A CLI-CPU Runner core logikája — tesztelhető, konzol-független
-/// osztály, amely .t0 bináris fájlokat futtat a TCpu szimulátoron,
+/// osztály, amely .t0 bináris fájlokat futtat a TCpuNano szimulátoron,
 /// és .NET assembly-ket (.dll) linkel CIL-T0 formátumra.
 /// <br />
 /// en: CLI-CPU Runner core logic — testable, console-independent
-/// class that runs .t0 binary files on the TCpu simulator and
+/// class that runs .t0 binary files on the TCpuNano simulator and
 /// links .NET assemblies (.dll) to CIL-T0 format.
 /// </summary>
 public static class TRunner
@@ -41,7 +41,7 @@ public static class TRunner
         if (AProgram.Length == 0)
             throw new ArgumentException("Program cannot be empty.", nameof(AProgram));
 
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         try
         {

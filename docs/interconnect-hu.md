@@ -108,6 +108,84 @@ Az Akka/actor stílusú rendszerekben az üzenetek nagy többsége kicsi (paranc
 
 A `CELL_SIZE` RTL paraméter biztonsági háló: ha egy specifikus CFPU-R konfiguráció workload-ja megköveteli, 128B-re állítható gyártáskor.
 
+**Végleges döntés (2026-04-20):** a 64B payload marad a fő mesh-re.
+
+#### Miért nem 128B? — Részletes elemzés
+
+**1. Az ML-Max nem indokolja a cella növelést.**
+Az eredeti 128→64 csökkentés egyik indoka az volt, hogy a Matrix Core 4×4 tile-hoz a 128B túlméretezett. Azóta a CFPU-ML-Max saját 128-bit systolic routert használ (cluster-en belüli on-die link) — a tenzor-adatforgalom **nem a fő mesh-en** halad. Tehát sem a 128B melletti, sem az ellene szóló eredeti ML-érv nem releváns már.
+
+**2. Aggregált throughput elemzés — a mátrix átbocsátó képessége.**
+
+Egyetlen link throughput (42-bit L0 @ 500 MHz):
+
+| Cella | Flit szám | Payload throughput | Link hatásfok |
+|-------|-----------|-------------------|---------------|
+| 80B (64B payload) | 16 flit | 64B / 16 cc = 4.00 B/cc | 80% |
+| 144B (128B payload) | 28 flit | 128B / 28 cc = 4.57 B/cc | 89% |
+
+**Egyetlen linken a 128B cella 14%-kal jobb.** De ez félrevezető — a rendszer-szintű throughput-ot a **tényleges hasznos adat / link-foglalási idő** határozza meg:
+
+Tipikus actor workload üzenetméret-eloszlás:
+- ~80% üzenet ≤ 48 byte payload (parancs, válasz, esemény, heartbeat)
+- ~15% üzenet 49–64 byte (közepes payload)
+- ~5% üzenet > 64 byte (code-load, state migration — multi-cell)
+
+Egy 32 byte-os actor üzenet szállítási költsége:
+
+| Cella | Flit | Hasznos adat | Hatásfok (B/flit) |
+|-------|------|-------------|-------------------|
+| 80B (64B payload) | 16 | 32B | 2.00 B/flit |
+| 144B (128B payload) | 28 | 32B | 1.14 B/flit ← **43% pazarlás** |
+
+A 128B cella **28 ciklusig foglalja a linket** egy 32 byte-os üzenettel — a 64B cella ugyanezt **16 ciklus** alatt szállítja. A hasznos adat azonos, de a link-foglalás 75%-kal hosszabb.
+
+Súlyozott aggregált hatásfok (B/flit, workload mixszel):
+
+```
+64B cella:  0.80×(32/16) + 0.15×(56/16) + 0.05×(64/16) = 2.33 B/flit
+128B cella: 0.80×(32/28) + 0.15×(56/28) + 0.05×(128/28) = 1.44 B/flit
+```
+
+**A 64B cella ~38%-kal nagyobb aggregált throughput-ot ad** a 10 000 core-os mesh-ben a tipikus actor workload mellett.
+
+**3. Wormhole routing és HOL blocking.**
+
+Wormhole routing-ban a cella **lefoglalja a köztes linkeket** amíg áthalad. Nagyobb cella = hosszabb foglalás = több torlódás:
+
+```
+H=50 átlagos hop (100×100 grid):
+  64B cella:  link foglalás = 2H + 15 = 115 cc
+  128B cella: link foglalás = 2H + 27 = 127 cc (+10%)
+```
+
+A 10%-kal hosszabb link-foglalás exponenciálisan növeli a Head-of-Line blocking valószínűségét magas terhelés mellett. A VOQ csökkenti, de nem szünteti meg. Az eredmény: a 128B cella hamarabb telíti a hálózatot.
+
+**4. Code-load throughput — multi-cell streaming-gel megoldott.**
+
+A Seal Core code-load a teljes chip forgalmának <5%-a. A throughput kérdése nem cella-méret növeléssel, hanem pipeline-olt multi-cell streaming-gel megoldott:
+- 16 KB metódus = 256 cella (64B payload), pipeline-olva
+- L0 throughput @ 500 MHz: ~2.6 GB/s
+- Worst-case kézbesítés: ~8 μs @ 500 MHz
+
+**5. Memória és tárhardverek natív burst mérete — a 64B természetes egység.**
+
+| Memória típus | Natív burst méret | Illeszkedés |
+|---------------|-------------------|-------------|
+| DDR4 | 64 byte (BL8 × 8B) | **= 64B payload** |
+| DDR5 | 64 byte (BL16 × 4B, dual sub-channel) | **= 64B payload** |
+| LPDDR5 | 32–64 byte (BL16 × 2B vagy BL32 × 2B) | ≤ 64B payload |
+| HBM2e/HBM3 | 32–256 byte (pseudo-channel, BL4 × 32B tipikus) | 64B és 128B is natív |
+| QSPI Flash | 64–256 byte (page: 256B, de 64B burst optimális) | **= 64B payload** |
+| On-chip SRAM | Cache line: 64 byte (iparági standard) | **= 64B payload** |
+| NOR Flash | 64–128 byte burst | ≤ 64B illeszkedik |
+
+A 64 byte-os payload **pontosan egy DDR4/DDR5 burst-nek, egy cache line-nak, és egy QSPI burst-nek felel meg**. Ez nem véletlen: az iparági memória-hierarchia a 64B-t választotta alapegységnek (Intel/AMD L1 cache line = 64B, ARM = 64B). A CFPU cella payload ennek tökéletesen illeszkedik — egy cella payload = egy memória-tranzakció, nincs töredék, nincs padding.
+
+A 128B payload a HBM-nél illeszkedne jobban, de a HBM 64B-s sub-burst-öt is támogat, míg a DDR4/DDR5 és QSPI **nem** támogat 128B-t natívan (két tranzakcióra bontaná).
+
+**Összefoglalás:** a 64B payload az actor-mesh optimális mérete. A 128B csak akkor lenne előnyös, ha a forgalom >50%-a 65–128 byte közötti — ez a CFPU-ban nem áll fenn. A 64B emellett az iparági memória-hardverek natív burst egysége.
+
 ### Címzés: 24 bit hierarchikus
 
 ```

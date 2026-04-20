@@ -85,7 +85,67 @@ A Seal Core ellenőrzi saját integritását:
 
 Ez a trust chain gyökere. Részletes trust-lánc leírás: [authcode-hu.md §7](authcode-hu.md#trustchain)
 
-### 2c. QSPI flash olvasás
+### 2c. Boot forrás kiválasztás
+
+A Seal Core **több forrásból** is képes betölteni a verifikálandó binárist. A boot forrást a `BOOT_SRC` konfiguráció határozza meg (FPGA: szintézis-idejű paraméter; ASIC: eFuse/pin-strap).
+
+#### Boot forrás tábla (XC7A200T FPGA prototípus)
+
+| # | Forrás | MMIO bázis | Sebesség | Felhasználás |
+|---|--------|-----------|----------|--------------|
+| 0 | **QSPI Flash** | `0xF0001000` | ~50 MB/s (Quad) | Normál production boot — on-board konfigurációs flash újrahasználása |
+| 1 | **UART** | `0xF0001100` | ~1 MB/s | Fejlesztés, debug, recovery — host-ról stream-elve |
+| 2 | **BRAM (on-chip)** | `0xF0001200` | Azonnali (1 cc) | Szintéziskor beégetett firmware — teszt / CI |
+| 3 | **Ethernet** | `0xF0001300` | ~12 MB/s | Remote boot — hálózatról (PXE-szerű), multi-board cluster |
+| 4 | **JTAG** | — (dedikált) | ~10 MB/s | Debug-boot — OpenOCD / Vivado-ból közvetlenül |
+
+#### Boot forrás keresési sorrend (Boot Device Scan)
+
+A Seal Core firmware POR után **végigpróbálja** a boot forrásokat egy fix prioritási sorrendben. Minden forrásnál megkísérli olvasni a binary header magic-et. Az első forrás amelyik valid headert ad → onnan bootol.
+
+```
+Seal Core firmware (boot device scan):
+
+  for each source in priority order:
+      1. Forrás inicializálás (QSPI: config, UART: wait RTS, ETH: PHY link, ...)
+      2. Timeout-tal header olvasás (magic + size + cert offset)
+      3. Ha valid magic ("TSCL" vagy "T0CL") → KIVÁLASZTVA, kilépés a ciklusból
+      4. Ha timeout vagy invalid magic → következő forrás
+
+  Ha egyik sem valid → HALT + FAULT jelzés
+```
+
+**Prioritási sorrend:**
+
+| Prioritás | Forrás | Timeout | Miért itt? |
+|-----------|--------|---------|------------|
+| 1. | **JTAG** | 10 ms | Debug-boot — ha JTAG aktív, az mindig nyer (fejlesztő szándékos) |
+| 2. | **BRAM** | 0 (azonnali) | Ha szintéziskor beégetett firmware van, az mindig valid |
+| 3. | **UART** | 50 ms | Host-initiated — ha a host RTS-t küld a timeout-on belül |
+| 4. | **Ethernet** | 100 ms | Remote boot — PHY link-up + magic frame vár |
+| 5. | **QSPI Flash** | 200 ms | Production default — mindig utolsónak próbálja, de ez a "biztos" |
+
+**Megjegyzés:** a sorrend úgy van kialakítva, hogy a fejlesztői/debug források (JTAG, BRAM, UART) megelőzik a production forrást (QSPI). Ez lehetővé teszi, hogy egy "brickelt" flash-es rendszert bármikor JTAG-ról vagy UART-ról helyre lehessen állítani.
+
+**FPGA-n:** az egyes források jelenléte szintézis-idejű paraméter (`HAS_UART_BOOT`, `HAS_ETH_BOOT`, stb.). Ha egy forrás nincs szintetizálva, a scan átlépi.
+
+**ASIC-on (F6+):** minden forrás HW-ben jelen van; eFuse-szal letilthatók egyes források (production lockdown: csak QSPI marad).
+
+#### Boot flow a megtalált forrásból
+
+A forrás kiválasztása után a flow minden esetben azonos:
+
+```
+Seal Core firmware (boot load + verify):
+  1. Binary header olvasás (méret, cert offset, flags)
+  2. Binary + cert streaming → SRAM buffer (64B chunk-onként)
+  3. SHA-256 HW verify (streaming, chunk-onként)
+  4. WOTS+/Merkle verify (a cert-en)
+  5. Ha VALID → QRAM CODE régióba SEAL
+  6. Ha INVALID → ZEROIZATION + HALT
+```
+
+#### QSPI Flash regiszterek (forrás #0)
 
 A Seal Core MMIO-n (`0xF0001000`) keresztül olvassa a külső flash-t:
 - Neuron OS CIL binary
@@ -157,14 +217,46 @@ Boot-releváns regiszterek. A teljes MMIO térképet lásd: [osreq-002 — MMIO 
 | Quench-RAM CODE base | `0xF0002030` | R/O | 4 byte | Verified CIL binary kezdőcíme |
 | Quench-RAM CODE size | `0xF0002034` | R/O | 4 byte | Verified CIL binary mérete |
 
-### Flash controller
+### Boot source selector
+
+| Register | Cím | Típus | Méret | Leírás |
+|----------|-----|-------|-------|--------|
+| BOOT_SRC_FOUND | `0xF0000F00` | R/O | 4 byte | Megtalált boot forrás (0=JTAG, 1=BRAM, 2=UART, 3=ETH, 4=QSPI, 0xFF=nincs) |
+| BOOT_STATUS | `0xF0000F04` | R/O | 4 byte | 0=scanning, 1=loading, 2=verifying, 3=done, 0xFF=fail |
+| BOOT_SRC_MASK | `0xF0000F08` | R/O | 4 byte | Szintéziskor/eFuse: mely források vannak jelen (bit0=JTAG, bit1=BRAM, bit2=UART, bit3=ETH, bit4=QSPI) |
+
+### Flash controller (boot forrás #0)
 
 | Register | Cím | Típus | Méret | Leírás |
 |----------|-----|-------|-------|--------|
 | QSPI config | `0xF0001000` | R/W | 4 byte | Enable, SPI mode, clock divider |
 | QSPI flash addr | `0xF0001004` | R/W | 4 byte | Flash olvasási cím |
 | QSPI binary size | `0xF0001008` | R/O | 4 byte | Binary méret (flash header-ből) |
-| QSPI data | `0xF000100C` | R/O | 1 byte | Következő byte a flash-ről |
+| QSPI data | `0xF000100C` | R/O | 64 byte | Következő 64-byte chunk a flash-ről (cella payload méret) |
+
+### UART boot controller (boot forrás #1)
+
+| Register | Cím | Típus | Méret | Leírás |
+|----------|-----|-------|-------|--------|
+| UART config | `0xF0001100` | R/W | 4 byte | Baud rate, parity, enable |
+| UART status | `0xF0001104` | R/O | 4 byte | RX ready, TX empty, error flags |
+| UART data | `0xF0001108` | R/W | 64 byte | RX/TX buffer (64-byte chunk) |
+
+### BRAM boot (boot forrás #2)
+
+| Register | Cím | Típus | Méret | Leírás |
+|----------|-----|-------|-------|--------|
+| BRAM base | `0xF0001200` | R/O | 4 byte | BRAM-ban tárolt firmware kezdőcíme |
+| BRAM size | `0xF0001204` | R/O | 4 byte | Firmware méret (szintéziskor rögzítve) |
+
+### Ethernet boot controller (boot forrás #3)
+
+| Register | Cím | Típus | Méret | Leírás |
+|----------|-----|-------|-------|--------|
+| ETH config | `0xF0001300` | R/W | 4 byte | PHY init, MAC address[31:0] |
+| ETH config2 | `0xF0001304` | R/W | 4 byte | MAC address[47:32], VLAN, enable |
+| ETH status | `0xF0001308` | R/O | 4 byte | Link up, RX ready, frame count |
+| ETH data | `0xF000130C` | R/O | 64 byte | Következő 64-byte chunk (Ethernet frame payload-ból) |
 
 ### Core discovery és vezérlés
 
@@ -222,4 +314,5 @@ Részletes core leírás: [core-types-hu.md](core-types-hu.md)
 
 | Verzió | Dátum | Változás |
 |--------|-------|---------|
+| 1.1 | 2026-04-20 | Boot forrás kiválasztás: 5 forrás (QSPI, UART, BRAM, Ethernet, JTAG) az XC7A200T FPGA képességeihez igazítva. MMIO regiszterek bővítése minden boot forráshoz. 64-byte chunk-os adatolvasás (= cella payload méret). |
 | 1.0 | 2026-04-19 | Első verzió — HW boot szétválasztva a NeuronOS boot-sequence-hu.md-ből |

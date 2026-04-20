@@ -2,10 +2,10 @@ namespace CilCpu.Sim.Runner;
 
 /// <summary>
 /// hu: A CilCpu.Sim.Runner CLI belépési pont — CIL-T0 bináris fájlok
-/// és C# forráskódok futtatása a TCpu szimulátoron.
+/// és C# forráskódok futtatása a TCpuNano szimulátoron.
 /// <br />
 /// en: CilCpu.Sim.Runner CLI entry point — runs CIL-T0 binary files
-/// and C# source code on the TCpu simulator.
+/// and C# source code on the TCpuNano simulator.
 /// </summary>
 public static class Program
 {

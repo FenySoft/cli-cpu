@@ -1,12 +1,12 @@
 namespace CilCpu.Sim.Tests;
 
 /// <summary>
-/// hu: A TCpu iter. 3 elágazás (branch) tesztjei: br.s, brfalse.s, brtrue.s,
+/// hu: A TCpuNano iter. 3 elágazás (branch) tesztjei: br.s, brfalse.s, brtrue.s,
 /// beq.s, bge.s, bgt.s, ble.s, blt.s, bne.un.s. A tesztek lefedik a takes /
 /// fall-through ágakat, az előre/hátrafelé ugrást, az érvénytelen branch
 /// targetet (InvalidBranchTarget trap), és a stack underflow-t.
 /// <br />
-/// en: TCpu iter. 3 branch tests: br.s, brfalse.s, brtrue.s, beq.s, bge.s,
+/// en: TCpuNano iter. 3 branch tests: br.s, brfalse.s, brtrue.s, beq.s, bge.s,
 /// bgt.s, ble.s, blt.s, bne.un.s. The tests cover taken/fall-through branches,
 /// forward and backward jumps, invalid branch targets (InvalidBranchTarget
 /// trap), and stack underflow.
@@ -29,7 +29,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_ForwardJump_SkipsPop()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B,       // 0: ldc.i4.5
@@ -72,7 +72,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_BackwardJumpReachable_ViaForwardSkip()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x00,       // 0: nop
@@ -100,7 +100,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_BackwardJump_PcReturnsEarlier()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         // 0: ldc.i4.0       (push 0)
         // 1: stloc.0        (local0 = 0)
         // 2: ldloc.0        (push local0)             ← LOOP
@@ -142,7 +142,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_JumpOutOfRange_Forward_RaisesInvalidBranchTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x2B, 0x7F  // 0: br.s +127 → target 129, prog hossz 2
@@ -162,7 +162,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_JumpOutOfRange_Backward_RaisesInvalidBranchTarget()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x2B, 0x80  // 0: br.s -128 → target = 0+2-128 = -126
@@ -186,7 +186,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrfalseS_ZeroTos_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x16,       // 0: ldc.i4.0
@@ -209,7 +209,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrfalseS_NonzeroTos_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x17,       // 0: ldc.i4.1
@@ -237,7 +237,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrtrueS_NonzeroTos_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x17,       // 0: ldc.i4.1
@@ -260,7 +260,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrtrueS_ZeroTos_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x16,       // 0: ldc.i4.0
@@ -287,7 +287,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BeqS_Equal_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x1B,       // ldc.i4.5; ldc.i4.5
@@ -308,7 +308,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BeqS_NotEqual_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x1A,       // ldc.i4.5; ldc.i4.4
@@ -334,7 +334,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BgeS_Greater_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x19,       // ldc.i4.5; ldc.i4.3
@@ -355,7 +355,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BgeS_Less_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x19, 0x1B,       // ldc.i4.3; ldc.i4.5
@@ -381,7 +381,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BgtS_Greater_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x19,       // ldc.i4.5; ldc.i4.3
@@ -402,7 +402,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BgtS_Equal_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x1B,       // ldc.i4.5; ldc.i4.5
@@ -427,7 +427,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BleS_Less_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x19, 0x1B,       // ldc.i4.3; ldc.i4.5
@@ -448,7 +448,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BleS_Greater_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x19,       // ldc.i4.5; ldc.i4.3
@@ -473,7 +473,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BltS_Less_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x19, 0x1B,       // ldc.i4.3; ldc.i4.5
@@ -494,7 +494,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BltS_Equal_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x1B,       // ldc.i4.5; ldc.i4.5
@@ -519,7 +519,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BneUnS_NotEqual_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x1A,       // ldc.i4.5; ldc.i4.4
@@ -540,7 +540,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BneUnS_Equal_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x1B, 0x1B,       // ldc.i4.5; ldc.i4.5
@@ -565,7 +565,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrfalseS_EmptyStack_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x2C, 0x00 };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -582,7 +582,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BeqS_OneElement_StackUnderflow()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x17, 0x2E, 0x00 }; // ldc.i4.1; beq.s +0
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -599,7 +599,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_TruncatedOperand_RaisesInvalidOpcode()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[] { 0x2B };
 
         var trap = Assert.Throws<TTrapException>(() => cpu.Execute(program));
@@ -616,7 +616,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_OffsetZero_Valid()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x2B, 0x00, // 0: br.s +0 → target 2
@@ -636,7 +636,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_TargetIsEndOfProgram_Valid()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x2B, 0x00 // 0: br.s +0 → target 2 == AProgram.Length
@@ -663,7 +663,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_MaxPositiveOffset127_Valid()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // Total: 131 bytes
         // [0]=0x2B, [1]=0x7F → br.s +127 → target = 0+2+127 = 129
@@ -693,7 +693,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrS_MaxNegativeOffsetMinus128_Valid()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
 
         // Total: 130 bytes
         // [0]=0x2B, [1]=0x7E → br.s +126 → target = 0+2+126 = 128
@@ -724,7 +724,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrfalseS_IntMin_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
@@ -750,7 +750,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrfalseS_IntMax_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0xFF, 0xFF, 0xFF, 0x7F, // 0: ldc.i4 INT_MAX
@@ -776,7 +776,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrtrueS_IntMin_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
@@ -802,7 +802,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BrtrueS_MinusOne_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x15,       // 0: ldc.i4.m1
@@ -827,7 +827,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BeqS_IntMinIntMin_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
@@ -853,7 +853,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BgeS_IntMinIntMax_FallThrough()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
@@ -879,7 +879,7 @@ public class TCpuIter3BranchTests
     [Fact]
     public void Execute_BltS_IntMinIntMax_TakesBranch()
     {
-        var cpu = new TCpu();
+        var cpu = new TCpuNano();
         var program = new byte[]
         {
             0x20, 0x00, 0x00, 0x00, 0x80, // 0: ldc.i4 INT_MIN
