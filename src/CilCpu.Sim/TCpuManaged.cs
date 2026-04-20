@@ -73,9 +73,15 @@ public class TCpuManaged : TCpuNano
     {
         var opcode = AProgram[FProgramCounter];
 
-        if (opcode is 0x8D or 0x8E or 0x90 or 0x9C)
+        if (opcode is 0x8D or 0x8E or 0x90 or 0x91 or 0x9C)
         {
             ExecuteArrayOpcode(AProgram, opcode);
+        }
+        else if (opcode is 0x69 or 0x6D or 0xD3)
+        {
+            // hu: conv.u / conv.i4 / conv.u4 — nop int32-only rendszerben
+            // en: conv.u / conv.i4 / conv.u4 — nop in int32-only system
+            FProgramCounter++;
         }
         else
         {
@@ -100,8 +106,13 @@ public class TCpuManaged : TCpuNano
                 FProgramCounter = pc + 1;
                 break;
 
-            case 0x90: // ldelem.u1 (1 byte)
+            case 0x90: // ldelem.u1 (1 byte) — zero-extended
                 ExecuteLdelemU1(pc);
+                FProgramCounter = pc + 1;
+                break;
+
+            case 0x91: // ldelem.i1 (1 byte) — sign-extended
+                ExecuteLdelemI1(pc);
                 FProgramCounter = pc + 1;
                 break;
 
@@ -175,6 +186,25 @@ public class TCpuManaged : TCpuNano
                 $"ldelem.u1 index {index} out of range [0..{length - 1}] at PC=0x{APc:X4}.");
 
         var value = FSram[arrayRef + 4 + index];
+        EvalPush(value, APc);
+    }
+
+    private void ExecuteLdelemI1(int APc)
+    {
+        var index = EvalPop(APc);
+        var arrayRef = EvalPop(APc);
+
+        if (arrayRef == NullRef)
+            throw new TTrapException(TTrapReason.NullReference, APc,
+                $"ldelem.i1 on null reference at PC=0x{APc:X4}.");
+
+        var length = SramReadInt32(arrayRef);
+
+        if (index < 0 || index >= length)
+            throw new TTrapException(TTrapReason.IndexOutOfRange, APc,
+                $"ldelem.i1 index {index} out of range [0..{length - 1}] at PC=0x{APc:X4}.");
+
+        var value = (int)(sbyte)FSram[arrayRef + 4 + index]; // sign-extended
         EvalPush(value, APc);
     }
 

@@ -193,13 +193,10 @@ public sealed class TCpuSeal : TCpuManaged
         for (var i = 0; i < 8; i++)
             WriteUInt32BE(FSram, stateRef + 4 + i * 4, h[i]);
 
-        // hu: State és data ref-et visszatesszük a stackre
-        //     (a firmware / Final újra használhatja).
-        //     Stack: [state, data]
-        // en: Push state and data refs back onto stack
-        //     (firmware / Final can reuse them).
-        EvalPush(stateRef, APc);
-        EvalPush(dataRef, APc);
+        // hu: Void return — a firmware lokálisokból hívja az Update-et,
+        //     a ref-eket a lokálisok tartják (nem a stack).
+        // en: Void return — firmware calls Update from locals,
+        //     refs are held in locals (not on stack).
     }
 
     private void ExecuteSha256Final(int APc)

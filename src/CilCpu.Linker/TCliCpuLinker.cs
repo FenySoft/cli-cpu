@@ -33,7 +33,15 @@ public static class TCliCpuLinker
     /// Transitively discovers called methods from the entry point,
     /// lays them out, and resolves call tokens.
     /// </summary>
-    public static byte[] Link(byte[] AAssemblyBytes, string AClassName, string AEntryMethodName)
+    public static byte[] Link(byte[] AAssemblyBytes, string AClassName, string AEntryMethodName) =>
+        Link(AAssemblyBytes, AClassName, AEntryMethodName, TIsaLevel.CilT0);
+
+    /// <summary>
+    /// hu: Egy assembly byte-tömböt a megadott ISA szintre fordít.
+    /// <br />
+    /// en: Translates an assembly byte array to the specified ISA level.
+    /// </summary>
+    public static byte[] Link(byte[] AAssemblyBytes, string AClassName, string AEntryMethodName, TIsaLevel AIsaLevel)
     {
         ArgumentNullException.ThrowIfNull(AAssemblyBytes);
         ArgumentNullException.ThrowIfNull(AClassName);
@@ -55,17 +63,33 @@ public static class TCliCpuLinker
         // all methods called from the entry point.
         var methodOrder = new List<MethodDefinitionHandle>();
         var methodSet = new HashSet<MethodDefinitionHandle>();
-        DiscoverMethods(metadata, peReader, entryHandle, methodOrder, methodSet);
+        DiscoverMethods(metadata, peReader, entryHandle, methodOrder, methodSet, AIsaLevel);
 
         // hu: 2. Layout — kiszámítjuk minden metódus header RVA-ját.
+        //     Extern metódusok (RVA=0) dispatch RVA-t kapnak.
         // en: 2. Layout — compute header RVA for each method.
+        //     Extern methods (RVA=0) get dispatch RVAs.
         var methodIL = new Dictionary<MethodDefinitionHandle, byte[]>();
         var methodRva = new Dictionary<MethodDefinitionHandle, int>();
+        var externMethods = new HashSet<MethodDefinitionHandle>();
         var offset = 0;
+        ushort nextDispatchIndex = 0;
 
         foreach (var handle in methodOrder)
         {
             var mdef = metadata.GetMethodDefinition(handle);
+
+            if (mdef.RelativeVirtualAddress == 0)
+            {
+                // hu: Extern metódus — [CryptoCall] dispatch RVA
+                // en: Extern method — [CryptoCall] dispatch RVA
+                var dispatchIndex = ReadCryptoCallIndex(metadata, mdef, nextDispatchIndex);
+                methodRva[handle] = unchecked((int)(0xFFFF_0000u + dispatchIndex));
+                externMethods.Add(handle);
+                nextDispatchIndex++;
+                continue;
+            }
+
             var il = ReadMethodIL(peReader, mdef);
             methodIL[handle] = il;
             methodRva[handle] = offset;
@@ -78,6 +102,9 @@ public static class TCliCpuLinker
 
         foreach (var handle in methodOrder)
         {
+            if (externMethods.Contains(handle))
+                continue;
+
             var mdef = metadata.GetMethodDefinition(handle);
             var il = methodIL[handle];
             var rva = methodRva[handle];
@@ -86,7 +113,7 @@ public static class TCliCpuLinker
 
             // hu: Token feloldás — a call operandusokat az abszolút RVA-kra írjuk.
             // en: Token resolution — rewrite call operands to absolute RVAs.
-            var linkedIl = ResolveCallTokens(il, methodRva);
+            var linkedIl = ResolveCallTokens(il, methodRva, AIsaLevel);
 
             WriteMethodHeader(output, rva, argCount, localCount, AMaxStack: 8, ACodeSize: linkedIl.Length);
             Array.Copy(linkedIl, 0, output, rva + MethodHeaderSize, linkedIl.Length);
@@ -107,21 +134,38 @@ public static class TCliCpuLinker
         PEReader APeReader,
         MethodDefinitionHandle AHandle,
         List<MethodDefinitionHandle> AOrder,
-        HashSet<MethodDefinitionHandle> AVisited)
+        HashSet<MethodDefinitionHandle> AVisited,
+        TIsaLevel AIsaLevel = TIsaLevel.CilT0)
     {
         if (!AVisited.Add(AHandle))
             return;
 
+        var mdef = AMetadata.GetMethodDefinition(AHandle);
+
+        // hu: Extern metódus (nincs IL body) — CIL-Seal-ben [CryptoCall],
+        //     nem kell discovery-zni, csak regisztrálni.
+        // en: Extern method (no IL body) — in CIL-Seal a [CryptoCall],
+        //     no discovery needed, just register.
+        if (mdef.RelativeVirtualAddress == 0)
+        {
+            if (AIsaLevel >= TIsaLevel.CilSeal)
+            {
+                AOrder.Add(AHandle);
+                return;
+            }
+
+            return; // CIL-T0: extern nem támogatott, kihagyás
+        }
+
         AOrder.Add(AHandle);
 
-        var mdef = AMetadata.GetMethodDefinition(AHandle);
         var il = ReadMethodIL(APeReader, mdef);
         var pc = 0;
 
         while (pc < il.Length)
         {
             var opcode = il[pc];
-            var length = OpcodeLength(opcode, il, pc);
+            var length = OpcodeLength(opcode, il, pc, AIsaLevel);
 
             if (opcode == 0x28) // call
             {
@@ -132,7 +176,7 @@ public static class TCliCpuLinker
                 if (tableType == 0x06) // MethodDef
                 {
                     var targetHandle = MetadataTokens.MethodDefinitionHandle(rowIndex);
-                    DiscoverMethods(AMetadata, APeReader, targetHandle, AOrder, AVisited);
+                    DiscoverMethods(AMetadata, APeReader, targetHandle, AOrder, AVisited, AIsaLevel);
                 }
             }
 
@@ -149,7 +193,8 @@ public static class TCliCpuLinker
     /// </summary>
     internal static byte[] ResolveCallTokens(
         byte[] AIlBytes,
-        Dictionary<MethodDefinitionHandle, int> AMethodRva)
+        Dictionary<MethodDefinitionHandle, int> AMethodRva,
+        TIsaLevel AIsaLevel = TIsaLevel.CilT0)
     {
         var output = (byte[])AIlBytes.Clone();
         var pc = 0;
@@ -157,7 +202,7 @@ public static class TCliCpuLinker
         while (pc < output.Length)
         {
             var opcode = output[pc];
-            var length = OpcodeLength(opcode, output, pc);
+            var length = OpcodeLength(opcode, output, pc, AIsaLevel);
 
             if (opcode == 0x28) // call
             {
@@ -246,6 +291,54 @@ public static class TCliCpuLinker
         return default;
     }
 
+    /// <summary>
+    /// hu: Kiolvassa a [CryptoCall(index)] attribútumot egy extern metódusból.
+    /// Ha nincs attribútum, a fallback index-et használja.
+    /// <br />
+    /// en: Reads the [CryptoCall(index)] attribute from an extern method.
+    /// If no attribute, uses the fallback index.
+    /// </summary>
+    private static ushort ReadCryptoCallIndex(
+        MetadataReader AMetadata,
+        MethodDefinition AMethodDef,
+        ushort AFallbackIndex)
+    {
+        foreach (var attrHandle in AMethodDef.GetCustomAttributes())
+        {
+            var attr = AMetadata.GetCustomAttribute(attrHandle);
+            string? attrName = null;
+
+            if (attr.Constructor.Kind == HandleKind.MemberReference)
+            {
+                var ctor = AMetadata.GetMemberReference((MemberReferenceHandle)attr.Constructor);
+
+                if (ctor.Parent.Kind == HandleKind.TypeReference)
+                    attrName = AMetadata.GetString(AMetadata.GetTypeReference((TypeReferenceHandle)ctor.Parent).Name);
+                else if (ctor.Parent.Kind == HandleKind.TypeDefinition)
+                    attrName = AMetadata.GetString(AMetadata.GetTypeDefinition((TypeDefinitionHandle)ctor.Parent).Name);
+            }
+            else if (attr.Constructor.Kind == HandleKind.MethodDefinition)
+            {
+                // hu: Attribútum ugyanabban az assembly-ben definiálva
+                // en: Attribute defined in the same assembly
+                var ctorDef = AMetadata.GetMethodDefinition((MethodDefinitionHandle)attr.Constructor);
+                var typeDef = AMetadata.GetTypeDefinition(ctorDef.GetDeclaringType());
+                attrName = AMetadata.GetString(typeDef.Name);
+            }
+
+            if (attrName == "CryptoCallAttribute")
+            {
+                // hu: Custom attribute blob: prolog (2 byte) + FixedArg (ushort)
+                // en: Custom attribute blob: prolog (2 bytes) + FixedArg (ushort)
+                var reader = AMetadata.GetBlobReader(attr.Value);
+                reader.ReadUInt16(); // prolog 0x0001
+                return reader.ReadUInt16();
+            }
+        }
+
+        return AFallbackIndex;
+    }
+
     private static byte[] ReadMethodIL(PEReader APeReader, MethodDefinition AMethodDef)
     {
         var rva = AMethodDef.RelativeVirtualAddress;
@@ -293,8 +386,13 @@ public static class TCliCpuLinker
     /// <br />
     /// en: Computes the full length of a CIL opcode for the CIL-T0 set.
     /// </summary>
-    internal static int OpcodeLength(byte AOpcode, byte[] AProgram, int APc)
+    internal static int OpcodeLength(byte AOpcode, byte[] AProgram, int APc) =>
+        OpcodeLength(AOpcode, AProgram, APc, TIsaLevel.CilT0);
+
+    internal static int OpcodeLength(byte AOpcode, byte[] AProgram, int APc, TIsaLevel AIsaLevel)
     {
+        // hu: CIL-T0 alap opkódok (minden ISA szinten érvényesek)
+        // en: CIL-T0 base opcodes (valid at all ISA levels)
         if (AOpcode == 0x00) return 1;
         if (AOpcode is >= 0x02 and <= 0x09) return 1;
         if (AOpcode is >= 0x0A and <= 0x0D) return 1;
@@ -330,6 +428,20 @@ public static class TCliCpuLinker
 
             throw new TCilT0LinkException(
                 $"Unsupported 0xFE-prefixed opcode 0xFE{second:X2} at IL offset 0x{APc:X4}.");
+        }
+
+        // hu: CIL-Seal bővítés — tömb opkódok + konverziók
+        // en: CIL-Seal extension — array opcodes + conversions
+        if (AIsaLevel >= TIsaLevel.CilSeal)
+        {
+            if (AOpcode == 0x8D) return 5; // newarr <token>
+            if (AOpcode == 0x8E) return 1; // ldlen
+            if (AOpcode == 0x90) return 1; // ldelem.u1
+            if (AOpcode == 0x91) return 1; // ldelem.i1
+            if (AOpcode == 0x9C) return 1; // stelem.i1
+            if (AOpcode == 0x69) return 1; // conv.u (ldlen → int konverzió)
+            if (AOpcode == 0x6D) return 1; // conv.i4
+            if (AOpcode == 0xD3) return 1; // conv.u4
         }
 
         throw new TCilT0LinkException(

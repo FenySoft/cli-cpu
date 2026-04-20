@@ -31,7 +31,7 @@ public static class TRoslynCompiler
     /// <br />
     /// en: The C# source code to compile.
     /// </param>
-    public static byte[] CompileToBytes(string ASource)
+    public static byte[] CompileToBytes(string ASource, bool AAllowUnsafe = false)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(ASource);
 
@@ -51,7 +51,8 @@ public static class TRoslynCompiler
             references: references,
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
-                optimizationLevel: OptimizationLevel.Release));
+                optimizationLevel: OptimizationLevel.Release,
+                allowUnsafe: AAllowUnsafe));
 
         using var ms = new MemoryStream();
         var result = compilation.Emit(ms);
