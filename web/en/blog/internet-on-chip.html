@@ -378,12 +378,12 @@
 <pre>10,000+ Rich Cores / chip (parameterizable, adapts to die size)
 
 4-level hierarchy:
-  L3: Chip ── 8 regions, star topology, Seal Core + crossbar at center
+  L3: Chip ── 10 regions, star topology, Seal Core + crossbar at center
    └── L2: Region ── 8 tiles, 8&times;8 crossbar (region center), serial link
         └── L1: Tile ── 8 clusters, 8&times;8 crossbar (tile center)
              └── L0: Cluster ── 16 Rich Cores, 4&times;4 mesh
 
-16 × 8 × 8 × 8 = 8,192 cores (ref. config, 7nm, 800 mm²)</pre>
+16 × 8 × 8 × 10 = 10,240 cores (ref. config, 5nm, 800 mm²)</pre>
 
     <p>Every crossbar sits at the <strong>geometric center</strong> of its level &mdash; equal maximum distance to all ports, fair and deterministic latency. At L3, <strong>star topology</strong>: every region connects directly to the central Seal Core + crossbar &mdash; cross-region traffic is always exactly <strong>2 hops</strong>.</p>
 
@@ -392,7 +392,7 @@
       <tr><td>L0: Core</td><td><strong>4&times;4 mesh</strong></td><td>16</td><td>Parallel</td><td>Physically adjacent, short wires</td></tr>
       <tr><td>L1: Cluster</td><td><strong>8&times;8 crossbar</strong></td><td>8</td><td>Parallel</td><td>Few ports, fixed 1 hop, VOQ+iSLIP</td></tr>
       <tr><td>L2: Tile</td><td><strong>8&times;8 crossbar</strong></td><td>8</td><td>Serial 10&times;</td><td>Medium distance, serial link</td></tr>
-      <tr><td>L3: Region</td><td><strong>Star (Seal Core center)</strong></td><td>8</td><td>Serial 10&times;</td><td>Seal Core sees all traffic</td></tr>
+      <tr><td>L3: Region</td><td><strong>Star (Seal Core center)</strong></td><td>10</td><td>Serial 10&times;</td><td>Seal Core sees all traffic</td></tr>
     </table>
 
     <table class="comparison-table">
@@ -406,7 +406,7 @@
     </table>
 
     <div class="highlight-box">
-      <strong>Router size:</strong> Turbo ~26,000 GE (0.007 mm&sup2;), Compact ~14,500 GE (0.004 mm&sup2;) &mdash; depends on core type.<br>
+      <strong>Router size:</strong> Turbo ~26,000 GE (0.006 mm&sup2;), Compact ~14,500 GE (0.003 mm&sup2;) &mdash; depends on core type.<br>
       <strong>Throughput:</strong> ~98% (Turbo, VOQ + iSLIP), ~75% (Compact).<br>
       <strong>Max hops:</strong> 18 (worst-case, cross-region).<br>
       <strong>Max latency:</strong> ~139 cycles worst-case (~278 ns @ 500 MHz).<br>
@@ -440,7 +440,17 @@
 
     <h3>The Seal Core Is Not a Bottleneck</h3>
     <p>
-      The Seal Core serves two functions: <strong>code authentication</strong> (rare but heavy) and <strong>L3 crossbar routing</strong> (the crossbar handles this independently, the crypto engine is not involved). At boot, authenticating all core code takes ~256 ms (8,192 cores, 7nm). Runtime hot code loading: <strong>&lt;0.1% utilization</strong>. The L3 crossbar runs at ~25% load with 8k cores &mdash; it scales to ~30,000 cores without saturation. Both the Seal Core and the L3 crossbar are <strong>power-gated</strong> &mdash; when there is no cross-region traffic and no code loading, everything at the chip center sleeps.
+      The Seal Core&rsquo;s crypto engine exclusively performs <strong>code authentication</strong>. At boot, verifying all core code takes ~256 ms (10,240 cores, 5nm). Runtime hot code loading: <strong>&lt;0.1% utilization</strong>. The Seal Core sleeps most of the time.
+    </p>
+
+    <h3>L3 Crossbar Scaling</h3>
+    <p>
+      The L3 crossbar handles cross-region routing <strong>independently</strong> &mdash; the Seal Core&rsquo;s crypto engine is not involved. More cores = more cross-region traffic. At 10k cores the L3 crossbar runs at <strong>~25% utilization</strong> &mdash; plenty of headroom to grow.
+    </p>
+
+    <h3>Power-Gating at the Chip Center</h3>
+    <p>
+      Both the Seal Core and the L3 crossbar are <strong>power-gated</strong>. When there is no cross-region traffic and no code loading, everything at the chip center sleeps.
     </p>
 
     <h3>The Deepest Insight</h3>

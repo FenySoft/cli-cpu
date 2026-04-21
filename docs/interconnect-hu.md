@@ -2,13 +2,13 @@
 
 > English version: [interconnect-en.md](interconnect-en.md)
 
-> Version: 2.1
+> Version: 2.3
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **on-chip interconnect hálózatát** specifikálja: a topológiát, a switching modellt, a router belső felépítését, a fizikai elrendezést, a core családot és a node-skálázási stratégiát.
 
 ## Core család
 
-A CFPU öt core típust definiál (Nano, Actor, Rich, Matrix, Seal) és hat termékvariánst (CFPU-N/A/R/ML/H/X). A részletekért — ISA különbségek, terület-hatás, SRAM méretezés, power domain-ek, piaci pozíció — lásd [`core-types-hu.md`](core-types-hu.md).
+A CFPU négy programozható core típust definiál (Nano, Actor, Rich, Seal) és hat termékvariánst (CFPU-N/A/R/ML/H/X). Az ML inference-hez MAC Slice-okat (FSM-vezérelt, nem programozható) használ. A részletekért — ISA különbségek, terület-hatás, SRAM méretezés, power domain-ek, piaci pozíció — lásd [`core-types-hu.md`](core-types-hu.md), a MAC Slice specifikációhoz: [`cfpu-ml-max-hu.md`](cfpu-ml-max-hu.md).
 
 ## Tervezési alapelvek (prioritás sorrendben)
 
@@ -39,17 +39,17 @@ L3: Chip ── N₃ régió, csillag topológia
 
 A mesh ott van, ahol fizikailag indokolt (core-ok között, ~300 μm). A crossbar ott van, ahol logikailag indokolt (gateway-ek között, 8-18 port).
 
-### Referencia konfiguráció (7nm, 800 mm²)
+### Referencia konfiguráció (5nm, 800 mm²)
 
 ```
-L0: 16 core × L1: 8 cluster × L2: 8 tile × L3: 8 régió = 8 192 core
+L0: 16 core × L1: 8 cluster × L2: 8 tile × L3: 10 régió = 10 240 core
 ```
 
 ### Paraméterezhető konfiguráció
 
 | Paraméter | Fix/Változó | Tartomány | Meghatározó |
 |-----------|-------------|-----------|-------------|
-| `CORES_PER_CLUSTER` | **Fix** | 16 (4×4) | Fizikai optimum: ~1.3 mm, 2 ciklusos wormhole pipeline/hop |
+| `CORES_PER_CLUSTER` | **Fix** | 16 (4×4) | Fizikai optimum: ~1.1 mm, 2 ciklusos wormhole pipeline/hop |
 | `CLUSTERS_PER_TILE` | Változó | 4-12 | Node, chipméret |
 | `TILES_PER_REGION` | Változó | 4-12 | Node, chipméret |
 | `REGIONS` | Változó | 4-24 | Chipméret |
@@ -100,7 +100,7 @@ Az eredeti 128 byte-os payload a Matrix Core 4×4 tile-jához volt túlméreteze
 | Szomszéd latencia | 2H + 15 = 17 cc | 2H + 27 = 29 cc |
 | Cross-régió latencia | ~139 cc | ~229 cc |
 | Router VOQ SRAM | kisebb | ~1,6× nagyobb |
-| Router terület (Turbo) | 0,007 mm² | ~0,009 mm² |
+| Router terület (Turbo) | 0,006 mm² | ~0,008 mm² |
 
 **Döntő érv: a latencia.** A 80 byte-os cella **40%-kal gyorsabb** cross-régió latenciát ad (139 vs 229 cc). Ez **minden üzenetre** hat — parancsokra, eseményekre, válaszokra —, míg a 128B payload header-overhead előnye (11% vs 20%) **csak a ritka, nagy üzeneteknél** (state migráció, bulk transfer) számít.
 
@@ -236,11 +236,11 @@ Ez a kombináció minden szinten eliminálja a deadlockot, Virtual Channel-ek va
 |-----------|-------|
 | Topológia | 4×4 mesh, XY routing |
 | Core-ok | 16 core (klaszterenként egy típus) |
-| Fizikai méret | ~1.3 mm × 1.3 mm (7nm) |
+| Fizikai méret | ~1.1 mm × 1.1 mm (5nm) |
 | Link típus | Párhuzamos, 42 bit, 1× core clock |
 | Vezeték hossz | ~330 μm (szomszéd core) |
 | Max hop | 6 |
-| Router terület / core | 0,004–0,007 mm² (lásd L0 Router variánsok) |
+| Router terület / core | 0,001–0,006 mm² (lásd L0 Router variánsok) |
 | Gateway | A sarok core router-jébe integrált uplink port |
 
 #### L0 Router variánsok
@@ -262,7 +262,7 @@ Az L0 router a legnagyobb per-core overhead a CFPU-ban. Az eredeti 5-portos base
 | Egyéb vezérlés | 12 000 | FSM, reset, power-gate interfész |
 | **Összesen** | **~44 300** | **≈ 0,011 mm²** |
 
-> **Terület-konvenció:** A GE→terület konverzió ~0,25 µm²/GE-t feltételez 7nm-en (logika + routing overhead), az SRAM dense 6T cellákat használ (~0,027 µm²/bit). Ezek szintézis előtti becslések; a végleges területet az RTL szintézis határozza meg (F4+). A baseline router 80B cellákra van méretezve.
+> **Terület-konvenció:** A GE→terület konverzió ~0,21 µm²/GE-t feltételez 5nm-en (logika + routing overhead), az SRAM dense 6T cellákat használ (~0,021 µm²/bit). Ezek szintézis előtti becslések; a végleges területet az RTL szintézis határozza meg (F4+). A baseline router 80B cellákra van méretezve.
 
 **Variáns A: Turbo — Sebesség > Terület**
 
@@ -276,7 +276,7 @@ Maximális átvitel és latencia optimalizálás. Terület csökkentés a sebess
 | 2 VN marad | Control plane izoláció kritikus | Nincs |
 | Credit: 3 (4 helyett) | 1-gyel kevesebb regiszter/port | Elhanyagolható |
 
-**Eredmény: ~26 000 GE ≈ 0,007 mm²** (−41% GE, −36% terület a baseline-hoz képest)
+**Eredmény: ~26 000 GE ≈ 0,006 mm²** (−41% GE, −36% terület a baseline-hoz képest)
 
 **Variáns B: Compact — Terület > Sebesség**
 
@@ -291,7 +291,7 @@ Agresszív router terület minimalizálás. Mérsékelt throughput csökkenés e
 | Credit: 2 (4 helyett) | Burst alatt több stall | Kisebb hatás |
 | Queue mélység: 2 (4 helyett) | Minimális bufferelés | Burst alatt több stall |
 
-**Eredmény: ~14 500 GE ≈ 0,004 mm²** (−67% GE, −64% terület a baseline-hoz képest)
+**Eredmény: ~14 500 GE ≈ 0,003 mm²** (−67% GE, −64% terület a baseline-hoz képest)
 
 **Variáns C: Systolic — ML/SNN > Általános**
 
@@ -362,25 +362,25 @@ A Systolic variáns **nem általános célú** — kizárólag ML/SNN workload-o
 
 | Core típus | Variáns | Router terület | Router / core | Indoklás |
 |------------|:-------:|---------------:|--------------:|----------|
-| **Nano** | Compact | 0,004 mm² | 29% | A core apró (0,014 mm²); egyszerű aktorok ritkán szaturálják a 75% throughput-ot |
-| **Actor** | Compact | 0,004 mm² | 11% | Üzenet-feldolgozási idő >> hálózati tranzit; 75% throughput ritkán szűk keresztmetszet |
-| **Matrix (actor)** | Turbo | 0,007 mm² | 28% | Általános actor workload Matrix core-on |
-| **Matrix (ML/SNN)** | **Systolic** | **0,001 mm²** | **4%** | Systolic pipeline: 128-bit link → MAC ~100% kihasználtság |
-| **Rich** | Turbo | 0,007 mm² | 8% | A core elég nagy (0,083 mm²), a Turbo overhead elfogadható |
+| **Nano** | Compact | 0,003 mm² | 38% | A core apró (0,008 mm²); egyszerű aktorok ritkán szaturálják a 75% throughput-ot |
+| **Actor** | Compact | 0,003 mm² | 13% | Üzenet-feldolgozási idő >> hálózati tranzit; 75% throughput ritkán szűk keresztmetszet |
+| **Matrix (actor)** | Turbo | 0,006 mm² | 43% | Általános actor workload Matrix core-on |
+| **Matrix (ML/SNN)** | **Systolic** | **0,001 mm²** | **7%** | Systolic pipeline: 128-bit link → MAC ~100% kihasználtság |
+| **Rich** | Turbo | 0,006 mm² | 10% | A core elég nagy (0,059 mm²), a Turbo overhead elfogadható |
 
-**Korrigált core-számok (7nm, 800 mm²):**
+**Korrigált core-számok (5nm, 800 mm²):**
 
-Az eredeti core-számok a [`core-types-hu.md`](core-types-hu.md)-ban `chipterület / (core + SRAM)` alapon számolódtak, fix hatékonysági faktorral, a per-core router terület explicit figyelembevétele nélkül. A korrigált számok tartalmazzák az ajánlott router variánst és az L1–L3 infrastruktúra per-core részét (~0,007 mm²):
+Az eredeti core-számok a [`core-types-hu.md`](core-types-hu.md)-ban `chipterület / (core + SRAM)` alapon számolódtak, fix hatékonysági faktorral, a per-core router terület explicit figyelembevétele nélkül. A korrigált számok tartalmazzák az ajánlott router variánst és az L1–L3 infrastruktúra per-core részét (~0,006 mm²):
 
 | Core típus | Core+SRAM | Router | Infra | **Node** | **Szám** | Δ vs Turbo |
 |------------|----------:|-------:|------:|---------:|---------:|--:|
-| Nano (4 KB) | 0,014 | 0,004 | 0,007 | 0,025 | **~32 000** | — |
-| Actor (64 KB) | 0,036 | 0,004 | 0,007 | 0,047 | **~17 000** | — |
-| Matrix Turbo (8 KB) | 0,025 | 0,007 | 0,007 | 0,039 | **~20 500** | — |
-| **Matrix Systolic (8 KB)** | **0,025** | **0,001** | **0,007** | **0,033** | **~24 200** | **+18%** |
-| Rich (256 KB) | 0,083 | 0,007 | 0,007 | 0,097 | **~8 250** | — |
+| Nano (4 KB) | 0,008 | 0,003 | 0,006 | 0,017 | **~47 000** | — |
+| Actor (64 KB) | 0,023 | 0,003 | 0,006 | 0,032 | **~25 000** | — |
+| Matrix Turbo (8 KB) | 0,014 | 0,006 | 0,006 | 0,026 | **~30 800** | — |
+| **Matrix Systolic (8 KB)** | **0,014** | **0,001** | **0,006** | **0,021** | **~38 100** | **+24%** |
+| Rich (256 KB) | 0,059 | 0,006 | 0,006 | 0,071 | **~11 300** | — |
 
-> **Megjegyzés:** A Systolic variáns +18%-kal több Matrix core-t tesz lehetővé a Turbo-hoz képest, a router 86%-os méretcsökkentésének köszönhetően. Minden szám szintézis előtti becslés.
+> **Megjegyzés:** A Systolic variáns +24%-kal több Matrix core-t tesz lehetővé a Turbo-hoz képest, a router 83%-os méretcsökkentésének köszönhetően. Minden szám szintézis előtti becslés.
 
 ### L1: Tile (crossbar, 8 cluster)
 
@@ -388,9 +388,9 @@ Az eredeti core-számok a [`core-types-hu.md`](core-types-hu.md)-ban `chipterül
 |-----------|-------|
 | Topológia | 8×8 crossbar (VOQ + iSLIP) |
 | Elhelyezés | A tile geometriai közepén |
-| Fizikai méret | ~3.8 mm × 3.8 mm (7nm) |
+| Fizikai méret | ~3.2 mm × 3.2 mm (5nm) |
 | Link típus | Párhuzamos, 84 bit |
-| Max távolság (GW → crossbar) | ~1.9 mm |
+| Max távolság (GW → crossbar) | ~1.6 mm |
 | Hop szám | Mindig 1 (determinisztikus) |
 | Gate szám | ~16 000 |
 | VOQ buffer | ~30 KB SRAM |
@@ -401,9 +401,9 @@ Az eredeti core-számok a [`core-types-hu.md`](core-types-hu.md)-ban `chipterül
 |-----------|-------|
 | Topológia | 8×8 crossbar (VOQ + iSLIP) |
 | Elhelyezés | A régió geometriai közepén |
-| Fizikai méret | ~11 mm × 11 mm (7nm) |
+| Fizikai méret | ~9 mm × 9 mm (5nm) |
 | Link típus | Soros `SERDES_RATIO`×, `SERIAL_WIRES` vezeték + clock |
-| Max távolság (tile GW → crossbar) | ~5.5 mm |
+| Max távolság (tile GW → crossbar) | ~4.5 mm |
 | Hop szám | Mindig 1 (determinisztikus) |
 | Gate szám | ~16 000 |
 | VOQ buffer | ~30 KB SRAM |
@@ -414,9 +414,9 @@ Az eredeti core-számok a [`core-types-hu.md`](core-types-hu.md)-ban `chipterül
 |-----------|-------|
 | Topológia | Csillag — minden régió közvetlenül a központhoz |
 | Elhelyezés | A chip geometriai közepén, a Seal Core-ral egyben |
-| Fizikai méret | ~37 mm × 37 mm (7nm, 800 mm²) |
+| Fizikai méret | ~28 mm × 28 mm (5nm, 800 mm²) |
 | Link típus | Soros `SERDES_RATIO`×, `SERIAL_WIRES` vezeték + clock |
-| Max távolság (régió GW → közép) | ~18 mm |
+| Max távolság (régió GW → közép) | ~14 mm |
 | Hop szám | Mindig 2 (régió → közép → régió) |
 | Gate szám | ~42 000 (crossbar) + ~200 000 (Seal Core) |
 | VOQ buffer | ~77 KB SRAM |
@@ -425,7 +425,7 @@ Az eredeti core-számok a [`core-types-hu.md`](core-types-hu.md)-ban `chipterül
 
 A Seal Core az L3 crossbar-ral együtt a chip **geometriai közepén** helyezkedik el. Ez az elhelyezés a **hálózati topológiából** következik, nem fizikai tamper-védelemből:
 
-- **Minimális vezetékhossz:** a csillag topológia közepe minimalizálja a maximális távolságot bármelyik régió gateway-től (~18 mm 7nm-en), determinisztikus latenciát biztosítva.
+- **Minimális vezetékhossz:** a csillag topológia közepe minimalizálja a maximális távolságot bármelyik régió gateway-től (~14 mm 5nm-en), determinisztikus latenciát biztosítva.
 - **Cross-régió ellenőrzési pont:** minden cross-régió forgalom áthalad az L3 crossbar-on, így a Seal Core biztonsági ellenőrzést végezhet (AuthCode verifikáció, forgalom-monitorozás) extra routing nélkül.
 - **Egyetlen RTL példányosítás:** a Seal Core + L3 crossbar egyetlen paraméterezhető blokkot alkot a chip közepén — nincs szükség speciális elhelyezési logikára.
 
@@ -468,9 +468,75 @@ A Seal Core két funkciót lát el: **kód hitelesítés** (ritka, de nehéz) é
 | 2 000 | ~2.5 GB/s | ~6% | Nem |
 | 8 192 | ~10 GB/s | ~25% | Nem |
 | 18 432 | ~23 GB/s | ~58% | Még nem |
-| ~30 000 | ~40 GB/s | ~100% | Szaturáció |
+A core szám növekedésével a cross-régió forgalom arányosan nő. 8 192 core-nál az L3 crossbar ~25%-os kihasználtsággal üzemel — jelentős headroom marad. Nagyobb chipeken (F6+) **2–64 Seal Core** lehet jelen redundancia és párhuzamos AuthCode verifikáció céljából (lásd [Seal Core](sealcore-hu.md)).
 
-Egyetlen Seal Core + L3 crossbar **~30 000 core-ig** skálázódik. Nagyobb chipeken (F6+) **2–64 Seal Core** lehet jelen redundancia és párhuzamos AuthCode verifikáció céljából (lásd [Seal Core](sealcore-hu.md)). Ha ~30 000-nél több core kell: több L3 crossbar, osztott régiókkal.
+### L3 Crosspoint hibatűrés
+
+Az L3 crossbar egy N×N iSLIP kapcsoló (N = `REGIONS`, jellemzően 8). Belül N² crosspoint-ból áll — minden crosspoint egyetlen bemenet→kimenet kapcsolat. Ha egy crosspoint meghibásodik, a kieső útvonal **egyetlen irányú kapcsolat** két régió között (pl. R2→R4), miközben az összes többi régiópár zavartalanul működik.
+
+#### Hibamodell
+
+```
+        Kimenet (cél régió)
+        R0  R1  R2  R3  R4  R5  R6  R7
+Bemenet ┌───┬───┬───┬───┬───┬───┬───┬───┐
+  R0    │ — │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │
+  R1    │ ✓ │ — │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │
+  R2    │ ✓ │ ✓ │ — │ ✓ │ ✗ │ ✓ │ ✓ │ ✓ │  ← R2→R4 crosspoint halott
+  R3    │ ✓ │ ✓ │ ✓ │ — │ ✓ │ ✓ │ ✓ │ ✓ │
+  ...
+```
+
+- **R2→R4** forgalom nem tud átmenni (halott crosspoint)
+- **R4→R2** még működik (külön crosspoint)
+- **Minden más régiópár** érintetlen
+- Mitigáció nélkül: az R4-nek szánt cellák R2 VOQ-jában gyűlnek → backpressure → R2-ben lévő, R4-et célzó core-ok megakadnak
+
+#### Mitigáció: relay szomszéd régión keresztül
+
+Az iSLIP scheduler egy **fault bitmap**-et tart karban — crosspoint-onként 1 bit (N² = 64 bit 8 régió esetén). A bitmap induláskor BIST-tel (Built-In Self-Test) töltődik, vagy futás közben frissül, ha egy crosspoint nem válaszol a timeout-ablakon belül.
+
+Ha a scheduler észleli, hogy a közvetlen crosspoint hibásnak van jelölve, **relay**-t hajt végre:
+
+```
+R2 ─╳→ R4           (közvetlen útvonal — halott crosspoint)
+R2 → R3 → L3 → R4   (relay: R3 köztes hop-ként működik)
+```
+
+**Relay mechanizmus:**
+
+1. A scheduler egy **alternatív kimeneti portot** (a relay régiót) választ egy előre számított relay-táblából
+2. A cellát a relay régió GW-jéhez továbbítja, a header reserved bitjeiben beállított **relay flag**-gel
+3. A relay régió GW visszainjektálja a cellát az L3 crossbar-ba az eredeti cél felé
+4. A cél régió normálisan fogadja a cellát — a relay a core-ok számára transzparens
+
+**Relay régió kiválasztás:** A scheduler azt a relay régiót választja, amelynek működik a crosspoint-ja a forrásból ÉS a célba. 8 régió és 1 halott crosspoint esetén mindig 6 érvényes relay-jelölt van.
+
+#### Költségelemzés
+
+| Komponens | Gate költség | SRAM költség | Megjegyzés |
+|-----------|-------------|--------------|------------|
+| Fault bitmap regiszter | ~130 gate | — | 64 FF + olvasó logika |
+| Relay tábla (előre számított) | ~200 gate | — | 8×3 bites best-relay LUT |
+| Scheduler módosítás | ~300 gate | — | Bitmap ellenőrzés + relay útvonal kiválasztás |
+| Header relay flag | 0 | 0 | 1 reserved bitet használ (40 elérhető) |
+| **Összesen** | **~630 gate** | **0** | **< 1.5% az L3 crossbar-ból** |
+
+#### Teljesítmény hatás
+
+| Szcenárió | Latency | Throughput |
+|-----------|---------|------------|
+| Nincs hiba | 2 hop (változatlan) | 100% |
+| 1 crosspoint hiba, relay-zve | 4 hop (forrás→relay→közép→cél) | ~50% az érintett párra, 100% az összes többire |
+| Több hiba | Graceful degradation — minden hibás pár relay-t használ | Throughput csökkenés a relay forgalommal arányos |
+
+A relay 2 extra crossbar-áthaladást ad az érintett régiópárnak. Tipikus cross-régió terhelésnél (~25% kihasználtság) még több relay-zett pár sem telíti a crossbar-t.
+
+#### Detekció: crosspoint állapotfigyelés
+
+- **Boot-time BIST:** minden crosspoint-ot ismert mintával tesztel; a hibák a fault bitmap-be kerülnek a normál működés megkezdése előtt
+- **Runtime watchdog:** ha egy crosspoint-nak kiosztott cella 4 cikluson belül nem produkál kimenet-oldali nyugtát, a crosspoint hibásnak jelölődik és a jövőbeli cellák relay-ződnek
+- **Seal Core értesítés:** crosspoint hibákat diagnosztikai eseményként jelenti a Seal Core-nak (naplózva, opcionálisan chip-en kívülre továbbítva management interfészen)
 
 ## Kód betöltés a hálózaton
 
@@ -561,7 +627,7 @@ HW multicast **csak a cluster gateway-ekben** (L1 crossbar-ban, nem minden L0 ro
 
 Az L2/L3 soros linkek on-chip SerDes-t használnak konfigurálható szorzóval (`SERDES_RATIO`). A maximális megvalósítható szorzó a core órajeltől függ — magasabb órajel alacsonyabb szorzót igényel, hogy a SerDes frekvencia a szilícium korlátain belül maradjon.
 
-**Korlát:** az on-chip SerDes IP 7nm/5nm-en jellemzően ~25–32 Gbps/lane-ig támogat. A SerDes frekvencia = core_clock × `SERDES_RATIO` e határ alatt kell maradjon.
+**Korlát:** az on-chip SerDes IP 5nm-en jellemzően ~25–32 Gbps/lane-ig támogat. A SerDes frekvencia = core_clock × `SERDES_RATIO` e határ alatt kell maradjon.
 
 | Core órajel | Max `SERDES_RATIO` | Ajánlott konfig | Effektív L2/L3 link szélesség | L2/L3 szerializáció |
 |------------|-------------------|-----------------|-------------------------------|---------------------|
@@ -582,18 +648,18 @@ A `SERIAL_WIRES` növelése 8-ról 16-ra nem ingyenes — mérhető terület- é
 | SerDes transceiver (link végpontonként) | ~3 000 GE | ~4 500 GE | ~6 000 GE | PLL közös, de CDR/EQ/driver lane-enként |
 | L2 crossbar I/O mux | ~15 000 GE | ~18 000 GE | ~21 000 GE | Szélesebb input/output portok |
 | L3 crossbar I/O mux | ~40 000 GE | ~48 000 GE | ~56 000 GE | Azonos skálázás |
-| Fizikai vezetékek (L3, ~18 mm) | 8 × 2 = 16 vez. | 12 × 2 = 24 | 16 × 2 = 32 | Kétirányú; fémréteg routing nyomás |
-| Fizikai vezetékek (L2, ~5.5 mm) | 16 vez. | 24 | 32 | Rövidebb, kevésbé kritikus |
+| Fizikai vezetékek (L3, ~14 mm) | 8 × 2 = 16 vez. | 12 × 2 = 24 | 16 × 2 = 32 | Kétirányú; fémréteg routing nyomás |
+| Fizikai vezetékek (L2, ~4.5 mm) | 16 vez. | 24 | 32 | Rövidebb, kevésbé kritikus |
 
 **Chip-szintű hatás 16 vezetéknél (`SERIAL_WIRES`=16):**
 - L2 crossbar terület: +~40% (+6 000 GE × 8 tile/régió)
 - L3 crossbar terület: +~40% (+16 000 GE, egyetlen példány)
-- Vezeték routing: az L3 linkek 32 vezetéket visznek ~18 mm-en — 5nm-en megvalósítható (fém pitch ~20 nm, teljes vezetékköteg ~0,64 µm széles), de regionálisan 1–2 dedikált fémréteget foglal
+- Vezeték routing: az L3 linkek 32 vezetéket visznek ~14 mm-en — 5nm-en megvalósítható (fém pitch ~20 nm, teljes vezetékköteg ~0,64 µm széles), de regionálisan 1–2 dedikált fémréteget foglal
 - **Teljes chip terület-növekedés: <1%** — a crossbar infrastruktúra eleve a die terület kis hányada (~2–3%)
 
 A területi költség pont azért elfogadható, mert az L2/L3 crossbar infrastruktúra több ezer core-ra amortizálódik. A domináns terület továbbra is a core SRAM.
 
-> **L3 vezetékhossz korlát:** az L3 link akár ~18 mm (7nm). 50 GHz-en (5 GHz × 10×) a vezeték terjedési késleltetés önmagában ~2–3 ns ≈ 100–150 bit-idő, ami többlépcsős retiming-et igényel. A SerDes frekvencia ≤ 20 GHz tartása elkerüli ezt a komplexitást.
+> **L3 vezetékhossz korlát:** az L3 link akár ~14 mm (5nm). 50 GHz-en (5 GHz × 10×) a vezeték terjedési késleltetés önmagában ~2–3 ns ≈ 100–150 bit-idő, ami többlépcsős retiming-et igényel. A SerDes frekvencia ≤ 20 GHz tartása elkerüli ezt a komplexitást.
 
 ## Hop-szám és latencia összefoglaló
 
@@ -648,7 +714,7 @@ Az RTL paraméterezhető — a chipméret és a gyártási technológia határoz
 | 130nm | 1.06 mm² | 16 KB | 588 | 1 030 | 2 |
 | 28nm | 0.18 mm² | 64 KB | 3 467 | 6 067 | 3 |
 | 7nm | 0.083 mm² | 256 KB | 7 518 | 13 157 | 4 |
-| 5nm | 0.103 mm² | 512 KB | 6 058 | 10 602 | 4 |
+| **5nm (ref)** | **0.103 mm²** | **512 KB** | **6 058** | **10 602** | **4** |
 
 **B) Fix 256 KB SRAM (maximális párhuzamosság):**
 
@@ -657,7 +723,7 @@ Az RTL paraméterezhető — a chipméret és a gyártási technológia határoz
 | 130nm | 2.93 mm² | 256 KB | 213 | 373 | 2 |
 | 28nm | 0.37 mm² | 256 KB | 1 686 | 2 951 | 3 |
 | 7nm | 0.083 mm² | 256 KB | 7 518 | 13 157 | 4 |
-| 5nm | 0.059 mm² | 256 KB | 10 576 | 18 508 | 4 |
+| **5nm (ref)** | **0.059 mm²** | **256 KB** | **10 576** | **18 508** | **4** |
 
 A döntés a workload-tól függ — az RTL `SRAM_KB_PER_CORE` paramétere gyártáskor állítható.
 
@@ -697,6 +763,8 @@ Ez a dokumentum az alábbi Neuron OS hardware requirement-ekre válaszol:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 2.3 | 2026-04-21 | L3 Crosspoint hibatűrés szekció: fault bitmap (64-bit), relay szomszéd régión keresztül (~630 gate, <1,5% overhead), BIST + runtime watchdog detekció, graceful degradation modell |
+| 2.2 | 2026-04-21 | Referencia node 7nm→5nm váltás. Újraszámolva: router területek (Turbo 0,006, Compact 0,003), core+SRAM méretek, korrigált core-számok (Nano ~47k, Actor ~25k, Matrix Turbo ~30,8k, Matrix Systolic ~38,1k, Rich ~11,3k), fizikai méretek (L0 1,1mm, L1 3,2mm, L2 9mm, L3 28mm), Seal Core vezetékhossz 14mm. Referencia konfig: 16×8×8×10 = 10 240 core |
 | 2.1 | 2026-04-19 | Systolic router variáns (Variáns C): 128-bites egyirányú linkek (W→E, N→S), ~5 000 GE ≈ 0,001 mm², ML/SNN dedikált. Sebesség tábla, ajánlott variáns tábla, korrigált core-számok és link típusok frissítve |
 | 2.0 | 2026-04-19 | Cella payload 128→64 byte (cella méret 144→80 byte). 16 flit/cella, 2H+15 latencia modell, L1 8cc, L2/L3 8cc szerializáció, cross-régió 139 ciklus (278 ns). Router gate számok, VOQ SRAM, core-számok újraszámolva. CELL_SIZE tartomány: 64/128. Turbo: 0,007 mm², Compact: 0,004 mm² |
 | 1.9 | 2026-04-19 | Cella header 8→16 byte (128-bit, 2-hatvány). Cella méret 136→144 byte. Összes származtatott érték újraszámolva: 28 flit/cella, 2H+27 latencia modell, L1 14cc, L2/L3 15cc szerializáció, cross-régió 229 ciklus (458 ns). VOQ SRAM és gate számok frissítve |

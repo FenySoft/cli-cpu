@@ -196,31 +196,29 @@
       <tr><td>20 000+</td><td><strong>4-5</strong></td><td>Wafer-scale</td></tr>
     </table>
 
-    <h2>&Ouml;t core t&iacute;pus</h2>
+    <h2>N&eacute;gy core t&iacute;pus + MAC Slice</h2>
 
-<p>A CFPU nem egyf&eacute;le core-t gy&aacute;rt &mdash; &ouml;t core t&iacute;pus l&eacute;tezik, &eacute;s a v&aacute;laszt&aacute;s az alkalmaz&aacute;si ter&uuml;lettől f&uuml;gg:</p>
+<p>A CFPU nem egyf&eacute;le core-t gy&aacute;rt &mdash; n&eacute;gy programozhat&oacute; core t&iacute;pus l&eacute;tezik, az ML inference-t pedig nem programozhat&oacute; MAC Slice-ok v&eacute;gzik:</p>
 
 <table class="comparison-table">
   <tr><th>Core</th><th>ISA</th><th>FPU</th><th>GC + Obj.</th><th>SRAM</th><th>Szerep</th></tr>
   <tr><td><strong>Nano</strong></td><td>CIL-T0 (48 opk&oacute;d)</td><td>Nincs</td><td>Nincs</td><td>4-64 KB</td><td>Spike, szenzor, egyszerű aktor</td></tr>
   <tr><td><strong>Actor</strong></td><td>Teljes CIL</td><td>Nincs</td><td><strong>Van</strong></td><td>64-256 KB</td><td>Aktor-nat&iacute;v: objektumok, GC, kiv&eacute;telek</td></tr>
-  <tr><td><strong>Rich</strong></td><td>Teljes CIL + FPU</td><td><strong>Van</strong></td><td><strong>Van</strong></td><td>128-512 KB</td><td>ML inference, FP-ig&eacute;nyes</td></tr>
-  <tr><td><strong>Matrix</strong></td><td>CIL-T0 + FP</td><td><strong>Van</strong> + 4&times;4 MAC + SFU (power-gated)</td><td>&mdash;</td><td>4-64 KB</td><td>ML inference, SNN neuron modellek &mdash; nincs GC, nincs objektummodell</td></tr>
-  <tr><td><strong>Seal</strong></td><td>AuthCode, hash</td><td>Crypto HW</td><td>&mdash;</td><td>~32 KB</td><td>K&oacute;d hiteles&iacute;t&eacute;s &mdash; mindig 1 db</td></tr>
+  <tr><td><strong>Rich</strong></td><td>Teljes CIL + FPU</td><td><strong>Van</strong></td><td><strong>Van</strong></td><td>128-512 KB</td><td>FP-ig&eacute;nyes, tudom&aacute;nyos, teljes .NET</td></tr>
+  <tr><td><strong>Seal</strong></td><td>AuthCode, hash</td><td>Crypto HW</td><td>&mdash;</td><td>~32 KB</td><td>K&oacute;d hiteles&iacute;t&eacute;s &mdash; 1+ / chip</td></tr>
+  <tr><td><strong>MAC Slice</strong></td><td>FSM (nincs CIL)</td><td>&mdash;</td><td>&mdash;</td><td>4-256 KB</td><td>ML inference &mdash; 8&times;8 INT8 MAC, nem programozhat&oacute;</td></tr>
 </table>
 
-<h3>Core sz&aacute;m &ouml;sszehasonl&iacute;t&aacute;s (7nm, 800 mm&sup2;)</h3>
+<h3>Core sz&aacute;m &ouml;sszehasonl&iacute;t&aacute;s (5nm, 800 mm&sup2;)</h3>
 
 <table class="comparison-table">
   <tr><th>Core + SRAM</th><th>Node m&eacute;ret</th><th>Core sz&aacute;m</th></tr>
-  <tr><td>Nano + 4 KB</td><td>0.025 mm&sup2;</td><td><strong>~32 000</strong></td></tr>
-  <tr><td>Actor + 64 KB</td><td>0.047 mm&sup2;</td><td><strong>~17 000</strong></td></tr>
-  <tr><td>Rich + 256 KB</td><td>0.097 mm&sup2;</td><td><strong>~8 250</strong></td></tr>
-  <tr><td><strong>Matrix Turbo + 8 KB</strong></td><td><strong>0.039 mm&sup2;</strong></td><td><strong>~20 500</strong></td></tr>
-  <tr><td><strong>Matrix Systolic + 8 KB</strong></td><td><strong>0.033 mm&sup2;</strong></td><td><strong>~24 200</strong></td></tr>
+  <tr><td>Nano + 4 KB</td><td>0,017 mm&sup2;</td><td><strong>~47 000</strong></td></tr>
+  <tr><td>Actor + 64 KB</td><td>0,032 mm&sup2;</td><td><strong>~25 000</strong></td></tr>
+  <tr><td>Rich + 256 KB</td><td>0,071 mm&sup2;</td><td><strong>~11 300</strong></td></tr>
 </table>
 
-<p>A <strong>Matrix Core optim&aacute;lis SRAM-ja 8 KB</strong> &mdash; a MAC array streaming m&oacute;dban dolgozik, a h&aacute;l&oacute;zat t&aacute;pl&aacute;lja adattal. 8 KB-ban a k&oacute;d + stack + MAC buffer k&eacute;nyelmesen elf&eacute;r, &eacute;s marad ~2 KB lok&aacute;lis cache. A node m&eacute;retek tartalmazz&aacute;k az L0 router ter&uuml;letet &eacute;s az L1&ndash;L3 infrastrukt&uacute;ra per-core r&eacute;sz&eacute;t (~0,007 mm&sup2;). A Systolic router vari&aacute;ns +18%-kal t&ouml;bb Matrix core-t tesz lehető&eacute;.</p>
+<p>A node m&eacute;retek tartalmazz&aacute;k az aj&aacute;nlott L0 router ter&uuml;letet &eacute;s az L1&ndash;L3 infrastrukt&uacute;ra per-core r&eacute;sz&eacute;t (~0,007 mm&sup2;). A CFPU-ML chip MAC Slice-okat haszn&aacute;l (nem programozhat&oacute; core-okat), chiplet architekt&uacute;r&aacute;ban &mdash; l&aacute;sd <a href="cfpu-ml-max.html">CFPU-ML-Max</a>.</p>
 
 <h3>CFPU term&eacute;kcsalád</h3>
 
@@ -229,7 +227,7 @@
   <tr><td><strong>CFPU-N</strong></td><td>1 Seal</td><td>Nano only</td><td>IoT, massz&iacute;v SNN</td></tr>
   <tr><td><strong>CFPU-A</strong></td><td>1 Seal</td><td>Actor only</td><td>Actor cluster, stream</td></tr>
   <tr><td><strong>CFPU-R</strong></td><td>1 Seal</td><td>Rich only</td><td>ML inference, FP</td></tr>
-  <tr><td><strong>CFPU-ML</strong></td><td>1 Seal</td><td>Matrix + Actor</td><td>ML/SNN optimalizált</td></tr>
+  <tr><td><strong>CFPU-ML</strong></td><td>1 Seal</td><td>MAC Slice + Actor</td><td>ML/SNN inference (chiplet)</td></tr>
   <tr><td><strong>CFPU-H</strong></td><td>1 Seal</td><td>Actor + Nano</td><td>Heterog&eacute;n supervisor+worker</td></tr>
   <tr><td><strong>CFPU-X</strong></td><td>1 Seal</td><td>Vegyes (b&aacute;rmely kombin&aacute;ci&oacute;)</td><td>Alkalmaz&aacute;s-specifikus</td></tr>
 </table>
@@ -237,8 +235,8 @@
 <p>Ugyanaz az RTL, a <code>CORE_TYPE</code> param&eacute;ter hat&aacute;rozza meg a gy&aacute;rtott core t&iacute;pust. Heterog&eacute;n chipen egy chipen bel&uuml;l is t&ouml;bb t&iacute;pus lehet.</p>
 
     <div class="highlight-box">
-      <strong>CFPU-ML (7nm, 800 mm&sup2;):</strong> ~19 500 Matrix Core (8 KB, Turbo) + ~1 000 Actor Core (64 KB) = <strong>~312 000 p&aacute;rhuzamos MAC egys&eacute;g</strong>, ~312 TOPS INT8 @ 500 MHz (elm&eacute;leti cs&uacute;cs&eacute;rt&eacute;k*). R&eacute;szletek: <a href="core-types.html">Core t&iacute;pusok blog</a>, <a href="cfpu-ml-max.html">CFPU-ML-Max blog</a>.<br><br>
-      <em style="font-size: 0.9em;">* Elm&eacute;leti cs&uacute;cs&eacute;rt&eacute;k: core sz&aacute;m &times; MAC egys&eacute;gek &times; &oacute;rajel alapj&aacute;n sz&aacute;molva. RTL szimul&aacute;ci&oacute; vagy szil&iacute;cium m&eacute;r&eacute;s m&eacute;g nem &aacute;ll rendelkez&eacute;sre. A val&oacute;s TDP jelent&odblac;sen magasabb lesz az aritmetikai becsl&eacute;sn&eacute;l.</em>
+      <strong>CFPU-ML-Max (5nm, chiplet, 18 tine):</strong> ~94 752 MAC Slice (8&times;8 INT8, M SKU) + ~150 Actor Core (FP16, IOD-n) = <strong>~6 066 cs&uacute;cs TOPS</strong> INT8 @ 500 MHz, 740 MB on-chip SRAM*. R&eacute;szletek: <a href="core-types.html">Core t&iacute;pusok blog</a>, <a href="cfpu-ml-max.html">CFPU-ML-Max blog</a>.<br><br>
+      <em style="font-size: 0.9em;">* Aritmetikai projekci&oacute;k +25% design marginnal. Chiplet: 85 mm&sup2; tine die (5nm), 2&times;9 elrendez&eacute;s (18 tine + IOD, SoIC+CoWoS). RTL szimul&aacute;ci&oacute; vagy szil&iacute;cium m&eacute;r&eacute;s m&eacute;g nem &aacute;ll rendelkez&eacute;sre.</em>
     </div>
 
     <h2>Node-specifikus konfigur&aacute;ci&oacute;k</h2>
@@ -284,7 +282,7 @@ L3: 10 r&eacute;gi&oacute;, 10&times;10 crossbar + Seal Core
     <h2>A latencia &aacute;lland&oacute; marad</h2>
 
     <p>
-      A worst-case latencia <strong>~99&ndash;139 ciklus tartom&aacute;nyban</strong> mozog a node-t&oacute;l &eacute;s a hierarchia m&eacute;lys&eacute;g&eacute;t&odblac;l f&uuml;gg&odblac;en. 7nm-en a cross-r&eacute;gi&oacute; worst-case ~139 ciklus (~278 ns @ 500 MHz). A kontextus: ez versenyképes a szoftveres aktor &uuml;zenetk&uuml;ld&eacute;ssel (Erlang/BEAM: ~0,5&ndash;2 &micro;s).
+      A worst-case latencia <strong>~99&ndash;139 ciklus tartom&aacute;nyban</strong> mozog a node-t&oacute;l &eacute;s a hierarchia m&eacute;lys&eacute;g&eacute;t&odblac;l f&uuml;gg&odblac;en. 5nm-en a cross-r&eacute;gi&oacute; worst-case ~139 ciklus (~278 ns @ 500 MHz). A kontextus: ez versenyképes a szoftveres aktor &uuml;zenetk&uuml;ld&eacute;ssel (Erlang/BEAM: ~0,5&ndash;2 &micro;s).
     </p>
 
     <table class="comparison-table">

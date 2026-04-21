@@ -196,31 +196,29 @@
       <tr><td>20,000+</td><td><strong>4-5</strong></td><td>Wafer-scale</td></tr>
     </table>
 
-    <h2>Five core types</h2>
+    <h2>Four core types + MAC Slice</h2>
 
-<p>The CFPU does not manufacture a single core type &mdash; five core types exist, and the choice depends on the application domain:</p>
+<p>The CFPU does not manufacture a single core type &mdash; four programmable core types exist, and ML inference uses non-programmable MAC Slices:</p>
 
 <table class="comparison-table">
   <tr><th>Core</th><th>ISA</th><th>FPU</th><th>GC + Obj.</th><th>SRAM</th><th>Role</th></tr>
   <tr><td><strong>Nano</strong></td><td>CIL-T0 (48 opcodes)</td><td>None</td><td>None</td><td>4-64 KB</td><td>Spike, sensor, simple actor</td></tr>
   <tr><td><strong>Actor</strong></td><td>Full CIL</td><td>None</td><td><strong>Yes</strong></td><td>64-256 KB</td><td>Actor-native: objects, GC, exceptions</td></tr>
-  <tr><td><strong>Rich</strong></td><td>Full CIL + FPU</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>128-512 KB</td><td>ML inference, FP-intensive</td></tr>
-  <tr><td><strong>Matrix</strong></td><td>CIL-T0 + FP</td><td><strong>Yes</strong> + 4&times;4 MAC + SFU (power-gated)</td><td>&mdash;</td><td>4-64 KB</td><td>ML inference, SNN neuron models &mdash; no GC, no object model</td></tr>
-  <tr><td><strong>Seal</strong></td><td>AuthCode, hash</td><td>Crypto HW</td><td>&mdash;</td><td>~32 KB</td><td>Code authentication &mdash; always exactly 1</td></tr>
+  <tr><td><strong>Rich</strong></td><td>Full CIL + FPU</td><td><strong>Yes</strong></td><td><strong>Yes</strong></td><td>128-512 KB</td><td>FP-intensive, scientific, full .NET</td></tr>
+  <tr><td><strong>Seal</strong></td><td>AuthCode, hash</td><td>Crypto HW</td><td>&mdash;</td><td>~32 KB</td><td>Code authentication &mdash; 1+ per chip</td></tr>
+  <tr><td><strong>MAC Slice</strong></td><td>FSM (no CIL)</td><td>&mdash;</td><td>&mdash;</td><td>4-256 KB</td><td>ML inference &mdash; 8&times;8 INT8 MAC, not programmable</td></tr>
 </table>
 
-<h3>Core count comparison (7nm, 800 mm&sup2;)</h3>
+<h3>Core count comparison (5nm, 800 mm&sup2;)</h3>
 
 <table class="comparison-table">
   <tr><th>Core + SRAM</th><th>Node size</th><th>Core count</th></tr>
-  <tr><td>Nano + 4 KB</td><td>0.025 mm&sup2;</td><td><strong>~32,000</strong></td></tr>
-  <tr><td>Actor + 64 KB</td><td>0.047 mm&sup2;</td><td><strong>~17,000</strong></td></tr>
-  <tr><td>Rich + 256 KB</td><td>0.097 mm&sup2;</td><td><strong>~8,250</strong></td></tr>
-  <tr><td><strong>Matrix Turbo + 8 KB</strong></td><td><strong>0.039 mm&sup2;</strong></td><td><strong>~20,500</strong></td></tr>
-  <tr><td><strong>Matrix Systolic + 8 KB</strong></td><td><strong>0.033 mm&sup2;</strong></td><td><strong>~24,200</strong></td></tr>
+  <tr><td>Nano + 4 KB</td><td>0.017 mm&sup2;</td><td><strong>~47,000</strong></td></tr>
+  <tr><td>Actor + 64 KB</td><td>0.032 mm&sup2;</td><td><strong>~25,000</strong></td></tr>
+  <tr><td>Rich + 256 KB</td><td>0.071 mm&sup2;</td><td><strong>~11,300</strong></td></tr>
 </table>
 
-<p>The <strong>optimal SRAM for the Matrix Core is 8 KB</strong> &mdash; the MAC array works in streaming mode, fed by the network. At 8 KB, the code + stack + MAC buffer fits comfortably with ~2 KB left for local cache. Node sizes include L0 router area and L1&ndash;L3 infrastructure per-core share (~0.007 mm&sup2;). The Systolic router variant enables +18% more Matrix cores.</p>
+<p>Node sizes include the recommended L0 router variant area and L1&ndash;L3 infrastructure per-core share (~0.007 mm&sup2;). The CFPU-ML chip uses MAC Slices (not programmable cores) in a chiplet architecture &mdash; see <a href="cfpu-ml-max.html">CFPU-ML-Max</a>.</p>
 
 <h3>CFPU product family</h3>
 
@@ -229,7 +227,7 @@
   <tr><td><strong>CFPU-N</strong></td><td>1 Seal</td><td>Nano only</td><td>IoT, massive SNN</td></tr>
   <tr><td><strong>CFPU-A</strong></td><td>1 Seal</td><td>Actor only</td><td>Actor cluster, streaming</td></tr>
   <tr><td><strong>CFPU-R</strong></td><td>1 Seal</td><td>Rich only</td><td>ML inference, FP</td></tr>
-  <tr><td><strong>CFPU-ML</strong></td><td>1 Seal</td><td>Matrix + Actor</td><td>ML/SNN optimized</td></tr>
+  <tr><td><strong>CFPU-ML</strong></td><td>1 Seal</td><td>MAC Slice + Actor</td><td>ML/SNN inference (chiplet)</td></tr>
   <tr><td><strong>CFPU-H</strong></td><td>1 Seal</td><td>Actor + Nano</td><td>Heterogeneous supervisor+worker</td></tr>
   <tr><td><strong>CFPU-X</strong></td><td>1 Seal</td><td>Mixed (any combination)</td><td>Application-specific</td></tr>
 </table>
@@ -237,8 +235,8 @@
 <p>Same RTL, the <code>CORE_TYPE</code> parameter determines the fabricated core type. On a heterogeneous chip, multiple types can coexist on a single die.</p>
 
     <div class="highlight-box">
-      <strong>CFPU-ML (7nm, 800 mm&sup2;):</strong> ~19,500 Matrix Cores (8 KB, Turbo) + ~1,000 Actor Cores (64 KB) = <strong>~312,000 parallel MAC units</strong>, ~312 TOPS INT8 @ 500 MHz (theoretical peak*). Details: <a href="core-types.html">Core Types blog</a>, <a href="cfpu-ml-max.html">CFPU-ML-Max blog</a>.<br><br>
-      <em style="font-size: 0.9em;">* Theoretical peak calculated as core count &times; MAC units &times; clock. No RTL simulation or silicon measurement exists yet. Actual TDP will be significantly higher than the arithmetic estimate.</em>
+      <strong>CFPU-ML-Max (5nm, chiplet, 18 tine):</strong> ~94,752 MAC Slices (8&times;8 INT8, M SKU) + ~150 Actor Cores (FP16, on IOD) = <strong>~6,066 peak TOPS</strong> INT8 @ 500 MHz, 740 MB on-chip SRAM*. Details: <a href="core-types.html">Core Types blog</a>, <a href="cfpu-ml-max.html">CFPU-ML-Max blog</a>.<br><br>
+      <em style="font-size: 0.9em;">* Arithmetic projections with +25% design margin. Chiplet: 85 mm&sup2; tine die (5nm), 2&times;9 layout (18 tine + IOD, SoIC+CoWoS). No RTL simulation or silicon measurement exists yet.</em>
     </div>
 
     <h2>Node-specific configurations</h2>
@@ -284,7 +282,7 @@ Total SRAM: 2.5 GB
     <h2>Latency remains constant</h2>
 
     <p>
-      Worst-case latency <strong>ranges from ~99 to ~139 cycles</strong> depending on the node and hierarchy depth. At 7nm, the cross-region worst case is ~139 cycles (~278 ns @ 500 MHz). For context: this is competitive with software actor messaging (Erlang/BEAM: ~0.5&ndash;2 &micro;s).
+      Worst-case latency <strong>ranges from ~99 to ~139 cycles</strong> depending on the node and hierarchy depth. At 5nm, the cross-region worst case is ~139 cycles (~278 ns @ 500 MHz). For context: this is competitive with software actor messaging (Erlang/BEAM: ~0.5&ndash;2 &micro;s).
     </p>
 
     <table class="comparison-table">

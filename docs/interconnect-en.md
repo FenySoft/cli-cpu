@@ -2,13 +2,13 @@
 
 > Magyar verzió: [interconnect-hu.md](interconnect-hu.md)
 
-> Version: 2.1
+> Version: 2.3
 
 This document specifies the **on-chip interconnect network** of the Cognitive Fabric Processing Unit (CFPU): the topology, switching model, router internals, physical layout, core family, and node-scaling strategy.
 
 ## Core Family
 
-The CFPU defines five core types (Nano, Actor, Rich, Matrix, Seal) and six product variants (CFPU-N/A/R/ML/H/X). For full details — ISA differences, area impact, SRAM sizing, power domains, and market positioning — see [`core-types-en.md`](core-types-en.md).
+The CFPU defines four programmable core types (Nano, Actor, Rich, Seal) and six product variants (CFPU-N/A/R/ML/H/X). ML inference uses MAC Slices (FSM-driven, non-programmable). For full details — ISA differences, area impact, SRAM sizing, power domains, and market positioning — see [`core-types-en.md`](core-types-en.md); for MAC Slice specification: [`cfpu-ml-max-hu.md`](cfpu-ml-max-hu.md).
 
 ## Design Principles (in priority order)
 
@@ -39,17 +39,17 @@ L3: Chip ── N₃ regions, star topology
 
 The mesh is used where physically justified (between cores, ~300 µm). The crossbar is used where logically justified (between gateways, 8–18 ports).
 
-### Reference Configuration (7nm, 800 mm²)
+### Reference Configuration (5nm, 800 mm²)
 
 ```
-L0: 16 cores × L1: 8 clusters × L2: 8 tiles × L3: 8 regions = 8,192 cores
+L0: 16 cores × L1: 8 clusters × L2: 8 tiles × L3: 10 regions = 10,240 cores
 ```
 
 ### Configurable Parameters
 
 | Parameter | Fixed/Variable | Range | Determined by |
 |-----------|----------------|-------|---------------|
-| `CORES_PER_CLUSTER` | **Fixed** | 16 (4×4) | Physical optimum: ~1.3 mm, 2-cycle wormhole pipeline/hop |
+| `CORES_PER_CLUSTER` | **Fixed** | 16 (4×4) | Physical optimum: ~1.1 mm, 2-cycle wormhole pipeline/hop |
 | `CLUSTERS_PER_TILE` | Variable | 4–12 | Node, die size |
 | `TILES_PER_REGION` | Variable | 4–12 | Node, die size |
 | `REGIONS` | Variable | 4–24 | Die size |
@@ -100,7 +100,7 @@ The original 128-byte payload was oversized for the Matrix Core's 4×4 tile, but
 | Neighbor latency | 2H + 15 = 17 cc | 2H + 27 = 29 cc |
 | Cross-region latency | ~139 cc | ~229 cc |
 | Router VOQ SRAM | smaller | ~1.6× larger |
-| Router area (Turbo) | 0.007 mm² | ~0.009 mm² |
+| Router area (Turbo) | 0.006 mm² | ~0.008 mm² |
 
 **Decisive argument: latency.** The 80-byte cell provides **40% faster** cross-region latency (139 vs 229 cc). This affects **every message** — commands, events, responses — while the 128B payload's header-overhead advantage (11% vs 20%) **only matters for rare, large messages** (state migration, bulk transfer).
 
@@ -236,11 +236,11 @@ The combination eliminates deadlock at every level without requiring Virtual Cha
 |-----------|-------|
 | Topology | 4×4 mesh, XY routing |
 | Cores | 16 cores (any single type per cluster) |
-| Physical size | ~1.3 mm × 1.3 mm (7nm) |
+| Physical size | ~1.1 mm × 1.1 mm (5nm) |
 | Link type | Parallel, 42-bit, 1× core clock |
 | Wire length | ~330 µm (neighboring core) |
 | Max hops | 6 |
-| Router area / core | 0.004–0.007 mm² (see L0 Router Variants) |
+| Router area / core | 0.001–0.006 mm² (see L0 Router Variants) |
 | Gateway | Uplink port integrated into corner core router |
 
 #### L0 Router Variants
@@ -262,7 +262,7 @@ The L0 router is the largest per-core overhead in the CFPU. The original 5-port 
 | Misc control | 12,000 | FSM, reset, power-gate interface |
 | **Total** | **~44,300** | **≈ 0.011 mm²** |
 
-> **Area convention:** GE-to-area conversion assumes ~0.25 µm²/GE at 7nm (logic + routing overhead), SRAM uses dense 6T cells (~0.027 µm²/bit). These estimates are pre-synthesis; final area will be determined by RTL synthesis (F4+). The baseline router is sized for 80-byte cells.
+> **Area convention:** GE-to-area conversion assumes ~0.21 µm²/GE at 5nm (logic + routing overhead), SRAM uses dense 6T cells (~0.021 µm²/bit). These estimates are pre-synthesis; final area will be determined by RTL synthesis (F4+). The baseline router is sized for 80-byte cells.
 
 **Variant A: Turbo — Speed > Area**
 
@@ -276,7 +276,7 @@ Optimizes for throughput and latency. Reduces area without sacrificing performan
 | 2 VN retained | Control plane isolation is critical | None |
 | Credits: 3 (not 4) | 1 fewer register per port | Negligible |
 
-**Result: ~26,000 GE ≈ 0.007 mm²** (−41% GE, −36% area vs baseline)
+**Result: ~26,000 GE ≈ 0.006 mm²** (−41% GE, −36% area vs baseline)
 
 **Variant B: Compact — Area > Speed**
 
@@ -291,7 +291,7 @@ Aggressively minimizes router area. Accepts moderate throughput reduction.
 | Credits: 2 (not 4) | More stalls under burst | Minor |
 | Queue depth: 2 (not 4) | Minimal buffering | More stalls under burst |
 
-**Result: ~14,500 GE ≈ 0.004 mm²** (−67% GE, −64% area vs baseline)
+**Result: ~14,500 GE ≈ 0.003 mm²** (−67% GE, −64% area vs baseline)
 
 **Variant C: Systolic — ML/SNN > General Purpose**
 
@@ -362,25 +362,25 @@ The Systolic variant is **not general purpose** — it is exclusively for ML/SNN
 
 | Core type | Variant | Router area | Router / core | Rationale |
 |-----------|:-------:|------------:|--------------:|-----------|
-| **Nano** | Compact | 0.004 mm² | 29% | Core is tiny (0.014 mm²); simple actors rarely saturate 75% throughput |
-| **Actor** | Compact | 0.004 mm² | 11% | Message processing time >> network transit; 75% throughput rarely bottlenecks |
-| **Matrix (actor)** | Turbo | 0.007 mm² | 28% | General actor workload on Matrix core |
-| **Matrix (ML/SNN)** | **Systolic** | **0.001 mm²** | **4%** | Systolic pipeline: 128-bit link → MAC ~100% utilization |
-| **Rich** | Turbo | 0.007 mm² | 8% | Core is large enough (0.083 mm²) that Turbo overhead is acceptable |
+| **Nano** | Compact | 0.003 mm² | 38% | Core is tiny (0.008 mm²); simple actors rarely saturate 75% throughput |
+| **Actor** | Compact | 0.003 mm² | 13% | Message processing time >> network transit; 75% throughput rarely bottlenecks |
+| **Matrix (actor)** | Turbo | 0.006 mm² | 43% | General actor workload on Matrix core |
+| **Matrix (ML/SNN)** | **Systolic** | **0.001 mm²** | **7%** | Systolic pipeline: 128-bit link → MAC ~100% utilization |
+| **Rich** | Turbo | 0.006 mm² | 10% | Core is large enough (0.059 mm²) that Turbo overhead is acceptable |
 
-**Corrected core counts (7nm, 800 mm²):**
+**Corrected core counts (5nm, 800 mm²):**
 
-The original core counts in [`core-types-en.md`](core-types-en.md) were computed as `die_area / (core + SRAM)` with a flat efficiency factor, without explicitly accounting for the per-core router area. The corrected counts include the recommended router variant plus per-core share of L1–L3 infrastructure (~0.007 mm²):
+The original core counts in [`core-types-en.md`](core-types-en.md) were computed as `die_area / (core + SRAM)` with a flat efficiency factor, without explicitly accounting for the per-core router area. The corrected counts include the recommended router variant plus per-core share of L1–L3 infrastructure (~0.006 mm²):
 
 | Core type | Core+SRAM | Router | Infra | **Node** | **Count** | Δ vs Turbo |
 |-----------|----------:|-------:|------:|---------:|---------:|--:|
-| Nano (4 KB) | 0.014 | 0.004 | 0.007 | 0.025 | **~32,000** | — |
-| Actor (64 KB) | 0.036 | 0.004 | 0.007 | 0.047 | **~17,000** | — |
-| Matrix Turbo (8 KB) | 0.025 | 0.007 | 0.007 | 0.039 | **~20,500** | — |
-| **Matrix Systolic (8 KB)** | **0.025** | **0.001** | **0.007** | **0.033** | **~24,200** | **+18%** |
-| Rich (256 KB) | 0.083 | 0.007 | 0.007 | 0.097 | **~8,250** | — |
+| Nano (4 KB) | 0.008 | 0.003 | 0.006 | 0.017 | **~47,000** | — |
+| Actor (64 KB) | 0.023 | 0.003 | 0.006 | 0.032 | **~25,000** | — |
+| Matrix Turbo (8 KB) | 0.014 | 0.006 | 0.006 | 0.026 | **~30,800** | — |
+| **Matrix Systolic (8 KB)** | **0.014** | **0.001** | **0.006** | **0.021** | **~38,100** | **+24%** |
+| Rich (256 KB) | 0.059 | 0.006 | 0.006 | 0.071 | **~11,300** | — |
 
-> **Note:** The Systolic variant enables +18% more Matrix cores compared to Turbo, thanks to the router's 86% area reduction. All counts are pre-synthesis estimates.
+> **Note:** The Systolic variant enables +24% more Matrix cores compared to Turbo, thanks to the router's 83% area reduction. All counts are pre-synthesis estimates.
 
 ### L1: Tile (crossbar, 8 clusters)
 
@@ -388,9 +388,9 @@ The original core counts in [`core-types-en.md`](core-types-en.md) were computed
 |-----------|-------|
 | Topology | 8×8 crossbar (VOQ + iSLIP) |
 | Placement | Geometric center of the tile |
-| Physical size | ~3.8 mm × 3.8 mm (7nm) |
+| Physical size | ~3.2 mm × 3.2 mm (5nm) |
 | Link type | Parallel, 84-bit |
-| Max distance (GW → crossbar) | ~1.9 mm |
+| Max distance (GW → crossbar) | ~1.6 mm |
 | Hop count | Always 1 (deterministic) |
 | Gate count | ~16,000 |
 | VOQ buffer | ~30 KB SRAM |
@@ -401,9 +401,9 @@ The original core counts in [`core-types-en.md`](core-types-en.md) were computed
 |-----------|-------|
 | Topology | 8×8 crossbar (VOQ + iSLIP) |
 | Placement | Geometric center of the region |
-| Physical size | ~11 mm × 11 mm (7nm) |
+| Physical size | ~9 mm × 9 mm (5nm) |
 | Link type | Serial `SERDES_RATIO`×, `SERIAL_WIRES` wires + clock |
-| Max distance (tile GW → crossbar) | ~5.5 mm |
+| Max distance (tile GW → crossbar) | ~4.5 mm |
 | Hop count | Always 1 (deterministic) |
 | Gate count | ~16,000 |
 | VOQ buffer | ~30 KB SRAM |
@@ -414,9 +414,9 @@ The original core counts in [`core-types-en.md`](core-types-en.md) were computed
 |-----------|-------|
 | Topology | Star — every region connects directly to the center |
 | Placement | Geometric center of the chip, co-located with Seal Core |
-| Physical size | ~37 mm × 37 mm (7nm, 800 mm²) |
+| Physical size | ~28 mm × 28 mm (5nm, 800 mm²) |
 | Link type | Serial `SERDES_RATIO`×, `SERIAL_WIRES` wires + clock |
-| Max distance (region GW → center) | ~18 mm |
+| Max distance (region GW → center) | ~14 mm |
 | Hop count | Always 2 (region → center → region) |
 | Gate count | ~42,000 (crossbar) + ~200,000 (Seal Core) |
 | VOQ buffer | ~77 KB SRAM |
@@ -425,7 +425,7 @@ The original core counts in [`core-types-en.md`](core-types-en.md) were computed
 
 The Seal Core is co-located with the L3 crossbar at the **geometric center** of the chip. This placement is driven by **network topology**, not physical tamper resistance:
 
-- **Minimal wire length:** the star topology center minimizes the maximum distance from any region gateway (~18 mm at 7nm), yielding deterministic latency.
+- **Minimal wire length:** the star topology center minimizes the maximum distance from any region gateway (~14 mm at 5nm), yielding deterministic latency.
 - **Cross-region inspection point:** all cross-region traffic passes through the L3 crossbar, enabling the Seal Core to perform security inspection (AuthCode verification, traffic monitoring) without additional routing.
 - **Single RTL instantiation:** the Seal Core + L3 crossbar form a single parameterizable block at the chip center — no special placement logic needed.
 
@@ -468,9 +468,75 @@ The Seal Core serves two functions: **code authentication** (infrequent but heav
 | 2,000 | ~2.5 GB/s | ~6% | No |
 | 8,192 | ~10 GB/s | ~25% | No |
 | 18,432 | ~23 GB/s | ~58% | Not yet |
-| ~30,000 | ~40 GB/s | ~100% | Saturation |
+As core count grows, cross-region traffic increases proportionally. At 8,192 cores the L3 crossbar runs at ~25% utilization — significant headroom remains. Larger chips (F6+) may include **2–64 Seal Cores** for redundancy and parallel AuthCode verification (see [Seal Core](sealcore-en.md)).
 
-A single Seal Core + L3 crossbar scales to **~30,000 cores**. Larger chips (F6+) may include **2–64 Seal Cores** for redundancy and parallel AuthCode verification (see [Seal Core](sealcore-en.md)). If more than ~30k cores are needed: multiple L3 crossbars with partitioned regions.
+### L3 Crosspoint Fault Tolerance
+
+The L3 crossbar is an N×N iSLIP switch (N = `REGIONS`, typically 8). Internally it consists of N² crosspoints — each crosspoint is a single input→output connection. If one crosspoint fails, the affected path is a **single directional route** between two regions (e.g., R2→R4), while all other region pairs remain operational.
+
+#### Failure Model
+
+```
+        Output (destination region)
+        R0  R1  R2  R3  R4  R5  R6  R7
+Input ┌───┬───┬───┬───┬───┬───┬───┬───┐
+  R0  │ — │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │
+  R1  │ ✓ │ — │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │ ✓ │
+  R2  │ ✓ │ ✓ │ — │ ✓ │ ✗ │ ✓ │ ✓ │ ✓ │  ← R2→R4 crosspoint dead
+  R3  │ ✓ │ ✓ │ ✓ │ — │ ✓ │ ✓ │ ✓ │ ✓ │
+  ...
+```
+
+- **R2→R4** traffic cannot pass (dead crosspoint)
+- **R4→R2** still works (separate crosspoint)
+- **All other region pairs** unaffected
+- Without mitigation: R4-destined cells accumulate in R2's VOQ → backpressure → cores in R2 targeting R4 stall
+
+#### Mitigation: Relay via Neighbor Region
+
+The iSLIP scheduler maintains a **fault bitmap** — one bit per crosspoint (N² = 64 bits for 8 regions). The bitmap is set at boot via BIST (Built-In Self-Test) or updated at runtime when a crosspoint fails to acknowledge within a timeout window.
+
+When the scheduler detects that the direct crosspoint is marked faulty, it performs a **relay**:
+
+```
+R2 ─╳→ R4           (direct path — dead crosspoint)
+R2 → R3 → L3 → R4   (relay: R3 acts as intermediate hop)
+```
+
+**Relay mechanism:**
+
+1. The scheduler selects an **alternate output port** (the relay region) from a pre-computed relay table
+2. The cell is forwarded to the relay region's GW with a **relay flag** set in the header's reserved bits
+3. The relay region GW re-injects the cell into the L3 crossbar toward the original destination
+4. The destination region receives the cell normally — the relay is transparent to cores
+
+**Relay region selection:** The scheduler picks the relay region that has a working crosspoint from the source AND to the destination. With 8 regions and 1 dead crosspoint, there are always 6 valid relay candidates.
+
+#### Cost Analysis
+
+| Component | Gate cost | SRAM cost | Notes |
+|-----------|-----------|-----------|-------|
+| Fault bitmap register | ~130 gates | — | 64 FF + read logic |
+| Relay table (precomputed) | ~200 gates | — | 8×3-bit best-relay LUT |
+| Scheduler modification | ~300 gates | — | Bitmap check + relay path selection |
+| Header relay flag | 0 | 0 | Uses 1 reserved bit (40 available) |
+| **Total** | **~630 gates** | **0** | **< 1.5% of L3 crossbar** |
+
+#### Performance Impact
+
+| Scenario | Latency | Throughput |
+|----------|---------|------------|
+| No fault | 2 hops (unchanged) | 100% |
+| 1 crosspoint fault, relayed | 4 hops (source→relay→center→dest) | ~50% for the affected pair, 100% for all others |
+| Multiple faults | Degrades gracefully — each faulty pair uses relay | Throughput reduction proportional to relay traffic |
+
+The relay adds 2 extra crossbar traversals for the affected region pair. At typical cross-region loads (~25% utilization), even multiple relayed pairs do not saturate the crossbar.
+
+#### Detection: Crosspoint Health Monitoring
+
+- **Boot-time BIST:** each crosspoint is tested with a known pattern; failures are recorded in the fault bitmap before normal operation begins
+- **Runtime watchdog:** if a cell granted to a crosspoint does not produce an output-side acknowledgment within 4 cycles, the crosspoint is marked faulty and future cells are relayed
+- **Seal Core notification:** crosspoint faults are reported to the Seal Core as a diagnostic event (logged, optionally forwarded off-chip via management interface)
 
 ## Code Loading over the Network
 
@@ -561,7 +627,7 @@ HW multicast **only in cluster gateways** (L1 crossbar, not in every L0 router).
 
 The L2/L3 serial links use on-chip SerDes with a configurable multiplier (`SERDES_RATIO`). The maximum feasible ratio depends on the core clock frequency — higher clocks require lower ratios to keep the SerDes frequency within silicon limits.
 
-**Constraint:** on-chip SerDes IP at 7nm/5nm typically supports up to ~25–32 Gbps/lane. The SerDes frequency = core_clock × `SERDES_RATIO` must stay below this limit.
+**Constraint:** on-chip SerDes IP at 5nm typically supports up to ~25–32 Gbps/lane. The SerDes frequency = core_clock × `SERDES_RATIO` must stay below this limit.
 
 | Core clock | Max `SERDES_RATIO` | Recommended config | Effective L2/L3 link width | L2/L3 serialization |
 |-----------|-------------------|-------------------|---------------------------|---------------------|
@@ -582,18 +648,18 @@ Increasing `SERIAL_WIRES` from 8 to 16 is not free — it has measurable area an
 | SerDes transceiver (per link endpoint) | ~3,000 GE | ~4,500 GE | ~6,000 GE | PLL shared, but CDR/EQ/driver per lane |
 | L2 crossbar I/O mux | ~15,000 GE | ~18,000 GE | ~21,000 GE | Wider input/output ports |
 | L3 crossbar I/O mux | ~40,000 GE | ~48,000 GE | ~56,000 GE | Same scaling |
-| Physical wires (L3, ~18 mm) | 8 × 2 = 16 wires | 12 × 2 = 24 | 16 × 2 = 32 | Bidirectional; metal layer routing pressure |
-| Physical wires (L2, ~5.5 mm) | 16 wires | 24 | 32 | Shorter, less critical |
+| Physical wires (L3, ~14 mm) | 8 × 2 = 16 wires | 12 × 2 = 24 | 16 × 2 = 32 | Bidirectional; metal layer routing pressure |
+| Physical wires (L2, ~4.5 mm) | 16 wires | 24 | 32 | Shorter, less critical |
 
 **Chip-level impact at 16 wires (`SERIAL_WIRES`=16):**
 - L2 crossbar area: +~40% (+6,000 GE × 8 tiles/region)
 - L3 crossbar area: +~40% (+16,000 GE, single instance)
-- Wire routing: L3 links carry 32 wires over ~18 mm — feasible at 5nm (metal pitch ~20 nm, total wire bundle ~0.64 µm wide), but consumes 1–2 dedicated metal layers regionally
+- Wire routing: L3 links carry 32 wires over ~14 mm — feasible at 5nm (metal pitch ~20 nm, total wire bundle ~0.64 µm wide), but consumes 1–2 dedicated metal layers regionally
 - **Total chip area increase: <1%** — crossbar infrastructure is already a small fraction of total die area (~2–3%)
 
 The area cost is acceptable precisely because the L2/L3 crossbar infrastructure is amortized across thousands of cores. The dominant area remains core SRAM.
 
-> **L3 wire length constraint:** the L3 link spans up to ~18 mm (7nm). At 50 GHz (5 GHz × 10×), wire propagation delay alone is ~2–3 ns ≈ 100–150 bit times, requiring multi-stage retiming. Keeping the SerDes frequency ≤ 20 GHz avoids this complexity.
+> **L3 wire length constraint:** the L3 link spans up to ~14 mm (5nm). At 50 GHz (5 GHz × 10×), wire propagation delay alone is ~2–3 ns ≈ 100–150 bit times, requiring multi-stage retiming. Keeping the SerDes frequency ≤ 20 GHz avoids this complexity.
 
 ## Hop Count and Latency Summary
 
@@ -648,7 +714,7 @@ The RTL is parameterizable — die size and process node determine core count.
 | 130nm | 1.06 mm² | 16 KB | 588 | 1,030 | 2 |
 | 28nm | 0.18 mm² | 64 KB | 3,467 | 6,067 | 3 |
 | 7nm | 0.083 mm² | 256 KB | 7,518 | 13,157 | 4 |
-| 5nm | 0.103 mm² | 512 KB | 6,058 | 10,602 | 4 |
+| **5nm (ref)** | **0.103 mm²** | **512 KB** | **6,058** | **10,602** | **4** |
 
 **B) Fixed 256 KB SRAM (maximum parallelism):**
 
@@ -657,7 +723,7 @@ The RTL is parameterizable — die size and process node determine core count.
 | 130nm | 2.93 mm² | 256 KB | 213 | 373 | 2 |
 | 28nm | 0.37 mm² | 256 KB | 1,686 | 2,951 | 3 |
 | 7nm | 0.083 mm² | 256 KB | 7,518 | 13,157 | 4 |
-| 5nm | 0.059 mm² | 256 KB | 10,576 | 18,508 | 4 |
+| **5nm (ref)** | **0.059 mm²** | **256 KB** | **10,576** | **18,508** | **4** |
 
 The choice depends on the workload — the RTL `SRAM_KB_PER_CORE` parameter is set at fabrication time.
 
@@ -697,6 +763,8 @@ This document addresses the following Neuron OS hardware requirements:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 2.3 | 2026-04-21 | L3 Crosspoint Fault Tolerance section: fault bitmap (64-bit), relay via neighbor region (~630 gates, <1.5% overhead), BIST + runtime watchdog detection, graceful degradation model |
+| 2.2 | 2026-04-21 | Reference node changed from 7nm to 5nm. Recalculated: router areas (Turbo 0.006, Compact 0.003), core+SRAM sizes, corrected core counts (Nano ~47k, Actor ~25k, Matrix Turbo ~30.8k, Matrix Systolic ~38.1k, Rich ~11.3k), physical sizes (L0 1.1mm, L1 3.2mm, L2 9mm, L3 28mm), Seal Core wire length 14mm. Reference config: 16×8×8×10 = 10,240 cores |
 | 2.1 | 2026-04-19 | Systolic router variant (Variant C): 128-bit unidirectional links (W→E, N→S), ~5,000 GE ≈ 0.001 mm², dedicated ML/SNN. Speed table, recommended variant table, corrected core counts, and link types updated |
 | 2.0 | 2026-04-19 | Cell payload 128→64 bytes (cell size 144→80 bytes). 16 flits/cell, 2H+15 latency model, L1 8cc, L2/L3 8cc serialization, cross-region 139 cycles (278 ns). Router gate counts, VOQ SRAM, core counts recalculated. CELL_SIZE range: 64/128. Turbo: 0.007 mm², Compact: 0.004 mm² |
 | 1.9 | 2026-04-19 | Cell header 8→16 bytes (128-bit, power-of-2). Cell size 136→144 bytes. All derived values recalculated: 28 flits/cell, 2H+27 latency model, L1 14cc, L2/L3 15cc serialization, cross-region 229 cycles (458 ns). VOQ SRAM and gate counts updated |
