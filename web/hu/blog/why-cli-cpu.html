@@ -297,12 +297,6 @@
     <p>
       A magok kizárólag <strong>hardveres mailbox FIFO-kon</strong> keresztül kommunikálnak. Egy mag egy 32 bites üzenetet ír a kimenő mailbox-ába; a hardver kézbesíti a célmag bejövő mailbox-ába. A küldő mag nem blokkolódik. A fogadó mag felébredl alvásból, amikor üzenet érkezik, feldolgozza, és visszaalszik. Ez az <strong>actor modell szilíciumban</strong>.
     </p>
-
-    <blockquote>
-      „A jelenlegi szoftverrendszerek alapvetően hibás modellekre épülnek. Olyan hardver kell, ahol minden mag egy actor."
-      <br>— Joe Armstrong, az Erlang megalkotója, 2014
-    </blockquote>
-
     <p>
       Ennek a tervezési döntésnek mélyreható következményei vannak:
     </p>

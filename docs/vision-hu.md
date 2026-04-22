@@ -6,9 +6,6 @@ Ez a dokumentum azt vizsgálja, mi történik, ha a **Cognitive Fabric Processin
 
 > *A CFPU a Cognitive Fabric architektúra hivatalos megnevezése. A **CLI-CPU** ennek első nyílt forráskódú referencia implementációja — részletek: [FAQ #1](faq-hu.md#1-mi-a-cfpu-és-mi-a-kapcsolata-a-cli-cpu-val).*
 
-> **Joe Armstrong, az Erlang atyja, 2014-ben:**
-> *„A jelenlegi szoftver-rendszerek alapjaiban rossz modellekre épülnek. Szükség van egy olyan hardverre, ahol minden core egy aktor."*
-
 ---
 
 ## A mai szoftver: egy hardver korlátainak lenyomata

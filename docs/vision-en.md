@@ -6,9 +6,6 @@ This document explores what happens when we **redesign the entire software stack
 
 > *CFPU is the official name for the Cognitive Fabric architecture. **CLI-CPU** is its first open-source reference implementation — see [FAQ #1](faq-en.md#1-what-is-the-cfpu-and-how-does-it-relate-to-cli-cpu) for details.*
 
-> **Joe Armstrong, creator of Erlang, 2014:**
-> *"Current software systems are built on fundamentally flawed models. We need hardware where every core is an actor."*
-
 ---
 
 ## Today's software: an imprint of hardware limitations

@@ -297,12 +297,6 @@
     <p>
       Cores communicate exclusively through <strong>hardware mailbox FIFOs</strong>. A core writes a 32-bit message to its outgoing mailbox; the hardware delivers it to the destination core's incoming mailbox. The sending core does not block. The receiving core wakes from sleep when a message arrives, processes it, and goes back to sleep. This is the <strong>actor model in silicon</strong>.
     </p>
-
-    <blockquote>
-      "Current software systems are built on fundamentally flawed models. We need hardware where every core is an actor."
-      <br>— Joe Armstrong, creator of Erlang, 2014
-    </blockquote>
-
     <p>
       The consequences of this design are profound:
     </p>
