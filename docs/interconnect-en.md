@@ -2,7 +2,7 @@
 
 > Magyar verzió: [interconnect-hu.md](interconnect-hu.md)
 
-> Version: 2.3
+> Version: 2.4
 
 This document specifies the **on-chip interconnect network** of the Cognitive Fabric Processing Unit (CFPU): the topology, switching model, router internals, physical layout, core family, and node-scaling strategy.
 
@@ -64,28 +64,68 @@ L0: 16 cores × L1: 8 clusters × L2: 8 tiles × L3: 10 regions = 10,240 cores
 
 ### ATM-Inspired Fixed Cell
 
-Every message is segmented into **fixed cells** that travel through the network: **16-byte header + 64-byte payload = 80 bytes**.
+Every message is segmented into **fixed cells** that travel through the network: **16-byte header + up to 64-byte payload = up to 80 bytes**. Buffers are fixed-size (80-byte slots), but **only the actual payload travels on the link** — the `len` field determines how many bytes are actually forwarded.
 
 ```
-Cell = Header (16 bytes) + Payload (64 bytes) = 80 bytes
+Cell = Header (16 bytes) + Payload (0-64 bytes) = 16-80 bytes on the link
 
 Header (16 bytes = 128 bits) — stored in Header SRAM:
-┌──────────────────────────────────────────────────────┐
-│  dst[24] + src[24] + seq[8] + flags[8]                │
-│  + len[16] + reserved[40] + CRC-8[8]                  │
-└──────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│  dst[24] + src[24]                              — routing (HW)  │
+│  + src_actor[16] + dst_actor[16]                — actor ID      │
+│  + seq[8] + flags[8] + len[8] + CRC-8[8]       — control       │
+│  + reserved[16]                                 — future use    │
+│                                            Total: 128 bits      │
+└──────────────────────────────────────────────────────────────────┘
 
-Payload (64 bytes) — stored in Payload SRAM:
+Payload (0-64 bytes) — stored in Payload SRAM:
 ┌──────────────────────────────────────────────────────┐
-│  64 bytes application data                            │
+│  0-64 bytes application data (determined by len)     │
 └──────────────────────────────────────────────────────┘
 ```
+
+**Header fields:**
+
+| Field | Size | Written by | Description |
+|-------|------|-----------|-------------|
+| `dst` | 24 bits | Sending core | Destination hierarchical HW address (region.tile.cluster.core) |
+| `src` | 24 bits | **NoC router HW** | Source HW address — hardware-filled, cannot be spoofed |
+| `src_actor` | 16 bits | Core scheduler | Sending actor identifier (max 65,536 actors / core) |
+| `dst_actor` | 16 bits | Sending actor | Destination actor identifier |
+| `seq` | 8 bits | Sender | Sequence number (ordering for fragmented messages) |
+| `flags` | 8 bits | Sender | VN0/VN1, relay flag, etc. |
+| `len` | 8 bits | Sender | Actual payload size in bytes (0-128, `CELL_SIZE` dependent) |
+| `CRC-8` | 8 bits | HW | Header integrity check |
+| `reserved` | 16 bits | — | Future extensions (QoS, etc.) |
+
+**Why `src_actor` / `dst_actor` in the header?** In v1.8, the actor ID was moved to the payload (software dispatch). With N:M actor-to-core mapping (multiple actors per core, including sleeping actors), having actor IDs in the header provides **hardware-level advantages**:
+- **DDR5 Controller CAM table** — actor-level access control via `src[24] + src_actor[16]`
+- **Crash recovery** — only the crashed actor's capabilities need to be revoked, not the entire core's
+- **Router-level dispatch** — the receiving core's scheduler knows which actor the message is for from the header, without reading the payload
+- **16 bits** — 65,536 actors / core, covers sleeping actors as well
+
+**Variable link occupancy:** router buffers are always fixed-size (80-byte slots), but **only the header + `len` payload bytes travel on the link**. The router computes the number of payload flits from the header's `len` field:
+
+```
+128-bit internal data path:
+  payload_flits = ceil(len / 16)    ← 4-bit right shift + carry
+  total_flits = 1 (header) + payload_flits
+
+Examples:
+  len = 8  → 1 + 1 = 2 flits  (32 bytes on link, not 80)
+  len = 32 → 1 + 2 = 3 flits  (48 bytes on link)
+  len = 64 → 1 + 4 = 5 flits  (80 bytes on link, full cell)
+```
+
+**HW cost:** 4-bit counter per port + shift. No LUT, no tail bit, no link-width overhead.
+
+**Impact on network throughput:** ~80% of actor messages have ≤48 byte payloads. With variable link occupancy, links are **occupied ~43% less on average**, nearly doubling effective network throughput.
 
 **Split SRAM design:** header and payload are stored in **separate SRAMs** inside the router. This is natural because they serve different functions: the scheduler reads the header for routing decisions while the payload is still arriving — **1 cycle latency saving**. No port contention between scheduler and crossbar. Both SRAMs are power-of-2 aligned: header = slot × 16, payload = slot × 64 — simple shift addressing, no multiplier needed.
 
-**Why 16-byte header?** The logical fields (dst, src, seq, flags, len, CRC) require 88 bits. A 16-byte (128-bit) header is the natural power-of-2 boundary, providing 40 reserved bits for future extensions (QoS class, message type, fragmentation info) without requiring a header format change. The 64-byte payload is also a natural power-of-2 boundary for software.
+**Why 16-byte header?** 128 bits is the natural power-of-2 boundary. The fields (dst, src, src_actor, dst_actor, seq, flags, len, CRC) require 112 bits, leaving 16 reserved bits for future extensions. The 64-byte payload is also a natural power-of-2 boundary for software.
 
-**Why fixed cells?** Fixed size yields deterministic timing, simple buffer management, and simpler crossbar hardware. This is the foundational principle of ATM networks (1985), adapted for silicon.
+**Why fixed buffers, variable links?** Fixed buffer size yields deterministic buffer management and simple SRAM addressing (the ATM networks' foundational principle). Variable link occupancy **does not increase buffer complexity** — only the forwarding counter changes — while significantly improving link utilization.
 
 ### Why 64-byte Payload — Even for Rich Cores?
 
@@ -96,13 +136,16 @@ The original 128-byte payload was oversized for the Matrix Core's 4×4 tile, but
 | Aspect | 64B payload (80B cell) | 128B payload (144B cell) |
 |--------|------------------------|--------------------------|
 | Header overhead | 20% | 11% |
-| Flit count (42-bit L0 link) | 16 flits | 28 flits |
-| Neighbor latency | 2H + 15 = 17 cc | 2H + 27 = 29 cc |
-| Cross-region latency | ~139 cc | ~229 cc |
+| Max flit count (128-bit internal link) | 5 flits | 9 flits |
+| Max flit count (42-bit L0 SerDes link) | 16 flits | 28 flits |
+| Neighbor latency (max) | 2H + 15 = 17 cc | 2H + 27 = 29 cc |
+| Cross-region latency (max) | ~139 cc | ~229 cc |
 | Router VOQ SRAM | smaller | ~1.6× larger |
 | Router area (Turbo) | 0.006 mm² | ~0.008 mm² |
 
-**Decisive argument: latency.** The 80-byte cell provides **40% faster** cross-region latency (139 vs 229 cc). This affects **every message** — commands, events, responses — while the 128B payload's header-overhead advantage (11% vs 20%) **only matters for rare, large messages** (state migration, bulk transfer).
+> **Note:** thanks to variable link occupancy, the flit counts and latencies above represent the **worst case** (full payload). A typical 32-byte actor message in a 64B cell: 3 flits on the 128-bit link (header + 2 payload), 10 flits on the 42-bit L0 — the link **frees up sooner**.
+
+**Decisive argument: latency.** The 80-byte cell provides **40% faster** worst-case cross-region latency (139 vs 229 cc). With variable link occupancy, typical actor messages (~80% ≤48 bytes) are even faster. The 128B payload's header-overhead advantage (11% vs 20%) **only matters for rare, large messages** (state migration, bulk transfer).
 
 In Akka/actor-style systems, the vast majority of messages are small (commands, events, short responses: 16–64 bytes), which fit in a single 64B cell. For large messages (4–16 KB state migration), the doubled cell count overhead is negligible relative to the total transfer time.
 
@@ -763,6 +806,7 @@ This document addresses the following Neuron OS hardware requirements:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 2.4 | 2026-04-22 | Header reorganization: `len[16]`→`len[8]`, `src_actor[16]` + `dst_actor[16]` added to header (N:M actor-to-core mapping, DDR5 CAM actor-level ACL, crash recovery). Variable link occupancy: only `len` payload bytes travel on the link (4-bit flit counter, ~43% average link savings), buffers remain fixed 80B slots. Latency tables updated (worst case annotation) |
 | 2.3 | 2026-04-21 | L3 Crosspoint Fault Tolerance section: fault bitmap (64-bit), relay via neighbor region (~630 gates, <1.5% overhead), BIST + runtime watchdog detection, graceful degradation model |
 | 2.2 | 2026-04-21 | Reference node changed from 7nm to 5nm. Recalculated: router areas (Turbo 0.006, Compact 0.003), core+SRAM sizes, corrected core counts (Nano ~47k, Actor ~25k, Matrix Turbo ~30.8k, Matrix Systolic ~38.1k, Rich ~11.3k), physical sizes (L0 1.1mm, L1 3.2mm, L2 9mm, L3 28mm), Seal Core wire length 14mm. Reference config: 16×8×8×10 = 10,240 cores |
 | 2.1 | 2026-04-19 | Systolic router variant (Variant C): 128-bit unidirectional links (W→E, N→S), ~5,000 GE ≈ 0.001 mm², dedicated ML/SNN. Speed table, recommended variant table, corrected core counts, and link types updated |
