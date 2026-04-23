@@ -220,3 +220,7 @@ A pályázathoz csatolandó PDF:
 | 1.2 | 2026-04-16 | **Csak dokumentáció frissítés a beadás után** — a „Cognitive Fabric Processing Unit (CFPU)" elnevezés bevezetése a címben és absztraktban. A beadott pályázat (v1.1) még nem használta a CFPU rövidítést. A technikai tartalom, a költségvetés és a mérföldkövek változatlanok. |
 | 1.1 | 2026-04-14 | **BEADOTT verzió.** 18 hónapos timeline, €35K mind az 5 mérföldkővel, óradíj bontás, teszt szám 250+, RTL tapasztalat, sustainability plan, Why now, ECMA-335 függetlenség, konkrét use case, Plan B TT-hoz |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
+
+---
+
+> **Beadási visszaigazolás (2026-04-14 este):** GDPR-kontrollált privát archívumban (nem a public repóban, a GDPR 5. cikk adat-minimalizálás elvét követve). Nyilvános metaadatok: [`nlnet-submission-record-hu.md`](nlnet-submission-record-hu.md). A belső review korrekciók és a beadott szövegben lévő ismert hibák katalógusa: [`nlnet-corrections-hu.md`](nlnet-corrections-hu.md).

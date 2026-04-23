@@ -168,3 +168,7 @@ PDF attachment:
 | 1.2 | 2026-04-16 | **Post-submission doc update only** — introduced "Cognitive Fabric Processing Unit (CFPU)" naming in title and abstract. The submitted application (v1.1) did not use the CFPU abbreviation. Technical content, budget, milestones unchanged. |
 | 1.1 | 2026-04-14 | **SUBMITTED version.** Timeline 18 months, €35K with all 5 milestones, hourly rate, test count 250+, RTL experience, sustainability plan, Why now, ECMA-335 independence, concrete use case, Plan B for TT |
 | 1.0 | 2026-04-14 | Initial version |
+
+---
+
+> **Submission confirmation (2026-04-14 evening):** Archived privately in a GDPR-controlled location (not in the public repo, per GDPR Article 5 data minimisation). Public metadata recorded in [`nlnet-submission-record.md`](nlnet-submission-record.md). Internal-review corrections and known errors in the submitted text catalogued in [`nlnet-corrections-en.md`](nlnet-corrections-en.md).
