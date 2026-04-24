@@ -42,3 +42,19 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# OpenXC7 (nextpnr-xilinx, Yosys) generált artefaktumok
+chipdb/
+*.bba
+*.fasm
+*.frames
+*.bit
+# Yosys post-synth netlist (OpenXC7 build intermediate)
+rtl/fpga/smoke_test/OpenXC7/*.json
+
+# Vivado parancssori futtatás naplói / Vivado command-line journal and log
+vivado.jou
+vivado.log
+
+# Claude
+.claude
