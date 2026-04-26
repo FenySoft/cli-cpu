@@ -54,7 +54,7 @@ The MicroPhase A7-Lite is manufactured in three FPGA variants sharing the same P
 - Role: FPGA bitstream + user application + data
 
 **Micro-SD card slot:**
-- Relevance: later Neuron OS boot / filesystem (F7)
+- Relevance: later Symphact boot / filesystem (F7)
 
 ## Communication
 

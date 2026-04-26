@@ -10,7 +10,7 @@ This document records the **licensing status** of tools used in CLI-CPU developm
 
 CLI-CPU distinguishes between two independent openness dimensions:
 
-1. **Output openness** — what the project **produces** (RTL, silicon GDSII, documentation, software, Neuron OS): **fully open source**.
+1. **Output openness** — what the project **produces** (RTL, silicon GDSII, documentation, software, Symphact): **fully open source**.
 2. **Process openness** — what the project **uses** during development (dev tools, CAD, simulator): **pragmatic mix**.
 
 **The output is 100% libre; in the process, every tool is open where a realistic alternative exists, and we use closed tools only where the hardware or shuttle platform mandates it.**
@@ -29,7 +29,7 @@ This strategy matches industry practice: **SpinalHDL, NaxRiscv, LibreCores**, an
 | cocotb testbench | Apache 2.0 | `rtl/tb/` |
 | FPGA bring-up smoke test | Apache 2.0 | `rtl/fpga/smoke_test/` |
 | Roadmap, architecture, security model | CC-BY-SA 4.0 | `docs/` |
-| Neuron OS vision and SDK (F7) | MIT + Apache 2.0 | `NeuronOS/` |
+| Symphact vision and SDK (F7) | MIT + Apache 2.0 | `Symphact/` |
 | Silicon GDSII (F3, F6-Silicon) | Apache 2.0 | `tt/`, `mpw/` |
 
 **All of these are in the project's public GitHub repository, open for pull requests and community contributions.**
@@ -112,7 +112,7 @@ Same as F2.7 — **Vivado** for FPGA, everything else (simulation, RTL, verifica
 
 **Fully open source silicon pipeline.**
 
-### F7 — Neuron OS SDK
+### F7 — Symphact SDK
 
 | Tool | Role | License | Open? |
 |------|------|---------|-------|

@@ -1,6 +1,6 @@
 # OSREQ-002: MMIO memória térkép — OS↔HW regiszter interfész
 
-> **Forrás:** [FenySoft/NeuronOS — osreq-002](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-hu.md)
+> **Forrás:** [FenySoft/Symphact — osreq-002](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-hu.md)
 >
 > **Állapot:** Draft — hardveres visszajelzésre vár
 >
@@ -8,7 +8,7 @@
 
 ## OS-oldali igény
 
-A Neuron OS boot szekvenciája konkrét MMIO regisztereket definiál a HW↔SW interfészhez. Ezek a boot, a core felderítés, a mailbox kezelés és az interrupt vezérlés alapjai.
+A Symphact boot szekvenciája konkrét MMIO regisztereket definiál a HW↔SW interfészhez. Ezek a boot, a core felderítés, a mailbox kezelés és az interrupt vezérlés alapjai.
 
 ## Javasolt MMIO térkép összefoglaló
 
@@ -35,4 +35,4 @@ A jelenlegi architecture doc a memória térképet magas szinten írja le. Ez az
 4. Max core szám: a `core_id×4` offset skálázhatósága (10k core → ~40 KB MMIO tér)
 5. QSPI vs OPI: az F6 OPI-ra vált — a regiszterek módosítandók?
 
-A részletes regiszter-specifikáció a [NeuronOS forrásban](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-hu.md).
+A részletes regiszter-specifikáció a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-hu.md).

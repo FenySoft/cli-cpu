@@ -1,6 +1,6 @@
 # OSREQ-003: Core reset mechanizmus — supervisor restart támogatás
 
-> **Forrás:** [FenySoft/NeuronOS — osreq-003](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-003-core-reset-hu.md)
+> **Forrás:** [FenySoft/Symphact — osreq-003](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-003-core-reset-hu.md)
 >
 > **Állapot:** Draft — hardveres visszajelzésre vár
 >
@@ -8,7 +8,7 @@
 
 ## OS-oldali igény
 
-A Neuron OS „let it crash" supervision modellje **gyakori core restart-ot** feltételez. Amikor egy actor hibát dob, a supervisor (Rich Core) újraindítja a hibás Nano core-t. Ehhez:
+A Symphact „let it crash" supervision modellje **gyakori core restart-ot** feltételez. Amikor egy actor hibát dob, a supervisor (Rich Core) újraindítja a hibás Nano core-t. Ehhez:
 
 1. **Atomi SRAM clear** — a teljes core SRAM nullázása (stack + heap + locals)
 2. **Mailbox FIFO flush** — pending üzenetek eldobása
@@ -32,4 +32,4 @@ A Neuron OS „let it crash" supervision modellje **gyakori core restart-ot** fe
 4. Cascade reset: cluster supervisor reset → egész cluster?
 5. Kell-e `CORE_RESET_REASON` regiszter (trap code, watchdog, explicit)?
 
-A részletes specifikáció a [NeuronOS forrásban](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-003-core-reset-hu.md).
+A részletes specifikáció a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-003-core-reset-hu.md).

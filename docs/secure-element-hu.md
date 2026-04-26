@@ -26,7 +26,7 @@
 
 ## Miért egy harmadik pálya <a name="miert-egy-harmadik-palya"></a>
 
-Az eddigi `docs/architecture-hu.md`, `docs/security-hu.md` és [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) dokumentumok **két piaci pályát** rögzítettek:
+Az eddigi `docs/architecture-hu.md`, `docs/security-hu.md` és [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) dokumentumok **két piaci pályát** rögzítettek:
 
 1. **Cognitive Fabric** — programozható kognitív szubsztrátum, AI/SNN/actor cluster (hosszú távú vízió)
 2. **Trustworthy Silicon** — regulated industries (automotive, aviation, medical, critical infra), rövid-közép távú bevétel
@@ -291,8 +291,8 @@ A `docs/architecture-hu.md`, `docs/security-hu.md` és `docs/ISA-CIL-T0-hu.md` m
 | **Auditálható (nyílt HDL)** | ✓ | F3 |
 | **Multi-application isolation** | **✓ (hardveres)** | **F4** |
 | **Immunitás Spectre/Meltdown/ROP/JOP** | ✓ | F3-F5 |
-| **Capability-based security (aktor ref)** | ✓ | F5 (Neuron OS) |
-| **Supervision hierarchia (fault tolerance)** | ✓ | F5 (Neuron OS) |
+| **Capability-based security (aktor ref)** | ✓ | F5 (Symphact) |
+| **Supervision hierarchia (fault tolerance)** | ✓ | F5 (Symphact) |
 
 Ez egy **nagyon erős kiindulás**. A jelenlegi F0-F6 terv **~80%-ban** lefedi a Secure Element követelményeket, **anélkül hogy azt kifejezetten céloznánk**.
 
@@ -722,7 +722,7 @@ A Secure Edition **nem sürget** semmit az F1-F4 fázisokban, mert a Cognitive F
 - [`docs/security-hu.md`](security-hu.md) — A hardveres biztonsági tulajdonságok itt vannak dokumentálva; a Secure Edition ezekre épül.
 - [`docs/architecture-hu.md`](architecture-hu.md) — A heterogén Nano + Rich multi-core architektúra a Secure Edition alapja is.
 - [`docs/roadmap-hu.md`](roadmap-hu.md) — Az F6.5 fázis itt kerül rögzítésre.
-- [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) — A Neuron OS aktor-alapú modellje **természetesen** támogatja a multi-SE hardveres isolation-t.
+- [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) — A Symphact aktor-alapú modellje **természetesen** támogatja a multi-SE hardveres isolation-t.
 
 ## Záró gondolat
 

@@ -6,7 +6,7 @@
 
 Ez a dokumentum a CFPU és a külső DDR5 memória közötti interfész **hardveres architektúráját** rögzíti. Nem csak a végeredményt, hanem az **érvelési utat** is dokumentálja: milyen alternatívákat vizsgáltunk, miért vetettük el őket, és milyen trade-off-ok vezettek a végső döntésekhez.
 
-> **Célközönség:** HW fejlesztők, RTL tervezők, FPGA implementátorok. Az OS-oldali (Neuron OS) nézőpontot a [NeuronOS docs/ddr5-memory-model-hu.md](https://github.com/FenySoft/NeuronOS/blob/main/docs/ddr5-memory-model-hu.md) tartalmazza.
+> **Célközönség:** HW fejlesztők, RTL tervezők, FPGA implementátorok. Az OS-oldali (Symphact) nézőpontot a [Symphact docs/ddr5-memory-model-hu.md](https://github.com/FenySoft/Symphact/blob/main/docs/ddr5-memory-model-hu.md) tartalmazza.
 
 ## Kiindulópont: milyen szerepet tölt be a DDR5 a CFPU-ban?
 
@@ -128,7 +128,7 @@ A CAM tábla `src[24] + src_actor[16]` alapján ellenőriz — **aktor szintű**
 
 ### 2.c) Ki konfigurálja a CAM táblát?
 
-A CAM táblát **kizárólag a `root_supervisor`** (Neuron OS legfelső szintű aktora) módosíthatja, **dedikált, hardwired config porton** keresztül.
+A CAM táblát **kizárólag a `root_supervisor`** (Symphact legfelső szintű aktora) módosíthatja, **dedikált, hardwired config porton** keresztül.
 
 **Miért nem a NoC-on?** Ha a config parancsok a NoC-on mennének, bármely kompromittált core küldhetne hamis config üzenetet. A dedikált fizikai vezeték garantálja, hogy **csak a `root_supervisor` Rich Core-ja** éri el a config regisztereket.
 
@@ -150,7 +150,7 @@ A következő ötlet: a `root_supervisor` (OS) ütemezi, mikor és mit tölt be 
 
 ### 3.c) Végső döntés: capability modell — egyszeri engedély, szabad használat
 
-Az aktor **egyszer kér hozzáférést** a `kernel_io_sup` aktortól (a Neuron OS I/O supervisor-a). Ha megkapja, **szabadon, közvetlenül** olvassa/írja a DDR5 tartományt MMIO-n keresztül, további engedélykérés nélkül:
+Az aktor **egyszer kér hozzáférést** a `kernel_io_sup` aktortól (a Symphact I/O supervisor-a). Ha megkapja, **szabadon, közvetlenül** olvassa/írja a DDR5 tartományt MMIO-n keresztül, további engedélykérés nélkül:
 
 ```
 1. Aktor --> kernel_io_sup: MsgGrantRequest(ObjectId, Access: RW)

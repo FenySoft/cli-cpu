@@ -31,7 +31,7 @@ A **CFPU Certified** tanusito vedjegy (EU certification mark, Nice osztaly: 9 + 
 
 ### Mire NEM vonatkozik
 
-- Szoftveres kompatibilitas (CIL toolchain, Neuron OS alkalmazasok) -- ez kulon tanusitasi program
+- Szoftveres kompatibilitas (CIL toolchain, Symphact alkalmazasok) -- ez kulon tanusitasi program
 - Fizikai tamper-resistance (dekapszulacio, FIB-tamadas) -- ez a threat model-en kivul esik
 - Teljesitmeny vagy energiahatekonysag -- a CFPU-SEC kizarolag biztonsagi property-ket vizsgal
 

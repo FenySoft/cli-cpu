@@ -787,7 +787,7 @@ A worst-case latencia ~100–139 ciklus tartományban marad (~200–278 ns @ 500
 
 ## OSREQ kereszthivatkozások
 
-Ez a dokumentum az alábbi Neuron OS hardware requirement-ekre válaszol:
+Ez a dokumentum az alábbi Symphact hardware requirement-ekre válaszol:
 
 | OSREQ | Téma | Státusz |
 |-------|------|---------|

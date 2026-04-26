@@ -26,7 +26,7 @@
 
 ## Why a Third Track <a name="why-a-third-track"></a>
 
-The existing `docs/architecture-en.md`, `docs/security-en.md`, and [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) documents established **two market tracks**:
+The existing `docs/architecture-en.md`, `docs/security-en.md`, and [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) documents established **two market tracks**:
 
 1. **Cognitive Fabric** — programmable cognitive substrate, AI/SNN/actor cluster (long-term vision)
 2. **Trustworthy Silicon** — regulated industries (automotive, aviation, medical, critical infra), short-to-medium-term revenue
@@ -291,8 +291,8 @@ The `docs/architecture-hu.md`, `docs/security-hu.md`, and `docs/ISA-CIL-T0-hu.md
 | **Auditable (open HDL)** | included | F3 |
 | **Multi-application isolation** | **included (hardware)** | **F4** |
 | **Immunity to Spectre/Meltdown/ROP/JOP** | included | F3-F5 |
-| **Capability-based security (actor ref)** | included | F5 (Neuron OS) |
-| **Supervision hierarchy (fault tolerance)** | included | F5 (Neuron OS) |
+| **Capability-based security (actor ref)** | included | F5 (Symphact) |
+| **Supervision hierarchy (fault tolerance)** | included | F5 (Symphact) |
 
 This is a **very strong starting point**. The current F0-F6 plan covers **~80%** of Secure Element requirements **without even explicitly targeting them**.
 
@@ -722,7 +722,7 @@ The Secure Edition **does not rush** anything in the F1-F4 phases, because the C
 - [`docs/security-en.md`](security-en.md) -- Hardware security properties are documented here; the Secure Edition builds on them.
 - [`docs/architecture-en.md`](architecture-en.md) -- The heterogeneous Nano + Rich multi-core architecture is also the foundation of the Secure Edition.
 - [`docs/roadmap-en.md`](roadmap-en.md) -- The F6.5 phase will be recorded here.
-- [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) -- The Neuron OS actor-based model **naturally** supports the multi-SE hardware isolation.
+- [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) -- The Symphact actor-based model **naturally** supports the multi-SE hardware isolation.
 
 ## Closing Thought
 

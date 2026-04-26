@@ -1,6 +1,6 @@
 # OSREQ-004: DMA engine — nem-blokkoló persistence támogatás
 
-> **Forrás:** [FenySoft/NeuronOS — osreq-004](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-hu.md)
+> **Forrás:** [FenySoft/Symphact — osreq-004](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-hu.md)
 >
 > **Állapot:** Draft — hardveres visszajelzésre vár
 >
@@ -8,7 +8,7 @@
 
 ## OS-oldali igény
 
-A Neuron OS persistence modellje (Event Sourcing) megköveteli, hogy actor állapotot **aszinkron, nem-blokkoló** módon lehessen kiírni külső tárolóra (FRAM/PSRAM). A core SRAM volatile → journal/snapshot kiíráshoz **DMA engine** kell.
+A Symphact persistence modellje (Event Sourcing) megköveteli, hogy actor állapotot **aszinkron, nem-blokkoló** módon lehessen kiírni külső tárolóra (FRAM/PSRAM). A core SRAM volatile → journal/snapshot kiíráshoz **DMA engine** kell.
 
 ## Javasolt megoldás
 
@@ -25,4 +25,4 @@ A Neuron OS persistence modellje (Event Sourcing) megköveteli, hogy actor álla
 4. Max átvitel méret (Nano: 4 KB, Rich: 256 KB)?
 5. Double buffering (ping-pong journal buffer)?
 
-A részletes specifikáció a [NeuronOS forrásban](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-hu.md).
+A részletes specifikáció a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-hu.md).

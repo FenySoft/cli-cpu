@@ -71,7 +71,7 @@ The Seal Core fits into the family of complementary CFPU security mechanisms:
                                     │
        ┌────────────────┬───────────┼───────────┬───────────────┐
        │                │           │           │               │
-  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [Neuron OS
+  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [Symphact
    memory cell     code sign.   runtime W⊕X   gatekeeper    HSM Card]
                                               core          crypto + signing
 ```
@@ -255,7 +255,7 @@ This is a **fundamentally different role** than in the pre-QRAM era. The protect
         (status=0) Quench-RAM region
       - Seal Core invokes the SEAL hardware state-machine operation to close it
       - Quench-RAM HW: status=1, bytecode is immutable henceforth
-5. Seal Core notifies Neuron OS scheduler: "new actor loaded, may start"
+5. Seal Core notifies Symphact scheduler: "new actor loaded, may start"
 ```
 
 In **step 4**, the Seal Core uses no special WE pin. It performs ordinary memory writes to the Quench-RAM mutable region (granted by its capability), then SEALs to lock. Protection comes from the fact that **only the Seal Core firmware can trigger the `SEAL` hardware state-machine operation in the AuthCode verify context** — the SEAL trigger list is closed: CODE region (Seal Core boot / hot_code_loader), SEND (payload leaves the Core), swap-out (DMA evict to external QRAM).
@@ -483,7 +483,7 @@ This v1.0 document captures the vision-level architecture. Details are to be res
 - `docs/quench-ram-en.md` — the QRAM cell providing CODE protection in the QRAM era
 - `docs/security-en.md` — the CFPU security model
 - `docs/architecture-en.md` — the CFPU microarchitecture hosting Seal Core as third core category
-- [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) — the `hot_code_loader` actor hosted by the Seal Core
+- [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) — the `hot_code_loader` actor hosted by the Seal Core
 
 ### External references
 

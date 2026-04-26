@@ -112,7 +112,7 @@ A három-rétegű felosztás azért létezik, mert mindegyik név olyan munkát 
 
 - Egy **terméknek** (pl. „CFPU-R Rich core") eladhatónak, brand-elhetőnek, és GPU/TPU/NPU-val kategória-szinten összehasonlíthatónak kell lennie. A „CLI-CPU Rich" nevet adva minden termékoldal úgy nézne ki, mintha egy szoftverprojektről, nem szilíciumról szólna.
 - Egy **projektnek** (pl. „a CLI-CPU szimulátor") kereshetőnek, idézhetőnek, licenc-rögzíthetőnek kell lennie, és stabil GitHub URL-lel kell rendelkeznie. Ha „a CFPU projekt"-nek hívjuk, összemossuk a nyílt forráskódú erőfeszítést jövőbeli, esetleg zárt forráskódú CFPU chipekkel.
-- Egy **víziónak** (pl. „a Cognitive Fabric a Neuron OS szubsztrátuma") evokatívnak, marketing-késznek, és bármely konkrét utasításkészlettől vagy core-típustól függetlennek kell lennie. Ez kerül egy-soros pitch-deck slide-ra.
+- Egy **víziónak** (pl. „a Cognitive Fabric a Symphact szubsztrátuma") evokatívnak, marketing-késznek, és bármely konkrét utasításkészlettől vagy core-típustól függetlennek kell lennie. Ez kerül egy-soros pitch-deck slide-ra.
 
 Ha a hármat egy névbe olvasztjuk, minden külső felület — tudományos cikk, termék-datasheet, pályázat, README, blog — rossz rétegbe szivárogtatja a jelentést.
 
@@ -160,7 +160,7 @@ Ha a hármat egy névbe olvasztjuk, minden külső felület — tudományos cikk
 - Az **architektúra-családról**, **vízióról**, vagy **marketing-narratíváról** beszélsz.
 - **Chipeket** nevezel meg (pl. *Cognitive Fabric One* — az F6 referencia-szilícium).
 - Az **ötletet** pitcheled bármely konkrét implementációtól függetlenül.
-- A **Neuron OS**-hez mint runtime-rétegez kapcsolod.
+- A **Symphact**-hez mint runtime-rétegez kapcsolod.
 
 **Példák:**
 
@@ -168,7 +168,7 @@ Ha a hármat egy névbe olvasztjuk, minden külső felület — tudományos cikk
 >
 > *„Cognitive Fabric One — az F6-Silicon referencia chip (6R+16N+1S, 15 mm²)."*
 >
-> *„Cognitive Fabric + Neuron OS a Linux-on-commodity-CPU utódja."*
+> *„Cognitive Fabric + Symphact a Linux-on-commodity-CPU utódja."*
 
 ---
 

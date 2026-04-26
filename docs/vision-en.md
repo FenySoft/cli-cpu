@@ -54,7 +54,7 @@ Linux kernel: ~40 million lines of code (2025, v6.14).
 (Source: https://www.stackscale.com/blog/linux-kernel-surpasses-40-million-lines-code/)
 ```
 
-### Neuron OS: peer actors, hardware isolation
+### Symphact: peer actors, hardware isolation
 
 ```
 ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
@@ -74,18 +74,18 @@ Isolation is not software-based (MMU + page table) — it is HARDWARE-BASED.
 
 ### What does this gain?
 
-| Aspect | Today (Linux/Windows/macOS) | Neuron OS |
+| Aspect | Today (Linux/Windows/macOS) | Symphact |
 |---|---|---|
 | Syscall overhead | ~1-5 us (mode switch) | **~5-20 ns** (mailbox message) |
 | Kernel bug impact | System crash | Supervisor **restarts** the faulty actor |
-| Kernel size | ~40M lines (Linux) | **~5K lines** Neuron OS core |
+| Kernel size | ~40M lines (Linux) | **~5K lines** Symphact core |
 | Isolation type | Software (MMU + page table) | **Hardware** (physical SRAM) |
 | Hot code reload | Impossible (kernel restart) | **Native** — actor code is swappable at runtime |
 | Boot time | ~1-30 seconds | **~1-10 us** (no init, no driver scan) |
 
 **The 40 million lines of the Linux kernel exist because shared memory must be protected in software.** If the hardware guarantees isolation, the kernel's **purpose disappears**.
 
-Details: [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md).
+Details: [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md).
 
 ---
 
@@ -320,7 +320,7 @@ class UserActor : Actor
 
 ### Programming model comparison
 
-| Aspect | Today's C# (async/await) | Actor model (Neuron OS) |
+| Aspect | Today's C# (async/await) | Actor model (Symphact) |
 |---|---|---|
 | Unit of concurrency | Thread / Task | **Actor** |
 | Synchronization | lock, Mutex, SemaphoreSlim | **None** — messages |
@@ -394,7 +394,7 @@ Academic experiments (MIT Alewife, Stanford DASH, Tilera TILE-Gx) demonstrated t
 CLI-CPU is the first attempt where:
 1. **The hardware natively supports the actor model** (mailbox FIFO, sleep/wake, shared-nothing)
 2. **The programming language is managed** (CIL/.NET — GC, type safety, verification)
-3. **The entire stack can be redesigned** (Neuron OS, actor GUI, actor DB — we are not emulating x86)
+3. **The entire stack can be redesigned** (Symphact, actor GUI, actor DB — we are not emulating x86)
 
 These three elements together **did not exist before** — and the vision rests on the premise that **all three must be present simultaneously**, or we fall back into the shared-memory model.
 
@@ -412,9 +412,9 @@ The vision does not materialize all at once. The development phases (`docs/roadm
 | **F4** | Multi-core FPGA — first actor system, scheduler + router | — |
 | **F5** | Rich core — full C#, heterogeneous Nano+Rich | — |
 | **F6** | Cognitive Fabric — 32-48 cores on FPGA, the vision becomes demonstrable | — |
-| **F7** | Neuron OS SDK — first developers can write actor GUI, actor DB | — |
+| **F7** | Symphact SDK — first developers can write actor GUI, actor DB | — |
 
-After F7, the vision elements are built **incrementally**: actor GUI toolkit, actor database engine, actor network stack. Each one in **C#**, built on the Neuron OS API, and each one **open source**.
+After F7, the vision elements are built **incrementally**: actor GUI toolkit, actor database engine, actor network stack. Each one in **C#**, built on the Symphact API, and each one **open source**.
 
 The goal is not to replace Linux or PostgreSQL — but to create a **new category** where the actor model is the natural primitive, and developers can write software in C# that fits the hardware.
 
@@ -423,7 +423,7 @@ The goal is not to replace Linux or PostgreSQL — but to create a **new categor
 ## References
 
 - [`docs/architecture-en.md`](architecture-en.md) — microarchitecture, pipeline, memory model, heterogeneous Nano+Rich design
-- [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) — detailed Neuron OS vision, actor API, supervisor tree, scheduler, hot code reload
+- [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) — detailed Symphact vision, actor API, supervisor tree, scheduler, hot code reload
 - [`docs/roadmap-en.md`](roadmap-en.md) — F0-F7 phase plan
 - [`docs/faq-en.md`](faq-en.md) — FAQ 5-7: CPU comparison, scheduling costs, fair benchmarking
 - [`docs/security-en.md`](security-en.md) — security model, formal verification plan

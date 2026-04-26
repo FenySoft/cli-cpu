@@ -54,7 +54,7 @@ A MicroPhase A7-Lite három FPGA variánssal gyártott, közös PCB-vel. A pin-a
 - Szerep: FPGA bitstream + user alkalmazás + adat
 
 **Micro-SD card slot:**
-- Relevancia: későbbi Neuron OS boot / filesystem (F7)
+- Relevancia: későbbi Symphact boot / filesystem (F7)
 
 ## Kommunikáció
 

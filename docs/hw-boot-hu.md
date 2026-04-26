@@ -4,9 +4,9 @@
 
 > Version: 1.0
 
-A CFPU chip bekapcsolásától a Rich core indulásáig tartó **tisztán hardveres** folyamat. Ez a szekvencia az operációs rendszer (Neuron OS) indulása **előtt** történik — szoftver nem vesz részt benne.
+A CFPU chip bekapcsolásától a Rich core indulásáig tartó **tisztán hardveres** folyamat. Ez a szekvencia az operációs rendszer (Symphact) indulása **előtt** történik — szoftver nem vesz részt benne.
 
-> A Neuron OS boot szekvenciáját (4-11. lépés) lásd: [FenySoft/NeuronOS — boot-sequence-hu.md](https://github.com/FenySoft/NeuronOS/docs/boot-sequence-hu.md)
+> A Symphact boot szekvenciáját (4-11. lépés) lásd: [FenySoft/Symphact — boot-sequence-hu.md](https://github.com/FenySoft/Symphact/docs/boot-sequence-hu.md)
 
 ## Tartalom
 
@@ -41,7 +41,7 @@ A CFPU chip bekapcsolásától a Rich core indulásáig tartó **tisztán hardve
 [3. Rich core indul] ──── Seal Core jelzi: verified code ready
      │                     Rich core Quench-RAM CODE régióból indul
      ▼
-[Neuron OS boot] ────── Innentől szoftver (→ NeuronOS repo)
+[Symphact boot] ────── Innentől szoftver (→ Symphact repo)
 ```
 
 ---
@@ -148,7 +148,7 @@ Seal Core firmware (boot load + verify):
 #### QSPI Flash regiszterek (forrás #0)
 
 A Seal Core MMIO-n (`0xF0001000`) keresztül olvassa a külső flash-t:
-- Neuron OS CIL binary
+- Symphact CIL binary
 - Hozzá tartozó aláírás és tanúsítvány
 
 ### 2d. Hardveres kriptográfiai verifikáció
@@ -194,7 +194,7 @@ A tanúsítvány formátumot és az aláírási modellt (PQC, WOTS+/LMS) lásd: 
 | CODE régió read-only | SEAL-elt — a Rich core nem tudja módosítani |
 | CIL execution engine aktív | Eval stack, locals, call frames inicializálódnak |
 
-A Rich core az első CIL metódust hívja: `NeuronOS.Boot.Main()` — **innentől szoftver** (→ [NeuronOS repo](https://github.com/FenySoft/NeuronOS)).
+A Rich core az első CIL metódust hívja: `Symphact.Boot.Main()` — **innentől szoftver** (→ [Symphact repo](https://github.com/FenySoft/Symphact)).
 
 **HW követelmény:**
 - Quench-RAM CODE régió (SEAL-elt, R/O a Rich core számára)
@@ -274,11 +274,11 @@ Boot-releváns regiszterek. A teljes MMIO térképet lásd: [osreq-002 — MMIO 
 
 ## SRAM Layout (Rich core) <a name="sram"></a>
 
-A Rich core SRAM tartalma a HW boot (3. lépés) végén, mielőtt a Neuron OS elindul:
+A Rich core SRAM tartalma a HW boot (3. lépés) végén, mielőtt a Symphact elindul:
 
 ```
 ┌─────────────────────────────────┐ 0x00000000
-│ CIL Code (Seal Core által SEAL) │ ~16-48 KB (NeuronOS binary, VERIFIED, R/O)
+│ CIL Code (Seal Core által SEAL) │ ~16-48 KB (Symphact binary, VERIFIED, R/O)
 ├─────────────────────────────────┤ 0x0000C000
 │ Eval Stack                      │ ~2-4 KB (CIL execution stack)
 ├─────────────────────────────────┤ 0x0000D000
@@ -315,4 +315,4 @@ Részletes core leírás: [core-types-hu.md](core-types-hu.md)
 | Verzió | Dátum | Változás |
 |--------|-------|---------|
 | 1.1 | 2026-04-20 | Boot forrás kiválasztás: 5 forrás (QSPI, UART, BRAM, Ethernet, JTAG) az XC7A200T FPGA képességeihez igazítva. MMIO regiszterek bővítése minden boot forráshoz. 64-byte chunk-os adatolvasás (= cella payload méret). |
-| 1.0 | 2026-04-19 | Első verzió — HW boot szétválasztva a NeuronOS boot-sequence-hu.md-ből |
+| 1.0 | 2026-04-19 | Első verzió — HW boot szétválasztva a Symphact boot-sequence-hu.md-ből |

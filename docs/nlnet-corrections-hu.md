@@ -5,7 +5,7 @@
 > **Hogyan használjuk:**
 > - Ha az NLnet bírálók pontosítást kérnek, használd az alábbi finomított szövegeket a válaszhoz.
 > - A follow-up pályázat (F5-F6) már ezeket a korrekciókat kezdetektől beépíti.
-> - A párhuzamos Neuron OS pályázat ([`FenySoft/NeuronOS`](https://github.com/FenySoft/NeuronOS)) már tükrözi ezeket a tanulságokat.
+> - A párhuzamos Symphact pályázat ([`FenySoft/Symphact`](https://github.com/FenySoft/Symphact)) már tükrözi ezeket a tanulságokat.
 
 > English version: [nlnet-corrections-en.md](nlnet-corrections-en.md)
 
@@ -74,25 +74,25 @@
 
 ---
 
-## 6. korrekció — Párhuzamos Neuron OS pályázat bejelentése szükséges
+## 6. korrekció — Párhuzamos Symphact pályázat bejelentése szükséges
 
 **Beadott szöveg (meglévő finanszírozási források):**
 > „Nincs más függőben lévő pályázat ugyanerre a munkára."
 
-**Probléma:** A beadás óta párhuzamos NLnet pályázat készült a **Neuron OS**-re. Bár a két projekt scope-ban elhatárolt (hardver vs szoftver), átláthatóság szükséges.
+**Probléma:** A beadás óta párhuzamos NLnet pályázat készült a **Symphact**-re. Bár a két projekt scope-ban elhatárolt (hardver vs szoftver), átláthatóság szükséges.
 
 **Finomított addendum:**
-> Párhuzamos NLnet NGI Zero Commons Fund pályázat tervezett (2026 Q3 beadási ablak) a **Neuron OS** projektre ([`FenySoft/NeuronOS`](https://github.com/FenySoft/NeuronOS)) — a capability-alapú aktor runtime, amely közösen-tervezve, de scope-ban elhatárolva készül ettől a hardveres pályázattól.
+> Párhuzamos NLnet NGI Zero Commons Fund pályázat tervezett (2026 Q3 beadási ablak) a **Symphact** projektre ([`FenySoft/Symphact`](https://github.com/FenySoft/Symphact)) — a capability-alapú aktor runtime, amely közösen-tervezve, de scope-ban elhatárolva készül ettől a hardveres pályázattól.
 >
-> | Dimenzió | CLI-CPU / CFPU | Neuron OS |
+> | Dimenzió | CLI-CPU / CFPU | Symphact |
 > |----------|---------------|-----------|
 > | Deliverable | Hardveres ISA, RTL, silicon tape-out, FPGA | Szoftveres runtime, OS szolgáltatások |
 > | Cél | Verilog szintézis, Sky130 PDK | .NET 10 library (Windows/Linux/macOS) |
 > | Licensz | CERN-OHL-S-2.0 | Apache-2.0 |
-> | Repository | `FenySoft/CLI-CPU` | `FenySoft/NeuronOS` |
+> | Repository | `FenySoft/CLI-CPU` | `FenySoft/Symphact` |
 > | Mérföldkövek | F2 RTL, F3 Tiny Tapeout, F4 FPGA multi-core | M0.3-M3.2 aktor runtime + kernel aktorok |
 >
-> A két pályázat szándékosan nem átfedő scope-pal rendelkezik. A Neuron OS nem függ a CLI-CPU szilíciumtól (ma szimulátorokon fut); a CLI-CPU nem függ a Neuron OS-től (a hardvernek saját C# referencia szimulátora van).
+> A két pályázat szándékosan nem átfedő scope-pal rendelkezik. A Symphact nem függ a CLI-CPU szilíciumtól (ma szimulátorokon fut); a CLI-CPU nem függ a Symphact-től (a hardvernek saját C# referencia szimulátora van).
 
 ---
 
@@ -121,7 +121,7 @@
 **Probléma:** Négy pont, egyikük (IHP ingyenes MPW) fent korrigálva. A bíráló jellemzően 3 éven belüli önfenntarthatóságot vár.
 
 **Finomított szöveg (6 csatorna):**
-> 1. **Grant lánc:** Következő NLnet pályázat az F5-F6-ra (Rich core RTL + silicon tape-out), tervezett €50-150K. A párhuzamos Neuron OS grant keresztökoszisztémás legitimitást ad.
+> 1. **Grant lánc:** Következő NLnet pályázat az F5-F6-ra (Rich core RTL + silicon tape-out), tervezett €50-150K. A párhuzamos Symphact grant keresztökoszisztémás legitimitást ad.
 > 2. **Európai kutatási útvonalak:** Chips JU / TRISTAN konzorciumi részvétel nem-RISC-V hozzájárulóként (CIL ISA mint kiegészítő célpont); Horizon Europe digitális szuverenitás hívások; IHP SG13G2 kutatási szilícium akadémiai partnerségen keresztül.
 > 3. **Dual licensing modell:** A core repo CERN-OHL-S-2.0 marad (erős reciprocal). Kereskedelmi licenszek elérhetők: (a) tanúsított termékekhez (IEC 61508, ISO 26262, IEC 62304) és (b) proprietary derivative RTL-hez — analóg a MariaDB / MongoDB üzleti modellel, szilíciumra alkalmazva.
 > 4. **Tanácsadási / integrációs szolgáltatások (FenySoft Kft., meglévő entitás):** Egyedi CFPU integráció szabályozott iparágaknak (egészségügy, kritikus infrastruktúra) keresztfinanszírozást biztosít a nyílt-core karbantartáshoz.
@@ -204,7 +204,7 @@ Ez explicitté teszi a kapcsolatot bármely bíráló számára, aki a pályáza
 1. **Ismerjük el, hogy a beadott verzió a v1.2** (a filed szöveg), és ajánljuk fel ezt a korrekciós dokumentumot pontosításként.
 2. **A leginkább lényegi korrekciókkal kezdjünk** (#1 TT árazás, #3 M4 scope, #8 fenntarthatóság) — ezek érintik a költségvetést és deliverable-öket.
 3. **Proaktívan ajánljuk fel a PDF mellékleteket**, ha még nem lettek beadva (architektúra áttekintés, roadmap, teszt screenshotok, 1-oldalas executive summary).
-4. **Említsük meg a párhuzamos Neuron OS pályázatot** (#6) elöl, hogy elkerüljük a kapcsolódó finanszírozási tervek elhallgatásának látszatát.
+4. **Említsük meg a párhuzamos Symphact pályázatot** (#6) elöl, hogy elkerüljük a kapcsolódó finanszírozási tervek elhallgatásának látszatát.
 
 ---
 

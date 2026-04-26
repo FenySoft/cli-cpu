@@ -249,7 +249,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Cél:** A Cognitive Fabric architektúra **teljes, FPGA-verifikált demonstrálása**. **Nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n.** Az F6-FPGA az elsődleges és kötelező mérföldkő; az F6-Silicon csak akkor indulhat, ha az F6-FPGA minden teszten zöld.
 
-**Architektúra:** Heterogén Rich + Nano multi-core fabric. Egyetlen A7-Lite 200T board-on **2 Rich + 8–10 Nano** (~105–115K / 134K LUT). Több board Ethernet-tel összekötve a Cognitive Fabric **elosztott multi-chip** változatát demonstrálja — ez a Neuron OS location transparency első valódi próbája.
+**Architektúra:** Heterogén Rich + Nano multi-core fabric. Egyetlen A7-Lite 200T board-on **2 Rich + 8–10 Nano** (~105–115K / 134K LUT). Több board Ethernet-tel összekötve a Cognitive Fabric **elosztott multi-chip** változatát demonstrálja — ez a Symphact location transparency első valódi próbája.
 
 #### F6-FPGA — Heterogén demonstráció A7-Lite 200T multi-board hálón (elsődleges, kötelező)
 
@@ -262,7 +262,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 **Új munka az F4+F5-höz képest:**
 - **Adaptív top-level instanciálás** — paraméterezhető (`#NUM_RICH`, `#NUM_NANO`) az ugyanazon RTL-re
 - **Mesh router** skálázhatóság — 4 core-nál nagyobb rendszerhez 2D grid topológia (~1 mérnökhónap)
-- **Inter-chip Ethernet bridge** — a board-ok közötti mailbox üzenetek Gigabit Ethernet-en, a Neuron OS location transparency valódi tesztje (~1 mérnökhónap)
+- **Inter-chip Ethernet bridge** — a board-ok közötti mailbox üzenetek Gigabit Ethernet-en, a Symphact location transparency valódi tesztje (~1 mérnökhónap)
 - **Heterogén verification** és többkonfigurációs test harness (~1 mérnökhónap)
 - **Configuration sweep script** — automatikus szintézis és P&R több (Rich, Nano) párra, LUT/timing/throughput riport
 - **Összesen: ~3-4 mérnökhónap**
@@ -333,7 +333,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Miért önálló mérföldkő:**
 - Az **F3** (TT, 1 Nano) bizonyítja, hogy a core működik szilíciumon
-- A **Cognitive Fabric Zero** (IHP, 1R+8N) bizonyítja, hogy a **heterogén multi-core működik szilíciumon** — supervisor + worker, mailbox mesh, sleep/wake, Neuron OS alapok
+- A **Cognitive Fabric Zero** (IHP, 1R+8N) bizonyítja, hogy a **heterogén multi-core működik szilíciumon** — supervisor + worker, mailbox mesh, sleep/wake, Symphact alapok
 - A **Cognitive Fabric One** (ChipIgnite, 6R+16N+1S) a teljes skálán bizonyít — benchmarkokkal, publikációval
 
 **Konfiguráció (3 mm² IHP SG13G2):**
@@ -451,22 +451,22 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 ---
 
-### F7 — Demonstrációs platform + Neuron OS fejlesztői SDK
+### F7 — Demonstrációs platform + Symphact fejlesztői SDK
 
-**Cél:** A Cognitive Fabric + Neuron OS kombináció mint **demonstrálható, fejleszthető platform** több valós use-case-re. A `Neuron OS` itt lép ki kutatási státuszból valós fejlesztői platform szintre.
+**Cél:** A Cognitive Fabric + Symphact kombináció mint **demonstrálható, fejleszthető platform** több valós use-case-re. A `Symphact` itt lép ki kutatási státuszból valós fejlesztői platform szintre.
 
-**A Neuron OS teljes víziója egy külön dokumentumban**: [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md). Röviden: aktor-alapú operációs rendszer, amely az Erlang OTP víziót valósítja meg hardveres támogatással (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchia, capability-alapú biztonság, hot code loading, location transparency.
+**A Symphact teljes víziója egy külön dokumentumban**: [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md). Röviden: aktor-alapú operációs rendszer, amely az Erlang OTP víziót valósítja meg hardveres támogatással (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchia, capability-alapú biztonság, hot code loading, location transparency.
 
 **Kimenet:**
 - **Referencia PCB-k** több use-case-re:
   - IoT szenzor node (QSPI flash, PSRAM, LoRa/WiFi, néhány szenzor)
   - Akka.NET cluster demó dev kit (több chip hálózatban)
   - SNN inference board (MNIST/CIFAR szintű feladatra)
-- **Neuron OS fejlesztői SDK**:
-  - `NeuronOS.Core` — aktor alapkönyvtár (Actor<T>, Supervisor, Spawn, Send, Receive)
-  - `NeuronOS.Devices` — device aktor library (UART, GPIO, QSPI, timer)
-  - `NeuronOS.Distributed` — inter-chip aktor protokoll
-  - `dotnet publish` target Neuron OS-re
+- **Symphact fejlesztői SDK**:
+  - `Symphact.Core` — aktor alapkönyvtár (Actor<T>, Supervisor, Spawn, Send, Receive)
+  - `Symphact.Devices` — device aktor library (UART, GPIO, QSPI, timer)
+  - `Symphact.Distributed` — inter-chip aktor protokoll
+  - `dotnet publish` target Symphact-re
   - VSCode / VS extension debugger aktor message replay-jel
   - NuGet csomagok publikus feed-en
 - **Referencia C# demó alkalmazások:**
@@ -476,17 +476,17 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
   - Multi-agent szimuláció (Boids, Conway's Game of Life kiterjesztése)
 - **Publikációs anyag:** cikk, előadás, demo video — az egész projektet bemutató narratíva, Linux Foundation projekt-státusz kérelem
 
-**Függőség:** F6 kész, chip a kézben, Neuron OS alfa (F5 óta) stabil.
+**Függőség:** F6 kész, chip a kézben, Symphact alfa (F5 óta) stabil.
 
-**Megjegyzés a Neuron OS fázisolásáról:** A Neuron OS **nem önálló fázis**, hanem **organikusan épül fel** az F1-F7 fázisok mentén:
-- **F1**: minimal `NeuronOS.Core` library a C# szimulátorban (Actor<T>, in-memory mailbox)
+**Megjegyzés a Symphact fázisolásáról:** A Symphact **nem önálló fázis**, hanem **organikusan épül fel** az F1-F7 fázisok mentén:
+- **F1**: minimal `Symphact.Core` library a C# szimulátorban (Actor<T>, in-memory mailbox)
 - **F3**: egy-aktoros bootloader a Tiny Tapeout chipen (echo neuron demó)
 - **F4**: 4-aktoros rendszer scheduler + router kezdeti implementációval
 - **F5**: teljes supervision fa, per-core GC, capability-alapú isolation, Roslyn source generator a `[RunsOn]` attribútumra
 - **F6**: hot code loading, writable microcode, elosztott aktorok több chipen
 - **F7**: fejlesztői SDK, VSCode integráció, NuGet publikálás, valódi alkalmazás demók
 
-Részletek és fejlesztői API példák: [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md).
+Részletek és fejlesztői API példák: [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md).
 
 ---
 
@@ -515,7 +515,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | **F6-Si Zero** | IHP 3 mm² (1R+8N, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Tervezett |
 | **F6-Si One** | ChipIgnite 15 mm² (6R+16N+1S, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Tervezett |
 | **F6.5** | Secure Edition (Crypto Actor, TRNG, PUF, tamper, DPA) | ~5 600 | ~35 | ⬜ Opcionális |
-| **F7** | Neuron OS SDK + demó platform (PCB-k, SDK, alkalmazások) | ~520 | ~3.3 | ⬜ Tervezett |
+| **F7** | Symphact SDK + demó platform (PCB-k, SDK, alkalmazások) | ~520 | ~3.3 | ⬜ Tervezett |
 | | **Összesen (F6.5 nélkül)** | **~3 630** | **~23** | |
 | | **Összesen (F6.5-tel)** | **~9 230** | **~58** | |
 
@@ -619,7 +619,7 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 ## Mai státusz
 
-**F0 koncepcionálisan készen van.** Hét dokumentum a `docs/` és a `README.md` alatt együtt ~3500+ sor, belsőleg konzisztens projekt-terv a **hárompályás pozicionálással** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, a Neuron OS vízióval, és a Secure Element stratégiai tervvel (F6.5 parallel tape-out).
+**F0 koncepcionálisan készen van.** Hét dokumentum a `docs/` és a `README.md` alatt együtt ~3500+ sor, belsőleg konzisztens projekt-terv a **hárompályás pozicionálással** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, a Symphact vízióval, és a Secure Element stratégiai tervvel (F6.5 parallel tape-out).
 
 **F1 — C# referencia szimulátor lezárva.** Az `src/CilCpu.Sim` és `src/CilCpu.Sim.Tests` projektek minden CIL-T0 spec által rögzített **48 opkódot** implementálják, minden hardveres trap tesztelt. Az **F1 aranypélda**: `Fibonacci(20) = 6765` zöld. A fejlesztés **4 iterációban** zajlott szigorú TDD-vel, minden iterációhoz Devil's Advocate review.
 
@@ -672,7 +672,7 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 2028 Q3      ─── Első szilícium a kézben
 ```
 
-**A legfontosabb azonnali akció:** NLnet NGI Zero Commons Fund pályázat előkészítése — **47 nap van a 2026. június 1-i deadline-ig**. A CLI-CPU projekt profilja (nyílt forráskódú libre silicon, újszerű Cognitive Fabric architektúra, actor-natív processzor, Neuron OS vízió) **kifejezetten erős jelölt**.
+**A legfontosabb azonnali akció:** NLnet NGI Zero Commons Fund pályázat előkészítése — **47 nap van a 2026. június 1-i deadline-ig**. A CLI-CPU projekt profilja (nyílt forráskódú libre silicon, újszerű Cognitive Fabric architektúra, actor-natív processzor, Symphact vízió) **kifejezetten erős jelölt**.
 
 ---
 

@@ -61,9 +61,9 @@ Részletek a `docs/architecture.md` **„Stratégiai pozicionálás: Cognitive F
 
 ## Hárompályás pozicionálás — hosszú távon a Linux utódja
 
-A CLI-CPU + [**Neuron OS**](https://neuron-os.org/hu/) **három párhuzamos piaci narratívát** követ, ugyanazzal a hardveres alappal, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
+A CLI-CPU + [**Symphact**](https://neuron-os.org/hu/) **három párhuzamos piaci narratívát** követ, ugyanazzal a hardveres alappal, és hosszú távon **egyetlen közös történeti célt** szolgál: **a Linux által örökölt 1970-es évek Unix alapjainak felváltását** modern, biztonságos, skálázható, aktor-alapú architektúrára.
 
-> **Testvérprojekt:** [**neuron-os.org**](https://neuron-os.org/hu/) ([forrás a GitHubon](https://github.com/FenySoft/NeuronOS/blob/main/README-hu.md)) — a capability-alapú aktor runtime, a CFPU-val együtt fejlesztve. Ma bármely .NET hoszton fut; holnap CFPU szilíciumra. Apache-2.0.
+> **Testvérprojekt:** [**neuron-os.org**](https://neuron-os.org/hu/) ([forrás a GitHubon](https://github.com/FenySoft/Symphact/blob/main/README-hu.md)) — a capability-alapú aktor runtime, a CFPU-val együtt fejlesztve. Ma bármely .NET hoszton fut; holnap CFPU szilíciumra. Apache-2.0.
 
 **Pálya 1 — „Cognitive Fabric"**: programozható kognitív szubsztrátum AI kutatóknak, Akka.NET / Orleans actor rendszereknek, spiking neural network szimulációnak, multi-agent szimulációnak, IoT edge gateway-nek. **Hosszú távú vízió.**
 
@@ -71,7 +71,7 @@ A CLI-CPU + [**Neuron OS**](https://neuron-os.org/hu/) **három párhuzamos piac
 
 **Pálya 3 — „Secure Edition"**: a JavaCard / TEE / Secure Element piac átalakítása — egy parallel tape-out a fő F6 mellett, Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures kiegészítésekkel. **Első termékek: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Megkülönböztető: **több független hardveres security domain egy chipen**, amit a meglévő nyílt alternatívák (TROPIC01, OpenTitan) **nem kínálnak**. Részletek: [`docs/secure-element-hu.md`](docs/secure-element-hu.md).
 
-Ugyanaz a chip-család, három különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Neuron OS lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) „A Linux öröklött problémái és a Neuron OS válasza" szekciójában.
+Ugyanaz a chip-család, három különböző piaci szegmens — **de ugyanaz a történeti cél**: ahogy az x86 leváltotta a mainframe-et, a mobile leváltotta a desktopot, a cloud leváltotta az on-prem szerverközpontot, úgy **a Cognitive Fabric + Symphact lesz a következő leváltási ciklus**, amely a modern, AI-vezérelt, biztonság-kritikus, masszívan elosztott korszak OS-ét adja. Részletek a [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) „A Linux öröklött problémái és a Symphact válasza" szekciójában.
 
 ## Heterogén multi-core: CFPU Nano + CFPU Rich
 
@@ -103,7 +103,7 @@ Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 - [docs/architecture-hu.md](docs/architecture-hu.md) — CLI-CPU mikroarchitektúra, Cognitive Fabric pozicionálás, prior art elemzés (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogén Nano + Rich multi-core
 - [docs/ISA-CIL-T0-hu.md](docs/ISA-CIL-T0-hu.md) — CIL-T0 subset specifikáció (48 opkód), mailbox MMIO interfész
 - [docs/security-hu.md](docs/security-hu.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
-- [Neuron OS vízió](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) — aktor-alapú operációs rendszer a CFPU-ra, „Erlang in silicon". **Implementáció:** [github.com/FenySoft/NeuronOS](https://github.com/FenySoft/NeuronOS/blob/main/README-hu.md) (a vízió dokumentum is ott él, hivatkozási stub: [`docs/neuron-os-hu.md`](docs/neuron-os-hu.md))
+- [Symphact vízió](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) — aktor-alapú operációs rendszer a CFPU-ra, „Erlang in silicon". **Implementáció:** [github.com/FenySoft/Symphact](https://github.com/FenySoft/Symphact/blob/main/README-hu.md) (a vízió dokumentum is ott él, hivatkozási stub: [`docs/symphact-hu.md`](docs/symphact-hu.md))
 - [docs/secure-element-hu.md](docs/secure-element-hu.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv
 - [docs/faq-hu.md](docs/faq-hu.md) — Gyakori Kérdések: koncepcionális horgonyok új olvasóknak (CLI vs CIL, CPU összehasonlítás, ütemezési költségek)
 - [docs/vision-hu.md](docs/vision-hu.md) — A shared-nothing jövő: OS, GUI, adatbázis, hálózat, programozási modell újragondolva
@@ -120,7 +120,7 @@ Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 | F5 | **Rich core születése** — 2× Rich + 8× Nano (teljes CIL) FPGA, első heterogén rendszer | ugyanaz az FPGA |
 | **F6-FPGA** | **FPGA-verifikált elosztott Cognitive Fabric** — 3× A7-Lite 200T multi-board Ethernet háló, 2R + ~26N, location transparency | 3× A7-Lite 200T, ~€960 |
 | F6-Silicon | **Cognitive Fabric real silicon** *(csak F6-FPGA verifikáció után)* — az FPGA-n verifikált design valós szilíciumon | Sky130 ChipIgnite vagy IHP MPW, ~$10k |
-| F7 | Demonstrációs platform + Neuron OS csírái | PCB + szoftver |
+| F7 | Demonstrációs platform + Symphact csírái | PCB + szoftver |
 
 ## Licenc
 

@@ -10,7 +10,7 @@ Ez a dokumentum a CLI-CPU projekt fejlesztéséhez használt eszközök **licenc
 
 A CLI-CPU projekt **két különálló nyitottsági dimenziót** különböztet meg:
 
-1. **Output nyitottság** — amit a projekt **létrehoz** (RTL, silicon GDSII, dokumentáció, szoftver, Neuron OS): **teljesen nyílt forráskódú**.
+1. **Output nyitottság** — amit a projekt **létrehoz** (RTL, silicon GDSII, dokumentáció, szoftver, Symphact): **teljesen nyílt forráskódú**.
 2. **Process nyitottság** — amit a projekt **használ** a fejlesztés során (dev tool-ok, CAD, szimulátor): **pragmatikus mix**.
 
 **Az output 100%-ban libre, a process-ben minden olyan eszköz nyílt, ahol reális alternatíva van, és csak ott használunk zárt eszközt, ahol a hardver vagy a shuttle platform ezt megköveteli.**
@@ -29,7 +29,7 @@ Ez a stratégia megfelel az iparági gyakorlatnak: a **SpinalHDL, NaxRiscv, Libr
 | cocotb tesztbench | Apache 2.0 | `rtl/tb/` |
 | FPGA bring-up smoke teszt | Apache 2.0 | `rtl/fpga/smoke_test/` |
 | Roadmap, architektúra, biztonsági modell | CC-BY-SA 4.0 | `docs/` |
-| Neuron OS víziódokumentum és SDK (F7) | MIT + Apache 2.0 | `NeuronOS/` |
+| Symphact víziódokumentum és SDK (F7) | MIT + Apache 2.0 | `Symphact/` |
 | Silicon GDSII (F3, F6-Silicon) | Apache 2.0 | `tt/`, `mpw/` |
 
 **Mindegyik a projekt GitHub repójában publikus, pull request-ekre nyitott, közösségi hozzájárulás fogadott.**
@@ -112,7 +112,7 @@ Ugyanaz mint F2.7 — **Vivado** az FPGA-ra, a többi (szimuláció, RTL, verifi
 
 **Teljes open source silicon pipeline.**
 
-### F7 — Neuron OS SDK
+### F7 — Symphact SDK
 
 | Eszköz | Szerep | Licenc | Nyílt? |
 |--------|--------|--------|--------|

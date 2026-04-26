@@ -61,9 +61,9 @@ Details in the **"Strategic Positioning: Cognitive Fabric"** section of `docs/ar
 
 ## Three-track positioning -- long-term successor to Linux
 
-CLI-CPU + [**Neuron OS**](https://neuron-os.org) pursues **three parallel market narratives** built on the same hardware foundation, all serving a **single shared historical goal**: **replacing the 1970s Unix foundations inherited by Linux** with a modern, secure, scalable, actor-based architecture.
+CLI-CPU + [**Symphact**](https://neuron-os.org) pursues **three parallel market narratives** built on the same hardware foundation, all serving a **single shared historical goal**: **replacing the 1970s Unix foundations inherited by Linux** with a modern, secure, scalable, actor-based architecture.
 
-> **Companion project:** [**neuron-os.org**](https://neuron-os.org) ([source on GitHub](https://github.com/FenySoft/NeuronOS)) — the capability-based actor runtime co-designed with the CFPU. Runs on any .NET host today; targets CFPU silicon tomorrow. Apache-2.0.
+> **Companion project:** [**neuron-os.org**](https://neuron-os.org) ([source on GitHub](https://github.com/FenySoft/Symphact)) — the capability-based actor runtime co-designed with the CFPU. Runs on any .NET host today; targets CFPU silicon tomorrow. Apache-2.0.
 
 **Track 1 -- "Cognitive Fabric"**: a programmable cognitive substrate for AI researchers, Akka.NET / Orleans actor systems, spiking neural network simulation, multi-agent simulation, and IoT edge gateways. **Long-term vision.**
 
@@ -71,7 +71,7 @@ CLI-CPU + [**Neuron OS**](https://neuron-os.org) pursues **three parallel market
 
 **Track 3 -- "Secure Edition"**: transforming the JavaCard / TEE / Secure Element market -- a parallel tape-out alongside the main F6, adding Crypto Actor + TRNG + PUF + tamper detection + DPA countermeasures. **First products: open banking card, open eSIM, open eID, open FIDO2 authenticator, open TPM, open hardware wallet, open V2X secure element, open medical SE.** Key differentiator: **multiple independent hardware security domains on a single chip**, which existing open alternatives (TROPIC01, OpenTitan) **do not offer**. Details: [`docs/secure-element-en.md`](docs/secure-element-en.md).
 
-Same chip family, three different market segments -- **but the same historical goal**: just as x86 replaced the mainframe, mobile replaced the desktop, and the cloud replaced the on-prem data center, **the Cognitive Fabric + Neuron OS will be the next replacement cycle**, delivering the OS for the modern, AI-driven, safety-critical, massively distributed era. Details in the "The inherited problems of Linux and Neuron OS's answer" section of [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md).
+Same chip family, three different market segments -- **but the same historical goal**: just as x86 replaced the mainframe, mobile replaced the desktop, and the cloud replaced the on-prem data center, **the Cognitive Fabric + Symphact will be the next replacement cycle**, delivering the OS for the modern, AI-driven, safety-critical, massively distributed era. Details in the "The inherited problems of Linux and Symphact's answer" section of [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md).
 
 ## Heterogeneous multi-core: CFPU Nano + CFPU Rich
 
@@ -103,7 +103,7 @@ See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 - [docs/architecture-en.md](docs/architecture-en.md) -- CLI-CPU microarchitecture, Cognitive Fabric positioning, prior art analysis (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogeneous Nano + Rich multi-core
 - [docs/ISA-CIL-T0-en.md](docs/ISA-CIL-T0-en.md) -- CIL-T0 subset specification (48 opcodes), mailbox MMIO interface
 - [docs/security-en.md](docs/security-en.md) -- Threat model, architectural security guarantees, attack immunity table, formal verification plan, certification paths (IEC 61508, ISO 26262, DO-178C, IEC 62304)
-- [Neuron OS vision](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) -- an actor-based operating system for the CFPU, "Erlang in silicon". **Implementation:** [github.com/FenySoft/NeuronOS](https://github.com/FenySoft/NeuronOS) (the vision document also lives there; local redirect stub: [`docs/neuron-os-en.md`](docs/neuron-os-en.md))
+- [Symphact vision](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) -- an actor-based operating system for the CFPU, "Erlang in silicon". **Implementation:** [github.com/FenySoft/Symphact](https://github.com/FenySoft/Symphact) (the vision document also lives there; local redirect stub: [`docs/symphact-en.md`](docs/symphact-en.md))
 - [docs/secure-element-en.md](docs/secure-element-en.md) -- Secure Edition: JavaCard / TEE / Secure Element market, detailed TROPIC01 analysis, multi-SE hardware isolation, F6.5 parallel tape-out plan
 - [docs/faq-en.md](docs/faq-en.md) -- FAQ: conceptual anchors for new readers (CLI vs CIL, CPU comparison, scheduling costs)
 - [docs/vision-en.md](docs/vision-en.md) -- The shared-nothing future: OS, GUI, database, networking, and programming model reimagined
@@ -120,7 +120,7 @@ See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 | F5 | **Rich core introduction** -- 2x Rich + 8x Nano (full CIL) FPGA, first heterogeneous system | same FPGA |
 | **F6-FPGA** | **FPGA-verified distributed Cognitive Fabric** -- 3x A7-Lite 200T multi-board Ethernet mesh, 2R + ~26N, location transparency | 3x A7-Lite 200T, ~$960 |
 | F6-Silicon | **Cognitive Fabric in real silicon** *(only after F6-FPGA verification)* -- the FPGA-verified design on real silicon | Sky130 ChipIgnite or IHP MPW, ~$10k |
-| F7 | Demonstration platform + Neuron OS seeds | PCB + software |
+| F7 | Demonstration platform + Symphact seeds | PCB + software |
 
 ## License
 

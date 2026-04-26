@@ -249,7 +249,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Goal:** **Full, FPGA-verified demonstration** of the Cognitive Fabric architecture. **No silicon tape-out with a design that hasn't run on FPGA.** F6-FPGA is the primary and mandatory milestone; F6-Silicon may only proceed once F6-FPGA passes all tests.
 
-**Architecture:** Heterogeneous Rich + Nano multi-core fabric. On a single A7-Lite 200T board, **2 Rich + 8–10 Nano** (~105–115K / 134K LUTs). Multiple boards connected via Ethernet demonstrate the Cognitive Fabric's **distributed multi-chip** variant — the first real test of Neuron OS location transparency.
+**Architecture:** Heterogeneous Rich + Nano multi-core fabric. On a single A7-Lite 200T board, **2 Rich + 8–10 Nano** (~105–115K / 134K LUTs). Multiple boards connected via Ethernet demonstrate the Cognitive Fabric's **distributed multi-chip** variant — the first real test of Symphact location transparency.
 
 #### F6-FPGA — Heterogeneous demonstration on A7-Lite 200T multi-board mesh (primary, mandatory)
 
@@ -262,7 +262,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 **New work beyond F4+F5:**
 - **Adaptive top-level instantiation** — parameterizable (`#NUM_RICH`, `#NUM_NANO`) on the same RTL
 - **Mesh router** scalability — 2D grid topology for systems larger than 4 cores (~1 engineer-month)
-- **Inter-chip Ethernet bridge** — cross-board mailbox messages over Gigabit Ethernet, the real test of Neuron OS location transparency (~1 engineer-month)
+- **Inter-chip Ethernet bridge** — cross-board mailbox messages over Gigabit Ethernet, the real test of Symphact location transparency (~1 engineer-month)
 - **Heterogeneous verification** and multi-configuration test harness (~1 engineer-month)
 - **Configuration sweep script** — automated synthesis and P&R for multiple (Rich, Nano) pairs, LUT/timing/throughput report
 - **Total: ~3-4 engineer-months**
@@ -333,7 +333,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Why a standalone milestone:**
 - **F3** (TT, 1 Nano) proves the core works in silicon
-- **Cognitive Fabric Zero** (IHP, 1R+8N) proves that **heterogeneous multi-core works in silicon** — supervisor + worker, mailbox mesh, sleep/wake, Neuron OS foundations
+- **Cognitive Fabric Zero** (IHP, 1R+8N) proves that **heterogeneous multi-core works in silicon** — supervisor + worker, mailbox mesh, sleep/wake, Symphact foundations
 - **Cognitive Fabric One** (ChipIgnite, 6R+16N+1S) proves at full scale — with benchmarks and publication
 
 **Configuration (3 mm² IHP SG13G2):**
@@ -451,22 +451,22 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 ---
 
-### F7 — Demonstration Platform + Neuron OS Developer SDK
+### F7 — Demonstration Platform + Symphact Developer SDK
 
-**Goal:** The Cognitive Fabric + Neuron OS combination as a **demonstrable, developable platform** for multiple real use cases. The `Neuron OS` graduates from research status to a real developer platform here.
+**Goal:** The Cognitive Fabric + Symphact combination as a **demonstrable, developable platform** for multiple real use cases. The `Symphact` graduates from research status to a real developer platform here.
 
-**The full Neuron OS vision is in a separate document**: [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md). In brief: an actor-based operating system that realizes the Erlang OTP vision with hardware support (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchy, capability-based security, hot code loading, location transparency.
+**The full Symphact vision is in a separate document**: [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md). In brief: an actor-based operating system that realizes the Erlang OTP vision with hardware support (Erlang in silicon). Everything is an actor, shared-nothing, let it crash, supervision hierarchy, capability-based security, hot code loading, location transparency.
 
 **Output:**
 - **Reference PCBs** for multiple use cases:
   - IoT sensor node (QSPI flash, PSRAM, LoRa/WiFi, a few sensors)
   - Akka.NET cluster demo dev kit (multiple chips networked)
   - SNN inference board (for MNIST/CIFAR-level tasks)
-- **Neuron OS Developer SDK**:
-  - `NeuronOS.Core` — actor base library (Actor<T>, Supervisor, Spawn, Send, Receive)
-  - `NeuronOS.Devices` — device actor library (UART, GPIO, QSPI, timer)
-  - `NeuronOS.Distributed` — inter-chip actor protocol
-  - `dotnet publish` target for Neuron OS
+- **Symphact Developer SDK**:
+  - `Symphact.Core` — actor base library (Actor<T>, Supervisor, Spawn, Send, Receive)
+  - `Symphact.Devices` — device actor library (UART, GPIO, QSPI, timer)
+  - `Symphact.Distributed` — inter-chip actor protocol
+  - `dotnet publish` target for Symphact
   - VSCode / VS extension debugger with actor message replay
   - NuGet packages on public feed
 - **Reference C# demo applications:**
@@ -476,17 +476,17 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
   - Multi-agent simulation (Boids, extension of Conway's Game of Life)
 - **Publication material:** paper, talk, demo video — a narrative presenting the entire project, Linux Foundation project status request
 
-**Dependency:** F6 done, chip in hand, Neuron OS alpha (since F5) stable.
+**Dependency:** F6 done, chip in hand, Symphact alpha (since F5) stable.
 
-**Note on Neuron OS phasing:** The Neuron OS is **not a standalone phase**, but **builds organically** along the F1-F7 phases:
-- **F1**: minimal `NeuronOS.Core` library in the C# simulator (Actor<T>, in-memory mailbox)
+**Note on Symphact phasing:** The Symphact is **not a standalone phase**, but **builds organically** along the F1-F7 phases:
+- **F1**: minimal `Symphact.Core` library in the C# simulator (Actor<T>, in-memory mailbox)
 - **F3**: single-actor bootloader on the Tiny Tapeout chip (echo neuron demo)
 - **F4**: 4-actor system with initial scheduler + router implementation
 - **F5**: full supervision tree, per-core GC, capability-based isolation, Roslyn source generator for the `[RunsOn]` attribute
 - **F6**: hot code loading, writable microcode, distributed actors across multiple chips
 - **F7**: developer SDK, VSCode integration, NuGet publishing, real application demos
 
-Details and developer API examples: [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md).
+Details and developer API examples: [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md).
 
 ---
 
@@ -515,7 +515,7 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | **F6-Si Zero** | IHP 3 mm² (1R+8N, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Planned |
 | **F6-Si One** | ChipIgnite 15 mm² (6R+16N+1S, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Planned |
 | **F6.5** | Secure Edition (Crypto Actor, TRNG, PUF, tamper, DPA) | ~5,600 | ~35 | ⬜ Optional |
-| **F7** | Neuron OS SDK + demo platform (PCBs, SDK, applications) | ~520 | ~3.3 | ⬜ Planned |
+| **F7** | Symphact SDK + demo platform (PCBs, SDK, applications) | ~520 | ~3.3 | ⬜ Planned |
 | | **Total (without F6.5)** | **~3,630** | **~23** | |
 | | **Total (with F6.5)** | **~9,230** | **~58** | |
 
@@ -617,7 +617,7 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 
 ## Current Status
 
-**F0 is conceptually complete.** Seven documents under `docs/` and `README.md` together amount to ~3500+ lines, forming an internally consistent project plan with the **three-track positioning** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), the heterogeneous Nano+Rich multi-core model, silicon-grade security positioning, the Neuron OS vision, and the Secure Element strategic plan (F6.5 parallel tape-out).
+**F0 is conceptually complete.** Seven documents under `docs/` and `README.md` together amount to ~3500+ lines, forming an internally consistent project plan with the **three-track positioning** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), the heterogeneous Nano+Rich multi-core model, silicon-grade security positioning, the Symphact vision, and the Secure Element strategic plan (F6.5 parallel tape-out).
 
 **F1 — C# reference simulator closed.** The `src/CilCpu.Sim` and `src/CilCpu.Sim.Tests` projects implement all **48 opcodes** specified by the CIL-T0 spec, with every hardware trap tested. The **F1 golden reference**: `Fibonacci(20) = 6765` green. Development took place across **4 iterations** with strict TDD, each iteration followed by a Devil's Advocate review.
 
@@ -670,7 +670,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 2028 Q3      --- First silicon in hand
 ```
 
-**The most important immediate action:** NLnet NGI Zero Commons Fund grant preparation — **47 days until the June 1, 2026 deadline**. The CLI-CPU project profile (open-source libre silicon, novel Cognitive Fabric architecture, actor-native processor, Neuron OS vision) **makes it a particularly strong candidate**.
+**The most important immediate action:** NLnet NGI Zero Commons Fund grant preparation — **47 days until the June 1, 2026 deadline**. The CLI-CPU project profile (open-source libre silicon, novel Cognitive Fabric architecture, actor-native processor, Symphact vision) **makes it a particularly strong candidate**.
 
 ---
 

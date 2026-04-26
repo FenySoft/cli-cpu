@@ -4,9 +4,9 @@
 
 > Version: 1.0
 
-The purely **hardware-driven** process from CFPU chip power-on to Rich core start. This sequence occurs **before** the operating system (Neuron OS) — no software is involved.
+The purely **hardware-driven** process from CFPU chip power-on to Rich core start. This sequence occurs **before** the operating system (Symphact) — no software is involved.
 
-> For the Neuron OS boot sequence (steps 4-11), see: [FenySoft/NeuronOS — boot-sequence-hu.md](https://github.com/FenySoft/NeuronOS/docs/boot-sequence-hu.md)
+> For the Symphact boot sequence (steps 4-11), see: [FenySoft/Symphact — boot-sequence-hu.md](https://github.com/FenySoft/Symphact/docs/boot-sequence-hu.md)
 
 ## Contents
 
@@ -41,7 +41,7 @@ The purely **hardware-driven** process from CFPU chip power-on to Rich core star
 [3. Rich core starts] ── Seal Core signals: verified code ready
      │                    Rich core boots from Quench-RAM CODE region
      ▼
-[Neuron OS boot] ─────── Software from here on (→ NeuronOS repo)
+[Symphact boot] ─────── Software from here on (→ Symphact repo)
 ```
 
 ---
@@ -148,7 +148,7 @@ Seal Core firmware (boot load + verify):
 #### QSPI Flash registers (source #0)
 
 The Seal Core reads the external flash via MMIO (`0xF0001000`):
-- Neuron OS CIL binary
+- Symphact CIL binary
 - Associated signature and certificate
 
 ### 2d. Hardware cryptographic verification
@@ -194,7 +194,7 @@ For the certificate format and signing model (PQC, WOTS+/LMS), see: [authcode-en
 | CODE region is read-only | SEAL-ed — the Rich core cannot modify it |
 | CIL execution engine active | Eval stack, locals, call frames initialized |
 
-The Rich core calls the first CIL method: `NeuronOS.Boot.Main()` — **software from here on** (→ [NeuronOS repo](https://github.com/FenySoft/NeuronOS)).
+The Rich core calls the first CIL method: `Symphact.Boot.Main()` — **software from here on** (→ [Symphact repo](https://github.com/FenySoft/Symphact)).
 
 **HW requirements:**
 - Quench-RAM CODE region (SEAL-ed, R/O for the Rich core)
@@ -274,11 +274,11 @@ Boot-relevant registers. For the full MMIO map, see: [osreq-002 — MMIO Memory 
 
 ## SRAM Layout (Rich core) <a name="sram"></a>
 
-Rich core SRAM contents at the end of HW boot (step 3), before Neuron OS starts:
+Rich core SRAM contents at the end of HW boot (step 3), before Symphact starts:
 
 ```
 ┌─────────────────────────────────┐ 0x00000000
-│ CIL Code (SEAL-ed by Seal Core) │ ~16-48 KB (NeuronOS binary, VERIFIED, R/O)
+│ CIL Code (SEAL-ed by Seal Core) │ ~16-48 KB (Symphact binary, VERIFIED, R/O)
 ├─────────────────────────────────┤ 0x0000C000
 │ Eval Stack                      │ ~2-4 KB (CIL execution stack)
 ├─────────────────────────────────┤ 0x0000D000
@@ -315,4 +315,4 @@ Detailed core description: [core-types-en.md](core-types-en.md)
 | Version | Date | Change |
 |---------|------|--------|
 | 1.1 | 2026-04-20 | Boot source selection: 5 sources (QSPI, UART, BRAM, Ethernet, JTAG) aligned to XC7A200T FPGA capabilities. MMIO registers extended for all boot sources. 64-byte chunk data reads (= cell payload size). |
-| 1.0 | 2026-04-19 | Initial version — HW boot separated from NeuronOS boot-sequence-hu.md |
+| 1.0 | 2026-04-19 | Initial version — HW boot separated from Symphact boot-sequence-hu.md |

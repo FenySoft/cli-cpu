@@ -112,7 +112,7 @@ The three-name split exists because each name does work the others cannot:
 
 - A **product** (e.g. "CFPU-R Rich core") needs to be sellable, brand-able, and category-comparable to GPU/TPU/NPU. Calling it "CLI-CPU Rich" would make every product page look like it was named after a software project, not silicon.
 - A **project** (e.g. "the CLI-CPU simulator") needs to be searchable, citeable, license-attachable, and have a stable GitHub URL. Calling it "the CFPU project" would conflate the open-source effort with future closed-source CFPU chips that may exist someday.
-- A **vision** (e.g. "Cognitive Fabric is the substrate for Neuron OS") needs to be evocative, marketing-ready, and decoupled from any specific instruction set or core type. It is what goes on a one-line pitch deck slide.
+- A **vision** (e.g. "Cognitive Fabric is the substrate for Symphact") needs to be evocative, marketing-ready, and decoupled from any specific instruction set or core type. It is what goes on a one-line pitch deck slide.
 
 If we collapse the three into one name, every public-facing surface — academic paper, product datasheet, grant application, README, blog post — leaks meaning into the wrong layer.
 
@@ -160,7 +160,7 @@ If we collapse the three into one name, every public-facing surface — academic
 - Talking about the **architecture family**, **vision**, or **marketing narrative**.
 - Naming **chips** (e.g. *Cognitive Fabric One* — the F6 reference silicon).
 - Pitching the **idea** independently of any specific implementation.
-- Connecting to **Neuron OS** as the runtime layer.
+- Connecting to **Symphact** as the runtime layer.
 
 **Examples:**
 
@@ -168,7 +168,7 @@ If we collapse the three into one name, every public-facing surface — academic
 >
 > *"Cognitive Fabric One — the F6-Silicon reference chip (6R+16N+1S, 15 mm²)."*
 >
-> *"Cognitive Fabric + Neuron OS is the successor to Linux on commodity CPUs."*
+> *"Cognitive Fabric + Symphact is the successor to Linux on commodity CPUs."*
 
 ---
 

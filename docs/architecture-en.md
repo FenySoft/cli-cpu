@@ -212,7 +212,7 @@ From phase F5 of the CLI-CPU project, the CFPU transitions to a **heterogeneous 
 
 - **ARM big.LITTLE (2011):** Two types of CPU cores on one chip — "big" (fast, power-hungry) and "LITTLE" (slow, efficient). The phone runs light tasks on LITTLE, heavy tasks on big. **In the CFPU: Rich = big, Nano = LITTLE.**
 - **Apple Secure Enclave (2013):** A separate, isolated chip-within-a-chip in the iPhone, whose sole purpose is security operations (Face ID, fingerprint, payments). Even if the phone is compromised, keys stored in the Secure Enclave remain safe. **In the CFPU: Secure Core = Secure Enclave.**
-- **Intel Alder Lake (2021):** P-core (Performance) + E-core (Efficiency) heterogeneous mix, with the OS scheduler assigning tasks. **In the CFPU: the Neuron OS supervisor distributes tasks between Rich and Nano cores.**
+- **Intel Alder Lake (2021):** P-core (Performance) + E-core (Efficiency) heterogeneous mix, with the OS scheduler assigning tasks. **In the CFPU: the Symphact supervisor distributes tasks between Rich and Nano cores.**
 
 A single chip contains **three element types** — two computational, one security:
 
@@ -446,7 +446,7 @@ We choose OpenFrame because:
 └──────────────────────────────────────────────────────────────┘
 
 Rich core roles:
-  #0: Neuron OS kernel — root supervisor, scheduler
+  #0: Symphact kernel — root supervisor, scheduler
   #1: Device drivers — OPI, USB, GPIO (crash → restart)
   #2: Application supervisor — app lifecycle, hot code loading
   #3: Complex domain logic — orchestrator, string/FP
@@ -564,7 +564,7 @@ Instead of UART, **USB 1.1 Full Speed** (12 Mbps) — feasible on Sky130 @50 MHz
 | Configuration | Rich | Nano | Secure | Total | Target market |
 |--------------|------|------|--------|-------|--------------|
 | 2R + 34N + 1S | 2 | 34 | 1 | 37 | SNN research, IoT sensor farm |
-| 4R + 26N + 1S | 4 | 26 | 1 | 31 | Neuron OS + worker mix |
+| 4R + 26N + 1S | 4 | 26 | 1 | 31 | Symphact + worker mix |
 | **6R + 16N + 1S** | **6** | **16** | **1** | **23** | **Reference — app + demo balance** |
 | 8R + 9N + 1S | 8 | 9 | 1 | 18 | General .NET application (JokerQ-style) |
 
@@ -626,11 +626,11 @@ The same 10 mm² Sky130 area. RISC-V **requires cache coherency** when using sha
 
 **Important:** in single-core IPC, RISC-V (especially OoO variants) is faster. The CFPU **does not win in the single-core race**, but rather in the fact that **on the same silicon it performs far more useful parallel work** on actor-based workloads, while remaining deterministic and secure.
 
-### Neuron OS layers on-chip
+### Symphact layers on-chip
 
 | Layer | Where it runs | Function |
 |-------|--------------|----------|
-| **Neuron OS kernel** | Rich core #0 | Root supervisor, scheduler, capability registry, hot code loader |
+| **Symphact kernel** | Rich core #0 | Root supervisor, scheduler, capability registry, hot code loader |
 | **Device driver actors** | Rich core #1 | UART, QSPI, GPIO, timer — crash -> supervisor restart, not kernel panic |
 | **Application supervisor** | Rich core #0 or #1 | App lifecycle, actor spawn/kill, supervision strategies |
 | **Worker actors** (16) | Nano cores | SNN neurons, IoT handlers, filter pipeline, state machines, anything |
@@ -1334,7 +1334,7 @@ Actor ID:   payload first 1–2 bytes (software dispatch on the destination core
 | Single-actor per core (no scheduling needed) | **F3–F4** | Current model |
 | Multi-actor scheduling + DMA prefetch | **F5+** | DMA engine required |
 | QRAM External Extension (encrypt/MAC) | **F5+** | Per-core AES+CMAC engine |
-| Code sharing (identical actor types) | **F5+** | Neuron OS scheduler feature |
+| Code sharing (identical actor types) | **F5+** | Symphact scheduler feature |
 | Actor migration between cores | **F6+** | Cross-core state transfer via Seal Core |
 
 ## Silicon-grade security

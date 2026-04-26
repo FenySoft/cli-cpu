@@ -1,6 +1,6 @@
 ---
-name: "OS requirement from Neuron OS"
-about: "An OS-level need surfaced by Neuron OS that should be considered in CFPU hardware design"
+name: "OS requirement from Symphact"
+about: "An OS-level need surfaced by Symphact that should be considered in CFPU hardware design"
 title: "[osreq] "
 labels: ["osreq-from-os", "hw-codesign"]
 assignees: []
@@ -8,24 +8,24 @@ assignees: []
 
 ## Summary
 
-<!-- One sentence: what does Neuron OS need from the CFPU hardware? -->
+<!-- One sentence: what does Symphact need from the CFPU hardware? -->
 
 ## Source
 
-<!-- Link the corresponding issue / document in FenySoft/NeuronOS. -->
+<!-- Link the corresponding issue / document in FenySoft/Symphact. -->
 
-- NeuronOS issue: #TODO
-- NeuronOS osreq doc (if any): `docs/osreq-to-cfpu/...`
+- Symphact issue: #TODO
+- Symphact osreq doc (if any): `docs/osreq-to-cfpu/...`
 
 ## Context
 
-<!-- Where in Neuron OS did this requirement surface?
+<!-- Where in Symphact did this requirement surface?
   - Which module/actor/test revealed it?
   - Was it a performance bottleneck, a correctness issue, or a design limitation? -->
 
 ## Current software workaround
 
-<!-- How is Neuron OS handling this today without hardware support?
+<!-- How is Symphact handling this today without hardware support?
      Is the workaround acceptable, or is it blocking something? -->
 
 ## Proposed hardware behaviour
@@ -61,7 +61,7 @@ assignees: []
 <!-- If we skip this requirement, what breaks later?
   - Silicon area cost?
   - ABI stability problem?
-  - Perf cliff in Neuron OS workloads? -->
+  - Perf cliff in Symphact workloads? -->
 
 ## Related CFPU docs
 

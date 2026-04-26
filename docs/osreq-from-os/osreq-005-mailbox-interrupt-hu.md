@@ -1,6 +1,6 @@
 # OSREQ-005: Mailbox interrupt vs polling — core értesítési mechanizmus
 
-> **Forrás:** [FenySoft/NeuronOS — osreq-005](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-hu.md)
+> **Forrás:** [FenySoft/Symphact — osreq-005](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-hu.md)
 >
 > **Állapot:** Draft — hardveres visszajelzésre vár
 >
@@ -8,7 +8,7 @@
 
 ## OS-oldali igény
 
-A Neuron OS scheduler-nek tudnia kell, hogyan értesül egy core az új mailbox üzenetről. Ez az event-driven modell alapja.
+A Symphact scheduler-nek tudnia kell, hogyan értesül egy core az új mailbox üzenetről. Ez az event-driven modell alapja.
 
 ## Javasolt megoldás
 
@@ -25,4 +25,4 @@ A Neuron OS scheduler-nek tudnia kell, hogyan értesül egy core az új mailbox 
 4. IRQ prioritás: mailbox vs watchdog vs trap — fix vagy programozható?
 5. Power domain: clock-gated, power-gated, vagy mindkettő?
 
-A részletes specifikáció (energiaszámítással) a [NeuronOS forrásban](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-hu.md).
+A részletes specifikáció (energiaszámítással) a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-hu.md).

@@ -1,6 +1,6 @@
 # OSREQ-006: Inter-chip link protocol — distributed fabric communication
 
-> **Source:** [FenySoft/NeuronOS — osreq-006](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-en.md)
+> **Source:** [FenySoft/Symphact — osreq-006](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-en.md)
 >
 > **Status:** Draft — awaiting hardware feedback
 >
@@ -8,7 +8,7 @@
 
 ## OS-side requirement
 
-Neuron OS location transparency requires that `TActorRef` **does not reveal** whether the target actor is local or on another chip. The `Send(ref, msg)` call must work transparently across chip boundaries.
+Symphact location transparency requires that `TActorRef` **does not reveal** whether the target actor is local or on another chip. The `Send(ref, msg)` call must work transparently across chip boundaries.
 
 ## Proposed solution
 
@@ -31,4 +31,4 @@ Message format: `[src_chip:8][dst_chip:8][dst_cluster:8][dst_core:16][msg_len:16
 5. Hot plug: runtime chip addition/removal?
 6. Encryption: are inter-chip messages encrypted?
 
-The detailed specification is in the [NeuronOS source](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-en.md).
+The detailed specification is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-en.md).

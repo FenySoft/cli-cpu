@@ -4,13 +4,13 @@
 
 > Version: 1.0
 
-Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architektúráját** specifikálja: a chiplet típusokat, a multi-chiplet elrendezéseket, a technológiai skálázást és a Neuron OS-re gyakorolt hatást.
+Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architektúráját** specifikálja: a chiplet típusokat, a multi-chiplet elrendezéseket, a technológiai skálázást és a Symphact-re gyakorolt hatást.
 
 ## Tervezési alapelvek
 
 1. **Két chiplet típus** — egy központi (C) és egy compute (R) chiplet, azonos gyártósorról
 2. **2-hatvány core számok** — minden szinten 2ⁿ (cluster, chiplet, package)
-3. **Technológia-független skálázás** — a Neuron OS ugyanazt a kódot futtatja 4k és 32k core-on
+3. **Technológia-független skálázás** — a Symphact ugyanazt a kódot futtatja 4k és 32k core-on
 4. **Yield optimalizálás** — chiplet méret a 90%+ yield tartományban
 
 ## Chiplet típusok
@@ -223,7 +223,7 @@ A sűrűség javulás és a chiplet méret növekedés együttes hatása:
 
 > A core szám generációnként ~2×-re nő, a két tényező (sűrűség + chiplet méret) együttes hatásából.
 
-## Neuron OS hatás
+## Symphact hatás
 
 ### Ami fix marad generációk közt
 
@@ -244,7 +244,7 @@ A sűrűség javulás és a chiplet méret növekedés együttes hatása:
 
 ### Scheduler skálázás
 
-A Neuron OS scheduler egyetlen paramétere: **hány cluster van a chipletben**. A boot folyamat:
+A Symphact scheduler egyetlen paramétere: **hány cluster van a chipletben**. A boot folyamat:
 
 1. Chiplet jelenti: „N cluster vagyok"
 2. OS felépíti a scheduler fát
@@ -273,7 +273,7 @@ Ha a hűtés technológia megengedi, a chiplet-ek két rétegben stackelhetők S
   17R + 1C = 18 chiplet, ~34 816 Rich Core
 ```
 
-> A felső réteg hűtése kritikus — a Neuron OS scheduler-nek réteg-tudatosnak kell lennie (z=1 core-okat kevésbé terhelni). A 3×3×3 (27 chiplet) a középső réteg hűtési problémája miatt jelenleg nem reális.
+> A felső réteg hűtése kritikus — a Symphact scheduler-nek réteg-tudatosnak kell lennie (z=1 core-okat kevésbé terhelni). A 3×3×3 (27 chiplet) a középső réteg hűtési problémája miatt jelenleg nem reális.
 
 ## Kapcsolódó dokumentumok
 
@@ -287,4 +287,4 @@ Ha a hűtés technológia megengedi, a chiplet-ek két rétegben stackelhetők S
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
-| 1.0 | 2026-04-23 | Kezdeti verzió — C/R chiplet típusok, 1+1..8 termékváltozatok, kombinált mesh+csillag topológia, 256-bit 500 MHz link, DDR5 a C chipletben, technológiai skálázás (SRAM fal, 3D SRAM, chiplet méret növekedés), Neuron OS scheduler hatás |
+| 1.0 | 2026-04-23 | Kezdeti verzió — C/R chiplet típusok, 1+1..8 termékváltozatok, kombinált mesh+csillag topológia, 256-bit 500 MHz link, DDR5 a C chipletben, technológiai skálázás (SRAM fal, 3D SRAM, chiplet méret növekedés), Symphact scheduler hatás |

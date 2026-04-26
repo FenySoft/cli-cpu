@@ -17,7 +17,7 @@
 | **2** | 24 Cores, Zero Cache Coherency: How Shared-Nothing Beats Multi-Threading | CPU architecture enthusiasts | Planned |
 | **3** | From 250+ Tests to Silicon: Test-Driven Hardware Development | .NET / software developers | Planned |
 | **4** | Hardware-Level Security Without Mitigations: Why Spectre Can't Touch This | Security audience | Planned |
-| **5** | The Neuron OS Vision: Why Linux's 1970s Architecture Needs a Successor | OS / systems programmers | Planned |
+| **5** | The Symphact Vision: Why Linux's 1970s Architecture Needs a Successor | OS / systems programmers | Planned |
 | **6** | 8 Million .NET Developers, One Hardware Platform: Every Language, Native Silicon | .NET community | Planned |
 
 ## Article #2 — Outline
@@ -66,12 +66,12 @@
 
 ## Article #5 — Outline
 
-**Title:** The Neuron OS Vision: Why Linux's 1970s Architecture Needs a Successor
+**Title:** The Symphact Vision: Why Linux's 1970s Architecture Needs a Successor
 
 - Linux inherited 1970s Unix decisions: shared memory, fork/exec, POSIX
 - Why these don't scale to 1000+ cores
 - The Erlang/OTP model: 40 years of proof that actors work
-- Neuron OS: everything is an actor, hardware-enforced isolation
+- Symphact: everything is an actor, hardware-enforced isolation
 - Let it crash + supervision: fault tolerance from architecture
 - Hot code loading: zero-downtime updates
 

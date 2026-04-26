@@ -1,6 +1,6 @@
 # OSREQ-006: Inter-chip link protokoll — elosztott fabric kommunikáció
 
-> **Forrás:** [FenySoft/NeuronOS — osreq-006](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-hu.md)
+> **Forrás:** [FenySoft/Symphact — osreq-006](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-hu.md)
 >
 > **Állapot:** Draft — hardveres visszajelzésre vár
 >
@@ -8,7 +8,7 @@
 
 ## OS-oldali igény
 
-A Neuron OS location transparency megköveteli, hogy `TActorRef` **ne árulja el**, hogy a cél actor lokális vagy más chip-en van. A `Send(ref, msg)` hívásnak transzparensen kell működnie chip-határokon át.
+A Symphact location transparency megköveteli, hogy `TActorRef` **ne árulja el**, hogy a cél actor lokális vagy más chip-en van. A `Send(ref, msg)` hívásnak transzparensen kell működnie chip-határokon át.
 
 ## Javasolt megoldás
 
@@ -31,4 +31,4 @@ Send(ref, msg):
 5. Hot plug: runtime chip hozzáadás/eltávolítás?
 6. Encryption: inter-chip üzenetek titkosítottak?
 
-A részletes specifikáció a [NeuronOS forrásban](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-hu.md).
+A részletes specifikáció a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-hu.md).

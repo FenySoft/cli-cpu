@@ -1,6 +1,6 @@
 # OSREQ-001: Tree-structured interconnect between cores
 
-> **Source:** [FenySoft/NeuronOS — osreq-001](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-en.md)
+> **Source:** [FenySoft/Symphact — osreq-001](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-en.md)
 >
 > **Status:** Draft — awaiting hardware feedback
 >
@@ -8,7 +8,7 @@
 
 ## OS-side requirement
 
-Three fundamental Neuron OS structures assume a **tree hierarchy**:
+Three fundamental Symphact structures assume a **tree hierarchy**:
 
 1. **Supervisor tree** — parent-child actor hierarchy (error handling, lifecycle)
 2. **Capability delegation** — rights delegate downward from the root supervisor
@@ -24,7 +24,7 @@ The `architecture-hu.md` currently states:
 >
 > *"Above 16 cores, the bus topology should become a mesh (2D grid)"*
 
-The **mesh (2D grid)** proposal does not match Neuron OS requirements. The OS supervisor tree is a **tree**, not a grid. Mesh assumes uniform routing, but CFPU communication is **local and hierarchical** (neighboring cores, parent-child supervisor, intra-cluster spikes).
+The **mesh (2D grid)** proposal does not match Symphact requirements. The OS supervisor tree is a **tree**, not a grid. Mesh assumes uniform routing, but CFPU communication is **local and hierarchical** (neighboring cores, parent-child supervisor, intra-cluster spikes).
 
 ## Proposed topology: Hierarchical tree (fat tree)
 
@@ -97,7 +97,7 @@ The "Scaling to F6" section needs updating: **fat tree** topology instead of **m
 
 ## Cross-references
 
-- Neuron OS source: [osreq-001-tree-interconnect-en.md](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-en.md)
+- Symphact source: [osreq-001-tree-interconnect-en.md](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-en.md)
 - CLI-CPU architecture: `docs/architecture-hu.md` — "Scaling to F6" section
-- Neuron OS boot sequence: `docs/boot-sequence-hu.md` — step 8 (Nano Core Wake)
-- Neuron OS roadmap: M2.3 (Router), M2.4 (Memory Manager)
+- Symphact boot sequence: `docs/boot-sequence-hu.md` — step 8 (Nano Core Wake)
+- Symphact roadmap: M2.3 (Router), M2.4 (Memory Manager)

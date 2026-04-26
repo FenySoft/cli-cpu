@@ -1,6 +1,6 @@
 # OSREQ-004: DMA engine — non-blocking persistence support
 
-> **Source:** [FenySoft/NeuronOS — osreq-004](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-en.md)
+> **Source:** [FenySoft/Symphact — osreq-004](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-en.md)
 >
 > **Status:** Draft — awaiting hardware feedback
 >
@@ -8,7 +8,7 @@
 
 ## OS-side requirement
 
-The Neuron OS persistence model (Event Sourcing) requires that actor state can be written to external storage (FRAM/PSRAM) in an **asynchronous, non-blocking** manner. Core SRAM is volatile → a **DMA engine** is needed for journal/snapshot writes.
+The Symphact persistence model (Event Sourcing) requires that actor state can be written to external storage (FRAM/PSRAM) in an **asynchronous, non-blocking** manner. Core SRAM is volatile → a **DMA engine** is needed for journal/snapshot writes.
 
 ## Proposed solution
 
@@ -25,4 +25,4 @@ The Neuron OS persistence model (Event Sourcing) requires that actor state can b
 4. Max transfer size (Nano: 4 KB, Rich: 256 KB)?
 5. Double buffering (ping-pong journal buffer)?
 
-The detailed specification is in the [NeuronOS source](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-en.md).
+The detailed specification is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-en.md).

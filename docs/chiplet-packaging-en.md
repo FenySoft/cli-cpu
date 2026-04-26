@@ -4,13 +4,13 @@
 
 > Version: 1.0
 
-This document specifies the Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architecture**: chiplet types, multi-chiplet configurations, technology scaling, and the impact on Neuron OS.
+This document specifies the Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architecture**: chiplet types, multi-chiplet configurations, technology scaling, and the impact on Symphact.
 
 ## Design Principles
 
 1. **Two chiplet types** — one central (C) and one compute (R) chiplet, from the same fabrication line
 2. **Power-of-2 core counts** — 2ⁿ at every level (cluster, chiplet, package)
-3. **Technology-independent scaling** — Neuron OS runs the same code on 4k and 32k cores
+3. **Technology-independent scaling** — Symphact runs the same code on 4k and 32k cores
 4. **Yield optimization** — chiplet size in the 90%+ yield range
 
 ## Chiplet Types
@@ -223,7 +223,7 @@ Combined impact of density improvement and chiplet size growth:
 
 > Core count grows ~2× per generation, from the combined effect of both factors (density + chiplet size).
 
-## Neuron OS Impact
+## Symphact Impact
 
 ### What Remains Fixed Across Generations
 
@@ -244,7 +244,7 @@ Combined impact of density improvement and chiplet size growth:
 
 ### Scheduler Scaling
 
-The Neuron OS scheduler has a single parameter: **how many clusters are in the chiplet**. The boot process:
+The Symphact scheduler has a single parameter: **how many clusters are in the chiplet**. The boot process:
 
 1. Chiplet reports: "I have N clusters"
 2. OS builds the scheduler tree
@@ -273,7 +273,7 @@ If cooling technology permits, chiplets can be stacked in two layers via SoIC:
   17R + 1C = 18 chiplets, ~34,816 Rich Cores
 ```
 
-> Upper layer cooling is critical — the Neuron OS scheduler must be layer-aware (reduce load on z=1 cores). The 3×3×3 configuration (27 chiplets) is currently impractical due to middle layer cooling issues.
+> Upper layer cooling is critical — the Symphact scheduler must be layer-aware (reduce load on z=1 cores). The 3×3×3 configuration (27 chiplets) is currently impractical due to middle layer cooling issues.
 
 ## Related Documents
 
@@ -287,4 +287,4 @@ If cooling technology permits, chiplets can be stacked in two layers via SoIC:
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 1.0 | 2026-04-23 | Initial version — C/R chiplet types, 1+1..8 product variants, combined mesh+star topology, 256-bit 500 MHz link, DDR5 in C chiplet, technology scaling (SRAM wall, 3D SRAM, chiplet size growth), Neuron OS scheduler impact |
+| 1.0 | 2026-04-23 | Initial version — C/R chiplet types, 1+1..8 product variants, combined mesh+star topology, 256-bit 500 MHz link, DDR5 in C chiplet, technology scaling (SRAM wall, 3D SRAM, chiplet size growth), Symphact scheduler impact |

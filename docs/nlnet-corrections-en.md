@@ -5,7 +5,7 @@
 > **How to use this document:**
 > - If NLnet reviewers request clarification, respond using the refined text below.
 > - The follow-up proposal (F5-F6) should incorporate these corrections from the start.
-> - The parallel Neuron OS proposal ([`FenySoft/NeuronOS`](https://github.com/FenySoft/NeuronOS)) already reflects these lessons.
+> - The parallel Symphact proposal ([`FenySoft/Symphact`](https://github.com/FenySoft/Symphact)) already reflects these lessons.
 
 > Magyar verzió: [nlnet-corrections-hu.md](nlnet-corrections-hu.md)
 
@@ -74,25 +74,25 @@
 
 ---
 
-## Correction 6 — Parallel Neuron OS proposal needed disclosure
+## Correction 6 — Parallel Symphact proposal needed disclosure
 
 **Submitted text (funding sources):**
 > "There are no pending applications to other funding bodies for the same work."
 
-**Issue:** Since submission, a parallel NLnet proposal for **Neuron OS** has been drafted. While the two projects are scope-separated (hardware vs. software), transparency is required.
+**Issue:** Since submission, a parallel NLnet proposal for **Symphact** has been drafted. While the two projects are scope-separated (hardware vs. software), transparency is required.
 
 **Refined addendum:**
-> A parallel NLnet NGI Zero Commons Fund application is planned (Q3 2026 submission window) for the **Neuron OS** project ([`FenySoft/NeuronOS`](https://github.com/FenySoft/NeuronOS)) — the capability-based actor runtime co-designed with, but scope-separated from, this hardware proposal.
+> A parallel NLnet NGI Zero Commons Fund application is planned (Q3 2026 submission window) for the **Symphact** project ([`FenySoft/Symphact`](https://github.com/FenySoft/Symphact)) — the capability-based actor runtime co-designed with, but scope-separated from, this hardware proposal.
 >
-> | Dimension | CLI-CPU / CFPU | Neuron OS |
+> | Dimension | CLI-CPU / CFPU | Symphact |
 > |-----------|---------------|-----------|
 > | Deliverable | Hardware ISA, RTL, silicon tape-out, FPGA | Software runtime, OS services |
 > | Target | Verilog synthesis, Sky130 PDK | .NET 10 library (runs on Windows/Linux/macOS) |
 > | License | CERN-OHL-S-2.0 | Apache-2.0 |
-> | Repository | `FenySoft/CLI-CPU` | `FenySoft/NeuronOS` |
+> | Repository | `FenySoft/CLI-CPU` | `FenySoft/Symphact` |
 > | Milestones | F2 RTL, F3 Tiny Tapeout, F4 FPGA multi-core | M0.3-M3.2 actor runtime + kernel actors |
 >
-> The two proposals are deliberately non-overlapping in scope. Neuron OS does not depend on CLI-CPU silicon (it runs on simulators today); CLI-CPU does not depend on Neuron OS (the hardware has its own reference C# simulator).
+> The two proposals are deliberately non-overlapping in scope. Symphact does not depend on CLI-CPU silicon (it runs on simulators today); CLI-CPU does not depend on Symphact (the hardware has its own reference C# simulator).
 
 ---
 
@@ -121,7 +121,7 @@
 **Issue:** Four bullets, one of which (IHP free MPW) was corrected above. Reviewer typically wants to see a path to self-sustainability within 3 years.
 
 **Refined text (6 channels):**
-> 1. **Grant chain:** Follow-up NLnet proposal for F5-F6 (Rich core RTL + silicon tape-out), projected €50-150K. Parallel Neuron OS grant provides cross-ecosystem legitimacy.
+> 1. **Grant chain:** Follow-up NLnet proposal for F5-F6 (Rich core RTL + silicon tape-out), projected €50-150K. Parallel Symphact grant provides cross-ecosystem legitimacy.
 > 2. **European research pathways:** Chips JU / TRISTAN consortium participation as a non-RISC-V contributor (CIL ISA as a complementary target); Horizon Europe digital sovereignty calls; IHP SG13G2 research-grade silicon via academic partnership.
 > 3. **Dual licensing model:** Core repo stays CERN-OHL-S-2.0 (strong reciprocal). Commercial licenses available for (a) certified products (IEC 61508, ISO 26262, IEC 62304) and (b) proprietary derivative RTL — analogous to MariaDB / MongoDB business model applied to silicon.
 > 4. **Consulting / integration services (FenySoft Kft., existing entity):** Custom CFPU integration for regulated industries (healthcare, critical infrastructure) provides cross-subsidy for open-core maintenance.
@@ -204,7 +204,7 @@ This makes the relationship explicit for any reviewer following the README link 
 1. **Acknowledge the submitted version is v1.2** (the filed text), and offer this corrections document as a clarification.
 2. **Lead with the most material corrections** (#1 TT pricing, #3 M4 scope, #8 sustainability) — these affect budget and deliverables.
 3. **Offer PDF attachments proactively** if not already submitted (architecture overview, roadmap, test screenshots, 1-page executive summary).
-4. **Mention the parallel Neuron OS proposal** (#6) upfront to avoid the appearance of withholding related funding plans.
+4. **Mention the parallel Symphact proposal** (#6) upfront to avoid the appearance of withholding related funding plans.
 
 ---
 

@@ -1,6 +1,6 @@
 # OSREQ-001: Fa topológiájú interconnect a core-ok között
 
-> **Forrás:** [FenySoft/NeuronOS — osreq-001](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-hu.md)
+> **Forrás:** [FenySoft/Symphact — osreq-001](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-hu.md)
 >
 > **Állapot:** Draft — hardveres visszajelzésre vár
 >
@@ -8,7 +8,7 @@
 
 ## OS-oldali igény
 
-A Neuron OS három alapvető struktúrája **fa hierachiát** feltételez:
+A Symphact három alapvető struktúrája **fa hierachiát** feltételez:
 
 1. **Supervisor tree** — az actor-ok szülő-gyerek hierarchiája (hibakezelés, lifecycle)
 2. **Capability delegation** — a jogok a root supervisor-tól delegálódnak lefelé
@@ -24,7 +24,7 @@ Az `architecture-hu.md` jelenleg ezt írja:
 >
 > *"16 core felett a bus topológiát át kell nevezni mesh-re (2D grid)"*
 
-A **mesh (2D grid)** javaslat nem illeszkedik a Neuron OS igényeihez. Az OS supervisor tree **fa**, nem grid. A mesh uniform routing-ot feltételez, de a CFPU kommunikációja **lokális és hierarchikus** (szomszédos core-ok, parent-child supervisor, cluster-en belüli spike-ok).
+A **mesh (2D grid)** javaslat nem illeszkedik a Symphact igényeihez. Az OS supervisor tree **fa**, nem grid. A mesh uniform routing-ot feltételez, de a CFPU kommunikációja **lokális és hierarchikus** (szomszédos core-ok, parent-child supervisor, cluster-en belüli spike-ok).
 
 ## Javasolt topológia: Hierarchikus fa (fat tree)
 
@@ -97,7 +97,7 @@ Az „F6-ra skálázódás" szekció frissítendő: a **mesh** helyett **fat tre
 
 ## Kereszthivatkozások
 
-- Neuron OS forrás: [osreq-001-tree-interconnect-hu.md](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-hu.md)
+- Symphact forrás: [osreq-001-tree-interconnect-hu.md](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-hu.md)
 - CLI-CPU architecture: `docs/architecture-hu.md` — „Skálázódás F6-ra" szekció
-- Neuron OS boot sequence: `docs/boot-sequence-hu.md` — 8. lépés (Nano Core Wake)
-- Neuron OS roadmap: M2.3 (Router), M2.4 (Memory Manager)
+- Symphact boot sequence: `docs/boot-sequence-hu.md` — 8. lépés (Nano Core Wake)
+- Symphact roadmap: M2.3 (Router), M2.4 (Memory Manager)

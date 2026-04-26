@@ -1,6 +1,6 @@
 # OSREQ-005: Mailbox interrupt vs polling — core notification mechanism
 
-> **Source:** [FenySoft/NeuronOS — osreq-005](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-en.md)
+> **Source:** [FenySoft/Symphact — osreq-005](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-en.md)
 >
 > **Status:** Draft — awaiting hardware feedback
 >
@@ -8,7 +8,7 @@
 
 ## OS-side requirement
 
-The Neuron OS scheduler needs to know how a core is notified of a new mailbox message. This is the foundation of the event-driven model.
+The Symphact scheduler needs to know how a core is notified of a new mailbox message. This is the foundation of the event-driven model.
 
 ## Proposed solution
 
@@ -25,4 +25,4 @@ The Neuron OS scheduler needs to know how a core is notified of a new mailbox me
 4. IRQ priority: mailbox vs watchdog vs trap — fixed or programmable?
 5. Power domain: clock-gated, power-gated, or both?
 
-The detailed specification (with power calculations) is in the [NeuronOS source](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-en.md).
+The detailed specification (with power calculations) is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-en.md).

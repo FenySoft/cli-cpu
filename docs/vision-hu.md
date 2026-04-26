@@ -54,7 +54,7 @@ Linux kernel: ~40 millió sor kód (2025, v6.14).
 (Forrás: https://www.stackscale.com/blog/linux-kernel-surpasses-40-million-lines-code/)
 ```
 
-### Neuron OS: egyenrangú aktorok, hardveres izoláció
+### Symphact: egyenrangú aktorok, hardveres izoláció
 
 ```
 ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
@@ -74,18 +74,18 @@ Az izoláció nem szoftveres (MMU + page table) → HARDVERES.
 
 ### Mit nyer ez?
 
-| Szempont | Ma (Linux/Windows/macOS) | Neuron OS |
+| Szempont | Ma (Linux/Windows/macOS) | Symphact |
 |---|---|---|
 | Syscall overhead | ~1-5 µs (mode switch) | **~5-20 ns** (mailbox üzenet) |
 | Kernel bug hatása | Rendszerösszeomlás | Supervisor **újraindítja** a hibás aktort |
-| Kernel méret | ~40M sor (Linux) | **~5K sor** Neuron OS core |
+| Kernel méret | ~40M sor (Linux) | **~5K sor** Symphact core |
 | Izoláció típusa | Szoftveres (MMU + page table) | **Hardveres** (fizikai SRAM) |
 | Hot code reload | Lehetetlen (kernel újraindítás) | **Natív** — aktor kód futás közben cserélhető |
 | Boot idő | ~1-30 másodperc | **~1-10 µs** (nincs init, nincs driver scan) |
 
 **A Linux kernel 40 millió sora azért létezik, mert a shared memory-t szoftveresen kell védeni.** Ha a hardver garantálja az izolációt, a kernel **feladata eltűnik**.
 
-Részletek: [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md).
+Részletek: [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md).
 
 ---
 
@@ -318,7 +318,7 @@ class UserActor : Actor
 
 ### A programozási modell összehasonlítása
 
-| Szempont | Mai C# (async/await) | Actor modell (Neuron OS) |
+| Szempont | Mai C# (async/await) | Actor modell (Symphact) |
 |---|---|---|
 | Párhuzamosság egysége | Thread / Task | **Aktor** |
 | Szinkronizáció | lock, Mutex, SemaphoreSlim | **Nincs** — üzenet |
@@ -392,7 +392,7 @@ Az akadémiai kísérletek (MIT Alewife, Stanford DASH, Tilera TILE-Gx) megmutat
 A CLI-CPU az első kísérlet, ahol:
 1. **A hardver natívan actor-modellt támogat** (mailbox FIFO, sleep/wake, shared-nothing)
 2. **A programozási nyelv managed** (CIL/.NET — GC, type safety, verifikáció)
-3. **Az egész stack újratervezhető** (Neuron OS, actor GUI, actor DB — nem x86-ot emulálunk)
+3. **Az egész stack újratervezhető** (Symphact, actor GUI, actor DB — nem x86-ot emulálunk)
 
 Ez a három elem együtt **nem létezett eddig** — és a vízió azon áll, hogy **együtt kell, hogy legyen mind a három**, különben visszacsúszunk a shared-memory modellbe.
 
@@ -410,9 +410,9 @@ A vízió nem egyszerre valósul meg. A fejlesztési fázisok (`docs/roadmap-hu.
 | **F4** | Multi-core FPGA — első actor rendszer, scheduler + router | — |
 | **F5** | Rich core — teljes C#, heterogén Nano+Rich | — |
 | **F6** | Cognitive Fabric — 32-48 core FPGA-n, a vízió demonstrálható | — |
-| **F7** | Neuron OS SDK — az első fejlesztők actor GUI-t, actor DB-t írhatnak | — |
+| **F7** | Symphact SDK — az első fejlesztők actor GUI-t, actor DB-t írhatnak | — |
 
-Az F7 után a vízió elemei **fokozatosan** épülnek: actor GUI toolkit, actor adatbázis motor, actor hálózati stack. Mindegyik **C#-ban**, a Neuron OS API-ra épülve, és mindegyik **nyílt forráskódú**.
+Az F7 után a vízió elemei **fokozatosan** épülnek: actor GUI toolkit, actor adatbázis motor, actor hálózati stack. Mindegyik **C#-ban**, a Symphact API-ra épülve, és mindegyik **nyílt forráskódú**.
 
 A cél nem az, hogy lecseréljük a Linuxot vagy a PostgreSQL-t — hanem hogy egy **új kategóriát** teremtsünk, ahol az actor modell a természetes primitív, és a fejlesztők C#-ban a hardverhez illeszkedő szoftvert írhatnak.
 
@@ -421,7 +421,7 @@ A cél nem az, hogy lecseréljük a Linuxot vagy a PostgreSQL-t — hanem hogy e
 ## Hivatkozások
 
 - [`docs/architecture-hu.md`](architecture-hu.md) — mikroarchitektúra, pipeline, memória modell, heterogén Nano+Rich design
-- [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) — a Neuron OS részletes víziója, aktor API, supervisor fa, scheduler, hot code reload
+- [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) — a Symphact részletes víziója, aktor API, supervisor fa, scheduler, hot code reload
 - [`docs/roadmap-hu.md`](roadmap-hu.md) — F0-F7 fázisterv
 - [`docs/faq-hu.md`](faq-hu.md) — FAQ 5-7: CPU összehasonlítás, ütemezési költségek, igazságos összevetés
 - [`docs/security-hu.md`](security-hu.md) — biztonsági modell, formális verifikáció terv

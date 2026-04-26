@@ -37,7 +37,7 @@ In this environment, the "security = software abstraction" paradigm has failed. 
 - **Physical attacks** — if someone gains physical access to the chip and decapsulates it, the contents become visible (FIB, probing attacks). This is the domain of tamper resistance, which is a separate design layer (e.g., SEAL, mesh shielding), and the current design **does not** include it.
 - **Full side-channel protection** — power analysis, EM emission, and thermal side-channel attacks are not addressed in the current design. The CFPU's simpler pipeline makes these **harder**, but not impossible.
 - **Fault injection** — protection against laser/glitch attacks requires the tamper-resistance design layer.
-- **Denial of Service** — a malicious core can flood the mailboxes, slowing the system down. Rate limiting is the responsibility of the software runtime (Neuron OS).
+- **Denial of Service** — a malicious core can flood the mailboxes, slowing the system down. Rate limiting is the responsibility of the software runtime (Symphact).
 - **Business logic bugs** — if the C# code itself incorrectly checks permissions, the hardware cannot fix that. This remains the responsibility of secure-by-design software development.
 - **Quantum attacks** — the current design does not include post-quantum crypto primitives; this is a post-F7 addition.
 
@@ -149,7 +149,7 @@ The CFPU uses an in-order, non-speculative pipeline. **There is no branch predic
 | Capability tag forging | — | Possible via RAM patching | **Eliminated** ([Quench-RAM](quench-ram-en.md): stored in sealed region) |
 | Unsigned code execution | CWE-345 | OS-dependent, bypassable | **Eliminated** ([AuthCode](authcode-en.md): hardware verify of every bytecode) |
 | Tampered binary execution | CWE-345 | Software check, bypassable | **Eliminated** ([AuthCode](authcode-en.md): SHA-256(bytecode) ↔ cert.PkHash binding) |
-| Stateful signature key reuse | — | Easy with software signer | **Eliminated** ([Neuron OS HSM Card](authcode-en.md#neuroncard): single-use NVRAM) |
+| Stateful signature key reuse | — | Easy with software signer | **Eliminated** ([Symphact HSM Card](authcode-en.md#neuroncard): single-use NVRAM) |
 | Quantum break of signature | — | Shor breaks ECDSA/Ed25519 | **Eliminated** ([BitIce](authcode-en.md): WOTS+/LMS hash-based PQC) |
 | Hot code loader tamper | — | Exposed by kernel-level attack | **Eliminated** ([Seal Core](sealcore-en.md) firmware: mask ROM / eFuse immutable) |
 | Memory controller write-path bypass | — | Software check bypassable | **Eliminated** ([Seal Core](sealcore-en.md): pre-QRAM WE routing / QRAM SEAL HW trigger) |
@@ -158,7 +158,7 @@ The CFPU uses an in-order, non-speculative pipeline. **There is no branch predic
 
 > **Memory cell details:** the Quench-RAM rows are based on the [Quench-RAM](quench-ram-en.md) hardware memory cell, which physically eliminates memory-reuse bugs via a per-block status bit plus atomic "wipe-on-release" semantics.
 
-> **Code loading details:** the AuthCode / BitIce / Neuron OS HSM Card rows are based on the [AuthCode + CodeLock](authcode-en.md) mechanism, which uses a hash-based PQC certificate chain (eFuse → CA → vendor → developer card → bytecode) plus runtime W⊕X separation to guarantee that only authenticated code runs on the chip, and data can never become code.
+> **Code loading details:** the AuthCode / BitIce / Symphact HSM Card rows are based on the [AuthCode + CodeLock](authcode-en.md) mechanism, which uses a hash-based PQC certificate chain (eFuse → CA → vendor → developer card → bytecode) plus runtime W⊕X separation to guarantee that only authenticated code runs on the chip, and data can never become code.
 
 **Given the above, it is clear why the CFPU security profile is stronger than that of any existing commercial CPU.** We are not adding a few extra layers — the architecture fundamentally **does not permit** these attacks.
 
@@ -320,7 +320,7 @@ The CFPU does **not** provide an absolute security guarantee. The model is best 
 - Shared-nothing isolation
 - No speculative execution
 
-### Firmware / Neuron OS layer (project responsibility)
+### Firmware / Symphact layer (project responsibility)
 
 - Secure boot (signed firmware verification)
 - Core allocation integrity

@@ -1,6 +1,6 @@
 # OSREQ-002: MMIO memory map — OS↔HW register interface
 
-> **Source:** [FenySoft/NeuronOS — osreq-002](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-en.md)
+> **Source:** [FenySoft/Symphact — osreq-002](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-en.md)
 >
 > **Status:** Draft — awaiting hardware feedback
 >
@@ -8,7 +8,7 @@
 
 ## OS-side requirement
 
-The Neuron OS boot sequence defines concrete MMIO registers for the HW↔SW interface. These are the foundation for boot, core discovery, mailbox management, and interrupt control.
+The Symphact boot sequence defines concrete MMIO registers for the HW↔SW interface. These are the foundation for boot, core discovery, mailbox management, and interrupt control.
 
 ## Proposed MMIO map summary
 
@@ -35,4 +35,4 @@ The current architecture doc describes the memory map at a high level. This OSRE
 4. Max core count: scalability of the `core_id×4` offset (10k cores → ~40 KB MMIO space)
 5. QSPI vs OPI: F6 switches to OPI — do the registers need modification?
 
-The detailed register specification is in the [NeuronOS source](https://github.com/FenySoft/NeuronOS/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-en.md).
+The detailed register specification is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-en.md).

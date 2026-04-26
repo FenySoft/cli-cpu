@@ -71,7 +71,7 @@ A Seal Core beilleszkedik a CFPU komplementer biztonsági mechanizmusok családj
                                     │
        ┌────────────────┬───────────┼───────────┬───────────────┐
        │                │           │           │               │
-  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [Neuron OS
+  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [Symphact
    memóriacella   kód-aláírás   runtime W⊕X   gatekeeper    HSM Card]
                                               core          crypto + signing
 ```
@@ -255,7 +255,7 @@ Ez egy **fundamentálisan más szerep**, mint a pre-QRAM érában. A védelem fo
         egy mutable (status=0) Quench-RAM régióba
       - Seal Core hívja a SEAL hardveres állapotgép-műveletet a régió lezárására
       - Quench-RAM HW: status=1, a bytecode innentől immutable
-5. Seal Core értesíti a Neuron OS scheduler-t: "új aktor betöltve, indulhat"
+5. Seal Core értesíti a Symphact scheduler-t: "új aktor betöltve, indulhat"
 ```
 
 A **4. lépésben** a Seal Core nem használ speciális WE-pint. Egyszerű memória-írást végez a Quench-RAM mutable régiójára (amit a capability rendszer neki biztosít), majd SEAL-lel lezárja. A védelem attól jön, hogy **csak a Seal Core firmware-e képes a `SEAL` hardveres állapotgép-műveletet triggerelni az AuthCode verify kontextusában** — a SEAL triggerek listája zárt: CODE régió (Seal Core boot / hot_code_loader), SEND (payload kilép a Core-ból), swap-out (DMA evict külső QRAM-ba).
@@ -483,7 +483,7 @@ Ez a v1.0 doksi a vízió-szintű architektúrát rögzíti. A részletek a megf
 - `docs/quench-ram-hu.md` — a QRAM memóriacella, ami QRAM érában a CODE védelmét adja
 - `docs/security-hu.md` — a CFPU biztonsági modell
 - `docs/architecture-hu.md` — a CFPU mikroarchitektúra, ahova a Seal Core mint harmadik core-kategória beilleszkedik
-- [`NeuronOS/docs/vision-hu.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-hu.md) — a `hot_code_loader` aktor, amit a Seal Core hosteol
+- [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) — a `hot_code_loader` aktor, amit a Seal Core hosteol
 
 ### Külső referenciák
 

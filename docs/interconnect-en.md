@@ -787,7 +787,7 @@ Worst-case latency stays in the ~100–139 cycle range (~200–278 ns @ 500 MHz)
 
 ## OSREQ Cross-References
 
-This document addresses the following Neuron OS hardware requirements:
+This document addresses the following Symphact hardware requirements:
 
 | OSREQ | Topic | Status |
 |-------|-------|--------|

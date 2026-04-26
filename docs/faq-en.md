@@ -4,7 +4,7 @@
 
 > Version: 1.0
 
-This document collects conceptual questions that are essential for understanding the project but do not fit neatly into the detailed spec documents (`architecture-en.md`, `ISA-CIL-T0-en.md`, `security-en.md`, [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md), `secure-element-en.md`).
+This document collects conceptual questions that are essential for understanding the project but do not fit neatly into the detailed spec documents (`architecture-en.md`, `ISA-CIL-T0-en.md`, `security-en.md`, [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md), `secure-element-en.md`).
 
 The purpose of this FAQ is to help a **new reader** (whether engineer, investor, or curious observer) quickly orient themselves without having to wade through the full ~3,500+ lines of documentation.
 
@@ -72,7 +72,7 @@ The CFPU is **MIMD actor-native** -- every core runs a **different** CIL program
   - *"Clone: `git clone https://github.com/FenySoft/CLI-CPU`"*
   - *"The CLI-CPU reference simulator has 250+ tests"*
 - **Cognitive Fabric** -- when talking about the **architecture family / marketing narrative**
-  - *"Cognitive Fabric + Neuron OS is the successor to Linux"*
+  - *"Cognitive Fabric + Symphact is the successor to Linux"*
 
 ### Why not "CFP"
 
@@ -250,11 +250,11 @@ In .NET, AppDomains provide software-based isolation. CLI-CPU has **none** -- in
 In .NET, new DLLs can be loaded at runtime. On CLI-CPU, this **differs by core type**:
 
 - **Nano core (CIL-T0):** **Not possible** -- binaries are **statically linked** `.t0` files, loaded once by the boot-loader. **This is a prerequisite for formal verification**: once the static image has been verified, nobody can modify it at runtime.
-- **Rich core (F5+):** **Yes** -- writable microcode SRAM and the Neuron OS hot code loading feature enable actor-level code replacement at runtime, **without downtime** (Erlang OTP-inspired). All dynamically loaded code must pass **mandatory PQC signature verification** before execution. Use cases: firmware updates, plugin loading, actor migration Nano → Rich, zero-downtime security patches.
+- **Rich core (F5+):** **Yes** -- writable microcode SRAM and the Symphact hot code loading feature enable actor-level code replacement at runtime, **without downtime** (Erlang OTP-inspired). All dynamically loaded code must pass **mandatory PQC signature verification** before execution. Use cases: firmware updates, plugin loading, actor migration Nano → Rich, zero-downtime security patches.
 
 #### Thread, async/await runtime
 
-The C# `async/await` keywords compile to **build-time state machine compilation** (done by Roslyn). There is no "async runtime" on CLI-CPU -- just **an actor message on the mailbox**. The async/await and Task patterns **naturally map** to mailbox-based messaging (details in [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md)).
+The C# `async/await` keywords compile to **build-time state machine compilation** (done by Roslyn). There is no "async runtime" on CLI-CPU -- just **an actor message on the mailbox**. The async/await and Task patterns **naturally map** to mailbox-based messaging (details in [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md)).
 
 ### Historical lessons -- what CLI-CPU does differently
 
@@ -302,11 +302,11 @@ According to the "Strategic positioning: Cognitive Fabric" section in `docs/arch
 
 ## 4. Can a single physical core serve multiple logical actors?
 
-**Short answer: yes, and this is not an optional optimization but a fundamental part of the Neuron OS vision.** A physical core is a hardware resource, a logical actor is an execution unit -- the ratio between them is a **design decision**, not a fixed 1:1 mapping.
+**Short answer: yes, and this is not an optional optimization but a fundamental part of the Symphact vision.** A physical core is a hardware resource, a logical actor is an execution unit -- the ratio between them is a **design decision**, not a fixed 1:1 mapping.
 
 ### The project documentation explicitly supports this
 
-The [`NeuronOS/docs/vision-en.md`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md) records the "multiple actors on one core" model in four distinct places:
+The [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) records the "multiple actors on one core" model in four distinct places:
 
 **Location transparency** (line 107):
 > "An actor reference **does not reveal** whether the target is **local (on the same core)**, on another core, or on another chip."
@@ -378,7 +378,7 @@ Message processing steps:
 4. **Runtime** --> switches to that actor's state, executes the message handler
 5. **Actor** --> returns, the runtime waits for the next message (possibly for a different actor)
 
-This is exactly like an **Akka.NET / Erlang runtime**, but with **hardware mailbox and private SRAM** support -- **cooperative multitasking** where the scheduler does not interrupt message processing ([`NeuronOS/vision-en.md#2-start`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#2-start)).
+This is exactly like an **Akka.NET / Erlang runtime**, but with **hardware mailbox and private SRAM** support -- **cooperative multitasking** where the scheduler does not interrupt message processing ([`Symphact/vision-en.md#2-start`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md#2-start)).
 
 ### How many actors fit on a single core?
 
@@ -412,14 +412,14 @@ There are cases where an actor is intentionally given a dedicated core:
 
 ### When should you use the "1 core = many actors" model?
 
-- **Large actor population** -- thousands or more actors (e.g., web server: 1 request = 1 actor, [`NeuronOS/vision-en.md#starting-a-new-actor-dynamically`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#starting-a-new-actor-dynamically))
+- **Large actor population** -- thousands or more actors (e.g., web server: 1 request = 1 actor, [`Symphact/vision-en.md#starting-a-new-actor-dynamically`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md#starting-a-new-actor-dynamically))
 - **Hot/cold workload** -- many actors, but only a few active at any given time (e.g., session handler)
 - **Internal nodes of a supervisor tree** -- rarely do work, a dedicated core would be wasteful
 - **Kernel actors together** -- `root_supervisor` + `scheduler` + `router` sharing a Rich core
 
 ### The full picture -- heterogeneous mapping
 
-The Neuron OS uses a **flexible N:M actor-to-core mapping**:
+The Symphact uses a **flexible N:M actor-to-core mapping**:
 
 ```
 +--- Rich core 0 ------------------+
@@ -448,7 +448,7 @@ Same chip, different actor/core ratios tailored to the workload.
 
 Watch out for a potential apparent contradiction: the `docs/roadmap-en.md` **F3 Tiny Tapeout** version runs a single CIL program on a single core. This does **not** mean the core can only host 1 actor -- in F3, the Tiny Tapeout tile's SRAM is simply too small to justify a runtime.
 
-**The multi-actor runtime arrives in F4** ([`NeuronOS/vision-en.md#f4----multi-core-scheduler--router`](https://github.com/FenySoft/NeuronOS/blob/main/docs/vision-en.md#f4----multi-core-scheduler--router)), when the `scheduler` + `router` take on real roles, and from F5 onward, multiple actors on a single core is natural.
+**The multi-actor runtime arrives in F4** ([`Symphact/vision-en.md#f4----multi-core-scheduler--router`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md#f4----multi-core-scheduler--router)), when the `scheduler` + `router` take on real roles, and from F5 onward, multiple actors on a single core is natural.
 
 ### The differentiating point versus other neuromorphic chips
 
