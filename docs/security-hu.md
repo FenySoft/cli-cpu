@@ -1,10 +1,12 @@
-# CLI-CPU — Security Model and Threat Analysis
+# CFPU — Biztonsági Modell és Threat Analízis
 
 > English version: [security-en.md](security-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
-Ez a dokumentum a CLI-CPU **biztonsági modelljét** írja le: mit véd hardveresen, mit nem, milyen támadás-osztályokra immunis, milyen formális verifikáció lehetséges, és milyen tanúsítási útvonalakat céloz meg hosszú távon.
+Ez a dokumentum a **Cognitive Fabric Processing Unit (CFPU)** **biztonsági modelljét** írja le: mit véd hardveresen, mit nem, milyen támadás-osztályokra immunis, milyen formális verifikáció lehetséges, és milyen tanúsítási útvonalakat céloz meg hosszú távon.
+
+> *A CFPU a processzor-egység kategóriája; a **CLI-CPU** ennek a kategóriának a nyílt forráskódú referencia-implementációja (a szimulátor, a linker, az ISA spec, a GitHub repo). Ahol ez a dokumentum chip-szintű garanciákról beszél, az a CFPU-é; ahol mérföldkövekről, szimulátorról vagy build-ekről, az a CLI-CPU projekté. A teljes elnevezés-rendszer: [brand-hu.md](brand-hu.md).*
 
 ## Miért fontos most
 
@@ -16,7 +18,7 @@ Az AI korszakban a biztonság tájképe **gyökeresen** átalakult, és a hagyom
 4. **Mikroarchitektúra-sebezhetőségek.** Spectre, Meltdown, L1TF, Rowhammer, Retbleed, Inception — a modern OoO CPU-k architekturális bugokkal tele vannak, amiket nem lehet szoftveresen javítani teljesítményvesztés nélkül.
 5. **Post-quantum fenyegetés közelít.** 2030-ra új kriptográfiai algoritmusok kellenek, és hozzá új hardveres primitívek.
 
-Ebben a környezetben a „biztonság = szoftveres absztrakció" paradigma megbukott. A CLI-CPU válasza: **biztonság = fizikai tulajdonság a szilíciumban**, amit sem szoftveres, sem firmware-szintű támadás nem tud megkerülni.
+Ebben a környezetben a „biztonság = szoftveres absztrakció" paradigma megbukott. A CFPU válasza: **biztonság = fizikai tulajdonság a szilíciumban**, amit sem szoftveres, sem firmware-szintű támadás nem tud megkerülni.
 
 ## Threat Model
 
@@ -34,7 +36,7 @@ Ebben a környezetben a „biztonság = szoftveres absztrakció" paradigma megbu
 ### Amit NEM védünk (out-of-scope — őszinte figyelmeztetés)
 
 - **Fizikai támadás** — ha valaki hozzáfér a chiphez és dekapszulálja, a tartalom láthatóvá válik (FIB, probing támadások). Ez a „tamper resistance" feladata, ami egy külön tervezési réteg (pl. SEAL, mesh shielding), és a jelenlegi terv **nem** tartalmazza.
-- **Oldalcsatornás támadások teljes körű védelme** — a power analysis, EM emission, thermal side-channel nem tárgya a mostani tervnek. A CLI-CPU egyszerűbb pipeline-ja ezeket **nehezebbé teszi**, de nem lehetetlenné.
+- **Oldalcsatornás támadások teljes körű védelme** — a power analysis, EM emission, thermal side-channel nem tárgya a mostani tervnek. A CFPU egyszerűbb pipeline-ja ezeket **nehezebbé teszi**, de nem lehetetlenné.
 - **Fault injection** — laser/glitch támadások ellen a tamper-resistance tervezési réteg szükséges.
 - **Denial of Service** — egy rosszindulatú core telesprayelheti a mailboxokat, ami a rendszert lelassítja. A rate limiting a szoftveres runtime (Neuron OS) feladata.
 - **Üzleti logika hibák** — ha a C# kód maga rosszul ellenőrzi az engedélyeket, azt a hardver nem tudja javítani. A „secure by design" szoftverfejlesztés felelőssége marad.
@@ -72,7 +74,7 @@ Minden memória-hozzáférés **hardveresen** ellenőrzött:
 
 ### 2. Típus-biztonság (type safety)
 
-A CIL ECMA-335 megkövetel egy **verifiable code** fogalmat, ami type-safe. A CLI-CPU ezt a hardverben kényszeríti ki:
+A CIL ECMA-335 megkövetel egy **verifiable code** fogalmat, ami type-safe. A CFPU ezt a hardverben kényszeríti ki:
 
 - Minden stack slot **implicit típusjelzést** hordoz (F5+)
 - `castclass` és `isinst` a runtime metaadat alapján hardveresen jár végig a típus-hierarchián
@@ -83,7 +85,7 @@ A CIL ECMA-335 megkövetel egy **verifiable code** fogalmat, ami type-safe. A CL
 
 ### 3. Vezérlési folyamat integritása (Control Flow Integrity, CFI)
 
-A hagyományos CPU-kon a CFI szoftveres védelem (Clang CFI, Intel CET, ARM PAC), ami **kiegészítő**, és **megkerülhető**. A CLI-CPU-n a CFI **nem opcionális**, hanem az ISA része:
+A hagyományos CPU-kon a CFI szoftveres védelem (Clang CFI, Intel CET, ARM PAC), ami **kiegészítő**, és **megkerülhető**. A CFPU-n a CFI **nem opcionális**, hanem az ISA része:
 
 - **Call target verification:** minden `call` és `callvirt` opkód olyan címet vesz, ami **a CIL metaadat szerint metódus-belépési pont**. Tetszőleges cím nem ugorható.
 - **Return target verification:** a `ret` egy **frame pointer-szerkezetből** vett címre ugrik, amit hardveres frame setup tett oda. ROP gadget-láncolás nem lehetséges, mert a stack-en tárolt visszatérési cím **külön memóriaterületen** van, nem a user stack-en.
@@ -93,7 +95,7 @@ A hagyományos CPU-kon a CFI szoftveres védelem (Clang CFI, Intel CET, ARM PAC)
 
 ### 4. Shared-nothing isolation
 
-A multi-core CLI-CPU-n (F4+) **nincs megosztott memória** a core-ok között. Minden core saját privát SRAM-ban dolgozik, és a core-ok **kizárólag** a mailbox FIFO-kon keresztül kommunikálnak.
+A multi-core CFPU-n (F4+ a CLI-CPU roadmap-ben) **nincs megosztott memória** a core-ok között. Minden core saját privát SRAM-ban dolgozik, és a core-ok **kizárólag** a mailbox FIFO-kon keresztül kommunikálnak.
 
 **Következmény:**
 - **Cross-core side-channel** (mint a Foreshadow, L1TF, Fallout) **kizárva** — nincs shared cache, nincs shared TLB
@@ -107,19 +109,19 @@ A CODE régió a chipen **külön címtartományban** van, mint a DATA/STACK ré
 
 **Következmény:**
 - **Nincs shellcode injection** — nem lehet bájtokat írni a CODE régióba
-- **Nincs JIT spraying** — **mert nincs JIT**. A CLI-CPU egyik legerősebb biztonsági érve: a CIL natívan fut, nincs JIT compiler, ami sebezhető lenne (Firefox, Chrome, Safari JIT-jét évente kihasználják).
+- **Nincs JIT spraying** — **mert nincs JIT**. A CFPU egyik legerősebb biztonsági érve: a CIL natívan fut, nincs JIT compiler, ami sebezhető lenne (Firefox, Chrome, Safari JIT-jét évente kihasználják).
 - **Nincs self-modifying code** — sem hibásan, sem szándékosan
 
 ### 6. Speculative execution hiánya
 
-A CLI-CPU in-order, nem-speculative pipeline. **Nincs branch prediction bypass, nincs out-of-order execution** (legalábbis az F6-ig).
+A CFPU in-order, nem-speculative pipeline. **Nincs branch prediction bypass, nincs out-of-order execution** (legalábbis az F6-ig).
 
 **Következmény:** **Spectre v1, v2, v4, Meltdown, L1TF, MDS, Inception — a teljes spekulatív támadás-család kizárva.** Ez azért nagy szám, mert a modern CPU-kon **minden évben** új variáns jön ki, és a javítás minden alkalommal 5–30% teljesítményvesztéssel jár.
 
 ## Támadás-immunitási táblázat
 
-| Támadás-osztály | CWE | Hagyományos CPU | CLI-CPU |
-|----------------|-----|-----------------|---------|
+| Támadás-osztály | CWE | Hagyományos CPU | CFPU |
+|----------------|-----|-----------------|------|
 | Buffer overflow | CWE-119/120/121/122 | Sebezhető | **Kizárva** (hardveres bounds check) |
 | Use-after-free | CWE-416 | Sebezhető | **Kizárva** (GC hardveresen) |
 | Double-free | CWE-415 | Sebezhető | **Kizárva** (GC hardveresen) |
@@ -155,7 +157,7 @@ A CLI-CPU in-order, nem-speculative pipeline. **Nincs branch prediction bypass, 
 | Supply chain at hardware level | — | Ellenőrizhetetlen | **Ellenőrizhető** (nyílt HDL, reprodukálható build) |
 | Supply chain at code level | — | Kevés rendszerben van védelem | **Ellenőrizhető** ([AuthCode](authcode-hu.md) trust chain: eFuse → CA → vendor → card → binary) |
 
-**Ezek után érthető, miért erősebb a CLI-CPU biztonsági profilja, mint bármely létező kereskedelmi CPU-é.** Nem néhány extra réteget adunk, hanem az architektúra alapja eleve **nem engedélyezi** ezeket a támadásokat.
+**Ezek után érthető, miért erősebb a CFPU biztonsági profilja, mint bármely létező kereskedelmi CPU-é.** Nem néhány extra réteget adunk, hanem az architektúra alapja eleve **nem engedélyezi** ezeket a támadásokat.
 
 > **Részletek a memóriacelláról:** a Quench-RAM sorok a [Quench-RAM](quench-ram-hu.md) hardveres memóriacellán alapulnak, amely per-blokk státuszbittel + atomi „wipe-on-release" szemantikával fizikailag kizárja a memória-újrahasznosítási hibákat.
 
@@ -167,7 +169,7 @@ A CLI-CPU in-order, nem-speculative pipeline. **Nincs branch prediction bypass, 
 
 A formális verifikáció **matematikai bizonyítása** annak, hogy egy rendszer megfelel a specifikációjának. Nem tesztelés (ami csak néhány esetet ellenőriz), hanem **minden lehetséges végrehajtás** bizonyítása.
 
-### Miért lehetséges a CLI-CPU-n
+### Miért lehetséges a CFPU-n
 
 A formális verifikáció **gyakorlatilag lehetetlen** a modern OoO x86/ARM magokon, mert:
 - 15 000+ opkód variáns (x86)
@@ -175,7 +177,7 @@ A formális verifikáció **gyakorlatilag lehetetlen** a modern OoO x86/ARM mago
 - Speculatív végrehajtás
 - Változó cache állapotok
 
-A **CLI-CPU Nano core** ezzel szemben:
+A **CFPU Nano core** ezzel szemben:
 - **48 opkód**
 - **5-stage in-order pipeline**, egyszerű állapottal
 - **Nincs spekuláció**
@@ -196,7 +198,7 @@ A **CLI-CPU Nano core** ezzel szemben:
 | **TLA+** | Specifikáció + model checking | AWS, Azure kritikus rendszerek |
 | **SMV / SPIN** | Model checking hardware-re | CPU verifikáció |
 
-### A CLI-CPU formális verifikáció terve
+### A CFPU formális verifikáció terve
 
 **Három szinten** verifikálható:
 
@@ -206,7 +208,7 @@ A **CLI-CPU Nano core** ezzel szemben:
 
 3. **C# szimulátor szint (F1-ben kezdve)** — a szimulátor **unit tesztekkel és QuickCheck-szerű property-based** teszteléssel ellenőrzött. **Nem formális bizonyítás**, de kiegészítő biztonság.
 
-**Ütemterv:**
+**Ütemterv (CLI-CPU projekt fázisok):**
 
 | Fázis | Formális verifikáció lépés |
 |-------|----------------------------|
@@ -220,14 +222,14 @@ A **CLI-CPU Nano core** ezzel szemben:
 
 ## Tanúsítási útvonalak
 
-A CLI-CPU biztonsági profilja **potenciálisan alkalmas** a következő ipari szabványokra, **ha** a formális verifikáció befejezett és a megfelelő szoftveres folyamatok (V-model, FMEDA, MTBF analízis) mellé állnak.
+A CFPU biztonsági profilja **potenciálisan alkalmas** a következő ipari szabványokra, **ha** a formális verifikáció befejezett és a megfelelő szoftveres folyamatok (V-model, FMEDA, MTBF analízis) mellé állnak.
 
 ### IEC 61508 — Functional Safety
 
 **Cél:** általános ipari funkcionális biztonság
 **Szintek:** SIL-1 (legalacsonyabb) … SIL-4 (legmagasabb)
 **Követelmények:**
-- Determinisztikus végrehajtás ✓ (CLI-CPU az)
+- Determinisztikus végrehajtás ✓ (a CFPU az)
 - Formal methods használata magasabb SIL-en ✓ (cél)
 - FMEDA (Failure Mode Effects and Diagnostic Analysis) — szoftveres munka
 - MTBF számítás — gyártási adatból
@@ -261,13 +263,13 @@ A CLI-CPU biztonsági profilja **potenciálisan alkalmas** a következő ipari s
 - Kockázatelemzés
 - Forráskód-audit
 - Szoftverfejlesztési folyamat dokumentálva
-**Realisztikus cél:** Class C **elérhető** egy CLI-CPU-alapú orvostechnikai eszközhöz, ha a szoftveres fejlesztői folyamat a Microsoft/Amazon/Apple szintű.
+**Realisztikus cél:** Class C **elérhető** egy CFPU-alapú orvostechnikai eszközhöz, ha a szoftveres fejlesztői folyamat a Microsoft/Amazon/Apple szintű.
 
 ### Kapcsolódó szabványok
 
 - **Common Criteria (ISO/IEC 15408)** — információbiztonsági tanúsítás, EAL-1 … EAL-7
 - **FIPS 140-3** — kriptográfiai modulok (USA kormányzati)
-- **CC EAL-5+** — Apple Secure Enclave-szint, **cél** a CLI-CPU-ra
+- **CC EAL-5+** — Apple Secure Enclave-szint, **cél** a CFPU-ra
 
 ## Kapcsolódó projektek — tanulandó és lehetséges partnerek
 
@@ -276,7 +278,7 @@ A CLI-CPU biztonsági profilja **potenciálisan alkalmas** a következő ipari s
 **Legközelebbi rokon.** Cambridge Egyetem projekt, ami **capability-based security-t** ad hardveres szinten. A memóriára mutató „pointer"-ek kapszulázva vannak, nem lehet őket növelni, csökkenteni, felülírni. A **Morello** prototípus ARM-alapú és már fut.
 
 **Miért érdekes nekünk:**
-- A CLI-CPU filozófiája **párhuzamos**, de más úton éri el ugyanazt (type-safe CIL helyett capability pointer)
+- A CFPU filozófiája **párhuzamos**, de más úton éri el ugyanazt (type-safe CIL helyett capability pointer)
 - A Cambridge csapat **formális verifikációt** csinál a CHERI-re
 - **Lehetséges akadémiai partner**
 
@@ -286,7 +288,7 @@ A világ első **formálisan bizonyított** OS kernele (~10 000 sor C, Coq + Isa
 
 **Miért érdekes nekünk:**
 - Pontos precedens arra, hogy **egy egyszerű rendszer formálisan bizonyítható**
-- A Nano core ISA-ja **kisebb**, mint a seL4
+- A CFPU Nano core ISA-ja **kisebb**, mint a seL4
 - **Lehetséges technikai partner** a formális verifikációhoz
 
 ### CompCert
@@ -294,7 +296,7 @@ A világ első **formálisan bizonyított** OS kernele (~10 000 sor C, Coq + Isa
 Formálisan bizonyított C fordító (Coq-ban). Ha egy szoftver CompCert-tel fordul, akkor **matematikailag** biztos, hogy a gépi kód megfelel a C forrásnak.
 
 **Miért érdekes nekünk:**
-- Analóg cél: egy formálisan bizonyított **CIL → CLI-CPU bináris** fordító
+- Analóg cél: egy formálisan bizonyított **CIL → CLI-CPU bináris** fordító (a linker output)
 - A mostani `cli-cpu-link` tool **hosszú távú célja** egy CompCert-szerű bizonyított változat
 
 ### Project Everest (Microsoft Research)
@@ -308,9 +310,9 @@ Formálisan verifikált **HTTPS/TLS stack** F\*-ban. Bizonyítottan helyes kript
 
 ## Felelősségi modell
 
-A CLI-CPU **nem** ad abszolút biztonsági garanciát. A modellt három rétegben érdemes tisztán elválasztani:
+A CFPU **nem** ad abszolút biztonsági garanciát. A modellt három rétegben érdemes tisztán elválasztani:
 
-### Hardver réteg (amit a CLI-CPU garantál)
+### Hardver réteg (amit a CFPU garantál)
 
 - Minden CIL opkód a specifikáció szerint viselkedik
 - Memory safety hardveresen kikényszerítve
@@ -335,14 +337,14 @@ A CLI-CPU **nem** ad abszolút biztonsági garanciát. A modellt három rétegbe
 - Adat- és hitelesítéskezelés
 - Biztonságos kommunikáció
 
-**A CLI-CPU **az első réteget** garantálja abszolút módon.** A második réteg **tervezési felelősségünk**, de csak F6-F7 után válik valós termékké. A harmadik réteg **mindig** a felhasználó felelőssége marad.
+**A CFPU **az első réteget** garantálja abszolút módon.** A második réteg **tervezési felelősségünk**, de csak F6-F7 után válik valós termékké. A harmadik réteg **mindig** a felhasználó felelőssége marad.
 
 ## Mit jelent ez a projekt gyakorlati célja szempontjából
 
 A biztonsági dimenzió **új piacokat** nyit, amelyek a jelenlegi Cognitive Fabric narratíva mellett párhuzamosan érvényesek:
 
-| Piaci szegmens | Piac mérete (globális, 2030 becslés) | CLI-CPU alkalmazhatóság |
-|----------------|--------------------------------------|-------------------------|
+| Piaci szegmens | Piac mérete (globális, 2030 becslés) | CFPU alkalmazhatóság |
+|----------------|--------------------------------------|----------------------|
 | **AI safety / watchdog** | ~$5–15B | **Magas** — kis formálisan verifikált chip kritikus AI mellé |
 | **Critical infrastructure** | ~$50–100B | **Magas** — SIL-3/4 tanúsítás |
 | **Automotive (ISO 26262)** | ~$60B | **Közepes–magas** — ASIL-B/C/D |
@@ -391,3 +393,4 @@ Ezek fényében a CLI-CPU projektet érdemes **két párhuzamos narratívával**
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
+| 1.1 | 2026-04-25 | CLI-CPU → CFPU átnevezés architektúra/szilícium szinten a [brand-hu.md](brand-hu.md) szerint; CLI-CPU megmarad a projekt-szintű hivatkozásoknál (roadmap fázisok, szimulátor, linker output, projekt kommunikáció). |

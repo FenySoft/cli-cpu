@@ -1,10 +1,12 @@
-# CLI-CPU Secure Edition — Open Secure Element / TEE / JavaCard Successor
+# CFPU Secure Edition — Open Secure Element / TEE / JavaCard Successor
 
 > **Strategic positioning document.** This is the third market track alongside Cognitive Fabric and Trustworthy Silicon. It describes a separate chip family built on the same base architecture, augmented with Secure Element-specific hardware components, targeting the JavaCard / TEE / Secure Element market.
 
-> Magyar verzio: [secure-element-hu.md](secure-element-hu.md)
+> Magyar verzió: [secure-element-hu.md](secure-element-hu.md)
 
-> Version: 1.0
+> Version: 1.1
+
+> *The **CFPU Secure Edition** is a chip-product family in the [CFPU](brand-en.md) category. The open-source reference implementation (simulator, linker, ISA spec, RTL) belongs to the **CLI-CPU** project. Throughout this document, "CFPU Secure Edition" refers to the silicon-level product family; "CLI-CPU" appears only when referring to the project (roadmap phase, simulator, linker output). See [brand-en.md](brand-en.md) for the full nomenclature.*
 
 ## Table of Contents
 
@@ -12,7 +14,7 @@
 2. [The Secure Element Market Overview](#the-secure-element-market-overview)
 3. [Competitor Map — Closed Vendors and Open Projects](#competitor-map)
 4. [TROPIC01 — In-Depth Analysis of the First Open Secure Element](#tropic01-in-depth)
-5. [CLI-CPU Secure Edition — Positioning and Differentiation](#positioning)
+5. [CFPU Secure Edition — Positioning and Differentiation](#positioning)
 6. [Architectural Fit — What We Have and What Is Missing](#architectural-fit)
 7. [Required Additions](#required-additions)
 8. [Certification Path](#certification-path)
@@ -32,8 +34,8 @@ The existing `docs/architecture-en.md`, `docs/security-en.md`, and [`NeuronOS/do
 This document introduces a **third track**: the **Secure Element / TEE / JavaCard** market. Three reasons justify a separate strategic-level document:
 
 1. **Massive market.** ~$25-40B globally, growing fast, and **ten times larger** than what we have positioned so far
-2. **Perfect architectural fit.** The core properties of CLI-CPU (memory safety, shared-nothing, formally verifiable ISA, small die size, low power, determinism) are **exactly** what the Secure Element market demands
-3. **Distinctive positioning is possible.** Current open SE projects (TROPIC01, OpenTitan) **all** use single-core, traditional models. The CLI-CPU multi-core, shared-nothing, actor-based approach could **create a new category**: multiple independent Secure Elements on a single chip, with hardware isolation
+2. **Perfect architectural fit.** The core properties of the CFPU (memory safety, shared-nothing, formally verifiable ISA, small die size, low power, determinism) are **exactly** what the Secure Element market demands
+3. **Distinctive positioning is possible.** Current open SE projects (TROPIC01, OpenTitan) **all** use single-core, traditional models. The CFPU multi-core, shared-nothing, actor-based approach could **create a new category**: multiple independent Secure Elements on a single chip, with hardware isolation
 
 The goal is **not** to replace Cognitive Fabric or Trustworthy Silicon, but to add a **complementary** market area on the same base hardware. Alongside F6 (eFabless ChipIgnite tape-out), an **F6.5 Secure Edition** variant can be produced, adding Secure Element-specific components (crypto accelerators, TRNG, PUF, tamper detection, side-channel countermeasures) -- with **minimal redesign**.
 
@@ -53,7 +55,7 @@ A **Secure Element (SE)** is a dedicated chip or chip region that stores and pro
 
 ### The JavaCard Legacy
 
-**JavaCard** (Oracle, originally Sun Microsystems, released in 1996) is the world's most widely deployed smart card software platform. An estimated **~30 billion cards** run it worldwide: SIMs, banking cards, national eID, transit tickets, eSIMs, FIDO authenticators. JavaCard does **exactly** what CLI-CPU also aims to do -- **native bytecode execution** on isolated security hardware -- except:
+**JavaCard** (Oracle, originally Sun Microsystems, released in 1996) is the world's most widely deployed smart card software platform. An estimated **~30 billion cards** run it worldwide: SIMs, banking cards, national eID, transit tickets, eSIMs, FIDO authenticators. JavaCard does **exactly** what the CFPU also aims to do -- **native bytecode execution** on isolated security hardware -- except:
 
 - **Java 1.5 level** (2004), lacking any modern developer experience
 - **Closed ecosystem**, Oracle license, high barrier to entry
@@ -77,7 +79,7 @@ A TEE is an isolated computing environment that runs alongside the main OS. Curr
 | **Google Titan M2** | Google | Closed, though several bugs found in Titan M already |
 | **RISC-V Keystone** | Academic | Experimental status |
 
-The common problem: TEEs are **retrofitted onto** a shared-memory, speculative-execution CPU. CLI-CPU, by contrast, is **shared-nothing by design**, so there is **no isolation layer to add after the fact** -- it is the foundation of the system.
+The common problem: TEEs are **retrofitted onto** a shared-memory, speculative-execution CPU. The CFPU, by contrast, is **shared-nothing by design**, so there is **no isolation layer to add after the fact** -- it is the foundation of the system.
 
 ### Market Size
 
@@ -140,7 +142,7 @@ The **first genuinely commercial open secure element**, backed by SatoshiLabs (t
 
 ## TROPIC01 -- In-Depth Analysis of the First Open Secure Element <a name="tropic01-in-depth"></a>
 
-TROPIC01 is **not just a concept or prototype** -- it is in **full production as of 2026 Q1**, already orderable, and the first partner products (the next-generation Trezor hardware wallet, MikroE Secure Tropic Click) are already available. This is the **first** real-world example of what the CLI-CPU Secure Edition also targets: an **open-architecture, auditable secure element**.
+TROPIC01 is **not just a concept or prototype** -- it is in **full production as of 2026 Q1**, already orderable, and the first partner products (the next-generation Trezor hardware wallet, MikroE Secure Tropic Click) are already available. This is the **first** real-world example of what the CFPU Secure Edition also targets: an **open-architecture, auditable secure element**.
 
 ### Architecture
 
@@ -217,18 +219,18 @@ This is **the first Secure Element** where the owner can **genuinely verify** wh
 4. **The Ibex dual lock-step approach is ISO 26262-friendly.** A deliberate choice for anyone targeting the automotive market.
 5. **The MikroE partnership model is worth adopting.** A hobbyist expansion board **dramatically** increases the developer community's reach.
 6. **Modern crypto only** -- RSA omitted, only Ed25519 / ECDSA / X25519 / AES-GCM / Keccak. This yields a **cleaner** codebase and a **smaller** attack surface.
-7. **Development timeframe**: ~6 years from founding to production. A realistic target for the CLI-CPU Secure Edition as well.
+7. **Development timeframe**: ~6 years from founding to production. A realistic target for the CFPU Secure Edition as well.
 8. **SatoshiLabs partnership**: the Bitcoin/crypto community is **willing to fund** open hardware when the narrative is right.
 
-## CLI-CPU Secure Edition -- Positioning and Differentiation <a name="positioning"></a>
+## CFPU Secure Edition -- Positioning and Differentiation <a name="positioning"></a>
 
 ### Not a Competitor, but the Next Generation
 
-TROPIC01 is an **excellent first-generation open secure element**, and OpenTitan is strong in its own datacenter RoT segment. These projects **pave the way** for CLI-CPU Secure Edition -- they prove that the market exists, is mature, and funds open alternatives.
+TROPIC01 is an **excellent first-generation open secure element**, and OpenTitan is strong in its own datacenter RoT segment. These projects **pave the way** for CFPU Secure Edition -- they prove that the market exists, is mature, and funds open alternatives.
 
-**CLI-CPU Secure Edition does not compete against them.** It offers a **next-generation** approach based on a **different architecture**, addressing problems that the market **has not yet solved**:
+**CFPU Secure Edition does not compete against them.** It offers a **next-generation** approach based on a **different architecture**, addressing problems that the market **has not yet solved**:
 
-| Aspect | TROPIC01 | OpenTitan | CLI-CPU Secure Edition |
+| Aspect | TROPIC01 | OpenTitan | CFPU Secure Edition |
 |--------|----------|-----------|------------------------|
 | **ISA** | Ibex RISC-V + SPECT | Ibex RISC-V | **CIL (ECMA-335)** |
 | **Core count** | 1 + lock-step + SPECT | 1 + a few crypto modules | **4-16 Nano + 1-4 Rich + Crypto Actor** |
@@ -246,7 +248,7 @@ TROPIC01 is an **excellent first-generation open secure element**, and OpenTitan
 
 **On today's Secure Element market, one chip equals one security domain.** If a smartwatch needs a banking SE, an eSIM, an eID, FIDO2, a crypto wallet, and a TPM simultaneously, it requires **six separate chips**. This is **physically expensive, power-hungry, and complex**.
 
-The CLI-CPU Secure Edition offers **multiple independent Secure Elements on a single chip**, with **hardware shared-nothing** isolation. Each Nano core is **an independent secure applet** that is **mathematically provably** unable to communicate with the others except through defined mailbox interfaces.
+The CFPU Secure Edition offers **multiple independent Secure Elements on a single chip**, with **hardware shared-nothing** isolation. Each Nano core is **an independent secure applet** that is **mathematically provably** unable to communicate with the others except through defined mailbox interfaces.
 
 **This is a new category** that neither TROPIC01 (one security domain), nor OpenTitan (one security domain), nor the classic closed SEs (sequential applet model) offer.
 
@@ -265,17 +267,17 @@ A modern smartphone requires:
 
 **With TROPIC01:** one chip, one security domain, **software** applet isolation -- gains **auditability** but not **physical isolation**.
 
-**With CLI-CPU Secure Edition:** one chip, **7 separate Nano cores**, each a full actor-based Secure Element, coordinated by a **Rich core** supervisor. If the banking core were ever compromised, the others are **architecturally unaffected** -- a physical, hardware guarantee, not a software hope.
+**With CFPU Secure Edition:** one chip, **7 separate Nano cores**, each a full actor-based Secure Element, coordinated by a **Rich core** supervisor. If the banking core were ever compromised, the others are **architecturally unaffected** -- a physical, hardware guarantee, not a software hope.
 
-**This is a real, unsolved market problem** that CLI-CPU Secure Edition **can solve**.
+**This is a real, unsolved market problem** that CFPU Secure Edition **can solve**.
 
 ## Architectural Fit -- What We Have and What Is Missing <a name="architectural-fit"></a>
 
-### What the Current CLI-CPU Design **Already Provides**
+### What the Current CFPU Design **Already Provides**
 
 The `docs/architecture-hu.md`, `docs/security-hu.md`, and `docs/ISA-CIL-T0-hu.md` documents already supply the foundations on which the Secure Edition can build, with **minimal redesign**:
 
-| Secure Element Requirement | CLI-CPU Status | Phase |
+| Secure Element Requirement | CFPU Status | Phase |
 |---------------------------|----------------|-------|
 | **Hardware memory safety** | included | F3 (Nano core) |
 | **Type safety (isinst/castclass)** | included | F5 (Rich core) |
@@ -302,7 +304,7 @@ The missing ~20% requires specific **Secure Element-specific** hardware componen
 
 ### 1. Crypto Actor -- a SPECT-Inspired Cryptographic Co-Processor
 
-Following the TROPIC01 SPECT pattern, the CLI-CPU Secure Edition will include a **dedicated Crypto Actor**. This is a separate Nano core-like unit, **but with its own microcoded instructions** optimized for cryptographic workloads.
+Following the TROPIC01 SPECT pattern, the CFPU Secure Edition will include a **dedicated Crypto Actor**. This is a separate Nano core-like unit, **but with its own microcoded instructions** optimized for cryptographic workloads.
 
 **Operating pattern:**
 
@@ -384,11 +386,11 @@ The chip can **send a message** to an external server (attestation server) that 
 3. The boot process completed correctly
 4. The current SE configuration
 
-This enables **remote trust establishment**: a cloud server can **confirm** that the communicating device is **genuinely** an authentic, audited CLI-CPU Secure Edition.
+This enables **remote trust establishment**: a cloud server can **confirm** that the communicating device is **genuinely** an authentic, audited CFPU Secure Edition.
 
 ### 6. Tamper Detection
 
-Learning from TROPIC01, the CLI-CPU Secure Edition **must include the same package**:
+Learning from TROPIC01, the CFPU Secure Edition **must include the same package**:
 
 | Component | Function | Size |
 |-----------|---------|------|
@@ -421,7 +423,7 @@ When any detector fires, it triggers **immediate key zeroization**: all sensitiv
 
 | Component | Std cell |
 |-----------|----------|
-| Base CLI-CPU (Nano + Rich, F6 plan) | ~200k |
+| Base CFPU (Nano + Rich, F6 plan) | ~200k |
 | **Crypto Actor** (AES, SHA, ECC, PQC, SPECT-inspired) | ~45k |
 | **TRNG** | ~2k |
 | **PUF** + error correction | ~1.5k |
@@ -450,7 +452,7 @@ This is **~32% larger** than the standard F6 Cognitive Fabric chip (~200k). It *
 | **EAL-6+** | Semi-formal verified design | **High-security government, military** |
 | EAL-7 | Formally verified design | **Critical weapons systems** |
 
-**The CLI-CPU Secure Edition realistically targets EAL-5+**, and **EAL-6+** is achievable thanks to the formally verifiable ISA and simple microarchitecture.
+**The CFPU Secure Edition realistically targets EAL-5+**, and **EAL-6+** is achievable thanks to the formally verifiable ISA and simple microarchitecture.
 
 ### Certification Time and Cost
 
@@ -466,7 +468,7 @@ Common Criteria certification is **neither cheap nor fast**:
 | Certification body review | 2-4 months | $20-40k |
 | **Total** | **24-48 months** | **$400k-1M** |
 
-This is **not a starter project budget**. EAL-5+ certification for the CLI-CPU Secure Edition should be initiated **after F6.5** (i.e. around 2031-2032), when real silicon and hands-on experience are available.
+This is **not a starter project budget**. EAL-5+ certification for the CFPU Secure Edition should be initiated **after F6.5** (i.e. around 2031-2032), when real silicon and hands-on experience are available.
 
 ### Accredited Labs
 
@@ -475,7 +477,7 @@ This is **not a starter project budget**. EAL-5+ certification for the CLI-CPU S
 - **NIAP** (USA) -- tied to the US NSA
 - **CCRA** -- mutual recognition arrangement
 
-Tropic Square is currently moving toward **BSI** and **ANSSI**. The CLI-CPU Secure Edition can follow the same path, **learning from TROPIC01's experience**.
+Tropic Square is currently moving toward **BSI** and **ANSSI**. The CFPU Secure Edition can follow the same path, **learning from TROPIC01's experience**.
 
 ### Alternative / Complementary Certifications
 
@@ -488,78 +490,78 @@ Tropic Square is currently moving toward **BSI** and **ANSSI**. The CLI-CPU Secu
 | **FIDO Certified** | FIDO2 / Passkey authenticator | Web authentication |
 | **TCG TPM 2.0** | Trusted Computing | Windows, server, IoT |
 
-The CLI-CPU Secure Edition is **a product family** that will **obtain multiple certifications** for its various target markets.
+The CFPU Secure Edition is **a product family** that will **obtain multiple certifications** for its various target markets.
 
 ## Product Family and Use Cases <a name="product-family"></a>
 
-The CLI-CPU Secure Edition is **not a single chip** but **a platform** on which **multiple concrete products** can be built, each targeting a specific market segment. The **hardware base is shared**, but the **firmware and certifications** differ.
+The CFPU Secure Edition is **not a single chip** but **a platform** on which **multiple concrete products** can be built, each targeting a specific market segment. The **hardware base is shared**, but the **firmware and certifications** differ.
 
-### 1. CLI-CPU Open Banking Card (EMV-Compatible)
+### 1. CFPU Open Banking Card (EMV-Compatible)
 
 **Goal**: the first open-source, EMV-compatible banking card platform.
 **Certification**: EMVCo + EAL-5+
 **Differentiator**: the user can **see** what runs on their card. A revolution in banking security.
 **Competitors**: Thales, Idemia, Infineon banking chips (all closed).
 
-### 2. CLI-CPU Open eSIM / iSIM
+### 2. CFPU Open eSIM / iSIM
 
 **Goal**: an open SIM/eSIM platform that the user can **flash themselves** onto their phone, independently choosing a carrier.
 **Certification**: GSMA eUICC + EAL-4+
 **Differentiator**: user sovereignty over mobile network identity.
 **Competitors**: Thales eSIM (closed).
 
-### 3. CLI-CPU Open eID / Passport
+### 3. CFPU Open eID / Passport
 
 **Goal**: a national electronic identity card where citizens can **audit** the firmware.
 **Certification**: ICAO 9303 + EAL-5+
 **Differentiator**: **privacy-respecting eGovernment**. Particularly attractive in the EU, aligned with the EU Digital Identity Wallet initiative.
 **Competitors**: Idemia, G+D eID chips.
 
-### 4. CLI-CPU Open FIDO2 / Passkey Authenticator
+### 4. CFPU Open FIDO2 / Passkey Authenticator
 
 **Goal**: a YubiKey alternative with auditable hardware token.
 **Certification**: FIDO Certified Level 2 or 3 + EAL-4+
 **Differentiator**: an **open, auditable, formally verifiable** FIDO authenticator. For the privacy-aware community.
 **Competitors**: Yubico (closed), SoloKeys (partially open, but not SE-based).
 
-### 5. CLI-CPU Open TPM 2.0
+### 5. CFPU Open TPM 2.0
 
 **Goal**: a Trusted Platform Module alternative for Windows/Linux/server/IoT systems.
 **Certification**: TCG TPM 2.0 + EAL-4+
 **Differentiator**: **replaces Intel PTT and AMD fTPM** for those who value auditability. A **Microsoft Pluton** alternative.
 **Competitors**: Infineon SLB (TPM 2.0, closed), Nuvoton NPCT.
 
-### 6. CLI-CPU Open Automotive V2X Secure Element
+### 6. CFPU Open Automotive V2X Secure Element
 
 **Goal**: vehicle-to-everything communication + digital key + OTA update + remote attestation.
 **Certification**: ISO 21434 + EAL-5+ + ASIL-D
 **Differentiator**: a **formally verified, open-source** automotive SE. Particularly attractive to the EU automotive industry (CHIPS Act context).
 **Competitors**: Infineon AURIX Secure Element, NXP A71.
 
-### 7. CLI-CPU Open Medical Secure Element
+### 7. CFPU Open Medical Secure Element
 
 **Goal**: secure element for implantable and wearable medical devices (pacemaker, insulin pump, CGM, neural implant).
 **Certification**: IEC 62304 Class C + HIPAA + EAL-4+
-**Differentiator**: **privacy-preserving medical AI inference, certifiable device identity, post-quantum ready crypto**. Today, most medical devices use **obsolete 8-bit MCUs** because new CPUs cannot be certified. CLI-CPU is modern and certifiable.
+**Differentiator**: **privacy-preserving medical AI inference, certifiable device identity, post-quantum ready crypto**. Today, most medical devices use **obsolete 8-bit MCUs** because new CPUs cannot be certified. The CFPU is modern and certifiable.
 **Competitors**: Microchip, Infineon medical.
 
-### 8. CLI-CPU Open Hardware Wallet
+### 8. CFPU Open Hardware Wallet
 
 **Goal**: a Ledger and Trezor alternative, **from open source**.
 **Certification**: EAL-5+ (optional)
-**Differentiator**: TROPIC01 provides **one** security domain; CLI-CPU Secure Edition supports **multiple** cryptocurrencies simultaneously (Bitcoin + Ethereum + Solana + Monero + ...), each in a separate hardware security domain. **Multi-chain multi-wallet on a single chip**, securely.
+**Differentiator**: TROPIC01 provides **one** security domain; CFPU Secure Edition supports **multiple** cryptocurrencies simultaneously (Bitcoin + Ethereum + Solana + Monero + ...), each in a separate hardware security domain. **Multi-chain multi-wallet on a single chip**, securely.
 **Competitors**: Trezor (on TROPIC01), Ledger (closed), GridPlus.
 
-### 9. CLI-CPU Open Validator Node
+### 9. CFPU Open Validator Node
 
 **Goal**: blockchain validator (Ethereum PoS, Cardano, Solana, Cosmos) in a **deterministic, audited** manner.
 **Certification**: EAL-5+ (optional)
 **Differentiator**: **deterministic execution**, **formally verified consensus logic**, **shared-nothing** between every validator instance. Validator maintenance becomes drastically simpler.
 **Competitors**: x86 servers + software validator nodes (highly vulnerable).
 
-### 10. CLI-CPU Open AI Safety Watchdog
+### 10. CFPU Open AI Safety Watchdog
 
-**Goal**: a small, formally verified CLI-CPU Secure Edition that **monitors** the decisions of a large AI model (LLM, agent) and performs an emergency shutdown if it detects anomalies.
+**Goal**: a small, formally verified CFPU Secure Edition that **monitors** the decisions of a large AI model (LLM, agent) and performs an emergency shutdown if it detects anomalies.
 **Certification**: IEC 61508 SIL-3/4 + EAL-5+
 **Differentiator**: thanks to **formal verification**, the watchdog is **mathematically proven** to never fail. Serves as an AI safety layer for autonomous systems.
 **Competitors**: none directly -- a new category.
@@ -623,7 +625,7 @@ This is **significant**, but the Trustworthy Silicon track (even without Cogniti
 - **Shared certification experience**: BSI, ANSSI processes -- they have already been through it
 - **Joint EU lobbying**: Chips Act, Horizon Europe, EU sovereignty
 - **Technical conferences**: joint talks at 35C3/FOSDEM/TROOPERS
-- **Hardware partnership**: a TROPIC01 could even **serve alongside** a CLI-CPU chip as a root of trust
+- **Hardware partnership**: a TROPIC01 could even **serve alongside** a CFPU chip as a root of trust
 
 **Not now**, because:
 - CLI-CPU is at the F0 spec stage; we are not yet at hardware
@@ -636,7 +638,7 @@ The OpenTitan consortium coordinated by lowRISC (Google, Nuvoton, Winbond, WD, e
 
 #### SatoshiLabs / Trezor
 
-SatoshiLabs funds Tropic Square. If CLI-CPU Secure Edition offers a **multi-chain hardware wallet** variant (product type #10), then the **Trezor ecosystem** is a natural partner.
+SatoshiLabs funds Tropic Square. If CFPU Secure Edition offers a **multi-chain hardware wallet** variant (product type #10), then the **Trezor ecosystem** is a natural partner.
 
 #### Academic Partners
 
@@ -670,7 +672,7 @@ The Secure Element community **differs** from the Cognitive Fabric / AI communit
 
 ## Realistic Timeline <a name="timeline"></a>
 
-The CLI-CPU Secure Edition is **not a quick project**. The Tropic Square lesson: **~6 years** from founding to full production, and **2-3 years** for Common Criteria certification.
+The CFPU Secure Edition is **not a quick project**. The Tropic Square lesson: **~6 years** from founding to full production, and **2-3 years** for Common Criteria certification.
 
 | Year | Phase | Event |
 |------|-------|-------|
@@ -724,11 +726,11 @@ The Secure Edition **does not rush** anything in the F1-F4 phases, because the C
 
 ## Closing Thought
 
-The Secure Element market is **enormous** (~$30-40B), **mature**, and **now opening** to open-source alternatives (TROPIC01 and OpenTitan prove it). The CLI-CPU Secure Edition **naturally** fits this space, because the base architecture (stack machine, shared-nothing, formally verifiable ISA, small die size, low power) is **exactly** what the SE market demands.
+The Secure Element market is **enormous** (~$30-40B), **mature**, and **now opening** to open-source alternatives (TROPIC01 and OpenTitan prove it). The CFPU Secure Edition **naturally** fits this space, because the base architecture (stack machine, shared-nothing, formally verifiable ISA, small die size, low power) is **exactly** what the SE market demands.
 
-Our **differentiating position** is not that we are "yet another open SE" -- but that we offer **multi-core, actor-based, multiple independent security domains on a single chip**. This is a **new category** that neither TROPIC01, nor OpenTitan, nor the closed vendors offer. The future Secure Element will **require multiple security domains** (smartwatch/smartphone banking + eSIM + eID + FIDO + wallet + TPM), and the CLI-CPU Secure Edition is **ready** for this.
+Our **differentiating position** is not that we are "yet another open SE" -- but that we offer **multi-core, actor-based, multiple independent security domains on a single chip**. This is a **new category** that neither TROPIC01, nor OpenTitan, nor the closed vendors offer. The future Secure Element will **require multiple security domains** (smartwatch/smartphone banking + eSIM + eID + FIDO + wallet + TPM), and the CFPU Secure Edition is **ready** for this.
 
-**Tropic Square has shown that the market is real and reachable.** The CLI-CPU Secure Edition **takes the next step**: the same auditability and openness, **on a generation-better architecture**.
+**Tropic Square has shown that the market is real and reachable.** The CFPU Secure Edition **takes the next step**: the same auditability and openness, **on a generation-better architecture**.
 
 ---
 
@@ -737,3 +739,4 @@ Our **differentiating position** is not that we are "yet another open SE" -- but
 | Version | Date | Summary |
 |---------|------|---------|
 | 1.0 | 2026-04-14 | Initial versioned release |
+| 1.1 | 2026-04-25 | Renamed CLI-CPU → CFPU at the chip / product-family level per [brand-en.md](brand-en.md); product line is now "CFPU Secure Edition" with sub-products "CFPU Open Banking Card", "CFPU Open eSIM", etc. CLI-CPU retained for project-level references (roadmap phase, repo, simulator). |

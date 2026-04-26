@@ -1,9 +1,11 @@
-# CLI-CPU — Security Model and Threat Analysis
+# CFPU — Security Model and Threat Analysis
 
-> Magyar verzio: [security-hu.md](security-hu.md)
-> Version: 1.0
+> Magyar verzió: [security-hu.md](security-hu.md)
+> Version: 1.1
 
-This document describes the CLI-CPU **security model**: what it protects at the hardware level, what it does not, which attack classes it is immune to, what formal verification is feasible, and which certification paths it targets long-term.
+This document describes the **Cognitive Fabric Processing Unit (CFPU)** **security model**: what it protects at the hardware level, what it does not, which attack classes it is immune to, what formal verification is feasible, and which certification paths it targets long-term.
+
+> *The CFPU is the processor-unit category; the **CLI-CPU** is the open-source reference implementation of that category (the simulator, the linker, the ISA spec, the GitHub repo). Where this document discusses chip-level guarantees, those belong to the CFPU; where it discusses milestones, simulators, or builds, those belong to the CLI-CPU project. See [brand-en.md](brand-en.md) for the full nomenclature.*
 
 ## Why it matters now
 
@@ -15,7 +17,7 @@ In the AI era, the security landscape has **fundamentally** changed, and traditi
 4. **Microarchitectural vulnerabilities.** Spectre, Meltdown, L1TF, Rowhammer, Retbleed, Inception — modern OoO CPUs are riddled with architectural bugs that cannot be patched in software without performance penalties.
 5. **The post-quantum threat is approaching.** By 2030, new cryptographic algorithms will be needed, along with new hardware primitives to support them.
 
-In this environment, the "security = software abstraction" paradigm has failed. The CLI-CPU answer: **security = a physical property of the silicon**, which neither software nor firmware-level attacks can circumvent.
+In this environment, the "security = software abstraction" paradigm has failed. The CFPU answer: **security = a physical property of the silicon**, which neither software nor firmware-level attacks can circumvent.
 
 ## Threat Model
 
@@ -33,7 +35,7 @@ In this environment, the "security = software abstraction" paradigm has failed. 
 ### What we do NOT protect (out-of-scope — honest disclaimer)
 
 - **Physical attacks** — if someone gains physical access to the chip and decapsulates it, the contents become visible (FIB, probing attacks). This is the domain of tamper resistance, which is a separate design layer (e.g., SEAL, mesh shielding), and the current design **does not** include it.
-- **Full side-channel protection** — power analysis, EM emission, and thermal side-channel attacks are not addressed in the current design. The CLI-CPU's simpler pipeline makes these **harder**, but not impossible.
+- **Full side-channel protection** — power analysis, EM emission, and thermal side-channel attacks are not addressed in the current design. The CFPU's simpler pipeline makes these **harder**, but not impossible.
 - **Fault injection** — protection against laser/glitch attacks requires the tamper-resistance design layer.
 - **Denial of Service** — a malicious core can flood the mailboxes, slowing the system down. Rate limiting is the responsibility of the software runtime (Neuron OS).
 - **Business logic bugs** — if the C# code itself incorrectly checks permissions, the hardware cannot fix that. This remains the responsibility of secure-by-design software development.
@@ -71,7 +73,7 @@ Every memory access is **hardware-checked**:
 
 ### 2. Type safety
 
-CIL per ECMA-335 mandates a **verifiable code** concept that is type-safe. CLI-CPU enforces this in hardware:
+CIL per ECMA-335 mandates a **verifiable code** concept that is type-safe. The CFPU enforces this in hardware:
 
 - Every stack slot carries an **implicit type tag** (F5+)
 - `castclass` and `isinst` traverse the type hierarchy in hardware based on runtime metadata
@@ -82,7 +84,7 @@ CIL per ECMA-335 mandates a **verifiable code** concept that is type-safe. CLI-C
 
 ### 3. Control Flow Integrity (CFI)
 
-On traditional CPUs, CFI is a software-level defense (Clang CFI, Intel CET, ARM PAC) that is **supplementary** and **bypassable**. On CLI-CPU, CFI is **not optional** — it is part of the ISA:
+On traditional CPUs, CFI is a software-level defense (Clang CFI, Intel CET, ARM PAC) that is **supplementary** and **bypassable**. On the CFPU, CFI is **not optional** — it is part of the ISA:
 
 - **Call target verification:** every `call` and `callvirt` opcode takes an address that **must be a method entry point according to the CIL metadata**. Arbitrary addresses cannot be jumped to.
 - **Return target verification:** `ret` jumps to an address from a **frame pointer structure** placed by hardware frame setup. ROP gadget chaining is impossible because the return address stored on the stack is in a **separate memory region**, not on the user stack.
@@ -92,7 +94,7 @@ On traditional CPUs, CFI is a software-level defense (Clang CFI, Intel CET, ARM 
 
 ### 4. Shared-nothing isolation
 
-On a multi-core CLI-CPU (F4+), **there is no shared memory** between cores. Each core operates in its own private SRAM, and cores communicate **exclusively** through mailbox FIFOs.
+On a multi-core CFPU (F4+ in the CLI-CPU roadmap), **there is no shared memory** between cores. Each core operates in its own private SRAM, and cores communicate **exclusively** through mailbox FIFOs.
 
 **Consequence:**
 - **Cross-core side-channels** (such as Foreshadow, L1TF, Fallout) **are eliminated** — no shared cache, no shared TLB
@@ -106,18 +108,18 @@ The CODE region on the chip resides in a **separate address space** from the DAT
 
 **Consequence:**
 - **No shellcode injection** — bytes cannot be written to the CODE region
-- **No JIT spraying** — **because there is no JIT**. This is one of CLI-CPU's strongest security arguments: CIL runs natively, there is no JIT compiler that could be exploited (Firefox, Chrome, and Safari JITs are exploited annually).
+- **No JIT spraying** — **because there is no JIT**. This is one of the CFPU's strongest security arguments: CIL runs natively, there is no JIT compiler that could be exploited (Firefox, Chrome, and Safari JITs are exploited annually).
 - **No self-modifying code** — neither accidentally nor intentionally
 
 ### 6. Absence of speculative execution
 
-The CLI-CPU uses an in-order, non-speculative pipeline. **There is no branch prediction bypass, no out-of-order execution** (at least through F6).
+The CFPU uses an in-order, non-speculative pipeline. **There is no branch prediction bypass, no out-of-order execution** (at least through F6).
 
 **Consequence:** **Spectre v1, v2, v4, Meltdown, L1TF, MDS, Inception — the entire speculative attack family is eliminated.** This is significant because on modern CPUs, **new variants emerge every year**, and each fix incurs a 5-30% performance penalty.
 
 ## Attack immunity table
 
-| Attack class | CWE | Traditional CPU | CLI-CPU |
+| Attack class | CWE | Traditional CPU | CFPU |
 |-------------|-----|-----------------|---------|
 | Buffer overflow | CWE-119/120/121/122 | Vulnerable | **Eliminated** (hardware bounds check) |
 | Use-after-free | CWE-416 | Vulnerable | **Eliminated** (hardware GC) |
@@ -158,7 +160,7 @@ The CLI-CPU uses an in-order, non-speculative pipeline. **There is no branch pre
 
 > **Code loading details:** the AuthCode / BitIce / Neuron OS HSM Card rows are based on the [AuthCode + CodeLock](authcode-en.md) mechanism, which uses a hash-based PQC certificate chain (eFuse → CA → vendor → developer card → bytecode) plus runtime W⊕X separation to guarantee that only authenticated code runs on the chip, and data can never become code.
 
-**Given the above, it is clear why the CLI-CPU security profile is stronger than that of any existing commercial CPU.** We are not adding a few extra layers — the architecture fundamentally **does not permit** these attacks.
+**Given the above, it is clear why the CFPU security profile is stronger than that of any existing commercial CPU.** We are not adding a few extra layers — the architecture fundamentally **does not permit** these attacks.
 
 ## Formal verification
 
@@ -166,7 +168,7 @@ The CLI-CPU uses an in-order, non-speculative pipeline. **There is no branch pre
 
 Formal verification is the **mathematical proof** that a system conforms to its specification. It is not testing (which only checks a handful of cases), but rather a **proof covering every possible execution**.
 
-### Why it is feasible for CLI-CPU
+### Why it is feasible for the CFPU
 
 Formal verification is **practically impossible** for modern OoO x86/ARM cores because:
 - 15,000+ opcode variants (x86)
@@ -174,7 +176,7 @@ Formal verification is **practically impossible** for modern OoO x86/ARM cores b
 - Speculative execution
 - Variable cache states
 
-The **CLI-CPU Nano core**, by contrast:
+The **CFPU Nano core**, by contrast:
 - **48 opcodes**
 - **5-stage in-order pipeline** with simple state
 - **No speculation**
@@ -195,7 +197,7 @@ The **CLI-CPU Nano core**, by contrast:
 | **TLA+** | Specification + model checking | AWS, Azure critical systems |
 | **SMV / SPIN** | Model checking for hardware | CPU verification |
 
-### CLI-CPU formal verification plan
+### CFPU formal verification plan
 
 Verification is feasible at **three levels**:
 
@@ -205,7 +207,7 @@ Verification is feasible at **three levels**:
 
 3. **C# simulator level (starting in F1)** — the simulator verified through **unit tests and QuickCheck-style property-based** testing. **Not a formal proof**, but complementary assurance.
 
-**Timeline:**
+**Timeline (CLI-CPU project phases):**
 
 | Phase | Formal verification step |
 |-------|--------------------------|
@@ -219,14 +221,14 @@ Verification is feasible at **three levels**:
 
 ## Certification paths
 
-The CLI-CPU security profile is **potentially suitable** for the following industry standards, **provided** formal verification is complete and accompanied by the appropriate software processes (V-model, FMEDA, MTBF analysis).
+The CFPU security profile is **potentially suitable** for the following industry standards, **provided** formal verification is complete and accompanied by the appropriate software processes (V-model, FMEDA, MTBF analysis).
 
 ### IEC 61508 — Functional Safety
 
 **Purpose:** general industrial functional safety
 **Levels:** SIL-1 (lowest) ... SIL-4 (highest)
 **Requirements:**
-- Deterministic execution -- (CLI-CPU satisfies this)
+- Deterministic execution -- (the CFPU satisfies this)
 - Formal methods at higher SIL levels -- (targeted)
 - FMEDA (Failure Mode Effects and Diagnostic Analysis) — software-side work
 - MTBF calculation — from manufacturing data
@@ -260,13 +262,13 @@ The CLI-CPU security profile is **potentially suitable** for the following indus
 - Risk analysis
 - Source code audit
 - Software development process documented
-**Realistic target:** Class C is **achievable** for a CLI-CPU-based medical device, provided the software development process is at Microsoft/Amazon/Apple level.
+**Realistic target:** Class C is **achievable** for a CFPU-based medical device, provided the software development process is at Microsoft/Amazon/Apple level.
 
 ### Related standards
 
 - **Common Criteria (ISO/IEC 15408)** — information security certification, EAL-1 ... EAL-7
 - **FIPS 140-3** — cryptographic modules (U.S. government)
-- **CC EAL-5+** — Apple Secure Enclave level, **targeted** for CLI-CPU
+- **CC EAL-5+** — Apple Secure Enclave level, **targeted** for the CFPU
 
 ## Related projects — learning from and potential partners
 
@@ -275,7 +277,7 @@ The CLI-CPU security profile is **potentially suitable** for the following indus
 **Closest relative.** A University of Cambridge project that adds **capability-based security** at the hardware level. Memory "pointers" are encapsulated and cannot be incremented, decremented, or overwritten. The **Morello** prototype is ARM-based and already running.
 
 **Why it matters to us:**
-- The CLI-CPU philosophy runs **in parallel**, but reaches the same goal by a different path (type-safe CIL instead of capability pointers)
+- The CFPU philosophy runs **in parallel**, but reaches the same goal by a different path (type-safe CIL instead of capability pointers)
 - The Cambridge team is doing **formal verification** on CHERI
 - **Potential academic partner**
 
@@ -285,7 +287,7 @@ The world's first **formally verified** OS kernel (~10,000 lines of C, Coq + Isa
 
 **Why it matters to us:**
 - A precise precedent that **a simple system can be formally verified**
-- The Nano core ISA is **smaller** than seL4
+- The CFPU Nano core ISA is **smaller** than seL4
 - **Potential technical partner** for formal verification
 
 ### CompCert
@@ -293,7 +295,7 @@ The world's first **formally verified** OS kernel (~10,000 lines of C, Coq + Isa
 A formally verified C compiler (in Coq). If software is compiled with CompCert, it is **mathematically certain** that the machine code matches the C source.
 
 **Why it matters to us:**
-- An analogous goal: a formally verified **CIL to CLI-CPU binary** compiler
+- An analogous goal: a formally verified **CIL to CLI-CPU binary** compiler (the linker output)
 - The current `cli-cpu-link` tool's **long-term goal** is a CompCert-style verified version
 
 ### Project Everest (Microsoft Research)
@@ -307,9 +309,9 @@ A formally verified **HTTPS/TLS stack** in F\*. Provably correct cryptography, p
 
 ## Responsibility model
 
-The CLI-CPU does **not** provide an absolute security guarantee. The model is best understood as three clearly separated layers:
+The CFPU does **not** provide an absolute security guarantee. The model is best understood as three clearly separated layers:
 
-### Hardware layer (what CLI-CPU guarantees)
+### Hardware layer (what the CFPU guarantees)
 
 - Every CIL opcode behaves according to specification
 - Memory safety enforced in hardware
@@ -334,14 +336,14 @@ The CLI-CPU does **not** provide an absolute security guarantee. The model is be
 - Data and authentication management
 - Secure communication
 
-**CLI-CPU guarantees the first layer absolutely.** The second layer is **our design responsibility**, but only becomes a real product after F6-F7. The third layer **always** remains the user's responsibility.
+**The CFPU guarantees the first layer absolutely.** The second layer is **our design responsibility**, but only becomes a real product after F6-F7. The third layer **always** remains the user's responsibility.
 
 ## What this means for the project's practical goals
 
 The security dimension **opens new markets** that are valid in parallel with the existing Cognitive Fabric narrative:
 
-| Market segment | Market size (global, 2030 estimate) | CLI-CPU applicability |
-|----------------|--------------------------------------|------------------------|
+| Market segment | Market size (global, 2030 estimate) | CFPU applicability |
+|----------------|--------------------------------------|--------------------|
 | **AI safety / watchdog** | ~$5-15B | **High** — small formally verified chip alongside critical AI |
 | **Critical infrastructure** | ~$50-100B | **High** — SIL-3/4 certification |
 | **Automotive (ISO 26262)** | ~$60B | **Medium-high** — ASIL-B/C/D |
@@ -390,3 +392,4 @@ In light of the above, the CLI-CPU project should be communicated with **two par
 | Version | Date | Summary |
 |---------|------|---------|
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |
+| 1.1 | 2026-04-25 | Renamed CLI-CPU → CFPU at the architecture/silicon level per [brand-en.md](brand-en.md); CLI-CPU retained for project-level references (roadmap phases, simulator, linker output, project communication). |

@@ -2,19 +2,19 @@
 
 > Magyar verzió: [architecture-hu.md](architecture-hu.md)
 
-> Version: 1.3
+> Version: 1.4
 
 This document describes the **Cognitive Fabric Processing Unit (CFPU)** **microarchitecture** at a high level: the stack machine model, the pipeline, the memory map, the decoding strategy, hardware support for GC and exception handling, and the techniques adopted from predecessor projects (picoJava, Jazelle, Transmeta).
 
-> *CFPU is the official category name of the processing unit (alongside CPU/GPU/TPU/NPU). The open-source reference implementation is the **CLI-CPU** project — the simulator, the linker, the ISA spec (CIL-T0), and all build artefacts carry the "CLI-CPU" name. See [FAQ #1](faq-en.md#1-what-is-the-cfpu-and-how-does-it-relate-to-cli-cpu) for details.*
+> *Throughout this document, "**CFPU**" refers to the chip-level architecture (microarchitecture, pipeline, memory map, security primitives, core types) — the *category*, sibling of CPU/GPU/TPU/NPU. "**CLI-CPU**" refers to the open-source *project* that implements it (roadmap phases F0–F7, simulator, linker, ISA spec, GitHub repo). When a sentence describes the silicon, prefer CFPU; when it describes a phase, build artefact, or test target, prefer CLI-CPU. See [brand-en.md](brand-en.md) for the full nomenclature; the short version is in [FAQ #1](faq-en.md#1-what-is-the-cfpu-and-how-does-it-relate-to-cli-cpu).*
 
 > **Note:** This architecture is built incrementally across phases F0–F7. The full feature set described here will be completed in the **F6-Silicon "Cognitive Fabric One"** chip (ChipIgnite or IHP MPW, 6R+16N+1S, 15 mm²). **Tiny Tapeout (F3)** implements only the single-core CIL-T0 subset, described in a separate document (`ISA-CIL-T0.md`). The "Cognitive Fabric One" section records the concrete reference chip vision and comparison with conventional multi-core CPUs.
 
 ## Strategic positioning: Cognitive Fabric
 
-The CLI-CPU **does not position itself as a classical bytecode CPU**, like Sun picoJava or ARM Jazelle once did. That path **has already been tried and failed**: software JIT + conventional CPU turned out to be cheaper and faster than dedicated bytecode hardware. Repeating that same path **would not make sense**.
+The CFPU **does not position itself as a classical bytecode CPU**, like Sun picoJava or ARM Jazelle once did. That path **has already been tried and failed**: software JIT + conventional CPU turned out to be cheaper and faster than dedicated bytecode hardware. Repeating that same path **would not make sense**.
 
-Instead, the CLI-CPU is a **programmable cognitive substrate** — many small, independent CIL-native cores that form a heterogeneous, event-driven network through **message-based communication**. Each core runs a **complete CIL program** with its own local state; cores communicate through **mailbox FIFOs**, with no shared memory, no cache coherence protocol, and no lock contention. Usage depends on the program: a chip can be an **Akka.NET actor cluster**, a **programmable spiking neural network**, a **multi-agent simulation**, or an **event-driven IoT edge**.
+Instead, the CFPU is a **programmable cognitive substrate** — many small, independent CIL-native cores that form a heterogeneous, event-driven network through **message-based communication**. Each core runs a **complete CIL program** with its own local state; cores communicate through **mailbox FIFOs**, with no shared memory, no cache coherence protocol, and no lock contention. Usage depends on the program: a chip can be an **Akka.NET actor cluster**, a **programmable spiking neural network**, a **multi-agent simulation**, or an **event-driven IoT edge**.
 
 ### Why this is different from existing solutions
 
@@ -27,15 +27,15 @@ Instead, the CLI-CPU is a **programmable cognitive substrate** — many small, i
 | SpiNNaker 2 (Manchester) | Yes — C/C++ ARM | Yes | Partial | No | No (polling) | No (ARM ISA) |
 | Akka.NET / Orleans | Yes — full C#/F# | No — software | Yes | Yes | No (OS scheduler) | No (host CPU ISA) |
 | Erlang BEAM | Yes — Erlang | No — software | Yes | No | No (BEAM scheduler) | No (host CPU ISA) |
-| **CLI-CPU (Cognitive Fabric)** | **Yes — full CIL** | **Yes** | **Yes** | **Yes** | **Yes** (hw mailbox wake) | **Yes** (CIL stack machine) |
+| **CFPU (Cognitive Fabric)** | **Yes — full CIL** | **Yes** | **Yes** | **Yes** | **Yes** (hw mailbox wake) | **Yes** (CIL stack machine) |
 
 The **neuromorphic competitors** (Loihi, TrueNorth, Akida, GrAI) all use **fixed neuron models** — you cannot run arbitrary algorithms on them, only configure weights and topology. **SpiNNaker** is the only one offering programmable nodes, but on **C/C++ ARM cores**, with significant engineering effort in an academic setting. **Software actor systems** (Akka.NET, Erlang) are flexible, but compete with scheduler, GC, and lock overhead on the host CPU.
 
-**The CLI-CPU occupies the only position** where **all six columns** are satisfied: programmable nodes + hardware + open + .NET native + event-driven + stack-compact ISA. This is not just "yet another bytecode CPU" — it is **a new category**.
+**The CFPU occupies the only position** where **all six columns** are satisfied: programmable nodes + hardware + open + .NET native + event-driven + stack-compact ISA. This is not just "yet another bytecode CPU" — it is **a new category**.
 
 ### Neuromorphic-inspired, but not neuromorphic
 
-The CLI-CPU **adopts** the most valuable principles of neuromorphic architectures:
+The CFPU **adopts** the most valuable principles of neuromorphic architectures:
 
 - **Many small independent units** with their own local state
 - **Message-based communication** (not shared memory)
@@ -67,9 +67,9 @@ This means that the **same hardware chip**, depending on the chosen program, can
 
 ### Multi-language platform — the entire .NET ecosystem in hardware
 
-The CLI-CPU **does not run C# — it runs CIL**. The ECMA-335 Common Intermediate Language is the target format that **every .NET language** compiles to. This means the CLI-CPU natively executes:
+The CFPU **does not run C# — it runs CIL**. The ECMA-335 Common Intermediate Language is the target format that **every .NET language** compiles to. This means the CFPU natively executes:
 
-| Language | Paradigm | CLI-CPU fit |
+| Language | Paradigm | CFPU fit |
 |----------|----------|------------|
 | **C#** | OOP + functional | Akka.NET, largest community (~6M developers) |
 | **F#** | Functional-first | **Natural fit** — immutable by default, pattern matching, algebraic types, actor-friendly |
@@ -77,7 +77,7 @@ The CLI-CPU **does not run C# — it runs CIL**. The ECMA-335 Common Intermediat
 | **IronPython** | Dynamic | Rapid prototyping, scripting on-chip |
 | **PowerShell** | Shell/scripting | Device management, configuration |
 
-**That is ~8 million developers' existing codebases** that can run natively on the CLI-CPU — without compilation, interpreter, or runtime overhead.
+**That is ~8 million developers' existing codebases** that can run natively on the CFPU — without compilation, interpreter, or runtime overhead.
 
 #### Why this is different from Jazelle
 
@@ -86,12 +86,12 @@ ARM Jazelle (2001) and Sun picoJava (1997) **failed** because:
 2. **Single-core** — on a shared-memory CPU, software JIT became faster
 3. **Not actor-native** — no hardware messaging, no mailbox
 
-The CLI-CPU is fundamentally different:
+The CFPU is fundamentally different:
 1. **Multi-language** — every .NET language compiles to CIL, the hardware executes CIL
 2. **Multi-core, shared-nothing** — software JIT cannot run in parallel across 18 cores without cache coherency
 3. **Actor-native** — the mailbox is in hardware, context switch takes 5-8 cycles (not 500-2000)
 
-#### F# — the "perfect CLI-CPU language"
+#### F# — the "perfect CFPU language"
 
 F# is a particularly strong fit because the language paradigm is **identical** to the Cognitive Fabric architecture:
 
@@ -103,7 +103,7 @@ F# is a particularly strong fit because the language paradigm is **identical** t
 - **No null** — fewer TTrapReason traps, safer code
 
 ```fsharp
-// F# actor on a CLI-CPU Nano core
+// F# actor on a CFPU Nano core
 [<RunsOn(CoreType.Nano)>]
 let ledController = actor {
     let! msg = receive ()
@@ -113,7 +113,7 @@ let ledController = actor {
     | GetState            -> reply (currentState ())
 }
 
-// F# actor on a CLI-CPU Rich core
+// F# actor on a CFPU Rich core
 [<RunsOn(CoreType.Rich)>]
 let navSupervisor = actor {
     let! msg = receive ()
@@ -127,11 +127,11 @@ let navSupervisor = actor {
 }
 ```
 
-#### Comparison: RISC-V vs CLI-CPU on .NET workloads
+#### Comparison: RISC-V vs CFPU on .NET workloads
 
 On the same ~10 mm² Sky130 silicon:
 
-| Metric | CLI-CPU (10R+8N) | RISC-V 4-core + CIL interpreter | RISC-V 4-core + AOT |
+| Metric | CFPU (10R+8N) | RISC-V 4-core + CIL interpreter | RISC-V 4-core + AOT |
 |--------|------------------|--------------------------------|---------------------|
 | **CIL execution** | Native (1x) | 10-50x slower (sw interpret) | ~1x but 10-50x larger binary |
 | **Core count** (same die) | **18** | 4 | 4 |
@@ -142,9 +142,9 @@ On the same ~10 mm² Sky130 silicon:
 | **GC** | Per-core, small heap | Global stop-the-world | Global stop-the-world |
 | **.NET language compatibility** | **All** (C#, F#, VB.NET, ...) | Interpreter: limited | AOT: most, but large binary |
 
-RISC-V has **two bad options** for .NET code: interpreter (10-50x slower) or AOT (10-50x larger binary, I-cache pressure). The CLI-CPU **natively executes CIL** in compact form, with hardware actor support.
+RISC-V has **two bad options** for .NET code: interpreter (10-50x slower) or AOT (10-50x larger binary, I-cache pressure). The CFPU **natively executes CIL** in compact form, with hardware actor support.
 
-**The narrative:** The CLI-CPU is **not "yet another CPU"** — it is **the first hardware platform that provides native silicon for an 8-million developer ecosystem**. Every C#, F#, VB.NET code that compiles to CIL runs natively on the Cognitive Fabric — without rewriting, interpreter, or JIT.
+**The narrative:** The CFPU is **not "yet another CPU"** — it is **the first hardware platform that provides native silicon for an 8-million developer ecosystem**. Every C#, F#, VB.NET code that compiles to CIL runs natively on the Cognitive Fabric — without rewriting, interpreter, or JIT.
 
 ## Design principles
 
@@ -159,11 +159,11 @@ RISC-V has **two bad options** for .NET code: interpreter (10-50x slower) or AOT
 
 ## Multi-core block diagram (F4+ cognitive fabric)
 
-In phase F4, the CLI-CPU becomes a **real network** for the first time. The 4 cores independently run their own CIL programs, each with its own local SRAM, and communicate exclusively through the mailbox interfaces. There is no shared heap, no cache coherence:
+In phase F4 of the CLI-CPU project, the CFPU becomes a **real network** for the first time. The 4 cores independently run their own CIL programs, each with its own local SRAM, and communicate exclusively through the mailbox interfaces. There is no shared heap, no cache coherence:
 
 ```
   ┌──────────────────────────────────────────────────────────────────────────┐
-  │                    CLI-CPU Cognitive Fabric (F4)                         │
+  │                    CFPU Cognitive Fabric (F4)                            │
   │                                                                          │
   │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
   │  │  Core 0      │  │  Core 1      │  │  Core 2      │  │  Core 3      │  │
@@ -208,11 +208,11 @@ The F4 4-core design **scales linearly** up to 16 cores without bus congestion �
 
 ## Heterogeneous multi-core: Nano + Rich
 
-From phase F5, the CLI-CPU transitions to a **heterogeneous multi-core** architecture, unifying three proven industry concepts in a single chip:
+From phase F5 of the CLI-CPU project, the CFPU transitions to a **heterogeneous multi-core** architecture, unifying three proven industry concepts in a single chip:
 
-- **ARM big.LITTLE (2011):** Two types of CPU cores on one chip — "big" (fast, power-hungry) and "LITTLE" (slow, efficient). The phone runs light tasks on LITTLE, heavy tasks on big. **In CLI-CPU: Rich = big, Nano = LITTLE.**
-- **Apple Secure Enclave (2013):** A separate, isolated chip-within-a-chip in the iPhone, whose sole purpose is security operations (Face ID, fingerprint, payments). Even if the phone is compromised, keys stored in the Secure Enclave remain safe. **In CLI-CPU: Secure Core = Secure Enclave.**
-- **Intel Alder Lake (2021):** P-core (Performance) + E-core (Efficiency) heterogeneous mix, with the OS scheduler assigning tasks. **In CLI-CPU: the Neuron OS supervisor distributes tasks between Rich and Nano cores.**
+- **ARM big.LITTLE (2011):** Two types of CPU cores on one chip — "big" (fast, power-hungry) and "LITTLE" (slow, efficient). The phone runs light tasks on LITTLE, heavy tasks on big. **In the CFPU: Rich = big, Nano = LITTLE.**
+- **Apple Secure Enclave (2013):** A separate, isolated chip-within-a-chip in the iPhone, whose sole purpose is security operations (Face ID, fingerprint, payments). Even if the phone is compromised, keys stored in the Secure Enclave remain safe. **In the CFPU: Secure Core = Secure Enclave.**
+- **Intel Alder Lake (2021):** P-core (Performance) + E-core (Efficiency) heterogeneous mix, with the OS scheduler assigning tasks. **In the CFPU: the Neuron OS supervisor distributes tasks between Rich and Nano cores.**
 
 A single chip contains **three element types** — two computational, one security:
 
@@ -330,7 +330,7 @@ The Nano core's steps:
 
 ### Secure Core — dedicated code verification trust anchor
 
-Alongside Nano and Rich, the CLI-CPU includes a **third, infrastructure-level core type**: the **Secure Core**. This is **not a compute core** (no user code runs on it) — it is the system's **trust anchor**, through which all code must pass before loading.
+Alongside Nano and Rich, the CFPU includes a **third, infrastructure-level core type**: the **Secure Core**. This is **not a compute core** (no user code runs on it) — it is the system's **trust anchor**, through which all code must pass before loading.
 
 **Responsibilities:**
 1. **SHA-256 hash** computation on the code to be loaded
@@ -387,7 +387,7 @@ Alongside Nano and Rich, the CLI-CPU includes a **third, infrastructure-level co
 
 ### Why not introduce additional core types?
 
-A core type is defined by its **ISA** (which opcodes it can execute), not by cache or SRAM size — that is just configuration. In theory, there could be a "Micro" (even smaller ISA, only 16 opcodes), but this **complicates the programming model**: developers would need to target three different opcode sets. Commercial examples (Apple, ARM, Intel) **all** use exactly 2 compute core types, and this is the sweet spot. The CLI-CPU also **stays at 2 compute cores** (Nano and Rich), complemented by the Secure Core infrastructure element.
+A core type is defined by its **ISA** (which opcodes it can execute), not by cache or SRAM size — that is just configuration. In theory, there could be a "Micro" (even smaller ISA, only 16 opcodes), but this **complicates the programming model**: developers would need to target three different opcode sets. Commercial examples (Apple, ARM, Intel) **all** use exactly 2 compute core types, and this is the sweet spot. The CFPU also **stays at 2 compute cores** (Nano and Rich), complemented by the Secure Core infrastructure element.
 
 ## Cognitive Fabric One — the reference silicon target (F6-Silicon)
 
@@ -407,14 +407,14 @@ The chip is built on the eFabless **ChipIgnite OpenFrame** harness (~$14,950), w
 We choose OpenFrame because:
 - **15 mm²** area fits the 6R+16N+1S configuration **comfortably** (~9.73 mm²), with ~5 mm² remaining for extra SRAM or future expansion
 - **44 GPIO** — 6 more pins than Caravel's 38, giving more comfortable pin allocation
-- **No unnecessary RISC-V management core** — CLI-CPU has its own Rich cores, no external CPU needed
+- **No unnecessary RISC-V management core** — the CFPU has its own Rich cores, no external CPU needed
 - Same price ($14,950), more area and flexibility
 
 ### Chip specification
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│             CLI-CPU "Cognitive Fabric One"                   │
+│              CFPU "Cognitive Fabric One"                     │
 │                    15 mm² Sky130 (OpenFrame)                 │
 │                                                              │
 │ ┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐┌────────┐ │
@@ -597,9 +597,9 @@ The same 10 mm² Sky130 area. RISC-V **requires cache coherency** when using sha
 
 (One RV32IMC core ~0.15 mm² logic + 4KB L1 I-cache + 4KB L1 D-cache = ~0.45 mm²/core. Cache coherency grows superlinearly with core count.)
 
-**Comparison with CLI-CPU Cognitive Fabric One:**
+**Comparison with the CFPU Cognitive Fabric One:**
 
-| | **CLI-CPU 6R+16N+1S** | **RISC-V 4 core** | **RISC-V 8 core** |
+| | **CFPU 6R+16N+1S** | **RISC-V 4 core** | **RISC-V 8 core** |
 |--|----------------------|------------------|------------------|
 | **Cores** | **23** (6 Rich + 16 Nano + 1 Secure) | **4** | **8** |
 | **On-chip RAM** | **160 KB** (private, no coherence) | **~214 KB** (L1+L2+extra) | **~152 KB** (L1+L2+extra) |
@@ -609,11 +609,11 @@ The same 10 mm² Sky130 area. RISC-V **requires cache coherency** when using sha
 | **Parallel actors** | **23** (hw mailbox) | 4 (sw queue + lock) | 8 (sw queue + lock) |
 | **Context switch** | **5-8 cycles** | 500-2000 cycles | 500-2000 cycles |
 
-**The key number:** RISC-V **spends 10-20% of the chip area on cache coherency**. On CLI-CPU, all that area **goes to extra cores**, because the shared-nothing architecture means the coherence problem **does not exist**. This is why 23 cores fit on 15 mm², while RISC-V stops at 4-8 on 10 mm². RAM quantities are similar (~150 KB), but CLI-CPU's is **private** (no coherency traffic), while RISC-V's is **shared** (coherency slows it down).
+**The key number:** RISC-V **spends 10-20% of the chip area on cache coherency**. On the CFPU, all that area **goes to extra cores**, because the shared-nothing architecture means the coherence problem **does not exist**. This is why 23 cores fit on 15 mm², while RISC-V stops at 4-8 on 10 mm². RAM quantities are similar (~150 KB), but the CFPU's is **private** (no coherency traffic), while RISC-V's is **shared** (coherency slows it down).
 
 ### Performance comparison on actor-based workloads
 
-| Metric | CLI-CPU (6R+16N @50MHz) | RISC-V 4-core (@50MHz, same die) | CLI-CPU advantage |
+| Metric | CFPU (6R+16N @50MHz) | RISC-V 4-core (@50MHz, same die) | CFPU advantage |
 |--------|------------------------|----------------------------------|-------------------|
 | **Actor msg/sec** | ~44M (22 cores × ~2M/core, hardware mailbox) | ~2M (software queue + lock + context switch) | **~22×** |
 | **Message latency** | ~10-20 cycles (hardware FIFO) | ~500-2000 cycles (lock acquire + context switch) | **~50-100×** |
@@ -624,7 +624,7 @@ The same 10 mm² Sky130 area. RISC-V **requires cache coherency** when using sha
 | **Determinism** | Guaranteed (no OoO, no preemption) | Not guaranteed (cache timing, preemption) | **Absolute** |
 | **Isolation** | Hardware (private SRAM, Secure Core) | Software (MMU, but Spectre/Meltdown) | **Stronger** |
 
-**Important:** in single-core IPC, RISC-V (especially OoO variants) is faster. The CLI-CPU **does not win in the single-core race**, but rather in the fact that **on the same silicon it performs far more useful parallel work** on actor-based workloads, while remaining deterministic and secure.
+**Important:** in single-core IPC, RISC-V (especially OoO variants) is faster. The CFPU **does not win in the single-core race**, but rather in the fact that **on the same silicon it performs far more useful parallel work** on actor-based workloads, while remaining deterministic and secure.
 
 ### Neuron OS layers on-chip
 
@@ -655,11 +655,11 @@ The chip's purpose is not "yet another CPU" but rather **proof of a new category
 
 > *"The Cognitive Fabric One is the world's first open-source, heterogeneous, actor-native processor. With its 23 cores (6 Rich + 16 Nano + 1 Secure), without cache coherency, on 15 mm² Sky130 silicon it handles 22x more actor messages per second than a conventional 4-core RISC-V — while remaining deterministic, hardware-isolated, and linearly scalable. This is not a faster CPU — this is a new paradigm."*
 
-## Block diagram (single-core CLI-CPU, F6 single-core target)
+## Block diagram (single-core CFPU, F6 single-core target)
 
 ```
                          ┌─────────────────────────────────────────┐
-                         │               CLI-CPU                   │
+                         │               CFPU                      │
                          │                                         │
   ┌──────────────┐       │  ┌────────────────────────────────────┐ │
   │ QSPI Flash   │◄──────┼─►│         I$  (CIL bytecode cache)   │ │
@@ -749,7 +749,7 @@ The chip's purpose is not "yet another CPU" but rather **proof of a new category
 
 ## Pipeline
 
-The CLI-CPU uses a **classic 5-stage in-order pipeline**, adapted for stack machine semantics:
+The CFPU uses a **classic 5-stage in-order pipeline**, adapted for stack machine semantics:
 
 ```
  IF  → FETCH:     Bytes from prefetch buffer, I$ with QSPI backing
@@ -770,7 +770,7 @@ The **uop cache**, however, significantly reduces decoding overhead on hot loops
 
 A stack machine pipeline has a unique hazard profile compared to a register machine. On a RISC CPU, data hazards arise only when two instructions reference the **same register** — a situation the compiler can often avoid by choosing different registers. On a stack machine, **every instruction** reads from and writes to the top of the stack, so RAW (Read After Write) hazards are the default, not the exception.
 
-The CLI-CPU addresses this with three mechanisms:
+The CFPU addresses this with three mechanisms:
 
 #### 1. TOS cache as register file
 
@@ -840,7 +840,7 @@ The CFPU trades single-core IPC heroics for **area-efficient many-core scaling**
 
 ### Address space
 
-The CLI-CPU uses a 32-bit virtual address space, logically divided into four regions:
+The CFPU uses a 32-bit virtual address space, logically divided into four regions:
 
 | Region | Address range | Contents | Backing |
 |--------|--------------|----------|---------|
@@ -855,7 +855,7 @@ The HEAP region has an associated **card table**: for every 512 bytes of heap da
 
 ### Stack structure
 
-The stack on the CLI-CPU is **three-tiered**:
+The stack on the CFPU is **three-tiered**:
 
 1. **Top-of-Stack Cache (TOS cache)** — 8 x 32-bit registers on-chip. The top 8 stack elements live here. Every ALU operation works on these, **without touching RAM**.
 2. **L1 D-cache** — 4 KB on-chip SRAM, spilled stack frames, local variables, heap hot lines.
@@ -865,13 +865,13 @@ Spilling to and from the TOS cache is handled automatically by hardware. To the 
 
 ### Frame layout
 
-On the CLI-CPU, CIL **is the machine code** — there is no JIT, no interpreter, no intermediate compilation. What Roslyn generates (method header + opcodes) is **directly executed by the hardware**. Therefore, the frame structure is not freely determined by the hardware designer, but **fixed by the Roslyn output**:
+On the CFPU, CIL **is the machine code** — there is no JIT, no interpreter, no intermediate compilation. What Roslyn generates (method header + opcodes) is **directly executed by the hardware**. Therefore, the frame structure is not freely determined by the hardware designer, but **fixed by the Roslyn output**:
 
 - The **method header** (`arg_count`, `local_count`, `max_stack`) determines the frame size
 - The **opcodes** (`ldarg.N`, `ldloc.N`, `stloc.N`) index the slots
 - The hardware's job: **compute the physical SRAM addresses** from the header
 
-This differs from conventional .NET, where the JIT can freely decide (put a local in a register, rearrange the frame, inline). On the CLI-CPU, there is no such freedom.
+This differs from conventional .NET, where the JIT can freely decide (put a local in a register, rearrange the frame, inline). On the CFPU, there is no such freedom.
 
 ### Hardware frame layout
 
@@ -1046,7 +1046,7 @@ The microcoded group:
 
 ## uops
 
-The CLI-CPU's internal micro-instruction format (to be finalized in F2, preliminary draft):
+The CFPU's internal micro-instruction format (to be finalized in F2, preliminary draft):
 
 ```
  Field    | Size  | Description
@@ -1116,7 +1116,7 @@ In the F4+ microarchitecture, the write barrier card table updates accumulate in
 
 ## Metadata Walker
 
-CIL metadata tokens (e.g., `MethodDef 0x06000042`) point into PE/COFF metadata tables. On the CLI-CPU, resolving these is the job of the **Metadata Walker coprocessor** (from F4):
+CIL metadata tokens (e.g., `MethodDef 0x06000042`) point into PE/COFF metadata tables. On the CFPU, resolving these is the job of the **Metadata Walker coprocessor** (from F4):
 
 1. The CIL opcode pushes the token into a small FIFO
 2. The Walker begins traversing PE/COFF tables (Method table, Type table, Field table, etc.)
@@ -1127,7 +1127,7 @@ CIL metadata tokens (e.g., `MethodDef 0x06000042`) point into PE/COFF metadata t
 
 ## Prior art and adopted techniques
 
-The CLI-CPU is not the first bytecode-native CPU, and it is worth learning from each predecessor.
+The CFPU is not the first bytecode-native CPU, and it is worth learning from each predecessor.
 
 ### Sun picoJava (1997, 1999)
 
@@ -1170,7 +1170,7 @@ The CLI-CPU is not the first bytecode-native CPU, and it is worth learning from 
 
 ### RISC-V
 
-**Not a predecessor**, but a reference architecture. RISC-V is a purely register-based RISC, the exact **opposite** of the stack machine CLI-CPU. However:
+**Not a predecessor**, but a reference architecture. RISC-V is a purely register-based RISC, the exact **opposite** of the stack machine CFPU. However:
 
 - **OpenLane2 / Sky130 / Caravel tooling** — we learn this from the RISC-V community
 - **Open source spirit** — all RTL, documentation, tests will be public
@@ -1178,7 +1178,7 @@ The CLI-CPU is not the first bytecode-native CPU, and it is worth learning from 
 
 ## Power management
 
-The CLI-CPU is divided into **four power domains** (F6 target):
+The CFPU is divided into **four power domains** (F6 target):
 
 1. **Core domain** — fetch, decode, execute, stack cache. Always active while the CPU is working.
 2. **FPU domain** — only powered on when an FP opcode is detected. Cold during integer loops.
@@ -1339,9 +1339,9 @@ Actor ID:   payload first 1–2 bytes (software dispatch on the destination core
 
 ## Silicon-grade security
 
-This section discusses the CLI-CPU's security architecture **from an architectural perspective**. The full security model, threat model, attack immunity table, formal verification plan, and certification paths are in a separate document: see [`docs/security-en.md`](security-en.md).
+This section discusses the CFPU's security architecture **from an architectural perspective**. The full security model, threat model, attack immunity table, formal verification plan, and certification paths are in a separate document: see [`docs/security-en.md`](security-en.md).
 
-### The CLI-CPU security principle
+### The CFPU security principle
 
 > **Memory safety, type safety, and control flow integrity are not software abstractions but physical properties in silicon.**
 
@@ -1370,9 +1370,9 @@ This statement is not marketing but an **architectural design consequence**. The
 | Type check (isinst/castclass) | `isinst`, `castclass` | `INVALID_CAST` | F5 |
 | GC write barrier | Reference-type `stfld`/`stelem.ref` | — (side-effect) | F5 |
 
-**Important note:** on the F3 Tiny Tapeout chip, **most of the basic security checks are already live in silicon**. This means the CLI-CPU's first real silicon **already has security properties that no standard CPU possesses**.
+**Important note:** on the F3 Tiny Tapeout chip, **most of the basic security checks are already live in silicon**. This means the CLI-CPU project's first real silicon **already has security properties that no standard CPU possesses**.
 
-### Attack classes the CLI-CPU is immune to
+### Attack classes the CFPU is immune to
 
 Brief summary (the detailed table is in [`docs/security-en.md`](security-en.md)):
 
@@ -1393,9 +1393,9 @@ Brief summary (the detailed table is in [`docs/security-en.md`](security-en.md))
 
 ### Formal verification feasibility
 
-The CLI-CPU **Nano core's** 48-opcode ISA is **practically smaller than the seL4 microkernel** (~10,000 lines of C), which the UNSW team **formally proved** using Coq + Isabelle tools over 15+ years of work.
+The CFPU **Nano core's** 48-opcode ISA is **practically smaller than the seL4 microkernel** (~10,000 lines of C), which the UNSW team **formally proved** using Coq + Isabelle tools over 15+ years of work.
 
-This means that **formal verification of the CLI-CPU is feasible** — not simple, not cheap, but **not impossible either**, and **not achievable for x86, ARM, or RISC-V with their full extension sets**.
+This means that **formal verification of the CFPU is feasible** — not simple, not cheap, but **not impossible either**, and **not achievable for x86, ARM, or RISC-V with their full extension sets**.
 
 For formal verification details, see the **"Formal verification"** section of [`docs/security-en.md`](security-en.md).
 
@@ -1408,7 +1408,7 @@ For formal verification details, see the **"Formal verification"** section of [`
 
 ## Dual-track positioning
 
-The CLI-CPU's security profile opens a **second market track** alongside the **Cognitive Fabric** (programmable cognitive substrate) narrative:
+The CFPU's security profile opens a **second market track** alongside the **Cognitive Fabric** (programmable cognitive substrate) narrative:
 
 - **Track 1 — "Cognitive Fabric"** — for AI researchers, actor systems, neural network simulation, multi-agent systems. Long-term vision.
 - **Track 2 — "Trustworthy Silicon"** — for regulated industries: automotive (ISO 26262), aviation (DO-178C), medical (IEC 62304), critical infrastructure (IEC 61508 SIL-3/4), AI safety watchdog chips, confidential computing. Short-to-medium-term revenue opportunity with high margins.
@@ -1425,6 +1425,7 @@ The `ISA-CIL-T0.md` document provides the complete opcode specification for the 
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.4 | 2026-04-25 | Strategic-positioning, microarchitecture, Cognitive Fabric One comparison, block diagram, pipeline, address-space, frame layout, dispatch, metadata walker, related projects, power domains, and security sections renamed CLI-CPU → CFPU per [brand-en.md](brand-en.md). CLI-CPU is retained for project-level references (roadmap phases F4/F5, Roslyn toolchain, "first real silicon" milestone, callout). |
 | 1.3 | 2026-04-19 | Actor Scheduling Pipeline section — hot context, DMA double-buffer, message-triggered prefetch, QRAM External Extension (AES+CMAC for off-chip PSRAM), code sharing, software actor dispatch, timing budget |
 | 1.2 | 2026-04-19 | Pipeline hazard management section — TOS cache bypass, forwarding, microcode vs. picoJava stack folding, stall catalogue, determinism guarantee |
 | 1.1 | 2026-04-16 | Core types, interconnect, Cognitive Fabric One |
