@@ -2,7 +2,9 @@
 
 > English version: [core-types-en.md](core-types-en.md)
 
-> Version: 2.2
+> Version: 2.3
+
+> **⚠️ Vízió-szintű dokumentum.** Az itt szereplő terület-, core-szám- és SRAM-becslések irodalmi adatokból (TSMC 5nm SRAM macro datasheet, ISSCC referenciák) extrapolált munkahipotézisek az F1.5 fázisban. A pontos értékek csak F4 RTL és F6 szilícium (Cognitive Fabric One MPW) után validálhatók — addig minden szám munkabecslés, ami a roadmap minden fázisában felülvizsgálandó. Az itt rögzített mikroarchitektúrális filozófia (in-order, statikus ILP, no OoO) viszont **architekturális elv**, ami a [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) dokumentumban kerül részletes indoklásra.
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **négy core típusát** specifikálja: az ISA különbségeket, a terület-hatást, az SRAM méretezést, a power domain-eket, a termékcsalád variánsokat és a piaci pozíciót. Az ML inference-re optimalizált MAC Slice (nem programozható compute egység) specifikációja a [CFPU-ML-Max](cfpu-ml-max-hu.md) dokumentumban található.
 
@@ -123,6 +125,23 @@ A CFPU-ML a legérdekesebb variáns ML/SNN szempontból:
 
 A CFPU-ML chip nem programozható core-okból, hanem **MAC Slice**-okból (FSM-vezérelt compute egységek) + Actor Core-okból + Seal Core-ból áll. Részletes specifikáció: **[CFPU-ML-Max](cfpu-ml-max-hu.md)**.
 
+## Mikroarchitektúra alapelvek (mind a négy core-ra)
+
+A négy core típus **közös architekturális alapokon** áll, csak az ISA gazdagságában és a terület-büdzsében különböznek:
+
+| Alapelv | Indok | Részletes hivatkozás |
+|---------|-------|----------------------|
+| **In-order pipeline** minden core-ban | Determinisztikus végrehajtás, auditálhatóság, side-channel mentes | [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) |
+| **Nincs Out-of-Order Execution** | Spectre/Meltdown osztályú támadások kizárva, sok-magos modell amúgy sem igényli | [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) |
+| **Nincs spekulatív végrehajtás** | Side-channel mentes; statikus branch hint elég | [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) |
+| **TLP > ILP** — magszám a single-thread sebesség előtt | Modern OS-ek 4 300+ szál; sok mag = 1:1 thread-mapping, nincs context switch overhead | [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) |
+| **Statikus ILP a Linker-ben** (macro-op fusion + pair-bit, EPIC-stílus) | A HW egyszerű marad, a fordító okosabb | [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) |
+| **TOS register stack** (16–32 reg flat frame) | Port-bottleneck eliminálása, multi-issue kompatibilis | [`internal-bus-hu.md`](internal-bus-hu.md) |
+| **Wide internal bus** (256/512/1024 bit core típustól függően) | Context move 1–4 cycle, warm-context cache életképes | [`internal-bus-hu.md`](internal-bus-hu.md) |
+| **Warm-context cache** mailbox-vezérelt aktor-váltáshoz | 0–4 cycle aktorváltás, scheduler szerepe minimális | [`internal-bus-hu.md`](internal-bus-hu.md) |
+
+A single-thread teljesítmény-becslés és összehasonlítási módszertan: [`perf-vs-riscv-hu.md`](perf-vs-riscv-hu.md).
+
 ## Tervezési megkülönböztetők
 
 | Tulajdonság | Leírás |
@@ -132,9 +151,14 @@ A CFPU-ML chip nem programozható core-okból, hanem **MAC Slice**-okból (FSM-v
 | Nyílt forráskód | Teljes ISA, RTL (tervezett), toolchain és OS — auditálható, fork-olható |
 | Seal Core | Hardveres kódhitelesítés — auditálható ML inference (orvosi, pénzügyi) |
 | Csak on-chip SRAM | Nincs DRAM controller — determinisztikus latencia |
+| In-order, no spekuláció | Determinisztikus pipeline, side-channel mentes, audit-barát |
+| Sok mag, kevés ILP | TLP > ILP — a single-thread sebességet a magszámért feláldozzuk |
 
 ## Kapcsolódó dokumentumok
 
+- [Mikroarchitektúra filozófia](microarch-philosophy-hu.md) — TLP > ILP, in-order, no OoO; minden core közös elve
+- [Belső busz méretezés](internal-bus-hu.md) — port-bottleneck, context move cycle-szám, core-onkénti busz-szélesség
+- [Perf vs RISC-V](perf-vs-riscv-hu.md) — single-thread összehasonlítás módszertana
 - [CFPU-ML-Max](cfpu-ml-max-hu.md) — ML inference accelerator: chiplet architektúra, MAC Slice, J/token összehasonlítás
 - [Interconnect architektúra](interconnect-hu.md) — 4-szintű hierarchia, switching modell, router felépítés
 - [Quench-RAM](quench-ram-hu.md) — per-blokk immutability, QRAM+hálózat szimbiózis
@@ -145,6 +169,7 @@ A CFPU-ML chip nem programozható core-okból, hanem **MAC Slice**-okból (FSM-v
 
 | Verzió | Dátum | Összefoglaló |
 |--------|------------|----------------------------------------------|
+| 2.3 | 2026-04-25 | Vízió-szintű disclaimer hozzáadva. Új „Mikroarchitektúra alapelvek" szekció (in-order, no OoO, TLP > ILP, statikus ILP, TOS reg stack, wide bus, warm-context cache) hivatkozással a `microarch-philosophy-hu.md` és `internal-bus-hu.md` dokumentumokra. Tervezési megkülönböztetők bővítve. |
 | 2.2 | 2026-04-21 | Core számok átszámolva monolitikus 800 mm²-ről a referencia chiplet konfigurációra (18 tine × 83 mm² = 1 494 mm²). SRAM skálázás szekció: 512 KB és 1 MB per core variánsok core számmal és chip SRAM-mal |
 | 2.1 | 2026-04-21 | Referencia node 7nm-ről 5nm-re változott. Minden logikai terület, core szám és router terület újraszámolva TSMC 5nm paraméterekkel (0,021 µm²/bit SRAM, ~171 MTr/mm² logikai sűrűség) |
 | 2.0 | 2026-04-20 | 4 core típus (Matrix Core → MAC Slice, külön dokumentumba: [CFPU-ML-Max](cfpu-ml-max-hu.md)). Kettős specializáció: Nano→Actor→Rich (programozás) + Nano→Seal (biztonság). Termékcsalád frissítve. |
