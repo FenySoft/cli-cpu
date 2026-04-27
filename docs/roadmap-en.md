@@ -503,7 +503,7 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | — F2.1 | ALU (32-bit integer) | ~30 | | ✅ DONE |
 | — F2.2a | Decoder (length + opcode) | ~40 | | ✅ DONE |
 | — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ DONE |
-| — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ⬜ Planned |
+| — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ DONE |
 | — F2.4 | QSPI controller | ~70 | | ⬜ Planned |
 | — F2.5 | Golden vector harness | ~35 | | ⬜ Planned |
 | — F2.6 | Yosys synthesis (Sky130) | ~30 | | ⬜ Planned |

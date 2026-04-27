@@ -503,7 +503,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | — F2.1 | ALU (32-bit egész) | ~30 | | ✅ KÉSZ |
 | — F2.2a | Decoder (hossz + opkód) | ~40 | | ✅ KÉSZ |
 | — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ KÉSZ |
-| — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ⬜ Tervezett |
+| — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ KÉSZ |
 | — F2.4 | QSPI vezérlő | ~70 | | ⬜ Tervezett |
 | — F2.5 | Golden vector harness | ~35 | | ⬜ Tervezett |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |

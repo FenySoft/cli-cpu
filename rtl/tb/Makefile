@@ -14,8 +14,21 @@ TOPLEVEL ?= cilcpu_alu
 # en: Verilator extra flags — include path for src/ directory
 EXTRA_ARGS += --trace -I$(PWD)/../src
 
-COCOTB_CONFIG ?= $(shell python3 -c "import os,cocotb;print(os.path.join(os.path.dirname(os.path.dirname(cocotb.__file__)),'..','..','..','bin','cocotb-config'))" 2>/dev/null || echo cocotb-config)
-include $(shell $(COCOTB_CONFIG) --makefiles)/Makefile.sim
+# hu: Venv Python és cocotb makefiles elérési útvonal.
+#     A .venv shebang törött (régi repo útvonal), ezért közvetlenül a
+#     python3.13 + PYTHONPATH kombináción keresztül futtatjuk.
+# en: Venv Python and cocotb makefiles path.
+#     The .venv shebang is broken (old repo path), so we use
+#     python3.13 + PYTHONPATH directly.
+VENV_PY     ?= /usr/local/bin/python3.13
+VENV_SITE   ?= $(PWD)/../../rtl/.venv/lib/python3.13/site-packages
+COCOTB_MAKEFILES ?= $(shell PYTHONPATH="$(VENV_SITE)" $(VENV_PY) -c \
+	"from cocotb_tools.config import main; import sys; sys.argv=['c','--makefiles']; main()" 2>/dev/null \
+	|| echo "$(VENV_SITE)/cocotb_tools/makefiles")
+
+export PYTHONPATH := $(VENV_SITE)
+
+include $(COCOTB_MAKEFILES)/Makefile.sim
 
 # hu: Kényelmi targetok — `make test_alu` közvetlenül futtatható
 # en: Convenience targets — `make test_alu` runs directly
@@ -31,4 +44,7 @@ test_decoder:
 test_microcode:
 	$(MAKE) MODULE=test_microcode TOPLEVEL=cilcpu_microcode VERILOG_SOURCES="$(PWD)/../src/cilcpu_microcode.v"
 
-.PHONY: test_alu test_sram test_decoder test_microcode
+test_stack_cache:
+	$(MAKE) MODULE=test_stack_cache TOPLEVEL=cilcpu_stack_cache VERILOG_SOURCES="$(PWD)/../src/cilcpu_stack_cache.v"
+
+.PHONY: test_alu test_sram test_decoder test_microcode test_stack_cache
