@@ -2,7 +2,7 @@
 
 > English version: [interconnect-en.md](interconnect-en.md)
 
-> Version: 3.1
+> Version: 3.2
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **on-chip interconnect hálózatát** specifikálja: a topológiát, a switching modellt, a router belső felépítését, a fizikai elrendezést, a core családot és a node-skálázási stratégiát.
 
@@ -419,11 +419,29 @@ Az eredeti core-számok a [`core-types-hu.md`](core-types-hu.md)-ban `chipterül
 | Topológia | 8×8 crossbar (VOQ + iSLIP) |
 | Elhelyezés | A tile geometriai közepén |
 | Fizikai méret | ~3.2 mm × 3.2 mm (5nm) |
-| Link típus | Párhuzamos, 84 bit |
+| Link típus | Párhuzamos, 128 bit data + 8 bit kontroll (= 136 wire/irány, kétirányú) |
 | Max távolság (GW → crossbar) | ~1.6 mm |
 | Hop szám | Mindig 1 (determinisztikus) |
 | Gate szám | ~16 000 |
 | VOQ buffer | ~30 KB SRAM |
+
+#### L1 link kontroll bitek (8 bit)
+
+A 128-bit-es data path mellé 8 bit kontroll-vezeték:
+
+| Bit | Név | Funkció |
+|-----|-----|---------|
+| 0 | `valid` | Flit-valid jelzés (1 = adat van a vezetéken) |
+| 1 | `head` | Első flit a cellában (header flit) |
+| 2 | `tail` | Utolsó flit a cellában |
+| 3 | `vn` | Virtual Network (0 = VN1 actor, 1 = VN0 control) |
+| 4..5 | `credit_back` | 2-bit credit visszacsatolás a fordított irányba (a kétirányú link mellékterméke) |
+| 6 | `parity` | Link-szintű egyszerű paritás bit (~99% bit-flip detection a flitre) |
+| 7 | `spare` | Jövőbeli bővítés (pl. priority-bit ágy a v3.x+ üzenetekhez) |
+
+A `head/tail` bit explicit jelzi a cella határait — ez egyszerűbb HW (a router nem kell `len`-t számoljon, csak figyel a `tail` bitet). A `valid` bit lehetővé teszi a stalled link kezelést. A `credit_back` a kétirányú link "ingyenes" előnye: a fordított vezetékek hat egyirányú adat-vezetéke közül 2-t a credit-flow-controlnak adunk.
+
+**Skálázási elv konzisztencia:** az L1 link 128-bit data path **megegyezik az L0 cluster mesh szélességével** (`BUS_WIDTH = 128`) — nincs width-transition a cluster gateway-ben, a header pontosan 1 flit az L1-en is.
 
 ### L2: Régió (crossbar, 8 tile)
 
@@ -649,7 +667,7 @@ HW multicast **csak a cluster gateway-ekben** (L1 crossbar-ban, nem minden L0 ro
 |-------|-------|-----------|--------|-------------|
 | L0 Turbo/Compact | Párhuzamos | 128 bit (egyirányú) | 1× core | ~8 GB/s |
 | **L0 Systolic** | **Párhuzamos** | **128 bit (egyirányú, 2 irány)** | **1× core** | **~16 GB/s aggregate (2 irány)** |
-| L1 (cluster → tile xbar) | Párhuzamos | 84 bit (kétirányú) | 1× core | ~5,2 GB/s |
+| L1 (cluster → tile xbar) | Párhuzamos | 128 bit data + 8 bit ctrl (kétirányú) | 1× core | ~8 GB/s |
 | L2 (tile → régió xbar) | Soros | `SERIAL_WIRES` vez. + clock | `SERDES_RATIO`× core | lásd SerDes skálázás |
 | L3 (régió → chip xbar) | Soros | `SERIAL_WIRES` vez. + clock | `SERDES_RATIO`× core | lásd SerDes skálázás |
 
@@ -701,11 +719,11 @@ A latenciák a **referencia konfigurációra** vonatkoznak (500 MHz, `SERDES_RAT
 | Útvonal | Hop | Tipikus (48B) | Worst case (128B) | @500 MHz (tipikus) |
 |---------|-----|--------------|-------------------|-------------------|
 | Szomszéd core (L0) | 1 | ~5 ciklus | ~10 ciklus | 10 ns |
-| Cross cluster, azonos tile (L0+L1+L0) | 6+1+6 = 13 | ~45 ciklus | ~69 ciklus | 90 ns |
-| Cross tile, azonos régió (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~75 ciklus | ~129 ciklus | 150 ns |
-| Cross régió (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~105 ciklus | ~191 ciklus | 210 ns |
+| Cross cluster, azonos tile (L0+L1+L0) | 6+1+6 = 13 | ~39 ciklus | ~59 ciklus | 78 ns |
+| Cross tile, azonos régió (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~63 ciklus | ~109 ciklus | 126 ns |
+| Cross régió (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~93 ciklus | ~171 ciklus | 186 ns |
 
-> **Kontextus:** a tipikus ~210 ns on-chip (48B payload) versenyképes a hagyományos CPU-kon futó szoftver aktor üzenetküldéssel (Erlang/BEAM: ~0.5–2 µs), miközben a CFPU-ban több ezer független hardver core dolgozik párhuzamosan. A worst-case 191 ciklus (382 ns) a ritka 128B payload-ra vonatkozik — a változó link foglalás miatt az üzenetek ~80%-a a tipikus latenciával halad. **A worst-case latency a v3.0-hoz képest jobb (~317 → ~191 cc), mert a feleakkora cella az L1/L2/L3 keskeny linkjein gyorsabban szerializálódik.**
+> **Kontextus:** a tipikus ~186 ns on-chip (48B payload) versenyképes a hagyományos CPU-kon futó szoftver aktor üzenetküldéssel (Erlang/BEAM: ~0.5–2 µs), miközben a CFPU-ban több ezer független hardver core dolgozik párhuzamosan. A worst-case 171 ciklus (342 ns) a ritka 128B payload-ra vonatkozik — a változó link foglalás miatt az üzenetek ~80%-a a tipikus latenciával halad. **A v3.2-ben a 84-bit L1 link 128-bit-re emelése további ~12 cc / ~20 cc nyereséget hoz a tipikus / worst case esetén** (105→93, 191→171), mert az L1 most 1 flit a header-nek, és a cellák 4 / 9 flit alatt szerializálódnak (vs 7 / 14 flit a régi 84-bit-en).
 
 <details>
 <summary>Cross-régió latencia részletezés (18 hop, tipikus 48B payload)</summary>
@@ -713,9 +731,9 @@ A latenciák a **referencia konfigurációra** vonatkoznak (500 MHz, `SERDES_RAT
 | Szegmens | Link szélesség | Ciklus | Megjegyzés |
 |----------|---------------|--------|-----------|
 | Forrás L0 wormhole (6 hop) | 128 bit | 15 | 2×6 + 3 body drain (48B = 3 payload flit @ 16B/flit) |
-| L1 link (GW → xbar) | 84 bit | 7 | ⌈512/84⌉ (64B cella = 512 bit) |
+| L1 link (GW → xbar) | 128 bit | 4 | ⌈512/128⌉ (64B cella = 512 bit) |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link (xbar → tile GW) | 84 bit | 7 | |
+| L1 link (xbar → tile GW) | 128 bit | 4 | |
 | L2 link (tile GW → xbar) | 80 bit | 7 | ⌈512/80⌉ |
 | L2 crossbar (iSLIP) | — | 1 | |
 | L2 link (xbar → régió GW) | 80 bit | 7 | |
@@ -725,11 +743,11 @@ A latenciák a **referencia konfigurációra** vonatkoznak (500 MHz, `SERDES_RAT
 | L2 link → xbar | 80 bit | 7 | |
 | L2 crossbar (iSLIP) | — | 1 | |
 | L2 link → cél tile GW | 80 bit | 7 | |
-| L1 link → xbar | 84 bit | 7 | |
+| L1 link → xbar | 128 bit | 4 | |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link → cél cluster GW | 84 bit | 7 | |
+| L1 link → cél cluster GW | 128 bit | 4 | |
 | Cél L0 wormhole (6 hop) | 128 bit | 15 | 2×6 + 3 body drain |
-| **Összesen** | | **~105** | |
+| **Összesen** | | **~93** | |
 
 </details>
 
@@ -739,9 +757,9 @@ A latenciák a **referencia konfigurációra** vonatkoznak (500 MHz, `SERDES_RAT
 | Szegmens | Link szélesség | Ciklus | Megjegyzés |
 |----------|---------------|--------|-----------|
 | Forrás L0 wormhole (6 hop) | 128 bit | 20 | 2×6 + 8 body drain (128B = 8 payload flit @ 16B/flit) |
-| L1 link (GW → xbar) | 84 bit | 14 | ⌈1152/84⌉ (144B cella = 1152 bit) |
+| L1 link (GW → xbar) | 128 bit | 9 | ⌈1152/128⌉ (144B cella = 1152 bit) |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link (xbar → tile GW) | 84 bit | 14 | |
+| L1 link (xbar → tile GW) | 128 bit | 9 | |
 | L2 link (tile GW → xbar) | 80 bit | 15 | ⌈1152/80⌉ |
 | L2 crossbar (iSLIP) | — | 1 | |
 | L2 link (xbar → régió GW) | 80 bit | 15 | |
@@ -751,11 +769,11 @@ A latenciák a **referencia konfigurációra** vonatkoznak (500 MHz, `SERDES_RAT
 | L2 link → xbar | 80 bit | 15 | |
 | L2 crossbar (iSLIP) | — | 1 | |
 | L2 link → cél tile GW | 80 bit | 15 | |
-| L1 link → xbar | 84 bit | 14 | |
+| L1 link → xbar | 128 bit | 9 | |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link → cél cluster GW | 84 bit | 14 | |
+| L1 link → cél cluster GW | 128 bit | 9 | |
 | Cél L0 wormhole (6 hop) | 128 bit | 20 | 2×6 + 8 body drain |
-| **Összesen** | | **~191** | |
+| **Összesen** | | **~171** | |
 
 </details>
 
@@ -783,7 +801,7 @@ Az RTL paraméterezhető — a chipméret és a gyártási technológia határoz
 
 A döntés a workload-tól függ — az RTL `SRAM_KB_PER_CORE` paramétere gyártáskor állítható.
 
-A tipikus cross-régió latencia ~105 ciklus (210 ns @ 500 MHz) 48B payload-ra, worst-case 128B payload-ra ~191 ciklus (382 ns) — a kisebb cluster fizikai méret a fejlettebb node-okon részben kompenzálja a mélyebb hierarchiát.
+A tipikus cross-régió latencia ~93 ciklus (186 ns @ 500 MHz) 48B payload-ra, worst-case 128B payload-ra ~171 ciklus (342 ns) — a kisebb cluster fizikai méret a fejlettebb node-okon részben kompenzálja a mélyebb hierarchiát.
 
 ## Kizárt alternatívák (és indoklás)
 
@@ -819,6 +837,7 @@ Ez a dokumentum az alábbi Symphact hardware requirement-ekre válaszol:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 3.2 | 2026-04-28 | **L1 tile crossbar link 84-bit → 128-bit + 8 bit kontroll.** A v1.0-ból örökölt 84-bit párhuzamos link nem volt 2-hatvány, nem aligned a header (128-bit) és L0 (128-bit) szélességével — felesleges design hiba. Az L1 mostantól egyezik az L0-val: 128-bit data + 8-bit kontroll (valid/head/tail/vn/credit_back/parity/spare) = 136 wire/irány. Header pontosan 1 flit az L1-en is, nincs width-transition a cluster gateway-ben. Latencia javulás: cross-cluster typ 45→39 cc (worst 69→59), cross-tile typ 75→63 cc (worst 129→109), cross-régió typ 105→93 cc (210→186 ns), worst 191→171 cc (382→342 ns). L1 throughput 5,2→8 GB/s. Cell-format / internal-bus szinkronizálva |
 | 3.1 | 2026-04-28 | **L0 busz visszaléptetés 256→128 bit** (FPGA-barát konzervatív lépés F2.7 A7-Lite 200T bring-up-hoz). Skálázási elv rögzítve: `header = 1 flit = BUS_WIDTH/8 byte`, `payload = 8 flit`. **Header layout változatlan** (16 byte = 1 flit a 128-bit linken). **Cella:** max 144 byte (16B header + 128B payload). Flit modell: 128-bit linken header=1 flit (no padding waste, vs v3.0 fél flit), worst case 2H+8 (változatlan), tipikus 2H+3. Latencia táblák újraszámolva. Cross-régió tipikus ~105 cc (210 ns), worst case ~191 cc (382 ns) — a worst case **jobb mint v3.0** (kisebb cella → gyorsabb L1/L2/L3 szerializáció). L0 throughput ~8 GB/s (vs v3.0 ~16 GB/s, vs v2.4 ~2,6 GB/s). `BUS_WIDTH` RTL paraméter bevezetve (default 128, jövőbeli upscale 256/512/1024). Indoklás: [`decision-bus-rollback-hu.md`](decision-bus-rollback-hu.md) |
 | 3.0 | 2026-04-28 | **Header v3.0:** 4×32-bit word-határos elrendezés. `src_actor`/`dst_actor` 16→8 bit (max 256 aktor/core). `src_actor` kitöltő: core scheduler→core HW (aktív actor context regiszter, nem hamisítható). `seq` 8→16 bit (max 65 536 fragment). `len[8]` = len+1 szemantika (1–256 byte payload, 0 byte-os payload nincs). CRC-16 hozzáadva (payload integritás, a header-ben). `flags[8]` bővítve: `[VN:1][relay:1][Pri:2][reserved:4]`. `reserved` 16→8 bit. HMAC és perms törölve — HW-managed Capability Slot Table (CST) QSRAM-ban. **L0 link:** 42→256 bit (tile-szintű NoC, `internal-bus-hu.md` alapján). **Cella:** max 272 byte (16B header + 256B payload). Flit modell: 256-bit linken header=1 flit, worst case 2H+8, tipikus 2H+2. Latencia táblák újraszámolva (tipikus 48B + worst case 256B). Cross-régió tipikus ~103 cc (206 ns), worst case ~317 cc (634 ns). L0 throughput ~16 GB/s (vs régi ~2,6 GB/s) |
 | 2.4 | 2026-04-22 | Header átszervezés: `len[16]`→`len[8]`, `src_actor[16]` + `dst_actor[16]` bekerül a header-be (N:M actor-to-core mapping, DDR5 CAM aktor-szintű ACL, crash recovery). Változó link foglalás: a linken csak `len` byte payload utazik (4 bites flit counter, ~43% átlagos link megtakarítás), buffer marad fix 80B slot. Latencia táblák frissítve (worst case jelöléssel) |

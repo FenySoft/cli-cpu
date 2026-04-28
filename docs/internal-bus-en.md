@@ -2,7 +2,7 @@
 
 > Magyar verzió: [internal-bus-hu.md](internal-bus-hu.md)
 
-> Version: 1.3
+> Version: 1.4
 
 > **⚠️ Vision-level document.** The bus widths, area, and power figures presented here are working hypotheses extrapolated from documented sources (TSMC 5nm SRAM macro datasheets, AMD Zen, Apple M, NVIDIA H100 published parameters). Precise values can only be validated after F2.7 FPGA bring-up and F6 silicon. The document records design direction and decision trail, not final parameters.
 
@@ -97,7 +97,7 @@ Estimates at 5nm node, 1 mm bus length:
 | Tenstorrent Tensix NoC | 1024-bit | tile-load baseline |
 | HBM3 die interface | 1024-bit | chiplet scale |
 | **CFPU L0 cluster mesh (v3.1)** | **128-bit** | Wormhole NoC link, FPGA-synthesizable, 16 cores / 4×4 mesh |
-| **CFPU L1 tile crossbar link** | **84-bit** parallel | cluster GW → tile xbar |
+| **CFPU L1 tile crossbar link (v3.2)** | **128-bit data + 8-bit ctrl** | cluster GW → tile xbar, matches L0 width |
 | **CFPU L2/L3** | **serial SerDes** | tile↔region, region↔chip |
 | **CFPU Nano (intra-core reg ↔ SRAM)** | **256-bit** | minimum core, many actors |
 | **CFPU Actor (intra-core back-end)** | **256-bit** | close to Rich |
@@ -119,7 +119,7 @@ Estimates at 5nm node, 1 mm bus length:
 | **ML/Matrix core (CFPU-ML MAC Slice)** | **1024-bit** | Tile-load baseline, vector pipe (32 elements × 32-bit / cycle) |
 | **Seal core** | **64-bit** | Auditability > speed, minimum logic |
 | **L0 cluster mesh** (16 cores, 4×4 mesh) | **128-bit** (v3.1) | Wormhole NoC link, header = 1 flit, payload = 8 flits. v3.1 default; `BUS_WIDTH` parameter for 256/512/1024 upscale |
-| **L1 tile crossbar link** (cluster GW → tile xbar) | **84-bit** parallel | Per `interconnect-en.md` v3.1 link types table |
+| **L1 tile crossbar link** (cluster GW → tile xbar) | **128-bit data + 8-bit ctrl** | Per `interconnect-en.md` v3.2 link types table; matches L0 width (no width transition) |
 | **L2/L3 tile-tile / region-chip links** | **serial SerDes** (`SERIAL_WIRES` + `SERDES_RATIO`) | Cm-scale distances; parallel bus does not scale |
 | **Toward DDR5 hub** | **128-bit** (2 channels × 64-bit) | DDR5 physical limit, see `ddr5-architecture-en.md` |
 
@@ -178,6 +178,7 @@ Estimates at 5nm node, 1 mm bus length:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.4 | 2026-04-28 | **L1 tile crossbar link synchronized with `interconnect-en.md` v3.2:** 84-bit → **128-bit data + 8-bit control**. "Selected sizing" and "Industry references" tables updated. L1 now matches the L0 cluster mesh width (`BUS_WIDTH = 128`) — no width transition at the cluster gateway |
 | 1.3 | 2026-04-28 | **Industry references table expanded.** New rows: ARM CoreLink CMN (128–512-bit configurable, 128-bit common), academic NoC meshes (64–128 bit), Synopsys/Cadence NoC IP (128–256-bit), Adapteva Epiphany (64-bit eMesh). CFPU layers explicitly separated: L0 cluster mesh (128-bit, v3.1), L1 tile crossbar (84-bit), L2/L3 (serial SerDes), and intra-core back-end buses listed separately (Nano/Actor 256, Rich 512, ML 1024, Seal 64). New conclusion: **128-bit NoC link** width is **industry standard** for small-to-medium chips |
 | 1.2 | 2026-04-28 | **HW cost table expanded with the 128-bit column.** The "HW cost — area and power" table now includes a 128-bit column (interpolated between 32-bit and 256-bit): wire trace 128, M3-M4 metal, ~256 repeaters/mm, 4 banks × 32 SRAM port, ~1.3 mW dynamic power, ~1.15× reg file area. New critical threshold: 128-bit is the L0 cluster mesh NoC link, FPGA-synthesizable, ~3% tile area overhead |
 | 1.1 | 2026-04-28 | **NoC layer synchronization with `interconnect-en.md` v3.1.** Selected sizing table corrected: "Tile-level NoC (4–8 cores)" → **L0 cluster mesh (16 cores, 4×4 mesh, 128-bit v3.1)**; the incorrect "Chip-level NoC (tile↔tile) 128-bit" v2.4 reference replaced with the actual hierarchical link types (L1 = 84-bit parallel, L2/L3 = serial SerDes). New note: the intra-core bus and the NoC link are **two different layers**. Intra-core bus widths (Nano/Actor 256, Rich 512, ML 1024, Seal 64) unchanged |

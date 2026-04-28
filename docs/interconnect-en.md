@@ -2,7 +2,7 @@
 
 > Magyar verzió: [interconnect-hu.md](interconnect-hu.md)
 
-> Version: 3.1
+> Version: 3.2
 
 This document specifies the **on-chip interconnect network** of the Cognitive Fabric Processing Unit (CFPU): the topology, switching model, router internals, physical layout, core family, and node-scaling strategy.
 
@@ -419,11 +419,29 @@ The original core counts in [`core-types-en.md`](core-types-en.md) were computed
 | Topology | 8×8 crossbar (VOQ + iSLIP) |
 | Placement | Geometric center of the tile |
 | Physical size | ~3.2 mm × 3.2 mm (5nm) |
-| Link type | Parallel, 84-bit |
+| Link type | Parallel, 128-bit data + 8-bit control (= 136 wires/direction, bidirectional) |
 | Max distance (GW → crossbar) | ~1.6 mm |
 | Hop count | Always 1 (deterministic) |
 | Gate count | ~16,000 |
 | VOQ buffer | ~30 KB SRAM |
+
+#### L1 link control bits (8 bits)
+
+In addition to the 128-bit data path, 8 control wires:
+
+| Bit | Name | Function |
+|-----|------|----------|
+| 0 | `valid` | Flit-valid signal (1 = data on the wire) |
+| 1 | `head` | First flit in the cell (header flit) |
+| 2 | `tail` | Last flit in the cell |
+| 3 | `vn` | Virtual Network (0 = VN1 actor, 1 = VN0 control) |
+| 4..5 | `credit_back` | 2-bit credit return on the reverse direction (free benefit of bidirectional link) |
+| 6 | `parity` | Link-level simple parity bit (~99% bit-flip detection per flit) |
+| 7 | `spare` | Future extension (e.g., priority-bit slot for v3.x+ messages) |
+
+The `head/tail` bits explicitly mark cell boundaries — simpler HW (the router does not need to count `len`, just watches `tail`). The `valid` bit enables stalled-link handling. `credit_back` is a "free" benefit of the bidirectional link: 2 of the reverse-direction wires are reused for credit-flow control.
+
+**Scaling rule consistency:** The L1 link 128-bit data path **matches the L0 cluster mesh width** (`BUS_WIDTH = 128`) — no width transition at the cluster gateway, the header is exactly 1 flit on L1 too.
 
 ### L2: Region (crossbar, 8 tiles)
 
@@ -649,7 +667,7 @@ HW multicast **only in cluster gateways** (L1 crossbar, not in every L0 router).
 |-------|------|-------|-------|-----------|
 | L0 Turbo/Compact | Parallel | 128-bit (unidirectional) | 1× core | ~8 GB/s |
 | **L0 Systolic** | **Parallel** | **128-bit (unidirectional, 2 directions)** | **1× core** | **~16 GB/s aggregate (2 directions)** |
-| L1 (cluster → tile xbar) | Parallel | 84-bit (bidirectional) | 1× core | ~5.2 GB/s |
+| L1 (cluster → tile xbar) | Parallel | 128-bit data + 8-bit ctrl (bidirectional) | 1× core | ~8 GB/s |
 | L2 (tile → region xbar) | Serial | `SERIAL_WIRES` + clock | `SERDES_RATIO`× core | see SerDes Scaling |
 | L3 (region → chip xbar) | Serial | `SERIAL_WIRES` + clock | `SERDES_RATIO`× core | see SerDes Scaling |
 
@@ -701,11 +719,11 @@ Latencies are for the **reference configuration** (500 MHz, `SERDES_RATIO`=10, `
 | Path | Hops | Typical (48B) | Worst case (128B) | @500 MHz (typical) |
 |------|------|--------------|-------------------|-------------------|
 | Neighboring core (L0) | 1 | ~5 cycles | ~10 cycles | 10 ns |
-| Cross-cluster, same tile (L0+L1+L0) | 6+1+6 = 13 | ~45 cycles | ~69 cycles | 90 ns |
-| Cross-tile, same region (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~75 cycles | ~129 cycles | 150 ns |
-| Cross-region (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~105 cycles | ~191 cycles | 210 ns |
+| Cross-cluster, same tile (L0+L1+L0) | 6+1+6 = 13 | ~39 cycles | ~59 cycles | 78 ns |
+| Cross-tile, same region (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~63 cycles | ~109 cycles | 126 ns |
+| Cross-region (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~93 cycles | ~171 cycles | 186 ns |
 
-> **Context:** typical ~210 ns on-chip (48B payload) is competitive with software actor message delivery on conventional CPUs (Erlang/BEAM: ~0.5–2 µs), while the CFPU runs thousands of independent hardware cores in parallel. The worst-case 191 cycles (382 ns) applies to rare 128B payloads — variable link occupancy means ~80% of messages travel at typical latency. **Worst-case latency is better than v3.0 (~317 → ~191 cc), since the halved cell serializes faster on the narrower L1/L2/L3 links.**
+> **Context:** typical ~186 ns on-chip (48B payload) is competitive with software actor message delivery on conventional CPUs (Erlang/BEAM: ~0.5–2 µs), while the CFPU runs thousands of independent hardware cores in parallel. The worst-case 171 cycles (342 ns) applies to rare 128B payloads — variable link occupancy means ~80% of messages travel at typical latency. **In v3.2 the L1 link upgrade from 84-bit to 128-bit yields an additional ~12 cc / ~20 cc gain in typical / worst case (105→93, 191→171), since L1 now sends the header in 1 flit and serializes cells in 4 / 9 flits (vs 7 / 14 flits on the old 84-bit).**
 
 <details>
 <summary>Cross-region latency breakdown (18 hops, typical 48B payload)</summary>
@@ -713,9 +731,9 @@ Latencies are for the **reference configuration** (500 MHz, `SERDES_RATIO`=10, `
 | Segment | Link width | Cycles | Notes |
 |---------|-----------|--------|-------|
 | Source L0 wormhole (6 hops) | 128-bit | 15 | 2×6 + 3 body drain (48B = 3 payload flits @ 16B/flit) |
-| L1 link (GW → xbar) | 84-bit | 7 | ⌈512/84⌉ (64B cell = 512 bits) |
+| L1 link (GW → xbar) | 128-bit | 4 | ⌈512/128⌉ (64B cell = 512 bits) |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link (xbar → tile GW) | 84-bit | 7 | |
+| L1 link (xbar → tile GW) | 128-bit | 4 | |
 | L2 link (tile GW → xbar) | 80-bit | 7 | ⌈512/80⌉ |
 | L2 crossbar (iSLIP) | — | 1 | |
 | L2 link (xbar → region GW) | 80-bit | 7 | |
@@ -725,11 +743,11 @@ Latencies are for the **reference configuration** (500 MHz, `SERDES_RATIO`=10, `
 | L2 link → xbar | 80-bit | 7 | |
 | L2 crossbar (iSLIP) | — | 1 | |
 | L2 link → dst tile GW | 80-bit | 7 | |
-| L1 link → xbar | 84-bit | 7 | |
+| L1 link → xbar | 128-bit | 4 | |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link → dst cluster GW | 84-bit | 7 | |
+| L1 link → dst cluster GW | 128-bit | 4 | |
 | Destination L0 wormhole (6 hops) | 128-bit | 15 | 2×6 + 3 body drain |
-| **Total** | | **~105** | |
+| **Total** | | **~93** | |
 
 </details>
 
@@ -739,9 +757,9 @@ Latencies are for the **reference configuration** (500 MHz, `SERDES_RATIO`=10, `
 | Segment | Link width | Cycles | Notes |
 |---------|-----------|--------|-------|
 | Source L0 wormhole (6 hops) | 128-bit | 20 | 2×6 + 8 body drain (128B = 8 payload flits @ 16B/flit) |
-| L1 link (GW → xbar) | 84-bit | 14 | ⌈1152/84⌉ (144B cell = 1152 bits) |
+| L1 link (GW → xbar) | 128-bit | 9 | ⌈1152/128⌉ (144B cell = 1152 bits) |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link (xbar → tile GW) | 84-bit | 14 | |
+| L1 link (xbar → tile GW) | 128-bit | 9 | |
 | L2 link (tile GW → xbar) | 80-bit | 15 | ⌈1152/80⌉ |
 | L2 crossbar (iSLIP) | — | 1 | |
 | L2 link (xbar → region GW) | 80-bit | 15 | |
@@ -751,11 +769,11 @@ Latencies are for the **reference configuration** (500 MHz, `SERDES_RATIO`=10, `
 | L2 link → xbar | 80-bit | 15 | |
 | L2 crossbar (iSLIP) | — | 1 | |
 | L2 link → dst tile GW | 80-bit | 15 | |
-| L1 link → xbar | 84-bit | 14 | |
+| L1 link → xbar | 128-bit | 9 | |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link → dst cluster GW | 84-bit | 14 | |
+| L1 link → dst cluster GW | 128-bit | 9 | |
 | Destination L0 wormhole (6 hops) | 128-bit | 20 | 2×6 + 8 body drain |
-| **Total** | | **~191** | |
+| **Total** | | **~171** | |
 
 </details>
 
@@ -783,7 +801,7 @@ The RTL is parameterizable — die size and process node determine core count.
 
 The choice depends on the workload — the RTL `SRAM_KB_PER_CORE` parameter is set at fabrication time.
 
-Typical cross-region latency is ~105 cycles (210 ns @ 500 MHz) for 48B payloads, worst-case 128B payloads ~191 cycles (382 ns) — smaller cluster physical size at advanced nodes partially compensates for the deeper hierarchy.
+Typical cross-region latency is ~93 cycles (186 ns @ 500 MHz) for 48B payloads, worst-case 128B payloads ~171 cycles (342 ns) — smaller cluster physical size at advanced nodes partially compensates for the deeper hierarchy.
 
 ## Excluded Alternatives (and Rationale)
 
@@ -819,6 +837,7 @@ This document addresses the following Symphact hardware requirements:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 3.2 | 2026-04-28 | **L1 tile crossbar link 84-bit → 128-bit + 8-bit control.** The 84-bit parallel link inherited from v1.0 was not a power of 2 and not aligned with the header (128-bit) or L0 (128-bit) widths — an unjustified design relic. L1 now matches L0: 128-bit data + 8-bit control (valid/head/tail/vn/credit_back/parity/spare) = 136 wires/direction. Header is exactly 1 flit on L1 too, no width transition at the cluster gateway. Latency improvements: cross-cluster typ 45→39 cc (worst 69→59), cross-tile typ 75→63 cc (worst 129→109), cross-region typ 105→93 cc (210→186 ns), worst 191→171 cc (382→342 ns). L1 throughput 5.2→8 GB/s. Cell-format / internal-bus synchronized |
 | 3.1 | 2026-04-28 | **L0 bus rollback 256→128 bit** (FPGA-friendly conservative step for F2.7 A7-Lite 200T bring-up). Scaling rule codified: `header = 1 flit = BUS_WIDTH/8 byte`, `payload = 8 flit`. **Header layout unchanged** (16 byte = 1 flit on 128-bit link). **Cell:** max 144 byte (16B header + 128B payload). Flit model: on 128-bit link header=1 flit (no padding waste, vs v3.0 half flit), worst case 2H+8 (unchanged), typical 2H+3. Latency tables recalculated. Cross-region typical ~105 cc (210 ns), worst case ~191 cc (382 ns) — worst case **better than v3.0** (smaller cell → faster L1/L2/L3 serialization). L0 throughput ~8 GB/s (vs v3.0 ~16 GB/s, vs v2.4 ~2.6 GB/s). `BUS_WIDTH` RTL parameter introduced (default 128, future upscale 256/512/1024). Rationale: [`decision-bus-rollback-en.md`](decision-bus-rollback-en.md) |
 | 3.0 | 2026-04-28 | **Header v3.0:** 4×32-bit word-aligned layout. `src_actor`/`dst_actor` 16→8 bits (max 256 actors/core). `src_actor` writer: core scheduler→core HW (active actor context register, cannot be spoofed). `seq` 8→16 bits (max 65,536 fragments). `len[8]` = len+1 semantics (1–256 byte payload, no zero-byte payload). CRC-16 added (payload integrity, stored in header). `flags[8]` expanded: `[VN:1][relay:1][Pri:2][reserved:4]`. `reserved` 16→8 bits. HMAC and perms removed — HW-managed Capability Slot Table (CST) in QSRAM. **L0 link:** 42→256 bits (tile-level NoC, per `internal-bus-hu.md`). **Cell:** max 272 bytes (16B header + 256B payload). Flit model: on 256-bit link header=1 flit, worst case 2H+8, typical 2H+2. Latency tables recalculated (typical 48B + worst case 256B). Cross-region typical ~103 cc (206 ns), worst case ~317 cc (634 ns). L0 throughput ~16 GB/s (vs old ~2.6 GB/s) |
 | 2.4 | 2026-04-22 | Header reorganization: `len[16]`→`len[8]`, `src_actor[16]` + `dst_actor[16]` added to header (N:M actor-to-core mapping, DDR5 CAM actor-level ACL, crash recovery). Variable link occupancy: only `len` payload bytes travel on the link (4-bit flit counter, ~43% average link savings), buffers remain fixed 80B slots. Latency tables updated (worst case annotation) |
