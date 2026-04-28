@@ -94,14 +94,14 @@ Payload (1-128 byte) — Payload SRAM-ban tárolva:
 | `src` | 24 bit | **NoC router HW** | Forrás HW cím — hardveresen kitöltve, nem hamisítható |
 | `src_actor` | 8 bit | **Core HW** | Küldő aktor azonosítója — az aktív actor context regiszterből, nem hamisítható |
 | `seq` | 16 bit | Küldő | Sorszám (fragmentált üzenetek sorrendje, max 65 536 fragment) |
-| `flags` | 8 bit | Küldő | `[VN:1][relay:1][Pri:2][reserved:4]` — VN0/VN1, relay flag, üzenet prioritás (4 szint) |
+| `flags` | 8 bit | Küldő SW + HW | `[VN:1][relay:1][Pri:2][zero_len:1][ddr5_cap:1][reserved:2]` — VN0/VN1, relay flag, üzenet prioritás (4 szint), zero-payload jelzés, **DDR5 capability flag (csak core HW állíthatja, lásd `ddr5-architecture-hu.md` v1.3)**. A részletes bit-allokáció: [`specs/cell-format-hu.md`](../specs/cell-format-hu.md) v2.2 |
 | `len` | 8 bit | Küldő | Payload méret: érték + 1 byte (v3.1: max 128 byte; a 8 bit jövőbeli upscale-re fenntartva, lásd `decision-bus-rollback-hu.md`). 0 byte-os payload nincs, azt flags jelzi |
 | `CRC-16` | 16 bit | HW | Payload integritás ellenőrzés (a header-ben van, a payload fölött számolva) |
 | `CRC-8` | 8 bit | HW | Header integritás ellenőrzés (az utolsó mező, az egész header fölött számolva, beleértve CRC-16-ot) |
 | `reserved` | 8 bit | — | Jövőbeli bővítés |
 
 **Miért `src_actor` / `dst_actor` a header-ben?** A v1.8-ban az actor ID a payload-ba került (szoftveres dispatch). Az N:M actor-to-core mapping miatt (több aktor egy core-on, beleértve alvó aktorokat) az actor ID a header-ben **hardveres szintű előnyöket** ad:
-- **DDR5 Controller CAM tábla** — `src[24] + src_actor[8]` alapján aktor-szintű jogosultság-ellenőrzés
+- **DDR5 capability slot** (`ddr5-architecture-hu.md` v1.3) — a forrás core QRAM-jában tárolt aktor-szintű hozzáférési jog, `src[24] + src_actor[8]` azonosítóval kettős ellenőrzés a controller-en
 - **Crash recovery** — csak az adott aktor capability-jét kell törölni, nem az egész core-ét
 - **Router szintű dispatch** — a fogadó core scheduler a header-ből tudja melyik aktornak szól, nem kell a payload-ba nyúlni
 - **8 bit** — 256 aktor / core, lefedi az alvó aktorokat is (a gyakorlatban 256 context/core bőven elegendő: a warm-context cache 4–8 aktív + 248 alvó aktor)

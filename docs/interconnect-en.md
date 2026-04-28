@@ -94,14 +94,14 @@ Payload (1-128 bytes) — stored in Payload SRAM:
 | `src` | 24 bits | **NoC router HW** | Source HW address — hardware-filled, cannot be spoofed |
 | `src_actor` | 8 bits | **Core HW** | Sending actor identifier — from the active actor context register, cannot be spoofed |
 | `seq` | 16 bits | Sender | Sequence number (ordering for fragmented messages, max 65,536 fragments) |
-| `flags` | 8 bits | Sender | `[VN:1][relay:1][Pri:2][reserved:4]` — VN0/VN1, relay flag, message priority (4 levels) |
+| `flags` | 8 bits | Sender SW + HW | `[VN:1][relay:1][Pri:2][zero_len:1][ddr5_cap:1][reserved:2]` — VN0/VN1, relay flag, message priority (4 levels), zero-payload signal, **DDR5 capability flag (settable only by core HW, see `ddr5-architecture-hu.md` v1.3)**. Detailed bit allocation: [`specs/cell-format-en.md`](../specs/cell-format-en.md) v2.2 |
 | `len` | 8 bits | Sender | Payload size: value + 1 byte (v3.1: max 128 bytes; the 8-bit field is reserved for future upscale, see `decision-bus-rollback-en.md`). Zero-byte payload does not exist, signaled via flags |
 | `CRC-16` | 16 bits | HW | Payload integrity check (stored in header, computed over the payload) |
 | `CRC-8` | 8 bits | HW | Header integrity check (last field, computed over the entire header including CRC-16) |
 | `reserved` | 8 bits | — | Future extensions |
 
 **Why `src_actor` / `dst_actor` in the header?** In v1.8, the actor ID was moved to the payload (software dispatch). With N:M actor-to-core mapping (multiple actors per core, including sleeping actors), having actor IDs in the header provides **hardware-level advantages**:
-- **DDR5 Controller CAM table** — actor-level access control via `src[24] + src_actor[8]`
+- **DDR5 capability slot** (`ddr5-architecture-hu.md` v1.3) — actor-level access right stored in the source core's QRAM; `src[24] + src_actor[8]` provides defence-in-depth at the controller
 - **Crash recovery** — only the crashed actor's capabilities need to be revoked, not the entire core's
 - **Router-level dispatch** — the receiving core's scheduler knows which actor the message is for from the header, without reading the payload
 - **8 bits** — 256 actors / core, covers sleeping actors as well (in practice, 256 contexts/core is sufficient: warm-context cache holds 4–8 active + 248 sleeping actors)

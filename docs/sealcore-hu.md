@@ -2,7 +2,7 @@
 
 > English version: [sealcore-en.md](sealcore-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 Ez a dokumentum a **Seal Core** komponenst írja le: egy dedikált, egyszerű, hardware-burned firmware-rel működő core-t, ami a CFPU chipen a **kódbetöltés hitelességét** biztosítja. A Seal Core két különböző mechanizmussal működik a CFPU fejlesztési fázisától függően — **pre-QRAM érában** (F3-F5) fizikai WE-pin routing révén, **QRAM érában** (F5+) AuthCode verifikációs gatekeeper szerepben. Ez a két megközelítés **külön mechanizmus**, amelyeket ez a doksi tudatosan szétválasztva tárgyal.
 
@@ -59,6 +59,8 @@ A Seal Core **nem fut alkalmazás-kódot**. A saját firmware-e hardveresen beé
 - **AuthCode verifikáció** — bejövő `.acode` konténerek aláírás-ellenőrzése (lásd `docs/authcode-hu.md`)
 - **Code-loader feladatok** — ellenőrzött bytecode beírása a CODE régióba
 - **Heartbeat jel** egy központi health monitor-nak (redundancia-célra)
+- **DDR5 capability slot kezelés** — `kernel_io_sup` policy alapján SEAL/RELEASE-eli a per-core capability slot-okat (lásd `ddr5-architecture-hu.md` v1.3, "5.e) HW Capability Slot")
+- **CST (Capability Slot Table) kezelés** — a NoC aktor-aktor capability tábla írása dedikált hardwired config porton (lásd `interconnect-hu.md` v3.0, `quench-ram-hu.md`)
 
 ## Kapcsolódás a CFPU brand-családfához <a name="brand"></a>
 
@@ -495,4 +497,5 @@ Ez a v1.0 doksi a vízió-szintű architektúrát rögzíti. A részletek a megf
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-04-28 | **DDR5 capability slot kezelés és CST írás hozzáadva** a Seal Core feladataihoz. A `ddr5-architecture-hu.md` v1.3 HW Capability Slot modellje szerint a Seal Core dedikált hardwired config porton SEAL/RELEASE-eli a per-core 8 KB capability slot táblát (256 actor × 4 slot × 8 byte). A NoC oldali CST (Capability Slot Table, `interconnect-hu.md` v3.0) is hasonlóan hardwired porton íródik. |
 | 1.0 | 2026-04-16 | Kezdeti vízió-szintű kiadás. A Seal Core két különálló mechanizmusként: (1) pre-QRAM érában fizikai WE-pin routing a CODE RAM chipre; (2) QRAM érában AuthCode verifikációs gatekeeper a SEAL HW-trigger forrással. Explicit szeparáció a két érá között, nincs cross-contamination. Ring és 2D mesh failover topológiák, graceful degradation. Firmware immutability mask ROM / eFuse alapon. |

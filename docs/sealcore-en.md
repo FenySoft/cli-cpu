@@ -2,7 +2,7 @@
 
 > Magyar verzió: [sealcore-hu.md](sealcore-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 This document describes the **Seal Core** component: a dedicated, simple, hardware-burned-firmware core that ensures **code-loading authenticity** on the CFPU chip. The Seal Core operates via two distinct mechanisms depending on CFPU phase — **pre-QRAM era** (F3-F5) through physical WE-pin routing, **QRAM era** (F5+) as an AuthCode verification gatekeeper. These are **two distinct mechanisms**, which this document treats in deliberately separated sections.
 
@@ -59,6 +59,8 @@ The Seal Core **does not run application code**. Its firmware is hardware-burned
 - **AuthCode verification** — signature checking of incoming `.acode` containers (see `docs/authcode-en.md`)
 - **Code-loader duties** — writing verified bytecode into the CODE region
 - **Heartbeat signal** to a central health monitor (for redundancy)
+- **DDR5 capability slot management** — SEAL/RELEASE per-core capability slots based on `kernel_io_sup` policy (see `ddr5-architecture-hu.md` v1.3, "5.e) HW Capability Slot")
+- **CST (Capability Slot Table) writes** — write the NoC actor-to-actor capability table via a dedicated hardwired config port (see `interconnect-en.md` v3.0, `quench-ram-en.md`)
 
 ## Role in the CFPU brand family <a name="brand"></a>
 
@@ -495,4 +497,5 @@ This v1.0 document captures the vision-level architecture. Details are to be res
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-04-28 | **DDR5 capability slot management and CST writes added** to Seal Core duties. Per the `ddr5-architecture-hu.md` v1.3 HW Capability Slot model, the Seal Core SEAL/RELEASE-s the per-core 8 KB capability slot table (256 actors × 4 slots × 8 bytes) via a dedicated hardwired config port. The NoC-side CST (Capability Slot Table, `interconnect-en.md` v3.0) is similarly written via a hardwired port. |
 | 1.0 | 2026-04-16 | Initial vision-level release. Seal Core as two distinct mechanisms: (1) pre-QRAM era physical WE pin routing to the CODE RAM chip; (2) QRAM era AuthCode verification gatekeeper acting as SEAL HW-trigger source. Explicit separation between eras, no cross-contamination. Ring and 2D mesh failover topologies, graceful degradation. Firmware immutability via mask ROM / eFuse. |

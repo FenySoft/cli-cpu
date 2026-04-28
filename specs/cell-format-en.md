@@ -2,7 +2,7 @@
 
 > Magyar verzió: [cell-format-hu.md](cell-format-hu.md)
 
-> Version: 2.1
+> Version: 2.2
 
 > Source: `docs/interconnect-en.md` v3.1 (2026-04-28)
 
@@ -66,13 +66,14 @@ Word 3: reserved[8] + CRC-16[16] + CRC-8[8]        = 32 bits — integrity
 
 ### flags field detail
 
-| Bit | Name | Meaning |
-|-----|------|---------|
-| 7 | `vn` | 0 = VN1 (actor message), 1 = VN0 (control: supervisor, trap, heartbeat) |
-| 6 | `relay` | 1 = relay message (L3 fault tolerance, see interconnect spec) |
-| 5..4 | `pri` | Priority (00 = normal, 01–11 = future QoS levels) |
-| 3 | `zero_len` | 1 = no payload (0 bytes), the `len` field is not interpreted |
-| 2..0 | reserved | Future use |
+| Bit | Name | Writable by | Meaning |
+|-----|------|-------------|---------|
+| 7 | `vn` | Sender SW | 0 = VN1 (actor message), 1 = VN0 (control: supervisor, trap, heartbeat) |
+| 6 | `relay` | NoC HW | 1 = relay message (L3 fault tolerance, see interconnect spec) |
+| 5..4 | `pri` | Sender SW | Priority (00 = normal, 01–11 = future QoS levels) |
+| 3 | `zero_len` | Sender SW | 1 = no payload (0 bytes), the `len` field is not interpreted |
+| 2 | `ddr5_cap` | **Core HW only** | 1 = the first 8 bytes of payload are HW-attached DDR5 capability slot. The SW `send` opcode has this bit masked to 0 (HW filter). See [`ddr5-architecture-hu.md`](../docs/ddr5-architecture-hu.md) v1.3 |
+| 1..0 | reserved | — | Future use |
 
 ## Payload (1–128 bytes)
 
@@ -191,7 +192,7 @@ With future `BUS_WIDTH=256` upscale, a 256B payload will fit 4× BL16 (or 1× BL
 **v2.0 revision (2026-04-28):** 16 bits → 8 bits per actor ID, because:
 - 256 actors/core is sufficient: the CST (Context Switch Table) is HW-managed — the active actor context register fills the `src_actor` field in hardware, **unspoofable** (core software cannot override it)
 - The freed 2 × 8 bits (16 bits total) expand the `seq` field from 8 → 16 bits, enabling larger fragmented message sequences
-- DDR5 CAM table actor-level ACL still works (`src[24] + src_actor[8]`)
+- DDR5 capability slot actor-level ACL still works (`src[24] + src_actor[8]` defence-in-depth at the controller, see `ddr5-architecture-hu.md` v1.3)
 - Crash recovery: only the crashed actor's capabilities are revoked
 - Router dispatch: readable from header, no need to inspect payload
 
@@ -220,6 +221,7 @@ With future `BUS_WIDTH=256` upscale, a 256B payload will fit 4× BL16 (or 1× BL
 
 | Version | Date | Change |
 |---------|------|--------|
+| 2.2 | 2026-04-28 | **`flags.ddr5_cap` HW-only bit allocated.** From the former `reserved[3]` field, one bit (bit 2) was named `ddr5_cap` with the meaning: the first 8 bytes of payload are a HW-attached DDR5 capability slot. The bit can **only be set by the core HW request assembler**; the actor SW `send` opcode has it masked to 0. The flags table now has a "Writable by" column. Details: [`docs/ddr5-architecture-hu.md`](../docs/ddr5-architecture-hu.md) v1.3 |
 | 2.1 | 2026-04-28 | **v3.1 interconnect rollback synchronization:** L0 bus 256→128 bits, max payload 256→128 bytes (`CELL_SIZE = 128`), buffer slot 272→144 bytes. Header layout **unchanged** (16 bytes, 4×32 bits). `len[8]` semantics unchanged (`len+1`), but v3.1 max is 128 (`len ≤ 127`); the upper 128 values reserved for future `BUS_WIDTH` upscale. `BUS_WIDTH` RTL parameter introduced (default 128, future 256/512/1024). DDR5 burst alignment updated (BL32 = 128 bytes native). Rationale: [`docs/decision-bus-rollback-en.md`](../docs/decision-bus-rollback-en.md) |
 | 2.0 | 2026-04-28 | Header reorganization: 4 × 32-bit word layout; src_actor/dst_actor 16→8 bits (HW-managed CST); seq 8→16 bits; len[9]→len[8] (len+1 encoding); CRC-16 added (payload integrity); flags expansion (pri, zero_len); 256-bit link flit table; decision log update (decisions 3–5) |
 | 1.0 | 2026-04-22 | Initial version — 256-byte payload, len[9], header bit fields, variable link occupancy, DDR5 burst alignment, decision log |

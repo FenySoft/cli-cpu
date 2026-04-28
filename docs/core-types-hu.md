@@ -2,7 +2,7 @@
 
 > English version: [core-types-en.md](core-types-en.md)
 
-> Version: 2.3
+> Version: 2.4
 
 > **⚠️ Vízió-szintű dokumentum.** Az itt szereplő terület-, core-szám- és SRAM-becslések irodalmi adatokból (TSMC 5nm SRAM macro datasheet, ISSCC referenciák) extrapolált munkahipotézisek az F1.5 fázisban. A pontos értékek csak F4 RTL és F6 szilícium (Cognitive Fabric One MPW) után validálhatók — addig minden szám munkabecslés, ami a roadmap minden fázisában felülvizsgálandó. Az itt rögzített mikroarchitektúrális filozófia (in-order, statikus ILP, no OoO) viszont **architekturális elv**, ami a [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) dokumentumban kerül részletes indoklásra.
 
@@ -67,6 +67,21 @@ A chip **hitelesítő kapuőre** — nem számítási egység. Minden kód (boot
 **Mikor:** Minden CFPU chipben. A darabszám az átbocsátási igénytől és a redundancia követelményektől függ.
 
 Skálázhatóság: 10 240 core-nál ~25%-os L3 crossbar kihasználtság (boot: ~320 ms, runtime: <0,1%).
+
+### QRAM régiók — capability slot tárolás (Nano / Actor / Rich)
+
+Minden Nano / Actor / Rich core SRAM-jának egy kis része **QRAM** (Quench-RAM, SEAL invariáns alatt), amelyet a HW-managed capability táblák használnak. A core szoftvere **nem írhatja**, a Seal Core dedikált hardwired config porton kezeli.
+
+| Régió | Méret / core | Használat | Spec |
+|-------|-------------|-----------|------|
+| **CST (NoC capability)** | ~2 KB | Aktor-aktor üzenet capability indexek (256 entry × 8 byte) | [`interconnect-hu.md`](interconnect-hu.md) v3.0, [`quench-ram-hu.md`](quench-ram-hu.md) |
+| **DDR5 capability slot** | **8 KB** | DDR5 hozzáférési jogok (256 actor × 4 slot × 8 byte) | [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) v1.3 |
+| **CODE régió SEAL** | aktor-függő | SEAL-elt CODE blokk (immutable kód) | [`quench-ram-hu.md`](quench-ram-hu.md) |
+| **Összesen QRAM-ban** | **~10 KB + CODE** | — | — |
+
+A 10 KB QRAM tipikus 64–256 KB SRAM méretből **<5%** — nem dominálja a core méretét.
+
+A Seal Core-nak **nincs** ilyen capability slot tárolása (a Seal Core nem aktor, nincsenek külső capability-jei).
 
 ## Terület összehasonlítás
 
@@ -169,6 +184,7 @@ A single-thread teljesítmény-becslés és összehasonlítási módszertan: [`p
 
 | Verzió | Dátum | Összefoglaló |
 |--------|------------|----------------------------------------------|
+| 2.4 | 2026-04-28 | **QRAM régiók szekció hozzáadva.** Minden Nano/Actor/Rich core SRAM-jában ~10 KB QRAM régió a HW-managed capability tárolásra: CST (~2 KB) és DDR5 capability slot (~8 KB). A Seal Core kezeli (SEAL/RELEASE), a software nem írhat. <5% a core SRAM-ból. Részletek: [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) v1.3, [`quench-ram-hu.md`](quench-ram-hu.md) v1.5. |
 | 2.3 | 2026-04-25 | Vízió-szintű disclaimer hozzáadva. Új „Mikroarchitektúra alapelvek" szekció (in-order, no OoO, TLP > ILP, statikus ILP, TOS reg stack, wide bus, warm-context cache) hivatkozással a `microarch-philosophy-hu.md` és `internal-bus-hu.md` dokumentumokra. Tervezési megkülönböztetők bővítve. |
 | 2.2 | 2026-04-21 | Core számok átszámolva monolitikus 800 mm²-ről a referencia chiplet konfigurációra (18 tine × 83 mm² = 1 494 mm²). SRAM skálázás szekció: 512 KB és 1 MB per core variánsok core számmal és chip SRAM-mal |
 | 2.1 | 2026-04-21 | Referencia node 7nm-ről 5nm-re változott. Minden logikai terület, core szám és router terület újraszámolva TSMC 5nm paraméterekkel (0,021 µm²/bit SRAM, ~171 MTr/mm² logikai sűrűség) |

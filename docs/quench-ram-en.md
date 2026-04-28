@@ -2,7 +2,7 @@
 
 > Magyar verzió: [quench-ram-hu.md](quench-ram-hu.md)
 
-> Version: 1.4
+> Version: 1.5
 
 This document describes the **architecture and ISA integration of the Quench-RAM** memory cell: per-block status-bit semantics, the two hardware state-machine operations (`SEAL`, `RELEASE`), the NAND-flash-derived "erase-on-release" pattern, and its relationship to ECMA-335 default-initialization semantics, the actor-model capability system, and the per-core garbage collector.
 
@@ -330,6 +330,32 @@ The linker (`cli-cpu-link`) decides at build time which region every field belon
 - **Capability forging physically eliminated:** the CST resides in a SEAL-ed QSRAM block; software sees only a 32-bit index
 - **Object identity stability:** the `ObjectId` is sealed; remains consistent across GC moves
 
+### DDR5 capability slot — same pattern, different use case
+
+The **DDR5 capability slot table** introduced in `ddr5-architecture-hu.md` v1.3 builds on the same SEAL invariant of QSRAM. Layout:
+
+```
+DDR5 capability slot (per core, in QRAM, under SEAL):
+
+slot_table[actor_id][slot_id] (8 bytes / slot):
++------------------+----------------+--------+-----+
+| region_base[36]  | region_size[24]| valid  | RWX |
++------------------+----------------+--------+-----+
+
+Allocation:  256 actors × 4 slots × 8 bytes = 8 KB / core
+Writer:      ONLY the Seal Core (atomic RELEASE+SEAL sequence)
+Reader:      HW request assembler (on ddr5_load/ddr5_store opcodes)
+```
+
+**Philosophical parallel:**
+- The **CST** (NoC actor-to-actor capability) lives in QSRAM under SEAL — software sees only an index
+- The **DDR5 capability slot** likewise lives in QSRAM under SEAL — software only sees a `slot_id` in the opcode
+- Both are HW-managed; Quench-RAM SEAL+RELEASE provides the tamper-proof guarantee and atomic revocation
+
+**Revocation:** when the `kernel_io_sup` actor revokes via the Seal Core, it **RELEASE**-s the slot — atomic wipe (1 cycle), no epoch, no window. This is the natural Quench-RAM behavior.
+
+**Details:** [`docs/ddr5-architecture-hu.md`](ddr5-architecture-hu.md) v1.3, "5.e) HW Capability Slot" decision.
+
 ## Security guarantees <a name="security"></a>
 
 Quench-RAM provides physical-level defense against **seven new attack classes** that the current `docs/security-en.md` table either omits or only partially addresses:
@@ -459,6 +485,7 @@ Quench-RAM is **not a prerequisite** for F0-F4; these continue to operate on the
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5 | 2026-04-28 | **DDR5 capability slot use case added.** The DDR5 capability slot table introduced in `ddr5-architecture-hu.md` v1.3 builds on the same QSRAM SEAL invariant — same pattern as CST: HW-managed, atomically revocable via RELEASE. New section under "Synergy with the actor-model capability system": per-core 8 KB capability slot table (256 actors × 4 slots × 8 bytes), managed by the Seal Core. |
 | 1.4 | 2026-04-24 | HMAC/SipHash references removed — capability protection replaced with CST (Capability Slot Table) model: QSRAM SEAL-protected, physically unforgeable. Software sees only 32-bit CST index, never raw ActorRef. CST entry: dst[24]+actor[8]+perm[8]+reserved[24]. Delegation: supervisor-to-supervisor VN0, UNSEAL→write→RESEAL atomic HW FSM. |
 | 1.3 | 2026-04-19 | SEAL triggers refined: within Core, only CODE region needs SEAL (data protected by CIL type system). Swap-out SEAL and swap-in RELEASE added. Primary motivation rewritten (CODE immutability + external QRAM protection). |
 | 1.2 | 2026-04-19 | Row-selective clear clarification (not BIST broadcast). F5: FPGA demo, F6: first silicon. |

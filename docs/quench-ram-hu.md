@@ -2,7 +2,7 @@
 
 > English version: [quench-ram-en.md](quench-ram-en.md)
 
-> Version: 1.4
+> Version: 1.5
 
 Ez a dokumentum a **Quench-RAM** memóriacella **architektúráját és ISA-illesztését** írja le: a per-blokk státuszbit szemantikáját, a két hardveres állapotgép-műveletet (`SEAL`, `RELEASE`), a NAND-flash-szel rokon „erase-on-release" mintát, és a kapcsolatot az ECMA-335 default-initialization szemantikával, az aktor-modell capability-rendszerével és a per-core garbage collector-ral.
 
@@ -330,6 +330,32 @@ A linker (`cli-cpu-link`) build-time eldönti minden mezőről, hogy melyik rég
 - **Capability forging fizikai kizárása:** a CST SEAL-elt QSRAM blokkban van; a szoftver csak 32-bit indexet lát
 - **Object identity stabilitása:** az `ObjectId` sealed; egy GC mozgatás után is konzisztens marad
 
+### DDR5 capability slot — ugyanaz a minta, más use case
+
+A `ddr5-architecture-hu.md` v1.3-ban bevezetett **DDR5 capability slot tábla** a QSRAM ugyanezen SEAL invariánsára épül. Felépítés:
+
+```
+DDR5 capability slot (per core, QRAM-ban, SEAL alatt):
+
+slot_table[actor_id][slot_id] (8 byte / slot):
++------------------+----------------+--------+-----+
+| region_base[36]  | region_size[24]| valid  | RWX |
++------------------+----------------+--------+-----+
+
+Allokáció:  256 actor × 4 slot × 8 byte = 8 KB / core
+Írhat:      KIZÁRÓLAG Seal Core (RELEASE+SEAL atomi szekvencia)
+Olvashat:   HW request assembler (ddr5_load/ddr5_store opkódoknál)
+```
+
+**Filozófia párhuzam:**
+- A **CST** (NoC aktor-aktor capability) a QSRAM-ban él, SEAL alatt — a szoftver csak indexet lát
+- A **DDR5 capability slot** ugyanígy a QSRAM-ban él, SEAL alatt — a szoftver csak `slot_id`-t lát az opkódban
+- Mindkettő HW-managed; a Quench-RAM SEAL+RELEASE adja a tamper-proof garanciát és az atomi visszavonást
+
+**Revocation:** a `kernel_io_sup` aktor visszahívási kérése a Seal Core-on keresztül **RELEASE**-eli a slot-ot — atomi wipe (1 ciklus), nincs epoch, nincs window. Ez a Quench-RAM természetes működése.
+
+**Részletek:** [`docs/ddr5-architecture-hu.md`](ddr5-architecture-hu.md) v1.3, "5.e) HW Capability Slot" döntés.
+
 ## Biztonsági garanciák <a name="biztonsag"></a>
 
 A Quench-RAM **hét új attack-class** ellen ad fizikai szintű védelmet, amelyeket a `docs/security-hu.md` jelenlegi táblázata vagy nem említ, vagy csak részben:
@@ -459,6 +485,7 @@ A Quench-RAM **nem feltétel** az F0-F4 fázisokhoz; ezek a meglévő SRAM-model
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.5 | 2026-04-28 | **DDR5 capability slot use case hozzáadva.** A `ddr5-architecture-hu.md` v1.3-ban bevezetett DDR5 capability slot tábla a QSRAM SEAL invariánsára épül — ugyanaz a minta, mint a CST: HW-managed, atomi RELEASE-szel visszavonható. Új szekció a "Szinergia az aktor-modell capability-rendszerével" alatt: per-core 8 KB capability slot tábla (256 actor × 4 slot × 8 byte), Seal Core kezeli. |
 | 1.4 | 2026-04-24 | HMAC/SipHash hivatkozások törölve — capability védelem CST (Capability Slot Table) modellre cserélve: QSRAM SEAL-védett, fizikailag hamisíthatatlan. Szoftver csak 32-bit CST indexet lát, nyers ActorRef-et nem. CST entry: dst[24]+actor[8]+perm[8]+reserved[24]. Delegation: supervisor-to-supervisor VN0, UNSEAL→write→RESEAL atomi HW FSM. |
 | 1.3 | 2026-04-19 | SEAL triggerek pontosítása: Core-on belül csak CODE régióra kell SEAL (adatot a CIL típusrendszer védi). Swap-out SEAL és swap-in RELEASE hozzáadva. Elsődleges motiváció átírva (CODE immutability + külső QRAM védelem). |
 | 1.2 | 2026-04-19 | Row-selective clear pontosítás (nem BIST broadcast). F5: FPGA demo, F6: első szilícium. |

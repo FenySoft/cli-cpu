@@ -2,7 +2,7 @@
 
 > Magyar verzió: [core-types-hu.md](core-types-hu.md)
 
-> Version: 2.3
+> Version: 2.4
 
 > **⚠️ Vision-level document.** The area, core-count, and SRAM figures presented here are working hypotheses extrapolated from documented sources (TSMC 5nm SRAM macro datasheets, ISSCC references) during the F1.5 phase. Precise values can only be validated after F4 RTL and F6 silicon (Cognitive Fabric One MPW) — until then every number is a working estimate subject to revision at each roadmap phase. The microarchitectural philosophy recorded here (in-order, static ILP, no OoO) is, however, an **architectural principle** detailed in [`microarch-philosophy-en.md`](microarch-philosophy-en.md).
 
@@ -67,6 +67,21 @@ The chip's **authentication gatekeeper** — not a compute unit. All code (boot,
 **When:** Every CFPU chip. The count depends on throughput requirements and redundancy needs.
 
 Scalability: at 10,240 cores, ~25% L3 crossbar utilization (boot: ~320 ms, runtime: <0.1%).
+
+### QRAM regions — capability slot storage (Nano / Actor / Rich)
+
+A small portion of every Nano / Actor / Rich core's SRAM is **QRAM** (Quench-RAM, under SEAL invariant), used by the HW-managed capability tables. Core software **cannot write** them; the Seal Core manages them via a dedicated hardwired config port.
+
+| Region | Size / core | Use | Spec |
+|--------|-------------|-----|------|
+| **CST (NoC capability)** | ~2 KB | Actor-to-actor message capability indexes (256 entries × 8 bytes) | [`interconnect-en.md`](interconnect-en.md) v3.0, [`quench-ram-en.md`](quench-ram-en.md) |
+| **DDR5 capability slot** | **8 KB** | DDR5 access rights (256 actors × 4 slots × 8 bytes) | [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) v1.3 |
+| **CODE region SEAL** | actor-dependent | SEAL-ed CODE block (immutable code) | [`quench-ram-en.md`](quench-ram-en.md) |
+| **Total in QRAM** | **~10 KB + CODE** | — | — |
+
+The 10 KB QRAM is **<5%** of a typical 64–256 KB SRAM — it does not dominate core size.
+
+The Seal Core has **no** such capability slot storage (Seal Core is not an actor and has no external capabilities).
 
 ## Area Comparison
 
@@ -169,6 +184,7 @@ Single-thread perf estimate and comparison methodology: [`perf-vs-riscv-en.md`](
 
 | Version | Date | Summary |
 |---------|------------|----------------------------------------------|
+| 2.4 | 2026-04-28 | **QRAM regions section added.** Every Nano/Actor/Rich core has ~10 KB QRAM in its SRAM for HW-managed capability storage: CST (~2 KB) and DDR5 capability slot (~8 KB). Managed by the Seal Core (SEAL/RELEASE), software cannot write. <5% of core SRAM. Details: [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) v1.3, [`quench-ram-en.md`](quench-ram-en.md) v1.5. |
 | 2.3 | 2026-04-25 | Vision-level disclaimer added. New "Microarchitectural Principles" section (in-order, no OoO, TLP > ILP, static ILP, TOS reg stack, wide bus, warm-context cache) cross-referencing `microarch-philosophy-en.md` and `internal-bus-en.md`. Design Differentiators extended. |
 | 2.2 | 2026-04-21 | Core counts recalculated from monolithic 800 mm² to reference chiplet configuration (18 tines × 83 mm² = 1,494 mm²). SRAM scaling section: 512 KB and 1 MB per core variants with core counts and chip SRAM |
 | 2.1 | 2026-04-21 | Reference node changed from 7nm to 5nm. All logic areas, core counts, and router areas recalculated using TSMC 5nm parameters (0.021 µm²/bit SRAM, ~171 MTr/mm² logic density) |

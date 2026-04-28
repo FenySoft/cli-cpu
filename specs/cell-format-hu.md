@@ -2,7 +2,7 @@
 
 > English version: [cell-format-en.md](cell-format-en.md)
 
-> Version: 2.1
+> Version: 2.2
 
 > Forrás: `docs/interconnect-hu.md` v3.1 (2026-04-28)
 
@@ -66,13 +66,14 @@ Szó 3: reserved[8] + CRC-16[16] + CRC-8[8]        = 32 bit  — integrity
 
 ### flags mező részletezés
 
-| Bit | Név | Jelentés |
-|-----|-----|---------|
-| 7 | `vn` | 0 = VN1 (actor üzenet), 1 = VN0 (control: supervisor, trap, heartbeat) |
-| 6 | `relay` | 1 = relay üzenet (L3 fault tolerance, lásd interconnect spec) |
-| 5..4 | `pri` | Prioritás (00 = normál, 01–11 = jövőbeli QoS szintek) |
-| 3 | `zero_len` | 1 = nincs payload (0 byte), a `len` mező nem értelmezett |
-| 2..0 | reserved | Jövőbeli használat |
+| Bit | Név | Ki írhatja? | Jelentés |
+|-----|-----|-------------|---------|
+| 7 | `vn` | Küldő SW | 0 = VN1 (actor üzenet), 1 = VN0 (control: supervisor, trap, heartbeat) |
+| 6 | `relay` | NoC HW | 1 = relay üzenet (L3 fault tolerance, lásd interconnect spec) |
+| 5..4 | `pri` | Küldő SW | Prioritás (00 = normál, 01–11 = jövőbeli QoS szintek) |
+| 3 | `zero_len` | Küldő SW | 1 = nincs payload (0 byte), a `len` mező nem értelmezett |
+| 2 | `ddr5_cap` | **CSAK core HW** | 1 = a payload első 8 byte-ja HW-attached DDR5 capability slot. A SW `send` opkódjában ez a bit maszkolva van 0-ra (HW filter). Részletek: [`ddr5-architecture-hu.md`](../docs/ddr5-architecture-hu.md) v1.3 |
+| 1..0 | reserved | — | Jövőbeli használat |
 
 ## Payload (1–128 byte)
 
@@ -191,7 +192,7 @@ A jövőbeli `BUS_WIDTH=256` upscale-nél a 256B payload egyetlen cellában fog 
 **v2.0 felülvizsgálat (2026-04-28):** 16 bit → 8 bit actor ID, mert:
 - 256 aktor/core elegendő: a CST (Context Switch Table) HW-managed — az aktív actor context regiszter hardveresen tölti a `src_actor` mezőt, **nem hamisítható** (a core szoftvere nem írhatja felül)
 - A felszabadult 2 × 8 bit (összesen 16 bit) a `seq` mezőt 8 → 16 bitre bővíti, ami nagyobb fragmentált üzeneteket tesz lehetővé
-- DDR5 CAM tábla aktor-szintű ACL továbbra is működik (`src[24] + src_actor[8]`)
+- DDR5 capability slot aktor-szintű ACL továbbra is működik (`src[24] + src_actor[8]` defence-in-depth a controller-en, lásd `ddr5-architecture-hu.md` v1.3)
 - Crash recovery: csak az adott aktor capability-jét törli
 - Router dispatch: header-ből olvasható, nem kell payload-ba nyúlni
 
@@ -220,6 +221,7 @@ A jövőbeli `BUS_WIDTH=256` upscale-nél a 256B payload egyetlen cellában fog 
 
 | Verzió | Dátum | Változás |
 |--------|-------|---------|
+| 2.2 | 2026-04-28 | **`flags.ddr5_cap` HW-only bit allokálva.** A korábbi `reserved[3]` bit-ből egyet (bit 2) elneveztük `ddr5_cap`-nek, jelentés: a payload első 8 byte-ja egy HW-attached DDR5 capability slot. A bitet **CSAK a core HW request assembler-e állíthatja be**; az aktor SW `send` opkódja maszkolva 0-ra. A flags tábla "Ki írhatja?" oszloppal bővült. Részletek: [`docs/ddr5-architecture-hu.md`](../docs/ddr5-architecture-hu.md) v1.3 |
 | 2.1 | 2026-04-28 | **v3.1 interconnect rollback szinkronizáció:** L0 busz 256→128 bit, max payload 256→128 byte (`CELL_SIZE = 128`), buffer slot 272→144 byte. Header layout **változatlan** (16 byte, 4×32 bit). `len[8]` szemantika változatlan (`len+1`), de v3.1-ben max 128 (`len ≤ 127`); a felső 128 érték a jövőbeli `BUS_WIDTH` upscale-re fenntartva. `BUS_WIDTH` RTL paraméter bevezetve (default 128, jövőbeli 256/512/1024). DDR5 burst illeszkedés frissítve (BL32 = 128 byte natív). Indoklás: [`docs/decision-bus-rollback-hu.md`](../docs/decision-bus-rollback-hu.md) |
 | 2.0 | 2026-04-28 | Header átszervezés: 4 × 32 bit szó layout; src_actor/dst_actor 16→8 bit (HW-managed CST); seq 8→16 bit; len[9]→len[8] (len+1 kódolás); CRC-16 hozzáadva (payload integritás); flags bővítés (pri, zero_len); 256-bit link flit táblázat; döntési napló frissítés (3–5. döntés) |
 | 1.0 | 2026-04-22 | Első verzió — 256 byte payload, len[9], header bitmezők, változó link foglalás, DDR5 burst illeszkedés, döntési napló |
