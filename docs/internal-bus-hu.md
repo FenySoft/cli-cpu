@@ -2,7 +2,7 @@
 
 > English version: [internal-bus-en.md](internal-bus-en.md)
 
-> Version: 1.1
+> Version: 1.2
 
 > **⚠️ Vízió-szintű dokumentum.** Az itt szereplő busz-szélesség, area- és power-becslések irodalmi adatokból (TSMC 5nm SRAM macro datasheet, AMD Zen, Apple M, NVIDIA H100 publikus paraméterek) extrapolált munkahipotézisek. A pontos értékek csak F2.7 FPGA bring-up és F6 szilícium után validálhatók. A dokumentum célja a tervezési irányt és a döntés-trail-t rögzíteni, nem a végleges paramétereket.
 
@@ -66,17 +66,18 @@ A **64-cycle stall** (amit a korábbi elemzések feltételeztek 32-bites busszal
 
 Becslések 5nm node-on, 1 mm-es busz-hossz:
 
-| Réteg | 32-bit | 256-bit | 512-bit | 1024-bit |
-|---|---|---|---|---|
-| Wire trace | ~32 | 256 | 512 | 1024 |
-| Metal layer felhasználás | M3–M4 | M3–M5 | M4–M6 | M4–M7 + tile-routing |
-| Repeater cell-ek (500 µm-enként) | ~64/mm | ~512/mm | ~1K/mm | ~2K/mm |
-| SRAM macro port szélesség | 32-bit | 256-bit (8 bank × 32) | 512-bit (8 bank × 64) | 1024-bit (16 bank × 64) |
-| Dinamikus power (1 GHz, 50% activity) | ~0,3 mW | ~2,5 mW | ~5 mW | ~10 mW |
-| Reg file area-növekmény (relatív) | 1× | ~1,3× | ~1,8× | ~2,8× |
+| Réteg | 32-bit | **128-bit** | 256-bit | 512-bit | 1024-bit |
+|---|---|---|---|---|---|
+| Wire trace | ~32 | **128** | 256 | 512 | 1024 |
+| Metal layer felhasználás | M3–M4 | **M3–M4** | M3–M5 | M4–M6 | M4–M7 + tile-routing |
+| Repeater cell-ek (500 µm-enként) | ~64/mm | **~256/mm** | ~512/mm | ~1K/mm | ~2K/mm |
+| SRAM macro port szélesség | 32-bit | **128-bit (4 bank × 32)** | 256-bit (8 bank × 32) | 512-bit (8 bank × 64) | 1024-bit (16 bank × 64) |
+| Dinamikus power (1 GHz, 50% activity) | ~0,3 mW | **~1,3 mW** | ~2,5 mW | ~5 mW | ~10 mW |
+| Reg file area-növekmény (relatív) | 1× | **~1,15×** | ~1,3× | ~1,8× | ~2,8× |
 
 **Kritikus küszöbök:**
 
+- **128-bit** az L0 cluster mesh NoC link szélessége (`interconnect-hu.md` v3.1) — szintetizálható FPGA-n (A7-Lite 200T), ~3% area-overhead a tile szintjén, könnyű routing
 - **256-bit** beleilleszthető egy egyszerű tile-routing-ba 5nm node-on, ~5–7% area-overhead a tile szintjén
 - **512-bit** erőltetett tile-en belül, ideális egy Rich core back-end buszának
 - **1024-bit** tile-en belül drága; itt érdemes 4-bank × 256-bit lokális + 1024-bit logikai látvánnyal megoldani (HBM-stílus)
@@ -168,5 +169,6 @@ A 256–512 bit egy mai 5nm AI/many-core chip-en **ipari standard**, nem extrava
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.2 | 2026-04-28 | **HW költés tábla bővítve 128-bit oszloppal.** A "HW költés — area és power" tábla mostantól tartalmazza a 128-bit oszlopot is (interpolált értékek a 32-bit és 256-bit között): wire trace 128, M3-M4 metal, ~256 repeater/mm, 4 bank × 32 SRAM port, ~1,3 mW dinamikus power, ~1,15× reg file area. Új kritikus küszöb: 128-bit az L0 cluster mesh NoC link, FPGA-szintetizálható, ~3% tile area-overhead |
 | 1.1 | 2026-04-28 | **NoC réteg szinkronizáció `interconnect-hu.md` v3.1-gyel.** A "Választott méretezés" tábla pontosítva: a "Tile-szintű NoC (4–8 mag)" → **L0 cluster mesh (16 core, 4×4 mesh, 128-bit v3.1)**; a "Chip-szintű NoC (tile↔tile) 128-bit" hibás v2.4 hivatkozás kicserélve a tényleges hierarchikus link típusokra (L1 = 84-bit párhuzamos, L2/L3 = soros SerDes). Új megjegyzés: a core-belső busz és a NoC link **két különböző réteg**. Core-belső busz méretek (Nano/Actor 256, Rich 512, ML 1024, Seal 64) változatlanok |
 | 1.0 | 2026-04-25 | Kezdeti verzió — port-bottleneck elemzés, context move cycle-számolás 32–1024 bit között, választott méretezés core típusonként, döntés-trail (egységes 32 / egységes 256 / heterogén / egységes 1024) |

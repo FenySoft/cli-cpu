@@ -2,7 +2,7 @@
 
 > Magyar verzió: [internal-bus-hu.md](internal-bus-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 > **⚠️ Vision-level document.** The bus widths, area, and power figures presented here are working hypotheses extrapolated from documented sources (TSMC 5nm SRAM macro datasheets, AMD Zen, Apple M, NVIDIA H100 published parameters). Precise values can only be validated after F2.7 FPGA bring-up and F6 silicon. The document records design direction and decision trail, not final parameters.
 
@@ -66,17 +66,18 @@ The **64-cycle stall** (assumed by earlier analyses with a 32-bit bus) **shrinks
 
 Estimates at 5nm node, 1 mm bus length:
 
-| Layer | 32-bit | 256-bit | 512-bit | 1024-bit |
-|---|---|---|---|---|
-| Wire trace | ~32 | 256 | 512 | 1024 |
-| Metal layer usage | M3–M4 | M3–M5 | M4–M6 | M4–M7 + tile routing |
-| Repeater cells (every 500 µm) | ~64/mm | ~512/mm | ~1K/mm | ~2K/mm |
-| SRAM macro port width | 32-bit | 256-bit (8 banks × 32) | 512-bit (8 banks × 64) | 1024-bit (16 banks × 64) |
-| Dynamic power (1 GHz, 50% activity) | ~0.3 mW | ~2.5 mW | ~5 mW | ~10 mW |
-| Reg file area increase (relative) | 1× | ~1.3× | ~1.8× | ~2.8× |
+| Layer | 32-bit | **128-bit** | 256-bit | 512-bit | 1024-bit |
+|---|---|---|---|---|---|
+| Wire trace | ~32 | **128** | 256 | 512 | 1024 |
+| Metal layer usage | M3–M4 | **M3–M4** | M3–M5 | M4–M6 | M4–M7 + tile routing |
+| Repeater cells (every 500 µm) | ~64/mm | **~256/mm** | ~512/mm | ~1K/mm | ~2K/mm |
+| SRAM macro port width | 32-bit | **128-bit (4 banks × 32)** | 256-bit (8 banks × 32) | 512-bit (8 banks × 64) | 1024-bit (16 banks × 64) |
+| Dynamic power (1 GHz, 50% activity) | ~0.3 mW | **~1.3 mW** | ~2.5 mW | ~5 mW | ~10 mW |
+| Reg file area increase (relative) | 1× | **~1.15×** | ~1.3× | ~1.8× | ~2.8× |
 
 **Critical thresholds:**
 
+- **128-bit** is the L0 cluster mesh NoC link width (`interconnect-en.md` v3.1) — synthesizable on FPGA (A7-Lite 200T), ~3% area overhead at tile level, easy routing
 - **256-bit** fits in a simple tile routing at 5nm node, ~5–7% area overhead at tile level
 - **512-bit** is tight within a tile, ideal as a Rich core back-end bus
 - **1024-bit** within a tile is expensive; better solved as 4-bank × 256-bit local + 1024-bit logical view (HBM-style)
@@ -168,5 +169,6 @@ Estimates at 5nm node, 1 mm bus length:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2 | 2026-04-28 | **HW cost table expanded with the 128-bit column.** The "HW cost — area and power" table now includes a 128-bit column (interpolated between 32-bit and 256-bit): wire trace 128, M3-M4 metal, ~256 repeaters/mm, 4 banks × 32 SRAM port, ~1.3 mW dynamic power, ~1.15× reg file area. New critical threshold: 128-bit is the L0 cluster mesh NoC link, FPGA-synthesizable, ~3% tile area overhead |
 | 1.1 | 2026-04-28 | **NoC layer synchronization with `interconnect-en.md` v3.1.** Selected sizing table corrected: "Tile-level NoC (4–8 cores)" → **L0 cluster mesh (16 cores, 4×4 mesh, 128-bit v3.1)**; the incorrect "Chip-level NoC (tile↔tile) 128-bit" v2.4 reference replaced with the actual hierarchical link types (L1 = 84-bit parallel, L2/L3 = serial SerDes). New note: the intra-core bus and the NoC link are **two different layers**. Intra-core bus widths (Nano/Actor 256, Rich 512, ML 1024, Seal 64) unchanged |
 | 1.0 | 2026-04-25 | Initial version — port bottleneck analysis, context move cycle counting from 32–1024 bit, selected sizing per core type, decision trail (uniform 32 / uniform 256 / heterogeneous / uniform 1024) |
