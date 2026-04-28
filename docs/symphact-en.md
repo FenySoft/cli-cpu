@@ -6,7 +6,7 @@
 
 > Magyar verzió: [symphact-hu.md](symphact-hu.md)
 
-> Version: 2.0 (2026-04-17 — stub, redirect only)
+> Version: 2.0
 
 ## What is this?
 
@@ -39,3 +39,10 @@ Three reasons:
 ## OS → HW feedback loop
 
 If an OS requirement surfaces during Symphact development (`osreq`), it is tracked at [`FenySoft/Symphact/docs/osreq-to-cfpu/`](https://github.com/FenySoft/Symphact/tree/main/docs/osreq-to-cfpu), and mirrored on the CLI-CPU side as issues labeled `osreq-from-os`.
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 2.0 | 2026-04-26 | Stub redirect — vision document moved to FenySoft/Symphact |
+| 1.0 | 2026-04-26 | Initial release |

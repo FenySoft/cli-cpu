@@ -392,5 +392,5 @@ Ezek fényében a CLI-CPU projektet érdemes **két párhuzamos narratívával**
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
-| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
 | 1.1 | 2026-04-25 | CLI-CPU → CFPU átnevezés architektúra/szilícium szinten a [brand-hu.md](brand-hu.md) szerint; CLI-CPU megmarad a projekt-szintű hivatkozásoknál (roadmap fázisok, szimulátor, linker output, projekt kommunikáció). |
+| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

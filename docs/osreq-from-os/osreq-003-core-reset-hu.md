@@ -6,6 +6,8 @@
 >
 > **Érintett CFPU fázis:** F4, F5, F6
 
+> Version: 1.0
+
 ## OS-oldali igény
 
 A Symphact „let it crash" supervision modellje **gyakori core restart-ot** feltételez. Amikor egy actor hibát dob, a supervisor (Rich Core) újraindítja a hibás Nano core-t. Ehhez:
@@ -33,3 +35,9 @@ A Symphact „let it crash" supervision modellje **gyakori core restart-ot** fel
 5. Kell-e `CORE_RESET_REASON` regiszter (trap code, watchdog, explicit)?
 
 A részletes specifikáció a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-003-core-reset-hu.md).
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-20 | Kezdeti kiadás |

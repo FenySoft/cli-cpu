@@ -310,9 +310,9 @@ Detailed core description: [core-types-en.md](core-types-en.md)
 
 ---
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
-| Version | Date | Change |
-|---------|------|--------|
+| Version | Date | Summary |
+|---------|------|---------|
 | 1.1 | 2026-04-20 | Boot source selection: 5 sources (QSPI, UART, BRAM, Ethernet, JTAG) aligned to XC7A200T FPGA capabilities. MMIO registers extended for all boot sources. 64-byte chunk data reads (= cell payload size). |
 | 1.0 | 2026-04-19 | Initial version — HW boot separated from Symphact boot-sequence-hu.md |

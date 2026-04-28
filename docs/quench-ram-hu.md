@@ -481,7 +481,7 @@ A Quench-RAM **nem feltétel** az F0-F4 fázisokhoz; ezek a meglévő SRAM-model
 - [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) — a per-core GC és capability registry, amelyek a Quench-RAM-ot használják
 - `docs/secure-element-hu.md` — F6.5 Secure Edition, ahol a finom-szemcsés Quench-RAM kötelező
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|

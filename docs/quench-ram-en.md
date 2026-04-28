@@ -481,7 +481,7 @@ Quench-RAM is **not a prerequisite** for F0-F4; these continue to operate on the
 - [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) — the per-core GC and capability registry that use Quench-RAM
 - `docs/secure-element-en.md` — F6.5 Secure Edition, where fine-grained Quench-RAM is mandatory
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
 | Version | Date | Summary |
 |---------|------|---------|

@@ -6,6 +6,8 @@
 >
 > **Affected CFPU phase:** F5, F6
 
+> Version: 1.0
+
 ## OS-side requirement
 
 The Symphact persistence model (Event Sourcing) requires that actor state can be written to external storage (FRAM/PSRAM) in an **asynchronous, non-blocking** manner. Core SRAM is volatile → a **DMA engine** is needed for journal/snapshot writes.
@@ -26,3 +28,9 @@ The Symphact persistence model (Event Sourcing) requires that actor state can be
 5. Double buffering (ping-pong journal buffer)?
 
 The detailed specification is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-en.md).
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-20 | Initial release |

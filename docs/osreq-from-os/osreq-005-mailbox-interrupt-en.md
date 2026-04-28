@@ -6,6 +6,8 @@
 >
 > **Affected CFPU phase:** F4, F5, F6
 
+> Version: 1.0
+
 ## OS-side requirement
 
 The Symphact scheduler needs to know how a core is notified of a new mailbox message. This is the foundation of the event-driven model.
@@ -26,3 +28,9 @@ The Symphact scheduler needs to know how a core is notified of a new mailbox mes
 5. Power domain: clock-gated, power-gated, or both?
 
 The detailed specification (with power calculations) is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-en.md).
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-20 | Initial release |

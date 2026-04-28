@@ -588,7 +588,7 @@ Ezek a kérdések **nem blokkolják** az alsóbb fázisokat — a v1.0 modell ko
 - RFC 8554: Leighton-Micali Hash-Based Signatures (LMS)
 - RFC 8391: XMSS: eXtended Merkle Signature Scheme
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|

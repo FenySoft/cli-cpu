@@ -218,3 +218,9 @@ Some sentences legitimately span two layers. The rule of thumb is: **lead with t
 - [docs/core-types-en.md](core-types-en.md) — CFPU product lines (Nano / Actor / Rich / Matrix / Seal).
 - [docs/security-en.md](security-en.md) — CFPU security model.
 - [docs/roadmap-en.md](roadmap-en.md) — CLI-CPU project phases F0–F7.
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-26 | Initial release |

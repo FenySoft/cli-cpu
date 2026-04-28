@@ -6,6 +6,8 @@
 >
 > **Affected CFPU phase:** F4, F5, F6
 
+> Version: 1.0
+
 ## OS-side requirement
 
 The Symphact "let it crash" supervision model assumes **frequent core restarts**. When an actor throws an error, the supervisor (Rich Core) restarts the faulty Nano core. This requires:
@@ -33,3 +35,9 @@ The Symphact "let it crash" supervision model assumes **frequent core restarts**
 5. Is a `CORE_RESET_REASON` register needed (trap code, watchdog, explicit)?
 
 The detailed specification is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-003-core-reset-en.md).
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-20 | Initial release |

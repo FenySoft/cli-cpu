@@ -4,6 +4,8 @@
 
 > Magyar verzió: [nlnet-submission-record-hu.md](nlnet-submission-record-hu.md)
 
+> Version: 1.0
+
 ## Submission metadata
 
 | Field | Value |

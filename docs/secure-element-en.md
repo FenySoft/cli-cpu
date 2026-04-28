@@ -738,5 +738,5 @@ Our **differentiating position** is not that we are "yet another open SE" -- but
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 1.0 | 2026-04-14 | Initial versioned release |
 | 1.1 | 2026-04-25 | Renamed CLI-CPU → CFPU at the chip / product-family level per [brand-en.md](brand-en.md); product line is now "CFPU Secure Edition" with sub-products "CFPU Open Banking Card", "CFPU Open eSIM", etc. CLI-CPU retained for project-level references (roadmap phase, repo, simulator). |
+| 1.0 | 2026-04-14 | Initial versioned release |

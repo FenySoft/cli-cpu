@@ -2,7 +2,7 @@
 
 > English version: [tool-openness-en.md](tool-openness-en.md)
 >
-> Verzió: 1.0
+> Version: 1.0
 
 Ez a dokumentum a CLI-CPU projekt fejlesztéséhez használt eszközök **licencelési státuszát** és a **nyitottsági stratégiát** rögzíti. Az NLnet NGI Zero Commons Fund pályázat explicit módon említi a „libre silicon"-t mint támogatási kritériumot, és ezért fontos, hogy a projekt filozófiája ebben a kérdésben átlátható és konzisztens legyen.
 

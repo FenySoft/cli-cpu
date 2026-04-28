@@ -6,6 +6,8 @@
 >
 > **Affected CFPU phase:** F6, F7
 
+> Version: 1.0
+
 ## OS-side requirement
 
 Symphact location transparency requires that `TActorRef` **does not reveal** whether the target actor is local or on another chip. The `Send(ref, msg)` call must work transparently across chip boundaries.
@@ -32,3 +34,9 @@ Message format: `[src_chip:8][dst_chip:8][dst_cluster:8][dst_core:16][msg_len:16
 6. Encryption: are inter-chip messages encrypted?
 
 The detailed specification is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-en.md).
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-20 | Initial release |

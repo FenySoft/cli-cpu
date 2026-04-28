@@ -1,6 +1,8 @@
 # Cognitive Fabric — Vision: The Shared-Nothing Future
 
-> Magyar verzio: [vision-hu.md](vision-hu.md)
+> Magyar verzió: [vision-hu.md](vision-hu.md)
+
+> Version: 1.1
 
 This document explores what happens when we **redesign the entire software stack** around the **Cognitive Fabric Processing Unit (CFPU)** hardware model — operating system, GUI, database, networking, programming model. Instead of measuring the hardware by today's software, we design the software to fit the hardware.
 
@@ -76,12 +78,12 @@ Isolation is not software-based (MMU + page table) — it is HARDWARE-BASED.
 
 | Aspect | Today (Linux/Windows/macOS) | Symphact |
 |---|---|---|
-| Syscall overhead | ~1-5 us (mode switch) | **~5-20 ns** (mailbox message) |
+| Syscall overhead | ~1-5 µs (mode switch) | **~5–20 ns** (mailbox message) |
 | Kernel bug impact | System crash | Supervisor **restarts** the faulty actor |
 | Kernel size | ~40M lines (Linux) | **~5K lines** Symphact core |
 | Isolation type | Software (MMU + page table) | **Hardware** (physical SRAM) |
 | Hot code reload | Impossible (kernel restart) | **Native** — actor code is swappable at runtime |
-| Boot time | ~1-30 seconds | **~1-10 us** (no init, no driver scan) |
+| Boot time | ~1-30 seconds | **~1-10 µs** (no init, no driver scan) |
 
 **The 40 million lines of the Linux kernel exist because shared memory must be protected in software.** If the hardware guarantees isolation, the kernel's **purpose disappears**.
 
@@ -160,11 +162,12 @@ Today the GPU is needed because a single CPU core cannot draw enough pixels with
 1000 Nano cores = ~2000 pixels / core / frame
 
 2000 pixels x 32 bit color = ~8 KB processing
-@ 3 GHz x 0.4 IPC = ~1.2 GIPS → ~6.7 us / core
+@ 3 GHz x 0.4 IPC = ~1.2 GIPS → ~6.7 µs / core
 
-Uses ~7 us out of a 16ms frame budget = ~0.04%
-Plenty of room. Software rendering without a GPU,
-but with HARDWARE parallelism.
+Uses ~7 µs out of a 16ms frame budget = ~0.04% (flat fill)
+Complex vector rendering (Bézier, anti-alias) may use ~1-5%,
+but still well within the 16ms budget. Software rendering
+without a GPU, but with HARDWARE parallelism.
 ```
 
 This does not mean the GPU is useless — texturing, 3D, ML inference still need it. But **2D vector GUI** (the way every business application, OS interface, and dashboard looks) can be **handled without a GPU, using a Nano core actor mesh**.
@@ -218,7 +221,7 @@ NO WAL — the message log IS the event log.
 
 | Aspect | Today's RDBMS (PostgreSQL) | Actor DB |
 |---|---|---|
-| INSERT latency | ~5-50 us (WAL + buffer lock + fsync) | **~50-500 ns** (SRAM write) |
+| INSERT latency | ~5-50 µs (WAL + buffer lock + fsync) | **~50-500 ns** (SRAM write) |
 | Lock contention | Degrades with core count | **0** — no shared state |
 | Horizontal scaling | Complex (replication, sharding) | **Trivial** — new partition = new actor |
 | Event sourcing | Separate framework (EventStore, Marten) | **Native** — the message log is the data |
@@ -236,16 +239,16 @@ NO WAL — the message log IS the event log.
 
 ```
 Application
-    ↓ syscall (~1-5 us)
+    ↓ syscall (~1-5 µs)
 Kernel socket layer
-    ↓ copy (~0.5-2 us)
+    ↓ copy (~0.5-2 µs)
 TCP/IP stack (kernel)
-    ↓ copy (~0.5-2 us)
+    ↓ copy (~0.5-2 µs)
 NIC driver
     ↓
 Hardware
 
-Processing one packet: ~3-10 us
+Processing one packet: ~3-10 µs
 ~80% of that is kernel overhead (mode switch, copy, lock).
 ```
 
@@ -270,8 +273,8 @@ This is the **Erlang/BEAM telecom model, but in hardware**. The Ericsson AXD 301
 
 | | x86 + Linux kernel TCP/IP | CLI-CPU actor pipeline |
 |---|---|---|
-| Packet latency | ~3-10 us | **~20-100 ns** |
-| Packet throughput (1 core) | ~1-5M pkt/s (without DPDK) | **~30-100M pkt/s** |
+| Packet latency | ~3-10 µs | **~20-100 ns** |
+| Packet throughput (1 core) | ~1-5M pkt/s (without DPDK) | **~10-50M pkt/s** (L3 forwarding) |
 | Kernel bypass (DPDK) needed? | Yes, complex | **No kernel, nothing to bypass** |
 
 ---
@@ -316,7 +319,7 @@ class UserActor : Actor
 // No race condition — the actor processes one message at a time.
 ```
 
-**Why does this work?** Because `Ask()` **does not block the core** — the scheduler switches to another actor until the reply arrives. The switching cost is ~10-60 cycles, not ~1-5 us.
+**Why does this work?** Because `Ask()` **does not block the core** — the scheduler switches to another actor until the reply arrives. The switching cost is ~10-60 cycles, not ~1-5 µs. The mechanism is essentially an **implicit cooperative yield** — the same thing async/await does, but the coloring burden falls on the **runtime, not the developer**. The function color problem disappears because `Ask()` is syntactically synchronous, while the scheduler handles the suspension behind the scenes.
 
 ### Programming model comparison
 
@@ -327,7 +330,7 @@ class UserActor : Actor
 | Shared state | Explicit protection (lock) | **None** — private state |
 | Async/await needed? | Yes, everywhere | **Does not exist** |
 | Race condition | Possible, hard to debug | **Impossible** |
-| Deadlock | Possible (lock ordering) | **Impossible** (no locks) |
+| Deadlock | Possible (lock ordering) | **Structurally avoidable** (no locks; cyclic Ask→Ask chains must be avoided) |
 | Testability | Mocks, integration tests | **Deterministic message replay** |
 
 ---
@@ -402,7 +405,7 @@ These three elements together **did not exist before** — and the vision rests 
 
 ## 9. The road ahead
 
-The vision does not materialize all at once. The development phases (`docs/roadmap-hu.md`) build it up incrementally:
+The vision does not materialize all at once. The development phases (`docs/roadmap-en.md`) build it up incrementally:
 
 | Phase | Software vision element | Status |
 |---|---|---|
@@ -428,3 +431,12 @@ The goal is not to replace Linux or PostgreSQL — but to create a **new categor
 - [`docs/faq-en.md`](faq-en.md) — FAQ 5-7: CPU comparison, scheduling costs, fair benchmarking
 - [`docs/security-en.md`](security-en.md) — security model, formal verification plan
 - [`docs/secure-element-en.md`](secure-element-en.md) — Secure Edition, multi-domain hardware isolation
+
+---
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.1 | 2026-04-28 | Deadlock clarification (structurally avoidable), Ask() mechanism explanation (implicit cooperative yield), packet throughput refinement (L3 forwarding), GUI rendering nuance (flat fill vs vector), µs notation fix, version + changelog added |
+| 1.0 | 2026-04-14 | Initial release |

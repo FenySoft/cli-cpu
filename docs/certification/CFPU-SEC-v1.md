@@ -574,8 +574,8 @@ A jelen Szabalyzatot a Foundation Steering Committee modosithatja. A modositasok
 | F6 ChipIgnite | Full vagy Redundant |
 | F7+ production | Redundant (ajanlott safety-critical alkalmazasokhoz) |
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
-| Verzio | Datum | Osszefoglalo |
+| Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
 | 1.0 | 2026-04-17 | Kezdeti kiadas. 12 kotelezo biztonsagi elem (S1--S12), harom tanusitasi szint (Basic/Full/Redundant), konformancia-tesztsuite vazlat (27 teszt), elektronikus tanusitvany (W3C Verifiable Credential), publikus regiszter, EUIPO Regulations of Use vazlat. |

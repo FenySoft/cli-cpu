@@ -493,7 +493,7 @@ This v1.0 document captures the vision-level architecture. Details are to be res
 - NIST SP 800-208: Stateful Hash-Based Signature Schemes
 - NIST FIPS 180-4: SHA-256 specification
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
 | Version | Date | Summary |
 |---------|------|---------|

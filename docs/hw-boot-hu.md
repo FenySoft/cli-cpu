@@ -310,9 +310,9 @@ Részletes core leírás: [core-types-hu.md](core-types-hu.md)
 
 ---
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
-| Verzió | Dátum | Változás |
-|--------|-------|---------|
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
 | 1.1 | 2026-04-20 | Boot forrás kiválasztás: 5 forrás (QSPI, UART, BRAM, Ethernet, JTAG) az XC7A200T FPGA képességeihez igazítva. MMIO regiszterek bővítése minden boot forráshoz. 64-byte chunk-os adatolvasás (= cella payload méret). |
 | 1.0 | 2026-04-19 | Első verzió — HW boot szétválasztva a Symphact boot-sequence-hu.md-ből |

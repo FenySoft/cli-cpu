@@ -2,6 +2,8 @@
 
 > English version: [vision-en.md](vision-en.md)
 
+> Version: 1.1
+
 Ez a dokumentum azt vizsgálja, mi történik, ha a **Cognitive Fabric Processing Unit (CFPU)** hardvermodelljéhez **az egész szoftver stack-et újratervezzük** — operációs rendszer, GUI, adatbázis, hálózat, programozási modell. Nem a mai szoftverrel mérjük a hardvert, hanem a hardverhez tervezzük a szoftvert.
 
 > *A CFPU a Cognitive Fabric architektúra hivatalos megnevezése. A **CLI-CPU** ennek első nyílt forráskódú referencia implementációja — részletek: [FAQ #1](faq-hu.md#1-mi-a-cfpu-és-mi-a-kapcsolata-a-cli-cpu-val).*
@@ -161,9 +163,10 @@ Ma a GPU azért kell, mert egyetlen CPU core nem tud elég pixelt rajzolni 16ms 
 2000 pixel × 32 bit szín = ~8 KB feldolgozás
 @ 3 GHz × 0.4 IPC = ~1.2 GIPS → ~6.7 µs / core
 
-16ms frame budget-ből ~7 µs-t használ = ~0.04%
-Bőven belefér. GPU nélkül, szoftveres renderinggel,
-de HARDVERES párhuzamosítással.
+16ms frame budget-ből ~7 µs-t használ = ~0.04% (flat fill)
+Komplex vektor rendering (Bézier, anti-alias) esetén ~1-5%,
+de még mindig BŐVEN a 16ms alatt. GPU nélkül, szoftveres
+renderinggel, de HARDVERES párhuzamosítással.
 ```
 
 Ez nem azt jelenti, hogy a GPU felesleges — textúrázás, 3D, ML inferencia arra továbbra is kell. De **2D vektor GUI** (ahogy minden üzleti alkalmazás, OS felület, dashboard kinéz) → **GPU nélkül, Nano core actor hálóval megoldható**.
@@ -269,7 +272,7 @@ Ez az **Erlang/BEAM telecom modell, de hardverben**. Az Ericsson AXD 301 switch 
 | | x86 + Linux kernel TCP/IP | CLI-CPU actor pipeline |
 |---|---|---|
 | Csomag latency | ~3-10 µs | **~20-100 ns** |
-| Csomag throughput (1 core) | ~1-5M pkt/s (DPDK nélkül) | **~30-100M pkt/s** |
+| Csomag throughput (1 core) | ~1-5M pkt/s (DPDK nélkül) | **~10-50M pkt/s** (L3 forwarding) |
 | Kernel bypass (DPDK) szükséges? | Igen, komplex | **Nincs kernel, nincs mit bypass-olni** |
 
 ---
@@ -314,7 +317,7 @@ class UserActor : Actor
 // Nincs race condition — az aktor egyszerre egy üzenetet dolgoz fel.
 ```
 
-**Miért működik ez?** Mert az `Ask()` **nem blokkolja a core-t** — a scheduler átkapcsol egy másik aktorra, amíg a válasz meg nem érkezik. A váltás költsége ~10-60 ciklus, nem ~1-5 µs.
+**Miért működik ez?** Mert az `Ask()` **nem blokkolja a core-t** — a scheduler átkapcsol egy másik aktorra, amíg a válasz meg nem érkezik. A váltás költsége ~10-60 ciklus, nem ~1-5 µs. A mechanizmus lényegében **implicit kooperatív yield** — ugyanaz, amit az async/await csinál, de a coloring terhét a **runtime viseli, nem a fejlesztő**. A function color probléma eltűnik, mert az `Ask()` szintaktikailag szinkron, miközben a háttérben a scheduler kezeli a várakozást.
 
 ### A programozási modell összehasonlítása
 
@@ -325,7 +328,7 @@ class UserActor : Actor
 | Megosztott állapot | Explicit védelem (lock) | **Nincs** — privát state |
 | Async/await kell? | Igen, mindenhol | **Nem létezik** |
 | Race condition | Lehetséges, nehéz debugolni | **Lehetetlen** |
-| Deadlock | Lehetséges (lock sorrend) | **Lehetetlen** (nincs lock) |
+| Deadlock | Lehetséges (lock sorrend) | **Strukturálisan elkerülhető** (nincs lock; ciklikus Ask→Ask lánc kerülendő) |
 | Tesztelhetőség | Mock-ok, integration tesztek | **Determinisztikus message replay** |
 
 ---
@@ -426,3 +429,12 @@ A cél nem az, hogy lecseréljük a Linuxot vagy a PostgreSQL-t — hanem hogy e
 - [`docs/faq-hu.md`](faq-hu.md) — FAQ 5-7: CPU összehasonlítás, ütemezési költségek, igazságos összevetés
 - [`docs/security-hu.md`](security-hu.md) — biztonsági modell, formális verifikáció terv
 - [`docs/secure-element-hu.md`](secure-element-hu.md) — Secure Edition, multi-domain hardware isolation
+
+---
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.1 | 2026-04-28 | Deadlock pontosítás (strukturálisan elkerülhető), Ask() mechanizmus magyarázat (implicit kooperatív yield), packet throughput finomítás (L3 forwarding), GUI rendering szám árnyalás (flat fill vs vektor), verzió + changelog hozzáadva |
+| 1.0 | 2026-04-14 | Kezdeti kiadás |

@@ -6,6 +6,8 @@
 >
 > **Affected CFPU phase:** F4, F5, F6
 
+> Version: 1.0
+
 ## OS-side requirement
 
 The Symphact boot sequence defines concrete MMIO registers for the HW↔SW interface. These are the foundation for boot, core discovery, mailbox management, and interrupt control.
@@ -36,3 +38,9 @@ The current architecture doc describes the memory map at a high level. This OSRE
 5. QSPI vs OPI: F6 switches to OPI — do the registers need modification?
 
 The detailed register specification is in the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-en.md).
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-20 | Initial release |

@@ -488,8 +488,8 @@ Futás:
 
 ## Changelog
 
-| Verzió | Dátum | Változás |
-|--------|-------|---------|
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
 | 1.3 | 2026-04-28 | **CAM tábla → HW Capability Slot (QRAM-ban).** Az 5.b-ben elvetett 21 MB-os központi CAM helyett: minden core QRAM-jában 8 KB capability slot tábla (256 actor × 4 slot × 8 byte), Seal Core SEAL/RELEASE-szel kezelve. Új `flags.DDR5_CAP` HW-only header bit a cellán (csak a forrás core HW request assembler állíthatja, az aktor SW nem). Az 5.c capability token + HMAC alternatíva is elvetve (a HMAC redundáns, ha a Quench-RAM SEAL gate-keep elegendő). Új döntés-trail: 5.a–5.e (szoftveres / CAM / HMAC token / per-core CAM / **HW Capability Slot**). Revocation = QRAM RELEASE (atomi, 1 ciklus). Memória összefoglaló tábla DDR5 sora frissítve. **Indoklás:** central CAM nem skálázódik on-chip, a Quench-RAM és a v3.0 CST modell mintát ad egy stateless, HW-only capability mechanizmushoz |
 | 1.2 | 2026-04-24 | src_actor mező 16→8 bitre szűkítve (max 256 actor/core), összhangban a CST modellel és az interconnect spec-kel. |
 | 1.1 | 2026-04-22 | SealRAM / SealFlash bevezetése kód-tárolásra, DDR5 = csak adat. Három memória típus összefoglaló tábla. |

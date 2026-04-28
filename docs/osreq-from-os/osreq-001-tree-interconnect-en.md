@@ -6,6 +6,8 @@
 >
 > **Affected CFPU phase:** F4 (multi-core FPGA), F5 (heterogeneous), F6 (silicon)
 
+> Version: 1.0
+
 ## OS-side requirement
 
 Three fundamental Symphact structures assume a **tree hierarchy**:
@@ -101,3 +103,9 @@ The "Scaling to F6" section needs updating: **fat tree** topology instead of **m
 - CLI-CPU architecture: `docs/architecture-hu.md` — "Scaling to F6" section
 - Symphact boot sequence: `docs/boot-sequence-hu.md` — step 8 (Nano Core Wake)
 - Symphact roadmap: M2.3 (Router), M2.4 (Memory Manager)
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-20 | Initial release |

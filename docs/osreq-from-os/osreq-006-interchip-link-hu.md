@@ -6,6 +6,8 @@
 >
 > **Érintett CFPU fázis:** F6, F7
 
+> Version: 1.0
+
 ## OS-oldali igény
 
 A Symphact location transparency megköveteli, hogy `TActorRef` **ne árulja el**, hogy a cél actor lokális vagy más chip-en van. A `Send(ref, msg)` hívásnak transzparensen kell működnie chip-határokon át.
@@ -32,3 +34,9 @@ Send(ref, msg):
 6. Encryption: inter-chip üzenetek titkosítottak?
 
 A részletes specifikáció a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-hu.md).
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-20 | Kezdeti kiadás |

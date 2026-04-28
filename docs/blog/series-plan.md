@@ -2,6 +2,8 @@
 
 > Internal planning document — not published on the website.
 
+> Version: 1.0
+
 ## Strategy
 
 - **Language:** English (international reach), with Hungarian translations on clicpu.org
@@ -93,3 +95,9 @@ Use these tags for all articles:
 - `open-source`
 - `fpga`
 - `hardware-security`
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-15 | Initial release |

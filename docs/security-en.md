@@ -391,5 +391,5 @@ In light of the above, the CLI-CPU project should be communicated with **two par
 
 | Version | Date | Summary |
 |---------|------|---------|
-| 1.0 | 2026-04-14 | Initial version, translated from Hungarian |
 | 1.1 | 2026-04-25 | Renamed CLI-CPU → CFPU at the architecture/silicon level per [brand-en.md](brand-en.md); CLI-CPU retained for project-level references (roadmap phases, simulator, linker output, project communication). |
+| 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

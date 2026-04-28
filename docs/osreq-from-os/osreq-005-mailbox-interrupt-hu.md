@@ -6,6 +6,8 @@
 >
 > **Érintett CFPU fázis:** F4, F5, F6
 
+> Version: 1.0
+
 ## OS-oldali igény
 
 A Symphact scheduler-nek tudnia kell, hogyan értesül egy core az új mailbox üzenetről. Ez az event-driven modell alapja.
@@ -26,3 +28,9 @@ A Symphact scheduler-nek tudnia kell, hogyan értesül egy core az új mailbox �
 5. Power domain: clock-gated, power-gated, vagy mindkettő?
 
 A részletes specifikáció (energiaszámítással) a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-hu.md).
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-20 | Kezdeti kiadás |

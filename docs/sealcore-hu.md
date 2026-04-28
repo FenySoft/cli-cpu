@@ -493,7 +493,7 @@ Ez a v1.0 doksi a vízió-szintű architektúrát rögzíti. A részletek a megf
 - NIST SP 800-208: Stateful Hash-Based Signature Schemes
 - NIST FIPS 180-4: SHA-256 specifikáció
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|

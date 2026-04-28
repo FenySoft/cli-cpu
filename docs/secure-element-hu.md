@@ -738,5 +738,5 @@ A **megkülönböztető pozíciónk** nem az, hogy "még egy nyílt SE" — hane
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
-| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
 | 1.1 | 2026-04-25 | CLI-CPU → CFPU átnevezés a chip / termékcsalád szinten a [brand-hu.md](brand-hu.md) szerint; a termékvonal most „CFPU Secure Edition", al-termékek „CFPU Open Banking Card", „CFPU Open eSIM" stb. CLI-CPU megmarad a projekt-szintű hivatkozásoknál (roadmap fázis, repo, szimulátor). |
+| 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

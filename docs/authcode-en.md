@@ -588,7 +588,7 @@ These questions **do not block** earlier phases — the v1.0 model allows consis
 - RFC 8554: Leighton-Micali Hash-Based Signatures (LMS)
 - RFC 8391: XMSS: eXtended Merkle Signature Scheme
 
-## Changelog <a name="changelog"></a>
+## Changelog
 
 | Version | Date | Summary |
 |---------|------|---------|

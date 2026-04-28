@@ -6,6 +6,8 @@
 >
 > **Érintett CFPU fázis:** F4 (multi-core FPGA), F5 (heterogén), F6 (silicon)
 
+> Version: 1.0
+
 ## OS-oldali igény
 
 A Symphact három alapvető struktúrája **fa hierachiát** feltételez:
@@ -101,3 +103,9 @@ Az „F6-ra skálázódás" szekció frissítendő: a **mesh** helyett **fat tre
 - CLI-CPU architecture: `docs/architecture-hu.md` — „Skálázódás F6-ra" szekció
 - Symphact boot sequence: `docs/boot-sequence-hu.md` — 8. lépés (Nano Core Wake)
 - Symphact roadmap: M2.3 (Router), M2.4 (Memory Manager)
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-20 | Kezdeti kiadás |

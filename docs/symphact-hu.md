@@ -6,7 +6,7 @@
 
 > English version: [symphact-en.md](symphact-en.md)
 
-> Version: 2.0 (2026-04-17 — stub, csak átirányításra)
+> Version: 2.0
 
 ## Mi ez?
 
@@ -39,3 +39,10 @@ Három ok:
 ## OS → HW visszacsatolás
 
 Ha a Symphact fejlesztése közben hardveres követelmény merül fel (`osreq`), a menetét a [`FenySoft/Symphact/docs/osreq-to-cfpu/`](https://github.com/FenySoft/Symphact/tree/main/docs/osreq-to-cfpu) követi nyomon, CLI-CPU oldalon pedig az `osreq-from-os` címkéjű issue-kként.
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 2.0 | 2026-04-26 | Stub átirányítás — vízió dokumentum átköltözött a FenySoft/Symphact repóba |
+| 1.0 | 2026-04-26 | Kezdeti kiadás |

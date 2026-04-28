@@ -218,3 +218,9 @@ Néhány mondat jogosan ível át két rétegen. Az ökölszabály: **a fő neve
 - [docs/core-types-hu.md](core-types-hu.md) — CFPU termékvonalak (Nano / Actor / Rich / Matrix / Seal).
 - [docs/security-hu.md](security-hu.md) — CFPU biztonsági modell.
 - [docs/roadmap-hu.md](roadmap-hu.md) — CLI-CPU projekt fázisok F0–F7.
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-26 | Kezdeti kiadás |

@@ -1,7 +1,9 @@
 # MicroPhase A7-Lite XC7A200T — board referencia
 
 > English version: [A7-Lite-en.md](A7-Lite-en.md)
->
+
+> Version: 1.0
+
 > Források:
 > - [MicroPhase fpga-docs GitHub — A7-LITE](https://github.com/MicroPhase/fpga-docs/tree/master/source/DEV_BOARD/A7-LITE)
 > - `A7-LITE_R11.pdf` (schematic R11, helyi másolat)
@@ -125,6 +127,8 @@ Minden user I/O length-matched (differenciális párokhoz szükséges).
 | **F5** | 1–2 Rich core + 4–8 Nano core (DDR3 a GC heap-hez) |
 | **F6-FPGA** | 3 darab board Ethernet hálóban, cross-chip mailbox bridge |
 
-## Dokumentum-verzió
+## Changelog
 
-- **2026-04-24** — első verzió a board megérkezésekor, a GitHub reference manual alapján
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-24 | Első verzió a board megérkezésekor, a GitHub reference manual alapján |

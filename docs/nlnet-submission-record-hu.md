@@ -4,6 +4,8 @@
 
 > English version: [nlnet-submission-record.md](nlnet-submission-record.md)
 
+> Version: 1.0
+
 ## Beadási metaadatok
 
 | Mező | Érték |

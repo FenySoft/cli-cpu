@@ -6,6 +6,8 @@
 >
 > **Érintett CFPU fázis:** F4, F5, F6
 
+> Version: 1.0
+
 ## OS-oldali igény
 
 A Symphact boot szekvenciája konkrét MMIO regisztereket definiál a HW↔SW interfészhez. Ezek a boot, a core felderítés, a mailbox kezelés és az interrupt vezérlés alapjai.
@@ -36,3 +38,9 @@ A jelenlegi architecture doc a memória térképet magas szinten írja le. Ez az
 5. QSPI vs OPI: az F6 OPI-ra vált — a regiszterek módosítandók?
 
 A részletes regiszter-specifikáció a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-hu.md).
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-20 | Kezdeti kiadás |

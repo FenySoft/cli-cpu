@@ -6,6 +6,8 @@
 >
 > **Érintett CFPU fázis:** F5, F6
 
+> Version: 1.0
+
 ## OS-oldali igény
 
 A Symphact persistence modellje (Event Sourcing) megköveteli, hogy actor állapotot **aszinkron, nem-blokkoló** módon lehessen kiírni külső tárolóra (FRAM/PSRAM). A core SRAM volatile → journal/snapshot kiíráshoz **DMA engine** kell.
@@ -26,3 +28,9 @@ A Symphact persistence modellje (Event Sourcing) megköveteli, hogy actor állap
 5. Double buffering (ping-pong journal buffer)?
 
 A részletes specifikáció a [Symphact forrásban](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-hu.md).
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-20 | Kezdeti kiadás |
