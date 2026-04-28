@@ -2,7 +2,7 @@
 
 > English version: [internal-bus-en.md](internal-bus-en.md)
 
-> Version: 1.2
+> Version: 1.3
 
 > **⚠️ Vízió-szintű dokumentum.** Az itt szereplő busz-szélesség, area- és power-becslések irodalmi adatokból (TSMC 5nm SRAM macro datasheet, AMD Zen, Apple M, NVIDIA H100 publikus paraméterek) extrapolált munkahipotézisek. A pontos értékek csak F2.7 FPGA bring-up és F6 szilícium után validálhatók. A dokumentum célja a tervezési irányt és a döntés-trail-t rögzíteni, nem a végleges paramétereket.
 
@@ -86,17 +86,26 @@ Becslések 5nm node-on, 1 mm-es busz-hossz:
 
 | Chip / blokk | Belső busz | Megjegyzés |
 |---|---|---|
+| ARM CoreLink CMN (mesh NoC IP) | 128–512-bit konfigurálható | 128-bit gyakori deployment kis chipekhez |
+| Akadémiai NoC mesh-ek (HPCA, MICRO) | 64–128 bit | tipikus on-chip mesh link szélesség |
+| Synopsys/Cadence NoC IP (FlexNoC, Arteris) | 128–256-bit | beépíthető IP, 128-bit gyakori alapérték |
+| Adapteva Epiphany (E16/E64) | 64-bit eMesh | many-core nano-architektúra |
 | AMD Zen 4 — L1↔reg path | 512-bit | OoO mag, multi-issue háttér |
 | Apple M4 P-core — L1↔reg | 256-bit | OoO mag |
 | NVIDIA H100 SM — reg file BW | ~8 Kbit/cycle aggregate | sok-warp parallel |
 | Cerebras WSE local fabric | 256-bit | sok kis core |
 | Tenstorrent Tensix NoC | 1024-bit | tile-load alapelvárás |
 | HBM3 die interface | 1024-bit | chiplet-skála |
-| **CFPU Rich (cél)** | **512-bit** | sok mag, in-order |
-| **CFPU Nano (cél)** | **256-bit** | minimum core, sok aktor |
-| **CFPU ML/Matrix (cél)** | **1024-bit** | tile-load alapelvárás |
+| **CFPU L0 cluster mesh (v3.1)** | **128-bit** | Wormhole NoC link, FPGA-szintetizálható, 16 core / 4×4 mesh |
+| **CFPU L1 tile crossbar link** | **84-bit** párhuzamos | cluster GW → tile xbar |
+| **CFPU L2/L3** | **soros SerDes** | tile↔régió, régió↔chip |
+| **CFPU Nano (belső reg ↔ SRAM)** | **256-bit** | minimum core, sok aktor |
+| **CFPU Actor (belső back-end)** | **256-bit** | Rich-hez közelít |
+| **CFPU Rich (belső back-end)** | **512-bit** | sok mag, in-order |
+| **CFPU ML/Matrix (MAC Slice)** | **1024-bit** | tile-load alapelvárás |
+| **CFPU Seal (belső)** | **64-bit** | auditálhatóság > sebesség |
 
-A 256–512 bit egy mai 5nm AI/many-core chip-en **ipari standard**, nem extravagáns.
+A **128-bit** a NoC link szélességére iparilag standard kis-közepes chipekhez (akadémiai NoC papers, ARM CMN belépő-konfig, Synopsys/Cadence IP gyakori beállítása). A **256–512 bit** core-on belüli back-end buszra (cache↔reg, reg file mozgatás) egy mai 5nm AI/many-core chip-en szintén iparilag elfogadott — nem extravagáns. **Az 1024-bit** csak ML tile-load esetén indokolt.
 
 ## Választott méretezés — core típusonként
 
@@ -169,6 +178,7 @@ A 256–512 bit egy mai 5nm AI/many-core chip-en **ipari standard**, nem extrava
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.3 | 2026-04-28 | **Iparági referenciák tábla bővítve.** Új sorok: ARM CoreLink CMN (128–512-bit konfigurálható, 128-bit gyakori), akadémiai NoC mesh-ek (64–128 bit), Synopsys/Cadence NoC IP (128–256-bit), Adapteva Epiphany (64-bit eMesh). CFPU rétegek explicit szétválasztva: L0 cluster mesh (128-bit, v3.1), L1 tile crossbar (84-bit), L2/L3 (soros SerDes), és külön a core-belső back-end buszok (Nano/Actor 256, Rich 512, ML 1024, Seal 64). Új konklúzió: a **128-bit NoC link** szélesség **iparilag standard** kis-közepes chipekhez |
 | 1.2 | 2026-04-28 | **HW költés tábla bővítve 128-bit oszloppal.** A "HW költés — area és power" tábla mostantól tartalmazza a 128-bit oszlopot is (interpolált értékek a 32-bit és 256-bit között): wire trace 128, M3-M4 metal, ~256 repeater/mm, 4 bank × 32 SRAM port, ~1,3 mW dinamikus power, ~1,15× reg file area. Új kritikus küszöb: 128-bit az L0 cluster mesh NoC link, FPGA-szintetizálható, ~3% tile area-overhead |
 | 1.1 | 2026-04-28 | **NoC réteg szinkronizáció `interconnect-hu.md` v3.1-gyel.** A "Választott méretezés" tábla pontosítva: a "Tile-szintű NoC (4–8 mag)" → **L0 cluster mesh (16 core, 4×4 mesh, 128-bit v3.1)**; a "Chip-szintű NoC (tile↔tile) 128-bit" hibás v2.4 hivatkozás kicserélve a tényleges hierarchikus link típusokra (L1 = 84-bit párhuzamos, L2/L3 = soros SerDes). Új megjegyzés: a core-belső busz és a NoC link **két különböző réteg**. Core-belső busz méretek (Nano/Actor 256, Rich 512, ML 1024, Seal 64) változatlanok |
 | 1.0 | 2026-04-25 | Kezdeti verzió — port-bottleneck elemzés, context move cycle-számolás 32–1024 bit között, választott méretezés core típusonként, döntés-trail (egységes 32 / egységes 256 / heterogén / egységes 1024) |

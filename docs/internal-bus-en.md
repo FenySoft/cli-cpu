@@ -2,7 +2,7 @@
 
 > Magyar verzió: [internal-bus-hu.md](internal-bus-hu.md)
 
-> Version: 1.2
+> Version: 1.3
 
 > **⚠️ Vision-level document.** The bus widths, area, and power figures presented here are working hypotheses extrapolated from documented sources (TSMC 5nm SRAM macro datasheets, AMD Zen, Apple M, NVIDIA H100 published parameters). Precise values can only be validated after F2.7 FPGA bring-up and F6 silicon. The document records design direction and decision trail, not final parameters.
 
@@ -86,17 +86,26 @@ Estimates at 5nm node, 1 mm bus length:
 
 | Chip / block | Internal bus | Note |
 |---|---|---|
+| ARM CoreLink CMN (mesh NoC IP) | 128–512-bit configurable | 128-bit is a common deployment for small chips |
+| Academic NoC meshes (HPCA, MICRO) | 64–128 bit | typical on-chip mesh link width |
+| Synopsys/Cadence NoC IP (FlexNoC, Arteris) | 128–256-bit | embeddable IP, 128-bit common default |
+| Adapteva Epiphany (E16/E64) | 64-bit eMesh | many-core nano architecture |
 | AMD Zen 4 — L1↔reg path | 512-bit | OoO core, multi-issue background |
 | Apple M4 P-core — L1↔reg | 256-bit | OoO core |
 | NVIDIA H100 SM — reg file BW | ~8 Kbit/cycle aggregate | many warps in parallel |
 | Cerebras WSE local fabric | 256-bit | many small cores |
 | Tenstorrent Tensix NoC | 1024-bit | tile-load baseline |
 | HBM3 die interface | 1024-bit | chiplet scale |
-| **CFPU Rich (target)** | **512-bit** | many cores, in-order |
-| **CFPU Nano (target)** | **256-bit** | minimum core, many actors |
-| **CFPU ML/Matrix (target)** | **1024-bit** | tile-load baseline |
+| **CFPU L0 cluster mesh (v3.1)** | **128-bit** | Wormhole NoC link, FPGA-synthesizable, 16 cores / 4×4 mesh |
+| **CFPU L1 tile crossbar link** | **84-bit** parallel | cluster GW → tile xbar |
+| **CFPU L2/L3** | **serial SerDes** | tile↔region, region↔chip |
+| **CFPU Nano (intra-core reg ↔ SRAM)** | **256-bit** | minimum core, many actors |
+| **CFPU Actor (intra-core back-end)** | **256-bit** | close to Rich |
+| **CFPU Rich (intra-core back-end)** | **512-bit** | many cores, in-order |
+| **CFPU ML/Matrix (MAC Slice)** | **1024-bit** | tile-load baseline |
+| **CFPU Seal (intra-core)** | **64-bit** | auditability > speed |
 
-256–512 bit is **industry standard** in modern 5nm AI/many-core chips, not extravagant.
+**128-bit** is industry standard for NoC link width in small-to-medium chips (academic NoC papers, ARM CMN entry config, common Synopsys/Cadence IP setup). **256–512 bit** for intra-core back-end buses (cache↔reg, reg file movement) on modern 5nm AI/many-core chips is also industry-accepted — not extravagant. **1024-bit** is only justified for ML tile-load.
 
 ## Selected sizing — per core type
 
@@ -169,6 +178,7 @@ Estimates at 5nm node, 1 mm bus length:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.3 | 2026-04-28 | **Industry references table expanded.** New rows: ARM CoreLink CMN (128–512-bit configurable, 128-bit common), academic NoC meshes (64–128 bit), Synopsys/Cadence NoC IP (128–256-bit), Adapteva Epiphany (64-bit eMesh). CFPU layers explicitly separated: L0 cluster mesh (128-bit, v3.1), L1 tile crossbar (84-bit), L2/L3 (serial SerDes), and intra-core back-end buses listed separately (Nano/Actor 256, Rich 512, ML 1024, Seal 64). New conclusion: **128-bit NoC link** width is **industry standard** for small-to-medium chips |
 | 1.2 | 2026-04-28 | **HW cost table expanded with the 128-bit column.** The "HW cost — area and power" table now includes a 128-bit column (interpolated between 32-bit and 256-bit): wire trace 128, M3-M4 metal, ~256 repeaters/mm, 4 banks × 32 SRAM port, ~1.3 mW dynamic power, ~1.15× reg file area. New critical threshold: 128-bit is the L0 cluster mesh NoC link, FPGA-synthesizable, ~3% tile area overhead |
 | 1.1 | 2026-04-28 | **NoC layer synchronization with `interconnect-en.md` v3.1.** Selected sizing table corrected: "Tile-level NoC (4–8 cores)" → **L0 cluster mesh (16 cores, 4×4 mesh, 128-bit v3.1)**; the incorrect "Chip-level NoC (tile↔tile) 128-bit" v2.4 reference replaced with the actual hierarchical link types (L1 = 84-bit parallel, L2/L3 = serial SerDes). New note: the intra-core bus and the NoC link are **two different layers**. Intra-core bus widths (Nano/Actor 256, Rich 512, ML 1024, Seal 64) unchanged |
 | 1.0 | 2026-04-25 | Initial version — port bottleneck analysis, context move cycle counting from 32–1024 bit, selected sizing per core type, decision trail (uniform 32 / uniform 256 / heterogeneous / uniform 1024) |
