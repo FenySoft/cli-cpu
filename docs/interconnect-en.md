@@ -2,7 +2,7 @@
 
 > Magyar verzió: [interconnect-hu.md](interconnect-hu.md)
 
-> Version: 2.4
+> Version: 3.0
 
 This document specifies the **on-chip interconnect network** of the Cognitive Fabric Processing Unit (CFPU): the topology, switching model, router internals, physical layout, core family, and node-scaling strategy.
 
@@ -54,7 +54,7 @@ L0: 16 cores × L1: 8 clusters × L2: 8 tiles × L3: 10 regions = 10,240 cores
 | `TILES_PER_REGION` | Variable | 4–12 | Node, die size |
 | `REGIONS` | Variable | 4–24 | Die size |
 | `SRAM_KB_PER_CORE` | Variable | 16–1024 | Node |
-| `CELL_SIZE` | Variable | 64/128 | Cell size variant |
+| `CELL_SIZE` | Variable | 256 (default) | Max payload size (bytes) |
 | `CORE_TYPE` | Variable | NANO/ACTOR/RICH/MATRIX | Application-dependent (mixed on heterogeneous chips) |
 | `ROUTER_VARIANT` | Variable | TURBO/COMPACT/SYSTOLIC | Core type dependent (cluster-level) |
 | `SERDES_RATIO` | Variable | 4–12 | Core clock dependent (see SerDes Scaling) |
@@ -64,170 +64,146 @@ L0: 16 cores × L1: 8 clusters × L2: 8 tiles × L3: 10 regions = 10,240 cores
 
 ### ATM-Inspired Fixed Cell
 
-Every message is segmented into **fixed cells** that travel through the network: **16-byte header + up to 64-byte payload = up to 80 bytes**. Buffers are fixed-size (80-byte slots), but **only the actual payload travels on the link** — the `len` field determines how many bytes are actually forwarded.
+Every message is segmented into **fixed cells** that travel through the network: **16-byte header + up to 256-byte payload = up to 272 bytes**. Buffers are fixed-size (272-byte slots), but **only the actual payload travels on the link** — the `len` field determines how many bytes are actually forwarded (`len` value + 1, i.e. 1–256 bytes; zero-byte payload does not exist, signaled via flags instead).
 
 ```
-Cell = Header (16 bytes) + Payload (0-64 bytes) = 16-80 bytes on the link
+Cell = Header (16 bytes) + Payload (1-256 bytes) = 17-272 bytes on the link
 
-Header (16 bytes = 128 bits) — stored in Header SRAM:
-┌──────────────────────────────────────────────────────────────────┐
-│  dst[24] + src[24]                              — routing (HW)  │
-│  + src_actor[16] + dst_actor[16]                — actor ID      │
-│  + seq[8] + flags[8] + len[8] + CRC-8[8]       — control       │
-│  + reserved[16]                                 — future use    │
-│                                            Total: 128 bits      │
-└──────────────────────────────────────────────────────────────────┘
+Header (16 bytes = 128 bits = 4 × 32 bits) — stored in Header SRAM:
+┌─────────────────────────────────────────────────────────────────────┐
+│  Word 0:  dst[24] + dst_actor[8]                — target (HW+actor)│
+│  Word 1:  src[24] + src_actor[8]                — source (HW+actor)│
+│  Word 2:  seq[16] + flags[8] + len[8]           — control          │
+│  Word 3:  reserved[8] + CRC-16[16] + CRC-8[8]  — integrity        │
+│                                             Total: 128 bits         │
+└─────────────────────────────────────────────────────────────────────┘
 
-Payload (0-64 bytes) — stored in Payload SRAM:
-┌──────────────────────────────────────────────────────┐
-│  0-64 bytes application data (determined by len)     │
-└──────────────────────────────────────────────────────┘
+Payload (1-256 bytes) — stored in Payload SRAM:
+┌────────────────────────────────────────────────────────────┐
+│  1-256 bytes application data (determined by len+1)        │
+└────────────────────────────────────────────────────────────┘
 ```
 
 **Header fields:**
 
 | Field | Size | Written by | Description |
 |-------|------|-----------|-------------|
-| `dst` | 24 bits | Sending core | Destination hierarchical HW address (region.tile.cluster.core) |
+| `dst` | 24 bits | Sending core HW | Destination hierarchical HW address (region.tile.cluster.core) — resolved by sending core HW from CST index |
+| `dst_actor` | 8 bits | Sending core HW | Destination actor identifier (max 256 actors / core) — resolved from CST index |
 | `src` | 24 bits | **NoC router HW** | Source HW address — hardware-filled, cannot be spoofed |
-| `src_actor` | 16 bits | Core scheduler | Sending actor identifier (max 65,536 actors / core) |
-| `dst_actor` | 16 bits | Sending actor | Destination actor identifier |
-| `seq` | 8 bits | Sender | Sequence number (ordering for fragmented messages) |
-| `flags` | 8 bits | Sender | VN0/VN1, relay flag, etc. |
-| `len` | 8 bits | Sender | Actual payload size in bytes (0-128, `CELL_SIZE` dependent) |
-| `CRC-8` | 8 bits | HW | Header integrity check |
-| `reserved` | 16 bits | — | Future extensions (QoS, etc.) |
+| `src_actor` | 8 bits | **Core HW** | Sending actor identifier — from the active actor context register, cannot be spoofed |
+| `seq` | 16 bits | Sender | Sequence number (ordering for fragmented messages, max 65,536 fragments) |
+| `flags` | 8 bits | Sender | `[VN:1][relay:1][Pri:2][reserved:4]` — VN0/VN1, relay flag, message priority (4 levels) |
+| `len` | 8 bits | Sender | Payload size: value + 1 = 1–256 bytes (zero-byte payload does not exist, signaled via flags) |
+| `CRC-16` | 16 bits | HW | Payload integrity check (stored in header, computed over the payload) |
+| `CRC-8` | 8 bits | HW | Header integrity check (last field, computed over the entire header including CRC-16) |
+| `reserved` | 8 bits | — | Future extensions |
 
 **Why `src_actor` / `dst_actor` in the header?** In v1.8, the actor ID was moved to the payload (software dispatch). With N:M actor-to-core mapping (multiple actors per core, including sleeping actors), having actor IDs in the header provides **hardware-level advantages**:
-- **DDR5 Controller CAM table** — actor-level access control via `src[24] + src_actor[16]`
+- **DDR5 Controller CAM table** — actor-level access control via `src[24] + src_actor[8]`
 - **Crash recovery** — only the crashed actor's capabilities need to be revoked, not the entire core's
 - **Router-level dispatch** — the receiving core's scheduler knows which actor the message is for from the header, without reading the payload
-- **16 bits** — 65,536 actors / core, covers sleeping actors as well
+- **8 bits** — 256 actors / core, covers sleeping actors as well (in practice, 256 contexts/core is sufficient: warm-context cache holds 4–8 active + 248 sleeping actors)
 
-**Variable link occupancy:** router buffers are always fixed-size (80-byte slots), but **only the header + `len` payload bytes travel on the link**. The router computes the number of payload flits from the header's `len` field:
+**Capability model (v3.0):** Software **never sees raw `dst`/`src` addresses** — only a 32-bit CST index (Capability Slot Table). The sending core's HW resolves the CST index into header `dst` + `dst_actor` fields. The CST resides in QSRAM with actor-level permissions (`perms`). The sending HW checks permissions at send time — `perms` does not travel in the header. HMAC is also unnecessary in the header: the CST is HW-managed, software cannot directly manipulate raw addresses.
+
+**Variable link occupancy:** router buffers are always fixed-size (272-byte slots), but **only the header + (len+1) payload bytes travel on the link**. The router computes the number of payload flits from the header's `len` field:
 
 ```
-128-bit internal data path:
-  payload_flits = ceil(len / 16)    ← 4-bit right shift + carry
+256-bit L0 data path (1 flit = 32 bytes):
+  payload_bytes = len + 1                    ← 1–256 bytes
+  payload_flits = ceil(payload_bytes / 32)   ← 5-bit right shift + carry
   total_flits = 1 (header) + payload_flits
 
 Examples:
-  len = 8  → 1 + 1 = 2 flits  (32 bytes on link, not 80)
-  len = 32 → 1 + 2 = 3 flits  (48 bytes on link)
-  len = 64 → 1 + 4 = 5 flits  (80 bytes on link, full cell)
+  len = 7   (8 bytes)   → 1 + 1 = 2 flits   (64 bytes on link, not 272)
+  len = 31  (32 bytes)  → 1 + 1 = 2 flits   (64 bytes on link)
+  len = 63  (64 bytes)  → 1 + 2 = 3 flits   (96 bytes on link)
+  len = 127 (128 bytes) → 1 + 4 = 5 flits   (160 bytes on link)
+  len = 255 (256 bytes) → 1 + 8 = 9 flits   (272 bytes on link, full cell)
 ```
 
-**HW cost:** 4-bit counter per port + shift. No LUT, no tail bit, no link-width overhead.
+**HW cost:** 5-bit counter per port + shift. No LUT, no tail bit, no link-width overhead.
 
 **Impact on network throughput:** ~80% of actor messages have ≤48 byte payloads. With variable link occupancy, links are **occupied ~43% less on average**, nearly doubling effective network throughput.
 
-**Split SRAM design:** header and payload are stored in **separate SRAMs** inside the router. This is natural because they serve different functions: the scheduler reads the header for routing decisions while the payload is still arriving — **1 cycle latency saving**. No port contention between scheduler and crossbar. Both SRAMs are power-of-2 aligned: header = slot × 16, payload = slot × 64 — simple shift addressing, no multiplier needed.
+**Split SRAM design:** header and payload are stored in **separate SRAMs** inside the router. This is natural because they serve different functions: the scheduler reads the header for routing decisions while the payload is still arriving — **1 cycle latency saving**. No port contention between scheduler and crossbar. Both SRAMs are power-of-2 aligned: header = slot × 16, payload = slot × 256 — simple shift addressing, no multiplier needed.
 
-**Why 16-byte header?** 128 bits is the natural power-of-2 boundary. The fields (dst, src, src_actor, dst_actor, seq, flags, len, CRC) require 112 bits, leaving 16 reserved bits for future extensions. The 64-byte payload is also a natural power-of-2 boundary for software.
+**Why 16-byte header?** 128 bits is the natural power-of-2 boundary. The fields (dst, dst_actor, src, src_actor, seq, flags, len, CRC-16, CRC-8) require 120 bits, leaving 8 reserved bits for future extensions. The 4 × 32-bit word-aligned layout simplifies the HW parser. The 256-byte payload is also a natural power-of-2 boundary, aligned with DDR5 burst and on-chip SRAM cache line sizes.
 
 **Why fixed buffers, variable links?** Fixed buffer size yields deterministic buffer management and simple SRAM addressing (the ATM networks' foundational principle). Variable link occupancy **does not increase buffer complexity** — only the forwarding counter changes — while significantly improving link utilization.
 
-### Why 64-byte Payload — Even for Rich Cores?
+### Why 256-byte Payload?
 
-The original 128-byte payload was oversized for the Matrix Core's 4×4 tile, but the question is fair: don't Rich Core actor messages need a larger cell?
+In the v2.x series, the payload was 64 bytes. In v3.0 it grew to 256 bytes — the `len[8]` field with `len+1` semantics covers 1–256 bytes. This decision is based on the combined effect of the 256-bit L0 link and variable link occupancy:
 
-**Analysis shows that the 64-byte payload is also advantageous for Rich Cores:**
+| Aspect | 256B payload (272B cell, 256-bit L0) | 64B payload (80B cell, 42-bit L0) |
+|--------|---------------------------------------|-------------------------------------|
+| Header overhead (worst case) | 6% | 20% |
+| Max flit count (256-bit L0 link) | 9 flits | 3 flits |
+| Neighbor latency (worst case) | 2H + 8 = 10 cc | 2H + 2 = 4 cc |
+| Neighbor latency (typical 48B) | 2H + 1 = 3 cc | 2H + 1 = 3 cc |
+| Router VOQ SRAM | ~3.4× larger | smaller |
 
-| Aspect | 64B payload (80B cell) | 128B payload (144B cell) |
-|--------|------------------------|--------------------------|
-| Header overhead | 20% | 11% |
-| Max flit count (128-bit internal link) | 5 flits | 9 flits |
-| Max flit count (42-bit L0 SerDes link) | 16 flits | 28 flits |
-| Neighbor latency (max) | 2H + 15 = 17 cc | 2H + 27 = 29 cc |
-| Cross-region latency (max) | ~139 cc | ~229 cc |
-| Router VOQ SRAM | smaller | ~1.6× larger |
-| Router area (Turbo) | 0.006 mm² | ~0.008 mm² |
+> **Note:** thanks to variable link occupancy, the worst-case flit counts above are rare. A typical 32-byte actor message: 2 flits on the 256-bit L0 (header + 1 payload) — the link **frees up very quickly**.
 
-> **Note:** thanks to variable link occupancy, the flit counts and latencies above represent the **worst case** (full payload). A typical 32-byte actor message in a 64B cell: 3 flits on the 128-bit link (header + 2 payload), 10 flits on the 42-bit L0 — the link **frees up sooner**.
+**Decisive argument: variable link occupancy.** On the 256-bit L0 link, typical actor messages (≤48 bytes) take only 2–3 flits — **faster** than the old 42-bit link with a 64B cell. The 256B max payload also enables large messages (state migration, code-load chunks) to use **fewer cells**, reducing header overhead and per-cell routing decisions.
 
-**Decisive argument: latency.** The 80-byte cell provides **40% faster** worst-case cross-region latency (139 vs 229 cc). With variable link occupancy, typical actor messages (~80% ≤48 bytes) are even faster. The 128B payload's header-overhead advantage (11% vs 20%) **only matters for rare, large messages** (state migration, bulk transfer).
+In Akka/actor-style systems, the vast majority of messages are small (commands, events, short responses: 16–64 bytes), which fit easily in a single 256B cell — without multi-cell fragmentation. For large messages (4–16 KB state migration), the 256B payload requires 4× fewer cells than the former 64B.
 
-In Akka/actor-style systems, the vast majority of messages are small (commands, events, short responses: 16–64 bytes), which fit in a single 64B cell. For large messages (4–16 KB state migration), the doubled cell count overhead is negligible relative to the total transfer time.
+The `CELL_SIZE` RTL parameter serves as a safety net: the max payload size is configurable at fabrication time.
 
-The `CELL_SIZE` RTL parameter serves as a safety net: if a specific CFPU-R configuration's workload demands it, it can be set to 128B at fabrication time.
+**Final decision (2026-04-28):** 256B payload on the main mesh, with 256-bit L0 links.
 
-**Final decision (2026-04-20):** 64B payload is confirmed for the main mesh.
+#### Why 256B? — Detailed analysis
 
-#### Why not 128B? — Detailed analysis
+**1. The 256-bit L0 link changes the math.**
+In v2.x, the 42-bit L0 link was the bottleneck: an 80B cell took 16 flits. On the 256-bit L0 link (tile-level NoC, see `internal-bus-en.md`), the header is a single flit and the full 256B payload takes only 8 flits. With variable link occupancy, typical small messages (≤48 bytes) traverse in 2–3 flits — **faster** than the old 42-bit link with a smaller cell.
 
-**1. ML-Max does not justify a larger cell.**
-The original 128→64 reduction was partly motivated by the Matrix Core 4×4 tile being oversized for 128B. Since then, CFPU-ML-Max uses its own 128-bit systolic router (intra-cluster on-die link) — tensor data traffic does **not traverse the main mesh**. Neither the original pro- nor contra-ML argument for 128B is relevant anymore.
+**2. Aggregate throughput analysis — 256-bit L0 @ 500 MHz:**
 
-**2. Aggregate throughput analysis — matrix bisection capacity.**
+| Payload size | Flit count (256-bit) | Payload throughput | Link efficiency |
+|--------------|----------------------|--------------------|----------------|
+| 32B (typical) | 2 flits | 32B / 2 cc = 16.0 B/cc | 50% |
+| 64B | 3 flits | 64B / 3 cc = 21.3 B/cc | 67% |
+| 128B | 5 flits | 128B / 5 cc = 25.6 B/cc | 80% |
+| 256B (worst case) | 9 flits | 256B / 9 cc = 28.4 B/cc | 89% |
 
-Single-link throughput (42-bit L0 @ 500 MHz):
+**L0 link throughput:** 256 bits × 500 MHz / 8 = **16 GB/s** (vs old 42-bit: ~2.6 GB/s, **~6× improvement**).
 
-| Cell | Flit count | Payload throughput | Link efficiency |
-|------|-----------|-------------------|----------------|
-| 80B (64B payload) | 16 flits | 64B / 16 cc = 4.00 B/cc | 80% |
-| 144B (128B payload) | 28 flits | 128B / 28 cc = 4.57 B/cc | 89% |
+**3. Wormhole routing and HOL blocking — improved.**
 
-**On a single link, 128B is 14% better.** But this is misleading — system-level throughput is determined by **useful data / link-occupancy time**:
-
-Typical actor workload message-size distribution:
-- ~80% messages ≤ 48 byte payload (commands, responses, events, heartbeats)
-- ~15% messages 49–64 byte (medium payload)
-- ~5% messages > 64 byte (code-load, state migration — multi-cell)
-
-Transport cost of a 32-byte actor message:
-
-| Cell | Flits | Useful data | Efficiency (B/flit) |
-|------|-------|------------|---------------------|
-| 80B (64B payload) | 16 | 32B | 2.00 B/flit |
-| 144B (128B payload) | 28 | 32B | 1.14 B/flit ← **43% waste** |
-
-The 128B cell **occupies the link for 28 cycles** to carry a 32-byte message — the 64B cell delivers the same in **16 cycles**. Useful data is identical, but link occupancy is 75% longer.
-
-Weighted aggregate efficiency (B/flit, with workload mix):
+On the 256-bit link, worst-case 256B payload is 9 flits — **shorter link occupancy** compared to the old 42-bit link's 16 flits:
 
 ```
-64B cell:  0.80×(32/16) + 0.15×(56/16) + 0.05×(64/16) = 2.33 B/flit
-128B cell: 0.80×(32/28) + 0.15×(56/28) + 0.05×(128/28) = 1.44 B/flit
+H=6 (max L0 hops):
+  256B cell, 256-bit link:  occupancy = 2H + 8 = 20 cc
+  typical 48B, 256-bit link: occupancy = 2H + 1 = 13 cc
 ```
 
-**The 64B cell provides ~38% higher aggregate throughput** on a 10,000-core mesh under typical actor workloads.
+Shorter link occupancy reduces HOL blocking probability.
 
-**3. Wormhole routing and HOL blocking.**
+**4. Code-load throughput — 4× fewer cells.**
 
-In wormhole routing, a cell **holds intermediate links** while traversing. Larger cell = longer occupancy = more congestion:
+Seal Core code-load with 256B cells requires 4× fewer cells:
+- 16 KB method = 64 cells (256B payload each), pipelined (vs old 256 cells × 64B)
+- L0 throughput @ 500 MHz: **~16 GB/s** (vs old ~2.6 GB/s)
+- Worst-case delivery: ~1.3 µs @ 500 MHz (vs old ~8 µs)
 
-```
-H=50 average hops (100×100 grid):
-  64B cell:  link occupancy = 2H + 15 = 115 cc
-  128B cell: link occupancy = 2H + 27 = 127 cc (+10%)
-```
-
-The 10% longer link occupancy exponentially increases Head-of-Line blocking probability under high load. VOQ mitigates but does not eliminate this. Result: the 128B cell saturates the network sooner.
-
-**4. Code-load throughput — solved by multi-cell streaming.**
-
-Seal Core code-load is <5% of total chip traffic. The throughput question is solved by pipelined multi-cell streaming, not by increasing cell size:
-- 16 KB method = 256 cells (64B payload each), pipelined
-- L0 throughput @ 500 MHz: ~2.6 GB/s
-- Worst-case delivery: ~8 µs @ 500 MHz
-
-**5. Memory and storage hardware native burst sizes — 64B is the natural unit.**
+**5. Memory alignment — 256B covers the industry spectrum.**
 
 | Memory type | Native burst size | Alignment |
 |-------------|-------------------|-----------|
-| DDR4 | 64 bytes (BL8 × 8B) | **= 64B payload** |
-| DDR5 | 64 bytes (BL16 × 4B, dual sub-channel) | **= 64B payload** |
-| LPDDR5 | 32–64 bytes (BL16 × 2B or BL32 × 2B) | ≤ 64B payload |
-| HBM2e/HBM3 | 32–256 bytes (pseudo-channel, BL4 × 32B typical) | Both 64B and 128B native |
-| QSPI Flash | 64–256 bytes (page: 256B, but 64B burst optimal) | **= 64B payload** |
-| On-chip SRAM | Cache line: 64 bytes (industry standard) | **= 64B payload** |
-| NOR Flash | 64–128 byte burst | ≤ 64B fits |
+| DDR4 | 64 bytes (BL8 × 8B) | ≤ 256B, 4× bursts in one cell |
+| DDR5 | 64 bytes (BL16 × 4B, dual sub-channel) | ≤ 256B, 4× bursts in one cell |
+| LPDDR5 | 32–64 bytes | ≤ 256B |
+| HBM2e/HBM3 | 32–256 bytes (pseudo-channel) | **= 256B payload** |
+| QSPI Flash | 64–256 bytes (page: 256B) | **= 256B payload** |
+| On-chip SRAM | Cache line: 64 bytes (industry standard) | ≤ 256B, 4× cache lines in one cell |
 
-The 64-byte payload **exactly matches one DDR4/DDR5 burst, one cache line, and one QSPI burst**. This is not coincidental: the industry memory hierarchy standardized on 64B as the fundamental unit (Intel/AMD L1 cache line = 64B, ARM = 64B). The CFPU cell payload aligns perfectly — one cell payload = one memory transaction, no fragmentation, no padding.
+The 256-byte payload **exactly matches one QSPI page and one HBM max burst**, while consolidating 4 DDR5 bursts into a single cell — moved without additional routing decisions.
 
-128B payload would align better with HBM, but HBM supports 64B sub-bursts natively, while DDR4/DDR5 and QSPI do **not** support 128B natively (they would split it into two transactions).
-
-**Summary:** 64B payload is optimal for the actor mesh. 128B would only win if >50% of traffic carried 65–128 byte payloads — which is not the case in CFPU. Additionally, 64B is the native burst unit of industry-standard memory hardware.
+**Summary:** the 256B payload + 256-bit L0 link combination is the right decision. Variable link occupancy means small messages (≤48 bytes, ~80%) occupy only 2–3 flits — faster than the old system. Large messages (state migration, code-load) fragment into 4× fewer cells.
 
 ### Addressing: 24-bit Hierarchical
 
@@ -244,7 +220,7 @@ Routing decisions are O(1): the address prefix immediately determines which leve
 
 The CFPU uses two switching modes, matched to each hierarchy level:
 
-**L0 (mesh) — Wormhole routing:** the header flit (42 bits, containing the destination address) is forwarded immediately after route computation; body flits follow in a pipeline, one per cycle. An 80-byte cell = 16 flits on the 42-bit link. For H hops, the header traverses the mesh in 2H cycles (2-cycle router pipeline: route + switch), and the last body flit arrives 15 cycles later. **Total: 2H + 15 cycles.**
+**L0 (mesh) — Wormhole routing:** the header flit (256 bits, containing the destination address) is forwarded immediately after route computation; body flits follow in a pipeline, one per cycle. A max 272-byte cell = max 9 flits on the 256-bit link (1 header + 8 payload). For H hops, the header traverses the mesh in 2H cycles (2-cycle router pipeline: route + switch), and the last body flit arrives up to 8 cycles later. **Worst case: 2H + 8 cycles. Typical (48B payload): 2H + 1 cycles.**
 
 **L1–L3 (crossbars) — Virtual Cut-Through (VCT):** the cell is fully buffered at the crossbar input before switching. The iSLIP scheduler reads the header during reception (1-cycle overlap), then the cell is forwarded in one crossbar cycle. VCT preserves the deadlock-freedom property of store-and-forward (no chained buffer reservation) while allowing pipelined header inspection.
 
@@ -280,7 +256,7 @@ The combination eliminates deadlock at every level without requiring Virtual Cha
 | Topology | 4×4 mesh, XY routing |
 | Cores | 16 cores (any single type per cluster) |
 | Physical size | ~1.1 mm × 1.1 mm (5nm) |
-| Link type | Parallel, 42-bit, 1× core clock |
+| Link type | Parallel, 256-bit, 1× core clock |
 | Wire length | ~330 µm (neighboring core) |
 | Max hops | 6 |
 | Router area / core | 0.001–0.006 mm² (see L0 Router Variants) |
@@ -294,9 +270,9 @@ The L0 router is the largest per-core overhead in the CFPU. The original 5-port 
 
 | Component | GE | Function |
 |-----------|---:|----------|
-| Crossbar (5×5, 80 B) | 2,950 | Input→output data switching |
+| Crossbar (5×5, 272 B) | 2,950 | Input→output data switching |
 | VOQ logic (5×5×4 = 100 slots) | 5,000 | Enqueue/dequeue, pointers, flags |
-| VOQ SRAM (100 × 80 B = 8 KB) | 14,700 | Cell storage |
+| VOQ SRAM (100 × 272 B = 27 KB) | 14,700 | Cell storage |
 | iSLIP scheduler (5×5) | 3,000 | Round-robin fair scheduling |
 | XY routing | 1,000 | Address → direction decode |
 | Credit flow control (5 × 4 credits) | 2,000 | Overflow prevention |
@@ -305,7 +281,7 @@ The L0 router is the largest per-core overhead in the CFPU. The original 5-port 
 | Misc control | 12,000 | FSM, reset, power-gate interface |
 | **Total** | **~44,300** | **≈ 0.011 mm²** |
 
-> **Area convention:** GE-to-area conversion assumes ~0.21 µm²/GE at 5nm (logic + routing overhead), SRAM uses dense 6T cells (~0.021 µm²/bit). These estimates are pre-synthesis; final area will be determined by RTL synthesis (F4+). The baseline router is sized for 80-byte cells.
+> **Area convention:** GE-to-area conversion assumes ~0.21 µm²/GE at 5nm (logic + routing overhead), SRAM uses dense 6T cells (~0.021 µm²/bit). These estimates are pre-synthesis; final area will be determined by RTL synthesis (F4+). The baseline router is sized for 272-byte cells (16B header + max 256B payload).
 
 **Variant A: Turbo — Speed > Area**
 
@@ -342,7 +318,7 @@ Dedicated ML/SNN pipeline router. Two 128-bit unidirectional links (W→E activa
 
 | Change | Rationale | Speed impact |
 |--------|-----------|--------------|
-| 2 directions (W→E, N→S), 128-bit | Systolic pipeline fixed data flow | **3× bandwidth** (128 vs 42 bit/cc) |
+| 2 directions (W→E, N→S), 128-bit | Systolic pipeline fixed data flow | Systolic-dedicated bandwidth (128 bit/cc, half of 256-bit L0, sufficient for systolic) |
 | VOQ removed | No routing conflict in systolic mode | No negative impact |
 | iSLIP removed | No arbitration, fixed directions | No negative impact |
 | XY routing removed | Fixed directions, no routing decisions | No negative impact |
@@ -356,7 +332,7 @@ Dedicated ML/SNN pipeline router. Two 128-bit unidirectional links (W→E activa
 | Component | GE | Function |
 |-----------|---:|----------|
 | Data path MUX (2 × 128-bit) | 1,000 | Local ↔ pass-through switching |
-| FIFO (2 directions × 2 slots × 80B) | 600 | Minimal buffering |
+| FIFO (2 directions × 2 slots × 272B) | 600 | Minimal buffering |
 | Credit flow control (2 × 4 credits) | 400 | Backpressure |
 | Control uplink (thin, VN0 only) | 1,500 | Code loading, supervisor |
 | Cell assembly + CRC-8 | 500 | Cell integrity |
@@ -373,9 +349,9 @@ Control uplink                    ~10 wires
 Total:                            ~274 wires/core
 ```
 
-This is **fewer** than Turbo (~340 wires/core) but **3×** the bandwidth (128 vs 42 bit/cc).
+This is **fewer** than Turbo (~600 wires/core) but sufficient bandwidth for systolic pipeline.
 
-**Cell serialization on Systolic Wide link:** 80 bytes = 640 bits → ⌈640/128⌉ = 5 flits. Neighbor latency: ~7 cc (2 hop pipeline + 5 body drain). Model: 2H + 5.
+**Cell serialization on Systolic Wide link:** max 272 bytes = 2176 bits → ⌈2176/128⌉ = 17 flits. Neighbor worst-case latency: ~19 cc (2 hop pipeline + 17 body drain). Model: 2H + (flits-1). Typical 48B payload: 64 bytes = 512 bits → ⌈512/128⌉ = 4 flits, latency: 2H + 3 = 5 cc.
 
 The Systolic variant is **not general purpose** — it is exclusively for ML/SNN workloads where data flow direction is known at compile time. General actor workloads require the Turbo or Compact variant.
 
@@ -384,17 +360,18 @@ The Systolic variant is **not general purpose** — it is exclusively for ML/SNN
 - No VOQ (systolic pipeline is synchronous, no conflict)
 - No iSLIP (no arbitration, fixed data flow)
 - No 2 VN (control uplink only)
-- 128-bit data path (vs 42-bit Turbo/Compact)
+- 128-bit data path (vs 256-bit Turbo/Compact)
 - 2 directions (vs 4–5 Turbo/Compact)
 
 **Speed comparison:**
 
 | Metric | Turbo | Compact | **Systolic** |
 |--------|:-----:|:-------:|:------------:|
-| Bandwidth / link | 42 bit/cc | 42 bit/cc | **128 bit/cc** |
+| Bandwidth / link | 256 bit/cc | 256 bit/cc | **128 bit/cc** |
 | Sustained throughput | ~98% | ~75% | **~95% (systolic)** |
-| Neighbor latency | ~17 cc | ~19–21 cc | **~7 cc** |
-| Worst-case intra-cluster | ~27 cc | ~30–34 cc | **~7 cc (1 hop)** |
+| Neighbor latency (worst case) | ~10 cc | ~12–14 cc | **~19 cc** |
+| Neighbor latency (typical 48B) | ~3 cc | ~5–7 cc | **~5 cc** |
+| Worst-case intra-cluster | ~20 cc | ~23–27 cc | **~19 cc (1 hop)** |
 | MAC utilization (ws) | ~15% | ~12% | **~100%** |
 | Communication | Any-to-any | Any-to-any | **W→E, N→S only** |
 | Control plane isolation | Full (VN0) | Priority bit (~95%) | Control uplink (~95%) |
@@ -549,7 +526,7 @@ R2 → R3 → L3 → R4   (relay: R3 acts as intermediate hop)
 **Relay mechanism:**
 
 1. The scheduler selects an **alternate output port** (the relay region) from a pre-computed relay table
-2. The cell is forwarded to the relay region's GW with a **relay flag** set in the header's reserved bits
+2. The cell is forwarded to the relay region's GW with a **relay flag** set in the header's flags field (bit 6)
 3. The relay region GW re-injects the cell into the L3 crossbar toward the original destination
 4. The destination region receives the cell normally — the relay is transparent to cores
 
@@ -562,7 +539,7 @@ R2 → R3 → L3 → R4   (relay: R3 acts as intermediate hop)
 | Fault bitmap register | ~130 gates | — | 64 FF + read logic |
 | Relay table (precomputed) | ~200 gates | — | 8×3-bit best-relay LUT |
 | Scheduler modification | ~300 gates | — | Bitmap check + relay path selection |
-| Header relay flag | 0 | 0 | Uses 1 reserved bit (40 available) |
+| Header relay flag | 0 | 0 | flags[6] relay bit (dedicated) |
 | **Total** | **~630 gates** | **0** | **< 1.5% of L3 crossbar** |
 
 #### Performance Impact
@@ -593,7 +570,7 @@ The communication network does not only carry actor messages — **program code*
 
 **All code passes through the Seal Core** — unauthenticated code cannot reach any core. The star topology provides this for free: the Seal Core is at the center of the L3 crossbar, so all cross-region traffic passes through it.
 
-Code loading is normal 80-byte cell traffic on the VN0 (control) channel. A 16 KB method = ~256 cells (64-byte payload each); pipeline throughput is limited by the narrowest link (L0, 42-bit @ 500 MHz = ~2.6 GB/s). Worst-case delivery: ~8 µs @ 500 MHz.
+Code loading is normal 272-byte cell traffic on the VN0 (control) channel. A 16 KB method = ~64 cells (256-byte payload each); pipeline throughput is limited by the narrowest link (L0, 256-bit @ 500 MHz = ~16 GB/s). Worst-case delivery: ~1.3 µs @ 500 MHz.
 
 ## Quench-RAM Integration with the Network
 
@@ -604,7 +581,7 @@ The [Quench-RAM](quench-ram-en.md) memory-security layer and the packet-switched
 ```
 SEND(dst_actor, payload_block):
   1. SEAL(payload_block)            ← payload becomes immutable (source core QRAM)
-  2. Copy → 80-byte cell(s)         ← placed on the network (wormhole at L0, VCT at crossbars)
+  2. Copy → 272-byte cell(s)         ← placed on the network (wormhole at L0, VCT at crossbars)
   3. Cells → router → ... → destination core SRAM
   4. Destination core: block alloc  ← QRAM: guaranteed zero-init (RELEASE invariant)
   5. Cell contents → new block      ← in destination core QRAM
@@ -660,7 +637,7 @@ HW multicast **only in cluster gateways** (L1 crossbar, not in every L0 router).
 
 | Level | Type | Wires | Clock | Bandwidth |
 |-------|------|-------|-------|-----------|
-| L0 Turbo/Compact | Parallel | 42-bit (unidirectional) | 1× core | ~2.6 GB/s |
+| L0 Turbo/Compact | Parallel | 256-bit (unidirectional) | 1× core | ~16 GB/s |
 | **L0 Systolic** | **Parallel** | **128-bit (unidirectional, 2 directions)** | **1× core** | **~8 GB/s** |
 | L1 (cluster → tile xbar) | Parallel | 84-bit (bidirectional) | 1× core | ~5.2 GB/s |
 | L2 (tile → region xbar) | Serial | `SERIAL_WIRES` + clock | `SERDES_RATIO`× core | see SerDes Scaling |
@@ -706,43 +683,69 @@ The area cost is acceptable precisely because the L2/L3 crossbar infrastructure 
 
 ## Hop Count and Latency Summary
 
-Latencies are for the **reference configuration** (500 MHz, `SERDES_RATIO`=10, `SERIAL_WIRES`=8, effective L2/L3 = 80 bit/cc), full 80-byte cell, zero contention. Higher core clocks with adjusted SerDes parameters yield similar cycle counts (see SerDes Scaling).
+Latencies are for the **reference configuration** (500 MHz, `SERDES_RATIO`=10, `SERIAL_WIRES`=8, effective L2/L3 = 80 bit/cc), zero contention. The "typical" column is for 48B payload (the most common actor message size), "worst case" is for 256B payload. Higher core clocks with adjusted SerDes parameters yield similar cycle counts (see SerDes Scaling).
 
-**L0 wormhole model:** 2 cycles/hop router pipeline + 15 body flits drain = 2H + 15 cycles for H hops.
-**Crossbar VCT model:** link serialization (⌈640 bits / link_width⌉ cycles) + 1 cycle iSLIP per crossbar. Output serialization overlaps with next stage's input.
+**L0 wormhole model (256-bit link):** 2 cycles/hop router pipeline + payload_flits body flit drain = 2H + payload_flits cycles for H hops. Typical 48B: 2H + 2. Worst case 256B: 2H + 8.
+**Crossbar VCT model:** link serialization (⌈cell_bits / link_width⌉ cycles) + 1 cycle iSLIP per crossbar. Output serialization overlaps with next stage's input.
 
-| Path | Hops | Latency | @500 MHz |
-|------|------|---------|----------|
-| Neighboring core (L0) | 1 | ~17 cycles | 34 ns |
-| Cross-cluster, same tile (L0+L1+L0) | 6+1+6 = 13 | ~63 cycles | 126 ns |
-| Cross-tile, same region (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~99 cycles | 198 ns |
-| Cross-region (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~139 cycles | 278 ns |
+| Path | Hops | Typical (48B) | Worst case (256B) | @500 MHz (typical) |
+|------|------|--------------|-------------------|-------------------|
+| Neighboring core (L0) | 1 | ~4 cycles | ~10 cycles | 8 ns |
+| Cross-cluster, same tile (L0+L1+L0) | 6+1+6 = 13 | ~43 cycles | ~93 cycles | 86 ns |
+| Cross-tile, same region (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~73 cycles | ~203 cycles | 146 ns |
+| Cross-region (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~103 cycles | ~317 cycles | 206 ns |
 
-> **Context:** worst-case ~280 ns on-chip is competitive with software actor message delivery on conventional CPUs (Erlang/BEAM: ~0.5–2 µs), while the CFPU runs thousands of independent hardware cores in parallel.
+> **Context:** typical ~206 ns on-chip (48B payload) is competitive with software actor message delivery on conventional CPUs (Erlang/BEAM: ~0.5–2 µs), while the CFPU runs thousands of independent hardware cores in parallel. The worst-case 317 cycles (634 ns) applies to rare 256B payloads — variable link occupancy means ~80% of messages travel at typical latency.
 
 <details>
-<summary>Cross-region latency breakdown (18 hops)</summary>
+<summary>Cross-region latency breakdown (18 hops, typical 48B payload)</summary>
 
 | Segment | Link width | Cycles | Notes |
 |---------|-----------|--------|-------|
-| Source L0 wormhole (6 hops) | 42-bit | 27 | 2×6 + 15 body drain |
-| L1 link (GW → xbar) | 84-bit | 8 | ⌈640/84⌉ |
+| Source L0 wormhole (6 hops) | 256-bit | 14 | 2×6 + 2 body drain (48B = 2 payload flits) |
+| L1 link (GW → xbar) | 84-bit | 7 | ⌈512/84⌉ (64B cell = 512 bits) |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link (xbar → tile GW) | 84-bit | 8 | |
-| L2 link (tile GW → xbar) | 80-bit | 8 | ⌈640/80⌉ |
+| L1 link (xbar → tile GW) | 84-bit | 7 | |
+| L2 link (tile GW → xbar) | 80-bit | 7 | ⌈512/80⌉ |
 | L2 crossbar (iSLIP) | — | 1 | |
-| L2 link (xbar → region GW) | 80-bit | 8 | |
-| L3 link (region GW → xbar) | 80-bit | 8 | |
+| L2 link (xbar → region GW) | 80-bit | 7 | |
+| L3 link (region GW → xbar) | 80-bit | 7 | |
 | L3 crossbar (iSLIP) | — | 1 | |
-| L3 link (xbar → dst region GW) | 80-bit | 8 | |
-| L2 link → xbar | 80-bit | 8 | |
+| L3 link (xbar → dst region GW) | 80-bit | 7 | |
+| L2 link → xbar | 80-bit | 7 | |
 | L2 crossbar (iSLIP) | — | 1 | |
-| L2 link → dst tile GW | 80-bit | 8 | |
-| L1 link → xbar | 84-bit | 8 | |
+| L2 link → dst tile GW | 80-bit | 7 | |
+| L1 link → xbar | 84-bit | 7 | |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link → dst cluster GW | 84-bit | 8 | |
-| Destination L0 wormhole (6 hops) | 42-bit | 27 | 2×6 + 15 body drain |
-| **Total** | | **139** | |
+| L1 link → dst cluster GW | 84-bit | 7 | |
+| Destination L0 wormhole (6 hops) | 256-bit | 14 | 2×6 + 2 body drain |
+| **Total** | | **~103** | |
+
+</details>
+
+<details>
+<summary>Cross-region latency breakdown (18 hops, worst case 256B payload)</summary>
+
+| Segment | Link width | Cycles | Notes |
+|---------|-----------|--------|-------|
+| Source L0 wormhole (6 hops) | 256-bit | 20 | 2×6 + 8 body drain (256B = 8 payload flits) |
+| L1 link (GW → xbar) | 84-bit | 26 | ⌈2176/84⌉ (272B cell = 2176 bits) |
+| L1 crossbar (iSLIP) | — | 1 | |
+| L1 link (xbar → tile GW) | 84-bit | 26 | |
+| L2 link (tile GW → xbar) | 80-bit | 28 | ⌈2176/80⌉ |
+| L2 crossbar (iSLIP) | — | 1 | |
+| L2 link (xbar → region GW) | 80-bit | 28 | |
+| L3 link (region GW → xbar) | 80-bit | 28 | |
+| L3 crossbar (iSLIP) | — | 1 | |
+| L3 link (xbar → dst region GW) | 80-bit | 28 | |
+| L2 link → xbar | 80-bit | 28 | |
+| L2 crossbar (iSLIP) | — | 1 | |
+| L2 link → dst tile GW | 80-bit | 28 | |
+| L1 link → xbar | 84-bit | 26 | |
+| L1 crossbar (iSLIP) | — | 1 | |
+| L1 link → dst cluster GW | 84-bit | 26 | |
+| Destination L0 wormhole (6 hops) | 256-bit | 20 | 2×6 + 8 body drain |
+| **Total** | | **~317** | |
 
 </details>
 
@@ -770,7 +773,7 @@ The RTL is parameterizable — die size and process node determine core count.
 
 The choice depends on the workload — the RTL `SRAM_KB_PER_CORE` parameter is set at fabrication time.
 
-Worst-case latency stays in the ~100–139 cycle range (~200–278 ns @ 500 MHz) across all nodes — smaller cluster physical size at advanced nodes partially compensates for the deeper hierarchy.
+Typical cross-region latency is ~103 cycles (206 ns @ 500 MHz) for 48B payloads, worst-case 256B payloads ~317 cycles (634 ns) — smaller cluster physical size at advanced nodes partially compensates for the deeper hierarchy.
 
 ## Excluded Alternatives (and Rationale)
 
@@ -806,6 +809,7 @@ This document addresses the following Symphact hardware requirements:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 3.0 | 2026-04-28 | **Header v3.0:** 4×32-bit word-aligned layout. `src_actor`/`dst_actor` 16→8 bits (max 256 actors/core). `src_actor` writer: core scheduler→core HW (active actor context register, cannot be spoofed). `seq` 8→16 bits (max 65,536 fragments). `len[8]` = len+1 semantics (1–256 byte payload, no zero-byte payload). CRC-16 added (payload integrity, stored in header). `flags[8]` expanded: `[VN:1][relay:1][Pri:2][reserved:4]`. `reserved` 16→8 bits. HMAC and perms removed — HW-managed Capability Slot Table (CST) in QSRAM. **L0 link:** 42→256 bits (tile-level NoC, per `internal-bus-hu.md`). **Cell:** max 272 bytes (16B header + 256B payload). Flit model: on 256-bit link header=1 flit, worst case 2H+8, typical 2H+2. Latency tables recalculated (typical 48B + worst case 256B). Cross-region typical ~103 cc (206 ns), worst case ~317 cc (634 ns). L0 throughput ~16 GB/s (vs old ~2.6 GB/s) |
 | 2.4 | 2026-04-22 | Header reorganization: `len[16]`→`len[8]`, `src_actor[16]` + `dst_actor[16]` added to header (N:M actor-to-core mapping, DDR5 CAM actor-level ACL, crash recovery). Variable link occupancy: only `len` payload bytes travel on the link (4-bit flit counter, ~43% average link savings), buffers remain fixed 80B slots. Latency tables updated (worst case annotation) |
 | 2.3 | 2026-04-21 | L3 Crosspoint Fault Tolerance section: fault bitmap (64-bit), relay via neighbor region (~630 gates, <1.5% overhead), BIST + runtime watchdog detection, graceful degradation model |
 | 2.2 | 2026-04-21 | Reference node changed from 7nm to 5nm. Recalculated: router areas (Turbo 0.006, Compact 0.003), core+SRAM sizes, corrected core counts (Nano ~47k, Actor ~25k, Matrix Turbo ~30.8k, Matrix Systolic ~38.1k, Rich ~11.3k), physical sizes (L0 1.1mm, L1 3.2mm, L2 9mm, L3 28mm), Seal Core wire length 14mm. Reference config: 16×8×8×10 = 10,240 cores |

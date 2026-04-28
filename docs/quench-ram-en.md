@@ -2,7 +2,7 @@
 
 > Magyar verzió: [quench-ram-hu.md](quench-ram-hu.md)
 
-> Version: 1.3
+> Version: 1.4
 
 This document describes the **architecture and ISA integration of the Quench-RAM** memory cell: per-block status-bit semantics, the two hardware state-machine operations (`SEAL`, `RELEASE`), the NAND-flash-derived "erase-on-release" pattern, and its relationship to ECMA-335 default-initialization semantics, the actor-model capability system, and the per-core garbage collector.
 
@@ -130,7 +130,7 @@ SEAL protection is needed where data **leaves the Core's isolated SRAM**:
 | GC sweep (within Core) | **RELEASE** | unreachable block reclamation |
 | CODE region unload | **RELEASE** | old code wiped |
 
-Within the Core, there is **no SEAL on data** — the CIL type system ensures integrity (TypeToken, CapabilityTag etc. are `readonly` fields), and other actors physically cannot access the Core's SRAM.
+Within the Core, there is **no SEAL on data** — the CIL type system ensures integrity (TypeToken, CstIndex etc. are `readonly` fields), and other actors physically cannot access the Core's SRAM.
 
 ## Trust boundary <a name="trust-boundary"></a>
 
@@ -147,7 +147,7 @@ This **already exists** in Symphact (lines 366-369). Every actor lives in its ow
 | Attack attempt | Why it fails |
 |----------------|--------------|
 | Malicious actor invokes `GC_SWEEP` | operates only on **its own heap** → cleans up its own garbage, cannot reach others' |
-| Malicious actor tries to obtain cap to another actor's block | capability tag is HMAC'd, unforgeable — router checks (line 398) |
+| Malicious actor tries to obtain cap to another actor's block | capability lives in the CST (Capability Slot Table), QSRAM SEAL-protected, physically unforgeable — software sees only a 32-bit CST index, never the raw ActorRef |
 | Malicious actor writes code calling SEAL or RELEASE | the linker (`cli-cpu-link`) rejects it — no such CIL opcode exists |
 | Malicious actor compromises `hot_code_loader` | `hot_code_loader` is itself a **signed, verified actor** (AuthCode), its code cannot be tampered with |
 
@@ -279,21 +279,26 @@ The "pinned object" notion in traditional .NET GC: an object the GC cannot move 
 
 The `ActorRef` capability token defined in [`Symphact/vision-en.md#the-concept-of-a-capability`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md#the-concept-of-a-capability) becomes **physically defendable** with Quench-RAM:
 
-```csharp
-public readonly struct ActorRef
-{
-    public int  CoreId;
-    public int  MailboxIndex;
-    public long CapabilityTag;   // HMAC-style, only the registry can write
-    public int  Permissions;
-}
+Capability protection is based on the **CST (Capability Slot Table)** model: software never sees the raw `ActorRef`, only a **32-bit CST index**. The CST resides in QSRAM, in the same **SEAL block** as the code — physically unforgeable.
+
+```
+CST entry (8 byte aligned):
++--------+---------+--------+----------+
+| dst[24]| actor[8]| perm[8]| rsrvd[24]|
++--------+---------+--------+----------+
 ```
 
-An `ActorRef` instance stored in a **sealed Quench-RAM block** becomes **tamper-proof at the hardware level**:
+CST entry fields:
+- **dst[24]** — destination core/node identifier
+- **actor[8]** — destination actor index (max 256 actors/core)
+- **perm[8]** — permissions (send, ask, supervise, etc.)
+- **reserved[24]** — reserved for future extension
 
-- The capability tag cannot be rewritten — the block is sealed
-- An actor bug attempting to forge another actor's capability is **physically incapable** of doing so (a write attempt after SEAL traps)
-- The capability registry itself (`capability_registry`, see line 243) stores issued tags in sealed blocks
+The CST is **tamper-proof at the hardware level**:
+
+- The CST block is SEAL-ed — a write attempt generates a trap
+- An actor bug attempting to forge another actor's capability is **physically incapable** of doing so (software only knows the CST index, cannot reach the internal structure)
+- **Delegation:** occurs as a supervisor-to-supervisor VN0 control message, via an atomic UNSEAL→write→RESEAL HW FSM operation
 
 ### Hybrid object layout
 
@@ -303,8 +308,8 @@ A CIL object can be split into two regions:
 ┌──────────────────────────────────────────────┐
 │ SEALED region (status=1, immutable):         │
 │   TypeToken      ─┐                           │
-│   ObjectId       ─├── identity, capability    │
-│   CapabilityTag  ─┘                           │
+│   ObjectId       ─├── identity                │
+│   CstIndex       ─┘   (32-bit CST index)     │
 │   init-only fields (readonly properties)     │
 ├──────────────────────────────────────────────┤
 │ MUTABLE region (status=0):                   │
@@ -322,7 +327,7 @@ The linker (`cli-cpu-link`) decides at build time which region every field belon
 ### What the system gains
 
 - **Type confusion physically eliminated:** the `TypeToken` is sealed; a memory-corruption bug cannot forge it
-- **Capability forging physically eliminated:** the `CapabilityTag` is sealed; cannot be overwritten
+- **Capability forging physically eliminated:** the CST resides in a SEAL-ed QSRAM block; software sees only a 32-bit index
 - **Object identity stability:** the `ObjectId` is sealed; remains consistent across GC moves
 
 ## Security guarantees <a name="security"></a>
@@ -337,7 +342,7 @@ Quench-RAM provides physical-level defense against **seven new attack classes** 
 | Uninitialized memory read | CWE-457 | Common (legacy C/C++) | **Eliminated** — every alloc provably zero-init |
 | Cold boot key recovery | — | Recoverable from DRAM | **Eliminated** — sealed key only released via RELEASE, which wipes |
 | Sensitive data in swap | CWE-200 | OS-dependent | **Eliminated** — no swap (per-core SRAM) + sealed unswappable |
-| Capability tag forging | — | Possible via RAM patching | **Eliminated** — stored in sealed region |
+| Capability forging | — | Possible via RAM patching | **Eliminated** — CST in SEAL-ed QSRAM block, software sees only CST index |
 
 ### What is NOT defended
 
@@ -403,7 +408,7 @@ A single F6 Rich core may support **multiple granularities** simultaneously acro
 | `DATA-fine` | 16 byte | capability registry, ActorRef pool |
 | `DATA-medium` | 256 byte | actor state objects |
 | `STACK` | n/a | no Quench-RAM (per-frame allocation is fast) |
-| `MAILBOX` | 64 byte | sealed message payloads |
+| `MAILBOX` | 256 byte | sealed message payloads (= cell payload size) |
 
 The Nano core (F4) is simpler: only **256 byte block** granularity, designed for simplicity.
 
@@ -454,6 +459,7 @@ Quench-RAM is **not a prerequisite** for F0-F4; these continue to operate on the
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.4 | 2026-04-24 | HMAC/SipHash references removed — capability protection replaced with CST (Capability Slot Table) model: QSRAM SEAL-protected, physically unforgeable. Software sees only 32-bit CST index, never raw ActorRef. CST entry: dst[24]+actor[8]+perm[8]+reserved[24]. Delegation: supervisor-to-supervisor VN0, UNSEAL→write→RESEAL atomic HW FSM. |
 | 1.3 | 2026-04-19 | SEAL triggers refined: within Core, only CODE region needs SEAL (data protected by CIL type system). Swap-out SEAL and swap-in RELEASE added. Primary motivation rewritten (CODE immutability + external QRAM protection). |
 | 1.2 | 2026-04-19 | Row-selective clear clarification (not BIST broadcast). F5: FPGA demo, F6: first silicon. |
 | 1.1 | 2026-04-16 | Trust boundary section. SEAL/RELEASE defined as HW FSM operations, per-actor heap isolation. |

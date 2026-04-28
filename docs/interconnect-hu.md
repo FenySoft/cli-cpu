@@ -2,7 +2,7 @@
 
 > English version: [interconnect-en.md](interconnect-en.md)
 
-> Version: 2.4
+> Version: 3.0
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **on-chip interconnect hálózatát** specifikálja: a topológiát, a switching modellt, a router belső felépítését, a fizikai elrendezést, a core családot és a node-skálázási stratégiát.
 
@@ -54,7 +54,7 @@ L0: 16 core × L1: 8 cluster × L2: 8 tile × L3: 10 régió = 10 240 core
 | `TILES_PER_REGION` | Változó | 4-12 | Node, chipméret |
 | `REGIONS` | Változó | 4-24 | Chipméret |
 | `SRAM_KB_PER_CORE` | Változó | 16-1024 | Node |
-| `CELL_SIZE` | Változó | 64/128 | Cella méret variáns |
+| `CELL_SIZE` | Változó | 256 (default) | Max payload méret (byte) |
 | `CORE_TYPE` | Változó | NANO/ACTOR/RICH/MATRIX | Alkalmazásfüggő (heterogénnél vegyes) |
 | `ROUTER_VARIANT` | Változó | TURBO/COMPACT/SYSTOLIC | Core típustól függő (klaszter-szintű) |
 | `SERDES_RATIO` | Változó | 4–12 | Core órajeltől függő (lásd SerDes skálázás) |
@@ -64,170 +64,146 @@ L0: 16 core × L1: 8 cluster × L2: 8 tile × L3: 10 régió = 10 240 core
 
 ### ATM-inspirált fix cella
 
-Minden üzenet **fix cellákra** darabolva halad a hálózaton: **16 byte header + max 64 byte payload = max 80 byte**. A buffer-ek fix méretűek (80 byte slot), de a **linken csak a hasznos payload utazik** — a `len` mező határozza meg, hány byte-ot kell ténylegesen továbbítani.
+Minden üzenet **fix cellákra** darabolva halad a hálózaton: **16 byte header + max 256 byte payload = max 272 byte**. A buffer-ek fix méretűek (272 byte slot), de a **linken csak a hasznos payload utazik** — a `len` mező határozza meg, hány byte-ot kell ténylegesen továbbítani (a `len` érték + 1-et jelent, tehát 1–256 byte; 0 byte-os payload nincs, azt a flags jelzi).
 
 ```
-Cella = Header (16 byte) + Payload (0-64 byte) = 16-80 byte a linken
+Cella = Header (16 byte) + Payload (1-256 byte) = 17-272 byte a linken
 
-Header (16 byte = 128 bit) — Header SRAM-ban tárolva:
-┌──────────────────────────────────────────────────────────────────┐
-│  dst[24] + src[24]                              — routing (HW)  │
-│  + src_actor[16] + dst_actor[16]                — actor ID      │
-│  + seq[8] + flags[8] + len[8] + CRC-8[8]       — control       │
-│  + reserved[16]                                 — jövőbeli      │
-│                                            Összesen: 128 bit    │
-└──────────────────────────────────────────────────────────────────┘
+Header (16 byte = 128 bit = 4 × 32 bit) — Header SRAM-ban tárolva:
+┌─────────────────────────────────────────────────────────────────────┐
+│  Word 0:  dst[24] + dst_actor[8]                — cél (HW+actor)   │
+│  Word 1:  src[24] + src_actor[8]                — forrás (HW+actor)│
+│  Word 2:  seq[16] + flags[8] + len[8]           — control          │
+│  Word 3:  reserved[8] + CRC-16[16] + CRC-8[8]  — integritás       │
+│                                             Összesen: 128 bit      │
+└─────────────────────────────────────────────────────────────────────┘
 
-Payload (0-64 byte) — Payload SRAM-ban tárolva:
-┌──────────────────────────────────────────────────────┐
-│  0-64 byte alkalmazás-adat (len mező határozza meg)  │
-└──────────────────────────────────────────────────────┘
+Payload (1-256 byte) — Payload SRAM-ban tárolva:
+┌────────────────────────────────────────────────────────────┐
+│  1-256 byte alkalmazás-adat (len+1 mező határozza meg)     │
+└────────────────────────────────────────────────────────────┘
 ```
 
 **Header mezők:**
 
 | Mező | Méret | Ki írja | Leírás |
 |------|-------|---------|--------|
-| `dst` | 24 bit | Küldő core | Cél hierarchikus HW cím (region.tile.cluster.core) |
+| `dst` | 24 bit | Küldő core HW | Cél hierarchikus HW cím (region.tile.cluster.core) — a küldő core HW a CST indexből oldja fel |
+| `dst_actor` | 8 bit | Küldő core HW | Cél aktor azonosítója (max 256 aktor / core) — a CST indexből feloldva |
 | `src` | 24 bit | **NoC router HW** | Forrás HW cím — hardveresen kitöltve, nem hamisítható |
-| `src_actor` | 16 bit | Core scheduler | Küldő aktor azonosítója (max 65 536 aktor / core) |
-| `dst_actor` | 16 bit | Küldő aktor | Cél aktor azonosítója |
-| `seq` | 8 bit | Küldő | Sorszám (fragmentált üzenetek sorrendje) |
-| `flags` | 8 bit | Küldő | VN0/VN1, relay flag, stb. |
-| `len` | 8 bit | Küldő | Payload tényleges mérete byte-ban (0-128, `CELL_SIZE` függő) |
-| `CRC-8` | 8 bit | HW | Header integritás ellenőrzés |
-| `reserved` | 16 bit | — | Jövőbeli bővítés (QoS, stb.) |
+| `src_actor` | 8 bit | **Core HW** | Küldő aktor azonosítója — az aktív actor context regiszterből, nem hamisítható |
+| `seq` | 16 bit | Küldő | Sorszám (fragmentált üzenetek sorrendje, max 65 536 fragment) |
+| `flags` | 8 bit | Küldő | `[VN:1][relay:1][Pri:2][reserved:4]` — VN0/VN1, relay flag, üzenet prioritás (4 szint) |
+| `len` | 8 bit | Küldő | Payload méret: érték + 1 = 1–256 byte (0 byte-os payload nincs, azt flags jelzi) |
+| `CRC-16` | 16 bit | HW | Payload integritás ellenőrzés (a header-ben van, a payload fölött számolva) |
+| `CRC-8` | 8 bit | HW | Header integritás ellenőrzés (az utolsó mező, az egész header fölött számolva, beleértve CRC-16-ot) |
+| `reserved` | 8 bit | — | Jövőbeli bővítés |
 
 **Miért `src_actor` / `dst_actor` a header-ben?** A v1.8-ban az actor ID a payload-ba került (szoftveres dispatch). Az N:M actor-to-core mapping miatt (több aktor egy core-on, beleértve alvó aktorokat) az actor ID a header-ben **hardveres szintű előnyöket** ad:
-- **DDR5 Controller CAM tábla** — `src[24] + src_actor[16]` alapján aktor-szintű jogosultság-ellenőrzés
+- **DDR5 Controller CAM tábla** — `src[24] + src_actor[8]` alapján aktor-szintű jogosultság-ellenőrzés
 - **Crash recovery** — csak az adott aktor capability-jét kell törölni, nem az egész core-ét
 - **Router szintű dispatch** — a fogadó core scheduler a header-ből tudja melyik aktornak szól, nem kell a payload-ba nyúlni
-- **16 bit** — 65 536 aktor / core, lefedi az alvó aktorokat is
+- **8 bit** — 256 aktor / core, lefedi az alvó aktorokat is (a gyakorlatban 256 context/core bőven elegendő: a warm-context cache 4–8 aktív + 248 alvó aktor)
 
-**Változó link foglalás:** a router buffer mindig fix méretű (80 byte slot), de a **linken csak a header + `len` byte payload halad**. A router a header `len` mezőjéből kiszámolja a payload flit-ek számát:
+**Capability modell (v3.0):** A szoftver **nem látja a nyers `dst`/`src` címeket** — csak egy 32-bit CST indexet (Capability Slot Table). A küldő core HW-ja oldja fel a CST indexet a header `dst` + `dst_actor` mezőire. A CST QSRAM-ban él, aktor-szintű jogosultságokkal (`perms`). A küldő HW ellenőrzi a jogosultságot küldéskor — a `perms` nem utazik a header-ben. Az HMAC szintén nem szükséges a header-ben: a CST HW-managed, a szoftver nem tudja közvetlenül manipulálni a nyers címeket.
+
+**Változó link foglalás:** a router buffer mindig fix méretű (272 byte slot), de a **linken csak a header + (len+1) byte payload halad**. A router a header `len` mezőjéből kiszámolja a payload flit-ek számát:
 
 ```
-128 bites belső adatút:
-  payload_flits = ceil(len / 16)    ← 4 bites jobb-shift + carry
+256 bites L0 adatút (1 flit = 32 byte):
+  payload_bytes = len + 1                    ← 1–256 byte
+  payload_flits = ceil(payload_bytes / 32)   ← 5 bites jobb-shift + carry
   total_flits = 1 (header) + payload_flits
 
 Példák:
-  len = 8  → 1 + 1 = 2 flit  (32 byte a linken, nem 80)
-  len = 32 → 1 + 2 = 3 flit  (48 byte a linken)
-  len = 64 → 1 + 4 = 5 flit  (80 byte a linken, teljes cella)
+  len = 7   (8 byte)   → 1 + 1 = 2 flit   (64 byte a linken, nem 272)
+  len = 31  (32 byte)  → 1 + 1 = 2 flit   (64 byte a linken)
+  len = 63  (64 byte)  → 1 + 2 = 3 flit   (96 byte a linken)
+  len = 127 (128 byte) → 1 + 4 = 5 flit   (160 byte a linken)
+  len = 255 (256 byte) → 1 + 8 = 9 flit   (272 byte a linken, teljes cella)
 ```
 
-**HW költség:** 4 bites számláló per port + shift. Nincs LUT, nincs tail bit, nincs link-szélességi overhead.
+**HW költség:** 5 bites számláló per port + shift. Nincs LUT, nincs tail bit, nincs link-szélességi overhead.
 
 **Hatás a hálózat áteresztőképességére:** az actor üzenetek ~80%-a ≤48 byte payload. Változó link foglalással a linkek **átlagosan ~43%-kal kevesebb ideig foglaltak**, ami közel megduplázza az effektív hálózati áteresztőképességet.
 
-**Split SRAM design:** a header és a payload **külön SRAM-ban** tárolódik a routerben. Ez természetes, mert funkcionálisan különböznek: a scheduler a headert olvassa a routing döntéshez, miközben a payload még érkezik — **1 ciklus latencia-megtakarítás**. Nincs port-verseny a scheduler és a crossbar között. Mindkét SRAM 2-hatvány igazított: header = slot × 16, payload = slot × 64 — egyszerű shift-es címzés, nincs szükség szorzóra.
+**Split SRAM design:** a header és a payload **külön SRAM-ban** tárolódik a routerben. Ez természetes, mert funkcionálisan különböznek: a scheduler a headert olvassa a routing döntéshez, miközben a payload még érkezik — **1 ciklus latencia-megtakarítás**. Nincs port-verseny a scheduler és a crossbar között. Mindkét SRAM 2-hatvány igazított: header = slot × 16, payload = slot × 256 — egyszerű shift-es címzés, nincs szükség szorzóra.
 
-**Miért 16 byte-os header?** 128 bit a természetes 2-hatvány határ. A mezők (dst, src, src_actor, dst_actor, seq, flags, len, CRC) 112 bitet igényelnek, 16 bit reserved marad jövőbeli bővítésekre. A 64 byte-os payload szintén természetes 2-hatvány határ a szoftver számára.
+**Miért 16 byte-os header?** 128 bit a természetes 2-hatvány határ. A mezők (dst, dst_actor, src, src_actor, seq, flags, len, CRC-16, CRC-8) 120 bitet igényelnek, 8 bit reserved marad jövőbeli bővítésekre. A 4 × 32 bites word-határos elrendezés egyszerűsíti a HW parsert. A 256 byte-os payload szintén természetes 2-hatvány határ, illeszkedik a DDR5 burst és az on-chip SRAM cache line méretekhez.
 
 **Miért fix buffer, változó link?** A fix buffer méret determinisztikus buffer-kezelést és egyszerű SRAM címzést eredményez (az ATM hálózatok alapelve). A változó link foglalás viszont **nem növeli a buffer komplexitást** — csak a forwarding számláló változik — miközben jelentősen javítja a link kihasználtságot.
 
-### Miért 64 byte payload — Rich Core-oknál is?
+### Miért 256 byte payload?
 
-Az eredeti 128 byte-os payload a Matrix Core 4×4 tile-jához volt túlméretezett, de a kérdés jogos: a Rich Core aktor-üzenetei nem igényelnek-e nagyobb cellát?
+A v2.x sorozatban a payload 64 byte volt. A v3.0-ban 256 byte-ra nőtt — a `len[8]` mező `len+1` szemantikával 1–256 byte-ot fed le. Ez a döntés a 256-bites L0 link és a változó link foglalás együttes hatásán alapul:
 
-**Az elemzés azt mutatja, hogy a 64 byte-os payload a Rich Core-nak is előnyös:**
+| Szempont | 256B payload (272B cella, 256-bit L0) | 64B payload (80B cella, 42-bit L0) |
+|----------|---------------------------------------|-------------------------------------|
+| Header overhead (worst case) | 6% | 20% |
+| Max flit szám (256-bit L0 link) | 9 flit | 3 flit |
+| Szomszéd latencia (worst case) | 2H + 8 = 10 cc | 2H + 2 = 4 cc |
+| Szomszéd latencia (tipikus 48B) | 2H + 1 = 3 cc | 2H + 1 = 3 cc |
+| Router VOQ SRAM | ~3,4× nagyobb | kisebb |
 
-| Szempont | 64B payload (80B cella) | 128B payload (144B cella) |
-|----------|------------------------|--------------------------|
-| Header overhead | 20% | 11% |
-| Max flit szám (128-bit belső link) | 5 flit | 9 flit |
-| Max flit szám (42-bit L0 SerDes link) | 16 flit | 28 flit |
-| Szomszéd latencia (max) | 2H + 15 = 17 cc | 2H + 27 = 29 cc |
-| Cross-régió latencia (max) | ~139 cc | ~229 cc |
-| Router VOQ SRAM | kisebb | ~1,6× nagyobb |
-| Router terület (Turbo) | 0,006 mm² | ~0,008 mm² |
+> **Megjegyzés:** a változó link foglalásnak köszönhetően a fenti worst-case flit számok ritkán fordulnak elő. Egy tipikus 32 byte-os actor üzenet: 256-bit L0-on 2 flit (header + 1 payload) — a link **nagyon gyorsan felszabadul**.
 
-> **Megjegyzés:** a változó link foglalásnak köszönhetően a fenti flit számok és latenciák a **worst case** (teljes payload). Egy tipikus 32 byte-os actor üzenet 64B cellában: 128-bit linken 3 flit (header + 2 payload), 42-bit L0-on 10 flit — a link **hamarabb felszabadul**.
+**Döntő érv: a változó link foglalás.** A 256-bites L0 linken a tipikus actor üzenet (≤48 byte) mindössze 2–3 flit — **gyorsabb**, mint a régi 42-bites linken a 64B cellával. A 256B max payload pedig lehetővé teszi, hogy a nagy üzenetek (state migráció, code-load chunk) **kevesebb cellára** daraboljanak, csökkentve a header overhead-et és a per-cell routing döntések számát.
 
-**Döntő érv: a latencia.** A 80 byte-os cella **40%-kal gyorsabb** worst-case cross-régió latenciát ad (139 vs 229 cc). A változó link foglalással a tipikus actor üzenetek (~80% ≤48 byte) ennél is gyorsabbak. A 128B payload header-overhead előnye (11% vs 20%) **csak a ritka, nagy üzeneteknél** (state migráció, bulk transfer) számít.
+Az Akka/actor stílusú rendszerekben az üzenetek nagy többsége kicsi (parancsok, események, rövid válaszok: 16–64 byte), amelyek egyetlen 256B cellába bőven elférnek — multi-cell fragmentáció nélkül. A nagy üzeneteknél (4–16 KB state migráció) a 256B payload 4× kevesebb cellát igényel, mint a korábbi 64B.
 
-Az Akka/actor stílusú rendszerekben az üzenetek nagy többsége kicsi (parancsok, események, rövid válaszok: 16–64 byte), amelyek egyetlen 64B cellába elférnek. A nagy üzeneteknél (4–16 KB state migráció) a dupla celladarab overhead elhanyagolható a teljes transzfer idejéhez képest.
+A `CELL_SIZE` RTL paraméter biztonsági háló: gyártáskor konfigurálható a max payload méret.
 
-A `CELL_SIZE` RTL paraméter biztonsági háló: ha egy specifikus CFPU-R konfiguráció workload-ja megköveteli, 128B-re állítható gyártáskor.
+**Végleges döntés (2026-04-28):** a 256B payload a fő mesh-re, 256-bites L0 linkkel.
 
-**Végleges döntés (2026-04-20):** a 64B payload marad a fő mesh-re.
+#### Miért pont 256B? — Részletes elemzés
 
-#### Miért nem 128B? — Részletes elemzés
+**1. A 256-bites L0 link megváltoztatja a számolást.**
+A v2.x-ben a 42-bites L0 link volt a szűk keresztmetszet: egy 80B cella 16 flit volt. A 256-bites L0 linken (tile-szintű NoC, lásd `internal-bus-hu.md`) a header egyetlen flit, a teljes 256B payload mindössze 8 flit. A változó link foglalás miatt a tipikus kis üzenetek (≤48 byte) 2–3 flit alatt áthaladnak — **gyorsabban**, mint a régi 42-bites linken a kisebb cellával.
 
-**1. Az ML-Max nem indokolja a cella növelést.**
-Az eredeti 128→64 csökkentés egyik indoka az volt, hogy a Matrix Core 4×4 tile-hoz a 128B túlméretezett. Azóta a CFPU-ML-Max saját 128-bit systolic routert használ (cluster-en belüli on-die link) — a tenzor-adatforgalom **nem a fő mesh-en** halad. Tehát sem a 128B melletti, sem az ellene szóló eredeti ML-érv nem releváns már.
+**2. Aggregált throughput elemzés — 256-bit L0 @ 500 MHz:**
 
-**2. Aggregált throughput elemzés — a mátrix átbocsátó képessége.**
+| Payload méret | Flit szám (256-bit) | Payload throughput | Link hatásfok |
+|---------------|---------------------|--------------------|---------------|
+| 32B (tipikus) | 2 flit | 32B / 2 cc = 16.0 B/cc | 50% |
+| 64B | 3 flit | 64B / 3 cc = 21.3 B/cc | 67% |
+| 128B | 5 flit | 128B / 5 cc = 25.6 B/cc | 80% |
+| 256B (worst case) | 9 flit | 256B / 9 cc = 28.4 B/cc | 89% |
 
-Egyetlen link throughput (42-bit L0 @ 500 MHz):
+**L0 link throughput:** 256 bit × 500 MHz / 8 = **16 GB/s** (vs régi 42-bit: ~2,6 GB/s, **~6× javulás**).
 
-| Cella | Flit szám | Payload throughput | Link hatásfok |
-|-------|-----------|-------------------|---------------|
-| 80B (64B payload) | 16 flit | 64B / 16 cc = 4.00 B/cc | 80% |
-| 144B (128B payload) | 28 flit | 128B / 28 cc = 4.57 B/cc | 89% |
+**3. Wormhole routing és HOL blocking — javult.**
 
-**Egyetlen linken a 128B cella 14%-kal jobb.** De ez félrevezető — a rendszer-szintű throughput-ot a **tényleges hasznos adat / link-foglalási idő** határozza meg:
-
-Tipikus actor workload üzenetméret-eloszlás:
-- ~80% üzenet ≤ 48 byte payload (parancs, válasz, esemény, heartbeat)
-- ~15% üzenet 49–64 byte (közepes payload)
-- ~5% üzenet > 64 byte (code-load, state migration — multi-cell)
-
-Egy 32 byte-os actor üzenet szállítási költsége:
-
-| Cella | Flit | Hasznos adat | Hatásfok (B/flit) |
-|-------|------|-------------|-------------------|
-| 80B (64B payload) | 16 | 32B | 2.00 B/flit |
-| 144B (128B payload) | 28 | 32B | 1.14 B/flit ← **43% pazarlás** |
-
-A 128B cella **28 ciklusig foglalja a linket** egy 32 byte-os üzenettel — a 64B cella ugyanezt **16 ciklus** alatt szállítja. A hasznos adat azonos, de a link-foglalás 75%-kal hosszabb.
-
-Súlyozott aggregált hatásfok (B/flit, workload mixszel):
+A 256-bites linken a worst-case 256B payload 9 flit, ami a 42-bites link 16 flit-jéhez képest **rövidebb link-foglalás**:
 
 ```
-64B cella:  0.80×(32/16) + 0.15×(56/16) + 0.05×(64/16) = 2.33 B/flit
-128B cella: 0.80×(32/28) + 0.15×(56/28) + 0.05×(128/28) = 1.44 B/flit
+H=6 (max L0 hop):
+  256B cella, 256-bit link:  foglalás = 2H + 8 = 20 cc
+  tipikus 48B, 256-bit link: foglalás = 2H + 1 = 13 cc
 ```
 
-**A 64B cella ~38%-kal nagyobb aggregált throughput-ot ad** a 10 000 core-os mesh-ben a tipikus actor workload mellett.
+A rövidebb link-foglalás csökkenti a HOL blocking valószínűségét.
 
-**3. Wormhole routing és HOL blocking.**
+**4. Code-load throughput — 4× kevesebb cella.**
 
-Wormhole routing-ban a cella **lefoglalja a köztes linkeket** amíg áthalad. Nagyobb cella = hosszabb foglalás = több torlódás:
+A Seal Core code-load 256B cellákkal 4× kevesebb cellát igényel:
+- 16 KB metódus = 64 cella (256B payload), pipeline-olva (vs régi 256 cella × 64B)
+- L0 throughput @ 500 MHz: **~16 GB/s** (vs régi ~2,6 GB/s)
+- Worst-case kézbesítés: ~1,3 µs @ 500 MHz (vs régi ~8 µs)
 
-```
-H=50 átlagos hop (100×100 grid):
-  64B cella:  link foglalás = 2H + 15 = 115 cc
-  128B cella: link foglalás = 2H + 27 = 127 cc (+10%)
-```
-
-A 10%-kal hosszabb link-foglalás exponenciálisan növeli a Head-of-Line blocking valószínűségét magas terhelés mellett. A VOQ csökkenti, de nem szünteti meg. Az eredmény: a 128B cella hamarabb telíti a hálózatot.
-
-**4. Code-load throughput — multi-cell streaming-gel megoldott.**
-
-A Seal Core code-load a teljes chip forgalmának <5%-a. A throughput kérdése nem cella-méret növeléssel, hanem pipeline-olt multi-cell streaming-gel megoldott:
-- 16 KB metódus = 256 cella (64B payload), pipeline-olva
-- L0 throughput @ 500 MHz: ~2.6 GB/s
-- Worst-case kézbesítés: ~8 μs @ 500 MHz
-
-**5. Memória és tárhardverek natív burst mérete — a 64B természetes egység.**
+**5. Memória illeszkedés — a 256B az iparági spektrumot lefedi.**
 
 | Memória típus | Natív burst méret | Illeszkedés |
 |---------------|-------------------|-------------|
-| DDR4 | 64 byte (BL8 × 8B) | **= 64B payload** |
-| DDR5 | 64 byte (BL16 × 4B, dual sub-channel) | **= 64B payload** |
-| LPDDR5 | 32–64 byte (BL16 × 2B vagy BL32 × 2B) | ≤ 64B payload |
-| HBM2e/HBM3 | 32–256 byte (pseudo-channel, BL4 × 32B tipikus) | 64B és 128B is natív |
-| QSPI Flash | 64–256 byte (page: 256B, de 64B burst optimális) | **= 64B payload** |
-| On-chip SRAM | Cache line: 64 byte (iparági standard) | **= 64B payload** |
-| NOR Flash | 64–128 byte burst | ≤ 64B illeszkedik |
+| DDR4 | 64 byte (BL8 × 8B) | ≤ 256B, 4× burst egy cellában |
+| DDR5 | 64 byte (BL16 × 4B, dual sub-channel) | ≤ 256B, 4× burst egy cellában |
+| LPDDR5 | 32–64 byte | ≤ 256B |
+| HBM2e/HBM3 | 32–256 byte (pseudo-channel) | **= 256B payload** |
+| QSPI Flash | 64–256 byte (page: 256B) | **= 256B payload** |
+| On-chip SRAM | Cache line: 64 byte (iparági standard) | ≤ 256B, 4× cache line egy cellában |
 
-A 64 byte-os payload **pontosan egy DDR4/DDR5 burst-nek, egy cache line-nak, és egy QSPI burst-nek felel meg**. Ez nem véletlen: az iparági memória-hierarchia a 64B-t választotta alapegységnek (Intel/AMD L1 cache line = 64B, ARM = 64B). A CFPU cella payload ennek tökéletesen illeszkedik — egy cella payload = egy memória-tranzakció, nincs töredék, nincs padding.
+A 256 byte-os payload **pontosan egy QSPI page-nek és egy HBM max burst-nek felel meg**, és 4 DDR5 burst-öt fog egybe — egyetlen cellában mozgatva, routing döntés nélkül.
 
-A 128B payload a HBM-nél illeszkedne jobban, de a HBM 64B-s sub-burst-öt is támogat, míg a DDR4/DDR5 és QSPI **nem** támogat 128B-t natívan (két tranzakcióra bontaná).
-
-**Összefoglalás:** a 64B payload az actor-mesh optimális mérete. A 128B csak akkor lenne előnyös, ha a forgalom >50%-a 65–128 byte közötti — ez a CFPU-ban nem áll fenn. A 64B emellett az iparági memória-hardverek natív burst egysége.
+**Összefoglalás:** a 256B payload + 256-bit L0 link kombináció a helyes döntés. A változó link foglalás miatt a kis üzenetek (≤48 byte, ~80%) mindössze 2–3 flit-et foglalnak — a régi rendszernél gyorsabban. A nagy üzenetek (state migráció, code-load) 4× kevesebb cellára darabolódnak.
 
 ### Címzés: 24 bit hierarchikus
 
@@ -244,7 +220,7 @@ A routing döntés O(1): a cím prefix-éből azonnal eldönthető, melyik szint
 
 A CFPU két switching módot használ, hierarchia-szinthez igazítva:
 
-**L0 (mesh) — Wormhole routing:** a header flit (42 bit, a célcímet tartalmazza) azonnal továbbítódik a route döntés után; a body flitek pipeline-ban követik, ciklusonként egy. Egy 80 byte-os cella = 16 flit a 42 bites linken. H hop esetén a header 2H ciklus alatt halad át a mesh-en (2 ciklusos router pipeline: route + switch), az utolsó body flit 15 ciklussal később érkezik. **Összesen: 2H + 15 ciklus.**
+**L0 (mesh) — Wormhole routing:** a header flit (256 bit, a célcímet tartalmazza) azonnal továbbítódik a route döntés után; a body flitek pipeline-ban követik, ciklusonként egy. Egy max 272 byte-os cella = max 9 flit a 256 bites linken (1 header + 8 payload). H hop esetén a header 2H ciklus alatt halad át a mesh-en (2 ciklusos router pipeline: route + switch), az utolsó body flit max 8 ciklussal később érkezik. **Worst case: 2H + 8 ciklus. Tipikus (48B payload): 2H + 1 ciklus.**
 
 **L1–L3 (crossbar-ok) — Virtual Cut-Through (VCT):** a cella teljesen beérkezik a crossbar input bufferbe a switching előtt. Az iSLIP scheduler a headert már fogadás közben olvassa (1 ciklus overlap), majd a cella 1 crossbar ciklussal továbbítódik. A VCT megőrzi a store-and-forward deadlock-mentességét (nincs láncos buffer-foglalás), miközben lehetővé teszi a pipelined header vizsgálatot.
 
@@ -280,7 +256,7 @@ Ez a kombináció minden szinten eliminálja a deadlockot, Virtual Channel-ek va
 | Topológia | 4×4 mesh, XY routing |
 | Core-ok | 16 core (klaszterenként egy típus) |
 | Fizikai méret | ~1.1 mm × 1.1 mm (5nm) |
-| Link típus | Párhuzamos, 42 bit, 1× core clock |
+| Link típus | Párhuzamos, 256 bit, 1× core clock |
 | Vezeték hossz | ~330 μm (szomszéd core) |
 | Max hop | 6 |
 | Router terület / core | 0,001–0,006 mm² (lásd L0 Router variánsok) |
@@ -294,9 +270,9 @@ Az L0 router a legnagyobb per-core overhead a CFPU-ban. Az eredeti 5-portos base
 
 | Komponens | GE | Funkció |
 |-----------|---:|---------|
-| Crossbar (5×5, 80 B) | 2 950 | Input→output adatkapcsolás |
+| Crossbar (5×5, 272 B) | 2 950 | Input→output adatkapcsolás |
 | VOQ logika (5×5×4 = 100 slot) | 5 000 | Enqueue/dequeue, pointerek, flag-ek |
-| VOQ SRAM (100 × 80 B = 8 KB) | 14 700 | Cella-tárolás |
+| VOQ SRAM (100 × 272 B = 27 KB) | 14 700 | Cella-tárolás |
 | iSLIP ütemező (5×5) | 3 000 | Round-robin fair scheduling |
 | XY routing | 1 000 | Cím → irány dekódolás |
 | Credit flow control (5 × 4 credit) | 2 000 | Túlcsordulás megelőzés |
@@ -305,7 +281,7 @@ Az L0 router a legnagyobb per-core overhead a CFPU-ban. Az eredeti 5-portos base
 | Egyéb vezérlés | 12 000 | FSM, reset, power-gate interfész |
 | **Összesen** | **~44 300** | **≈ 0,011 mm²** |
 
-> **Terület-konvenció:** A GE→terület konverzió ~0,21 µm²/GE-t feltételez 5nm-en (logika + routing overhead), az SRAM dense 6T cellákat használ (~0,021 µm²/bit). Ezek szintézis előtti becslések; a végleges területet az RTL szintézis határozza meg (F4+). A baseline router 80B cellákra van méretezve.
+> **Terület-konvenció:** A GE→terület konverzió ~0,21 µm²/GE-t feltételez 5nm-en (logika + routing overhead), az SRAM dense 6T cellákat használ (~0,021 µm²/bit). Ezek szintézis előtti becslések; a végleges területet az RTL szintézis határozza meg (F4+). A baseline router 272B cellákra van méretezve (16B header + max 256B payload).
 
 **Variáns A: Turbo — Sebesség > Terület**
 
@@ -342,7 +318,7 @@ Dedikált ML/SNN pipeline router. Két 128-bites egyirányú link (W→E aktivá
 
 | Változtatás | Indoklás | Sebesség hatás |
 |-------------|----------|----------------|
-| 2 irány (W→E, N→S), 128-bit | Systolic pipeline fix adatfolyam | **3× sávszélesség** (128 vs 42 bit/cc) |
+| 2 irány (W→E, N→S), 128-bit | Systolic pipeline fix adatfolyam | Systolic-dedikált sávszélesség (128 bit/cc, a 256-bit L0-hoz képest fele, de systolic-ban elegendő) |
 | VOQ eltávolítva | Nincs routing conflict systolic-ban | Nincs negatív hatás |
 | iSLIP eltávolítva | Nincs arbitráció, fix irányok | Nincs negatív hatás |
 | XY routing eltávolítva | Fix irányok, nincs routing döntés | Nincs negatív hatás |
@@ -356,7 +332,7 @@ Dedikált ML/SNN pipeline router. Két 128-bites egyirányú link (W→E aktivá
 | Komponens | GE | Funkció |
 |-----------|---:|---------|
 | Data path MUX (2 × 128-bit) | 1 000 | Lokális ↔ átmenő kapcsolás |
-| FIFO (2 irány × 2 slot × 80B) | 600 | Minimális pufferelés |
+| FIFO (2 irány × 2 slot × 272B) | 600 | Minimális pufferelés |
 | Credit flow control (2 × 4 credit) | 400 | Backpressure |
 | Control uplink (vékony, VN0 only) | 1 500 | Kód betöltés, supervisor |
 | Cell assembly + CRC-8 | 500 | Cella integritás |
@@ -373,9 +349,9 @@ Control uplink                   ~10 vezeték
 Összesen:                        ~274 vezeték/core
 ```
 
-Ez **kevesebb** mint a Turbo (~340 vez/core), de **3×** a sávszélesség (128 vs 42 bit/cc).
+Ez **kevesebb** mint a Turbo (~600 vez/core), de a systolic pipeline-ban ez elegendő sávszélesség.
 
-**Cella szerializáció Systolic Wide linken:** 80 byte = 640 bit → ⌈640/128⌉ = 5 flit. Szomszéd latencia: ~7 cc (2 hop pipeline + 5 body drain). Modell: 2H + 5.
+**Cella szerializáció Systolic Wide linken:** max 272 byte = 2176 bit → ⌈2176/128⌉ = 17 flit. Szomszéd worst-case latencia: ~19 cc (2 hop pipeline + 17 body drain). Modell: 2H + (flit-1). Tipikus 48B payload: 64 byte = 512 bit → ⌈512/128⌉ = 4 flit, latencia: 2H + 3 = 5 cc.
 
 A Systolic variáns **nem általános célú** — kizárólag ML/SNN workload-okhoz, ahol az adatfolyam iránya compile-time ismert. Általános actor workload-hoz a Turbo vagy Compact variáns szükséges.
 
@@ -384,17 +360,18 @@ A Systolic variáns **nem általános célú** — kizárólag ML/SNN workload-o
 - Nincs VOQ (systolic pipeline szinkron, nincs conflict)
 - Nincs iSLIP (nincs arbitráció, fix adatfolyam)
 - Nincs 2 VN (csak control uplink)
-- 128-bit data path (vs 42-bit Turbo/Compact)
+- 128-bit data path (vs 256-bit Turbo/Compact)
 - 2 irány (vs 4-5 Turbo/Compact)
 
 **Sebesség összehasonlítás:**
 
 | Metrika | Turbo | Compact | **Systolic** |
 |---------|:-----:|:-------:|:------------:|
-| Sávszélesség / link | 42 bit/cc | 42 bit/cc | **128 bit/cc** |
+| Sávszélesség / link | 256 bit/cc | 256 bit/cc | **128 bit/cc** |
 | Sustained throughput | ~98% | ~75% | **~95% (systolic)** |
-| Szomszéd latencia | ~17 cc | ~19–21 cc | **~7 cc** |
-| Worst-case klaszteren belül | ~27 cc | ~30–34 cc | **~7 cc (1 hop)** |
+| Szomszéd latencia (worst case) | ~10 cc | ~12–14 cc | **~19 cc** |
+| Szomszéd latencia (tipikus 48B) | ~3 cc | ~5–7 cc | **~5 cc** |
+| Worst-case klaszteren belül | ~20 cc | ~23–27 cc | **~19 cc (1 hop)** |
 | MAC kihasználtság (ws) | ~15% | ~12% | **~100%** |
 | Kommunikáció | Any-to-any | Any-to-any | **W→E, N→S only** |
 | Control plane izoláció | Teljes (VN0) | Priority bit (~95%) | Control uplink (~95%) |
@@ -549,7 +526,7 @@ R2 → R3 → L3 → R4   (relay: R3 köztes hop-ként működik)
 **Relay mechanizmus:**
 
 1. A scheduler egy **alternatív kimeneti portot** (a relay régiót) választ egy előre számított relay-táblából
-2. A cellát a relay régió GW-jéhez továbbítja, a header reserved bitjeiben beállított **relay flag**-gel
+2. A cellát a relay régió GW-jéhez továbbítja, a header flags mezőjében beállított **relay flag**-gel (bit 6)
 3. A relay régió GW visszainjektálja a cellát az L3 crossbar-ba az eredeti cél felé
 4. A cél régió normálisan fogadja a cellát — a relay a core-ok számára transzparens
 
@@ -562,7 +539,7 @@ R2 → R3 → L3 → R4   (relay: R3 köztes hop-ként működik)
 | Fault bitmap regiszter | ~130 gate | — | 64 FF + olvasó logika |
 | Relay tábla (előre számított) | ~200 gate | — | 8×3 bites best-relay LUT |
 | Scheduler módosítás | ~300 gate | — | Bitmap ellenőrzés + relay útvonal kiválasztás |
-| Header relay flag | 0 | 0 | 1 reserved bitet használ (40 elérhető) |
+| Header relay flag | 0 | 0 | flags[6] relay bit (dedikált) |
 | **Összesen** | **~630 gate** | **0** | **< 1.5% az L3 crossbar-ból** |
 
 #### Teljesítmény hatás
@@ -593,7 +570,7 @@ A kommunikációs hálózat nem csak aktor-üzeneteket visz — a **program kód
 
 **Minden kód a Seal Core-on megy át** — nem hitelesített kód nem juthat core-ra. A csillag topológia ezt ingyen biztosítja: a Seal Core az L3 crossbar közepe, minden cross-régió forgalom áthalad rajta.
 
-A kód betöltés normál 80 byte-os cellás forgalom a VN0 (control) csatornán. Egy 16 KB-os metódus = ~256 cella (64 byte payload cellánként); a pipeline throughput-ot a legszűkebb link korlátozza (L0, 42 bit @ 500 MHz = ~2.6 GB/s). Worst-case kézbesítés: ~8 µs @ 500 MHz.
+A kód betöltés normál 272 byte-os cellás forgalom a VN0 (control) csatornán. Egy 16 KB-os metódus = ~64 cella (256 byte payload cellánként); a pipeline throughput-ot a legszűkebb link korlátozza (L0, 256 bit @ 500 MHz = ~16 GB/s). Worst-case kézbesítés: ~1,3 µs @ 500 MHz.
 
 ## Quench-RAM integráció a hálózattal
 
@@ -604,7 +581,7 @@ A [Quench-RAM](quench-ram-hu.md) memória-biztonsági réteg és a packet-switch
 ```
 SEND(dst_actor, payload_block):
   1. SEAL(payload_block)            ← payload immutable lesz (forrás core QRAM)
-  2. Másolás → 80B cella(k)         ← a hálózatra kerül (wormhole L0-n, VCT crossbar-okon)
+  2. Másolás → 272B cella(k)         ← a hálózatra kerül (wormhole L0-n, VCT crossbar-okon)
   3. Cellák → router → ... → cél core SRAM
   4. Cél core: blokk allokáció      ← QRAM: guaranteed zero-init (RELEASE invariáns)
   5. Cella tartalom → új blokk      ← cél core QRAM-ban
@@ -660,7 +637,7 @@ HW multicast **csak a cluster gateway-ekben** (L1 crossbar-ban, nem minden L0 ro
 
 | Szint | Típus | Vezetékek | Órajel | Sávszélesség |
 |-------|-------|-----------|--------|-------------|
-| L0 Turbo/Compact | Párhuzamos | 42 bit (egyirányú) | 1× core | ~2,6 GB/s |
+| L0 Turbo/Compact | Párhuzamos | 256 bit (egyirányú) | 1× core | ~16 GB/s |
 | **L0 Systolic** | **Párhuzamos** | **128 bit (egyirányú, 2 irány)** | **1× core** | **~8 GB/s** |
 | L1 (cluster → tile xbar) | Párhuzamos | 84 bit (kétirányú) | 1× core | ~5,2 GB/s |
 | L2 (tile → régió xbar) | Soros | `SERIAL_WIRES` vez. + clock | `SERDES_RATIO`× core | lásd SerDes skálázás |
@@ -706,43 +683,69 @@ A területi költség pont azért elfogadható, mert az L2/L3 crossbar infrastru
 
 ## Hop-szám és latencia összefoglaló
 
-A latenciák a **referencia konfigurációra** vonatkoznak (500 MHz, `SERDES_RATIO`=10, `SERIAL_WIRES`=8, effektív L2/L3 = 80 bit/cc), teljes 80 byte-os cellára, nulla torlódás mellett. Magasabb core órajel az illesztett SerDes paraméterekkel hasonló ciklusszámot eredményez (lásd SerDes skálázás).
+A latenciák a **referencia konfigurációra** vonatkoznak (500 MHz, `SERDES_RATIO`=10, `SERIAL_WIRES`=8, effektív L2/L3 = 80 bit/cc), nulla torlódás mellett. A „tipikus" oszlop 48B payload-ra (a leggyakoribb actor üzenet méret), a „worst case" 256B payload-ra vonatkozik. Magasabb core órajel az illesztett SerDes paraméterekkel hasonló ciklusszámot eredményez (lásd SerDes skálázás).
 
-**L0 wormhole modell:** 2 ciklus/hop router pipeline + 15 body flit drain = 2H + 15 ciklus H hop esetén.
-**Crossbar VCT modell:** link szerializáció (⌈640 bit / link_szélesség⌉ ciklus) + 1 ciklus iSLIP crossbar-onként. A kimenő szerializáció átfed a következő szint bemenetével.
+**L0 wormhole modell (256-bit link):** 2 ciklus/hop router pipeline + (payload_flits) body flit drain = 2H + payload_flits ciklus H hop esetén. Tipikus 48B: 2H + 2. Worst case 256B: 2H + 8.
+**Crossbar VCT modell:** link szerializáció (⌈cella_bit / link_szélesség⌉ ciklus) + 1 ciklus iSLIP crossbar-onként. A kimenő szerializáció átfed a következő szint bemenetével.
 
-| Útvonal | Hop | Latencia | @500 MHz |
-|---------|-----|---------|----------|
-| Szomszéd core (L0) | 1 | ~17 ciklus | 34 ns |
-| Cross cluster, azonos tile (L0+L1+L0) | 6+1+6 = 13 | ~63 ciklus | 126 ns |
-| Cross tile, azonos régió (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~99 ciklus | 198 ns |
-| Cross régió (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~139 ciklus | 278 ns |
+| Útvonal | Hop | Tipikus (48B) | Worst case (256B) | @500 MHz (tipikus) |
+|---------|-----|--------------|-------------------|-------------------|
+| Szomszéd core (L0) | 1 | ~4 ciklus | ~10 ciklus | 8 ns |
+| Cross cluster, azonos tile (L0+L1+L0) | 6+1+6 = 13 | ~43 ciklus | ~93 ciklus | 86 ns |
+| Cross tile, azonos régió (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~73 ciklus | ~203 ciklus | 146 ns |
+| Cross régió (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~103 ciklus | ~317 ciklus | 206 ns |
 
-> **Kontextus:** a worst-case ~280 ns on-chip versenyképes a hagyományos CPU-kon futó szoftver aktor üzenetküldéssel (Erlang/BEAM: ~0.5–2 µs), miközben a CFPU-ban több ezer független hardver core dolgozik párhuzamosan.
+> **Kontextus:** a tipikus ~206 ns on-chip (48B payload) versenyképes a hagyományos CPU-kon futó szoftver aktor üzenetküldéssel (Erlang/BEAM: ~0.5–2 µs), miközben a CFPU-ban több ezer független hardver core dolgozik párhuzamosan. A worst-case 317 ciklus (634 ns) a ritka 256B payload-ra vonatkozik — a változó link foglalás miatt az üzenetek ~80%-a a tipikus latenciával halad.
 
 <details>
-<summary>Cross-régió latencia részletezés (18 hop)</summary>
+<summary>Cross-régió latencia részletezés (18 hop, tipikus 48B payload)</summary>
 
 | Szegmens | Link szélesség | Ciklus | Megjegyzés |
 |----------|---------------|--------|-----------|
-| Forrás L0 wormhole (6 hop) | 42 bit | 27 | 2×6 + 15 body drain |
-| L1 link (GW → xbar) | 84 bit | 8 | ⌈640/84⌉ |
+| Forrás L0 wormhole (6 hop) | 256 bit | 14 | 2×6 + 2 body drain (48B = 2 payload flit) |
+| L1 link (GW → xbar) | 84 bit | 7 | ⌈512/84⌉ (64B cella = 512 bit) |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link (xbar → tile GW) | 84 bit | 8 | |
-| L2 link (tile GW → xbar) | 80 bit | 8 | ⌈640/80⌉ |
+| L1 link (xbar → tile GW) | 84 bit | 7 | |
+| L2 link (tile GW → xbar) | 80 bit | 7 | ⌈512/80⌉ |
 | L2 crossbar (iSLIP) | — | 1 | |
-| L2 link (xbar → régió GW) | 80 bit | 8 | |
-| L3 link (régió GW → xbar) | 80 bit | 8 | |
+| L2 link (xbar → régió GW) | 80 bit | 7 | |
+| L3 link (régió GW → xbar) | 80 bit | 7 | |
 | L3 crossbar (iSLIP) | — | 1 | |
-| L3 link (xbar → cél régió GW) | 80 bit | 8 | |
-| L2 link → xbar | 80 bit | 8 | |
+| L3 link (xbar → cél régió GW) | 80 bit | 7 | |
+| L2 link → xbar | 80 bit | 7 | |
 | L2 crossbar (iSLIP) | — | 1 | |
-| L2 link → cél tile GW | 80 bit | 8 | |
-| L1 link → xbar | 84 bit | 8 | |
+| L2 link → cél tile GW | 80 bit | 7 | |
+| L1 link → xbar | 84 bit | 7 | |
 | L1 crossbar (iSLIP) | — | 1 | |
-| L1 link → cél cluster GW | 84 bit | 8 | |
-| Cél L0 wormhole (6 hop) | 42 bit | 27 | 2×6 + 15 body drain |
-| **Összesen** | | **139** | |
+| L1 link → cél cluster GW | 84 bit | 7 | |
+| Cél L0 wormhole (6 hop) | 256 bit | 14 | 2×6 + 2 body drain |
+| **Összesen** | | **~103** | |
+
+</details>
+
+<details>
+<summary>Cross-régió latencia részletezés (18 hop, worst case 256B payload)</summary>
+
+| Szegmens | Link szélesség | Ciklus | Megjegyzés |
+|----------|---------------|--------|-----------|
+| Forrás L0 wormhole (6 hop) | 256 bit | 20 | 2×6 + 8 body drain (256B = 8 payload flit) |
+| L1 link (GW → xbar) | 84 bit | 26 | ⌈2176/84⌉ (272B cella = 2176 bit) |
+| L1 crossbar (iSLIP) | — | 1 | |
+| L1 link (xbar → tile GW) | 84 bit | 26 | |
+| L2 link (tile GW → xbar) | 80 bit | 28 | ⌈2176/80⌉ |
+| L2 crossbar (iSLIP) | — | 1 | |
+| L2 link (xbar → régió GW) | 80 bit | 28 | |
+| L3 link (régió GW → xbar) | 80 bit | 28 | |
+| L3 crossbar (iSLIP) | — | 1 | |
+| L3 link (xbar → cél régió GW) | 80 bit | 28 | |
+| L2 link → xbar | 80 bit | 28 | |
+| L2 crossbar (iSLIP) | — | 1 | |
+| L2 link → cél tile GW | 80 bit | 28 | |
+| L1 link → xbar | 84 bit | 26 | |
+| L1 crossbar (iSLIP) | — | 1 | |
+| L1 link → cél cluster GW | 84 bit | 26 | |
+| Cél L0 wormhole (6 hop) | 256 bit | 20 | 2×6 + 8 body drain |
+| **Összesen** | | **~317** | |
 
 </details>
 
@@ -770,7 +773,7 @@ Az RTL paraméterezhető — a chipméret és a gyártási technológia határoz
 
 A döntés a workload-tól függ — az RTL `SRAM_KB_PER_CORE` paramétere gyártáskor állítható.
 
-A worst-case latencia ~100–139 ciklus tartományban marad (~200–278 ns @ 500 MHz) minden node-on — a kisebb cluster fizikai méret a fejlettebb node-okon részben kompenzálja a mélyebb hierarchiát.
+A tipikus cross-régió latencia ~103 ciklus (206 ns @ 500 MHz) 48B payload-ra, worst-case 256B payload-ra ~317 ciklus (634 ns) — a kisebb cluster fizikai méret a fejlettebb node-okon részben kompenzálja a mélyebb hierarchiát.
 
 ## Kizárt alternatívák (és indoklás)
 
@@ -806,6 +809,7 @@ Ez a dokumentum az alábbi Symphact hardware requirement-ekre válaszol:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 3.0 | 2026-04-28 | **Header v3.0:** 4×32-bit word-határos elrendezés. `src_actor`/`dst_actor` 16→8 bit (max 256 aktor/core). `src_actor` kitöltő: core scheduler→core HW (aktív actor context regiszter, nem hamisítható). `seq` 8→16 bit (max 65 536 fragment). `len[8]` = len+1 szemantika (1–256 byte payload, 0 byte-os payload nincs). CRC-16 hozzáadva (payload integritás, a header-ben). `flags[8]` bővítve: `[VN:1][relay:1][Pri:2][reserved:4]`. `reserved` 16→8 bit. HMAC és perms törölve — HW-managed Capability Slot Table (CST) QSRAM-ban. **L0 link:** 42→256 bit (tile-szintű NoC, `internal-bus-hu.md` alapján). **Cella:** max 272 byte (16B header + 256B payload). Flit modell: 256-bit linken header=1 flit, worst case 2H+8, tipikus 2H+2. Latencia táblák újraszámolva (tipikus 48B + worst case 256B). Cross-régió tipikus ~103 cc (206 ns), worst case ~317 cc (634 ns). L0 throughput ~16 GB/s (vs régi ~2,6 GB/s) |
 | 2.4 | 2026-04-22 | Header átszervezés: `len[16]`→`len[8]`, `src_actor[16]` + `dst_actor[16]` bekerül a header-be (N:M actor-to-core mapping, DDR5 CAM aktor-szintű ACL, crash recovery). Változó link foglalás: a linken csak `len` byte payload utazik (4 bites flit counter, ~43% átlagos link megtakarítás), buffer marad fix 80B slot. Latencia táblák frissítve (worst case jelöléssel) |
 | 2.3 | 2026-04-21 | L3 Crosspoint hibatűrés szekció: fault bitmap (64-bit), relay szomszéd régión keresztül (~630 gate, <1,5% overhead), BIST + runtime watchdog detekció, graceful degradation modell |
 | 2.2 | 2026-04-21 | Referencia node 7nm→5nm váltás. Újraszámolva: router területek (Turbo 0,006, Compact 0,003), core+SRAM méretek, korrigált core-számok (Nano ~47k, Actor ~25k, Matrix Turbo ~30,8k, Matrix Systolic ~38,1k, Rich ~11,3k), fizikai méretek (L0 1,1mm, L1 3,2mm, L2 9mm, L3 28mm), Seal Core vezetékhossz 14mm. Referencia konfig: 16×8×8×10 = 10 240 core |

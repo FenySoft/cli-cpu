@@ -138,7 +138,7 @@ A forrás kiválasztása után a flow minden esetben azonos:
 ```
 Seal Core firmware (boot load + verify):
   1. Binary header olvasás (méret, cert offset, flags)
-  2. Binary + cert streaming → SRAM buffer (64B chunk-onként)
+  2. Binary + cert streaming → SRAM buffer (256B chunk-onként)
   3. SHA-256 HW verify (streaming, chunk-onként)
   4. WOTS+/Merkle verify (a cert-en)
   5. Ha VALID → QRAM CODE régióba SEAL
@@ -232,7 +232,7 @@ Boot-releváns regiszterek. A teljes MMIO térképet lásd: [osreq-002 — MMIO 
 | QSPI config | `0xF0001000` | R/W | 4 byte | Enable, SPI mode, clock divider |
 | QSPI flash addr | `0xF0001004` | R/W | 4 byte | Flash olvasási cím |
 | QSPI binary size | `0xF0001008` | R/O | 4 byte | Binary méret (flash header-ből) |
-| QSPI data | `0xF000100C` | R/O | 64 byte | Következő 64-byte chunk a flash-ről (cella payload méret) |
+| QSPI data | `0xF000100C` | R/O | 256 byte | Következő 256 byte-os chunk a flash-ről (cella payload méret) |
 
 ### UART boot controller (boot forrás #1)
 
@@ -240,7 +240,7 @@ Boot-releváns regiszterek. A teljes MMIO térképet lásd: [osreq-002 — MMIO 
 |----------|-----|-------|-------|--------|
 | UART config | `0xF0001100` | R/W | 4 byte | Baud rate, parity, enable |
 | UART status | `0xF0001104` | R/O | 4 byte | RX ready, TX empty, error flags |
-| UART data | `0xF0001108` | R/W | 64 byte | RX/TX buffer (64-byte chunk) |
+| UART data | `0xF0001108` | R/W | 256 byte | RX/TX buffer (256 byte-os chunk) |
 
 ### BRAM boot (boot forrás #2)
 
@@ -256,7 +256,7 @@ Boot-releváns regiszterek. A teljes MMIO térképet lásd: [osreq-002 — MMIO 
 | ETH config | `0xF0001300` | R/W | 4 byte | PHY init, MAC address[31:0] |
 | ETH config2 | `0xF0001304` | R/W | 4 byte | MAC address[47:32], VLAN, enable |
 | ETH status | `0xF0001308` | R/O | 4 byte | Link up, RX ready, frame count |
-| ETH data | `0xF000130C` | R/O | 64 byte | Következő 64-byte chunk (Ethernet frame payload-ból) |
+| ETH data | `0xF000130C` | R/O | 256 byte | Következő 256 byte-os chunk (Ethernet frame payload-ból) |
 
 ### Core discovery és vezérlés
 

@@ -2,7 +2,7 @@
 
 > English version: [quench-ram-en.md](quench-ram-en.md)
 
-> Version: 1.3
+> Version: 1.4
 
 Ez a dokumentum a **Quench-RAM** memóriacella **architektúráját és ISA-illesztését** írja le: a per-blokk státuszbit szemantikáját, a két hardveres állapotgép-műveletet (`SEAL`, `RELEASE`), a NAND-flash-szel rokon „erase-on-release" mintát, és a kapcsolatot az ECMA-335 default-initialization szemantikával, az aktor-modell capability-rendszerével és a per-core garbage collector-ral.
 
@@ -130,7 +130,7 @@ A SEAL védelem ott szükséges, ahol az adat **elhagyja a Core izolált SRAM-j�
 | GC sweep (Core-on belül) | **RELEASE** | unreachable blokkok felszabadítása |
 | CODE régió unload | **RELEASE** | régi kód törlése |
 
-A Core-on **belül** az adatterületen nincs SEAL — a CIL típusrendszer biztosítja az integritást (TypeToken, CapabilityTag stb. `readonly` mezők), és más aktor fizikailag nem fér hozzá a Core SRAM-jához.
+A Core-on **belül** az adatterületen nincs SEAL — a CIL típusrendszer biztosítja az integritást (TypeToken, CstIndex stb. `readonly` mezők), és más aktor fizikailag nem fér hozzá a Core SRAM-jához.
 
 ## Trust boundary <a name="trust-boundary"></a>
 
@@ -147,7 +147,7 @@ Ez **már létezik** a Symphact-ben (366-369. sor). Minden aktor saját per-core
 | Támadás-kísérlet | Miért bukik |
 |-------------------|-------------|
 | Rosszindulatú aktor `GC_SWEEP`-et hív | csak a **saját heap-jén** dolgozik → a saját szemetét takarítja, másokét nem éri el |
-| Rosszindulatú aktor más aktor blokkjára akar cap-et szerezni | A capability tag HMAC-elt, hamisíthatatlan — router ellenőrzi (398. sor) |
+| Rosszindulatú aktor más aktor blokkjára akar cap-et szerezni | A capability a CST-ben (Capability Slot Table) van, QSRAM SEAL-védett, fizikailag hamisíthatatlan — a szoftver csak 32-bit CST indexet lát, nyers ActorRef-et nem |
 | Rosszindulatú aktor kódot ír, ami SEAL-t vagy RELEASE-t hív | A linker (`cli-cpu-link`) nem engedi le — nincs ilyen CIL opkód |
 | Rosszindulatú aktor hot_code_loader-t kompromittál | hot_code_loader maga **aláírt, verified aktor** (AuthCode), kódját nem lehet tamperelni |
 
@@ -279,21 +279,26 @@ A „pinned object" fogalma a hagyományos .NET GC-ben: olyan objektum, amit a G
 
 A [`Symphact/vision-hu.md#a-capability-fogalma`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md#a-capability-fogalma) szakaszban definiált `ActorRef` egy capability-token. A Quench-RAM ezt **fizikailag védhetővé teszi**:
 
-```csharp
-public readonly struct ActorRef
-{
-    public int  CoreId;
-    public int  MailboxIndex;
-    public long CapabilityTag;   // HMAC-szerű, csak a registry írhatja
-    public int  Permissions;
-}
+A capability védelem a **CST (Capability Slot Table)** modellre épül: a szoftver soha nem látja a nyers `ActorRef`-et, csak egy **32-bit CST indexet**. A CST a QSRAM-ban, a kóddal közös **SEAL blokkban** van — fizikailag hamisíthatatlan.
+
+```
+CST entry (8 byte aligned):
++--------+---------+--------+----------+
+| dst[24]| actor[8]| perm[8]| rsrvd[24]|
++--------+---------+--------+----------+
 ```
 
-Egy `ActorRef` instance, amelyet egy **sealed Quench-RAM blokkban** tárolunk, **tamper-proof a hardver szintjén**:
+A CST entry mezői:
+- **dst[24]** — cél core/node azonosító
+- **actor[8]** — cél aktor index (max 256 actor/core)
+- **perm[8]** — jogosultságok (send, ask, supervise stb.)
+- **reserved[24]** — jövőbeli bővítésre
 
-- A capability tag-et nem lehet utólag átírni — a blokk sealed
-- Egy aktor-bug, amely megpróbál egy másik aktor capability-jét hamisítani, **fizikailag képtelen** rá (a SEAL után írási kísérlet trap-et generál)
-- A capability registry maga (`capability_registry`, lásd 243. sor) is sealed blokkokban tárolja a kibocsátott tag-eket
+A CST **tamper-proof a hardver szintjén**:
+
+- A CST blokk SEAL-elt — írási kísérlet trap-et generál
+- Egy aktor-bug, amely megpróbál egy másik aktor capability-jét hamisítani, **fizikailag képtelen** rá (a szoftver csak a CST indexet ismeri, a belső struktúrát nem éri el)
+- **Delegation:** supervisor-to-supervisor VN0 control message-ként történik, UNSEAL→write→RESEAL atomi HW FSM művelettel
 
 ### Hibrid objektum-layout
 
@@ -303,8 +308,8 @@ Egy CIL objektum kétféle régióra bontható:
 ┌──────────────────────────────────────────────┐
 │ SEALED régió (status=1, immutable):          │
 │   TypeToken      ─┐                           │
-│   ObjectId       ─├── identitás, capability   │
-│   CapabilityTag  ─┘                           │
+│   ObjectId       ─├── identitás               │
+│   CstIndex       ─┘   (32-bit CST index)     │
 │   init-only mezők (readonly properties)       │
 ├──────────────────────────────────────────────┤
 │ MUTABLE régió (status=0):                    │
@@ -322,7 +327,7 @@ A linker (`cli-cpu-link`) build-time eldönti minden mezőről, hogy melyik rég
 ### Mit nyer a rendszer
 
 - **Type confusion fizikai kizárása:** a `TypeToken` sealed; egy memory-corruption bug nem tudja hamisítani
-- **Capability forging fizikai kizárása:** a `CapabilityTag` sealed; nem írható át
+- **Capability forging fizikai kizárása:** a CST SEAL-elt QSRAM blokkban van; a szoftver csak 32-bit indexet lát
 - **Object identity stabilitása:** az `ObjectId` sealed; egy GC mozgatás után is konzisztens marad
 
 ## Biztonsági garanciák <a name="biztonsag"></a>
@@ -337,7 +342,7 @@ A Quench-RAM **hét új attack-class** ellen ad fizikai szintű védelmet, amely
 | Uninitialized memory read | CWE-457 | Gyakori (régi C/C++) | **Kizárva** — minden alloc bizonyítottan zero-init |
 | Cold boot key recovery | — | DRAM-ból visszaolvasható | **Kizárva** — sealed kulcs csak RELEASE-szel szabadul, az pedig wipe |
 | Sensitive data in swap | CWE-200 | OS-függő | **Kizárva** — nincs swap (per-core SRAM) + sealed nem swappable |
-| Capability tag forging | — | RAM patcheléssel lehetséges | **Kizárva** — sealed régióban tárolva |
+| Capability forging | — | RAM patcheléssel lehetséges | **Kizárva** — CST SEAL-elt QSRAM blokkban, szoftver csak CST indexet lát |
 
 ### Ami nem védett
 
@@ -403,7 +408,7 @@ Egy F6 Rich core **több granularitást** támogathat egyidejűleg, különböz�
 | `DATA-fine` | 16 byte | capability registry, ActorRef pool |
 | `DATA-medium` | 256 byte | aktor state objektumok |
 | `STACK` | n/a | nincs Quench-RAM (per-frame allokáció gyors) |
-| `MAILBOX` | 64 byte | sealed üzenet-payload-ok |
+| `MAILBOX` | 256 byte | sealed üzenet-payload-ok (= cella payload méret) |
 
 A Nano core (F4) egyszerűbb: csak **256 byte blokk** granularitás, mert az egyszerűségre tervezve.
 
@@ -454,6 +459,7 @@ A Quench-RAM **nem feltétel** az F0-F4 fázisokhoz; ezek a meglévő SRAM-model
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.4 | 2026-04-24 | HMAC/SipHash hivatkozások törölve — capability védelem CST (Capability Slot Table) modellre cserélve: QSRAM SEAL-védett, fizikailag hamisíthatatlan. Szoftver csak 32-bit CST indexet lát, nyers ActorRef-et nem. CST entry: dst[24]+actor[8]+perm[8]+reserved[24]. Delegation: supervisor-to-supervisor VN0, UNSEAL→write→RESEAL atomi HW FSM. |
 | 1.3 | 2026-04-19 | SEAL triggerek pontosítása: Core-on belül csak CODE régióra kell SEAL (adatot a CIL típusrendszer védi). Swap-out SEAL és swap-in RELEASE hozzáadva. Elsődleges motiváció átírva (CODE immutability + külső QRAM védelem). |
 | 1.2 | 2026-04-19 | Row-selective clear pontosítás (nem BIST broadcast). F5: FPGA demo, F6: első szilícium. |
 | 1.1 | 2026-04-16 | Trust boundary szekció. SEAL/RELEASE HW FSM műveletként definiálva, per-aktor heap isolation. |

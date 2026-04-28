@@ -2,7 +2,7 @@
 
 > English version: [ddr5-architecture-en.md](ddr5-architecture-en.md)
 
-> Version: 1.1
+> Version: 1.2
 
 Ez a dokumentum a CFPU és a külső DDR5 memória közötti interfész **hardveres architektúráját** rögzíti. Nem csak a végeredményt, hanem az **érvelési utat** is dokumentálja: milyen alternatívákat vizsgáltunk, miért vetettük el őket, és milyen trade-off-ok vezettek a végső döntésekhez.
 
@@ -111,7 +111,7 @@ A DDR5 Controller minden portján **1 ciklus alatt**, pipeline-oltan ellenőrzi 
 ```
 +----------+------------+------------------+------------------+-------+
 | src[24]  | src_actor  | DDR5 Start       | DDR5 End         | Jog   |
-|          | [16]       |                  |                  |       |
+|          | [8]        |                  |                  |       |
 +----------+------------+------------------+------------------+-------+
 | Core 42  | Actor 7    | 0x0050_0000      | 0x0050_FFFF      | RW    |
 | Core 42  | Actor 12   | 0x0100_0000      | 0x0100_0FFF      | RW    |
@@ -119,7 +119,7 @@ A DDR5 Controller minden portján **1 ciklus alatt**, pipeline-oltan ellenőrzi 
 +----------+------------+------------------+------------------+-------+
 ```
 
-A CAM tábla `src[24] + src_actor[16]` alapján ellenőriz — **aktor szintű**, nem core szintű jogosultság-kezelés. Ez az interconnect spec v2.4-ben bevezetett header `src_actor` mezőjére épül (lásd `docs/interconnect-hu.md`).
+A CAM tábla `src[24] + src_actor[8]` alapján ellenőriz (max 256 actor/core) — **aktor szintű**, nem core szintű jogosultság-kezelés. Ez az interconnect spec v2.4-ben bevezetett header `src_actor` mezőjére épül (lásd `docs/interconnect-hu.md`).
 
 - **PASS** → kérés a Request Queue-ba
 - **DENY** → trap flit vissza a küldőnek (`InvalidMemoryAccess`)
@@ -347,4 +347,5 @@ Futás:
 | Verzió | Dátum | Változás |
 |--------|-------|---------|
 | 1.0 | 2026-04-22 | Első verzió — DDR5 Controller döntési folyamat, biztonsági modell, capability grant, perifériakezelés |
+| 1.2 | 2026-04-24 | src_actor mező 16→8 bitre szűkítve (max 256 actor/core), összhangban a CST modellel és az interconnect spec-kel. |
 | 1.1 | 2026-04-22 | SealRAM / SealFlash bevezetése kód-tárolásra, DDR5 = csak adat. Három memória típus összefoglaló tábla. |

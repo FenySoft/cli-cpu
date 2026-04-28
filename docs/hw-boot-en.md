@@ -138,7 +138,7 @@ Once a source is selected, the flow is identical in all cases:
 ```
 Seal Core firmware (boot load + verify):
   1. Read binary header (size, cert offset, flags)
-  2. Stream binary + cert → SRAM buffer (64-byte chunks)
+  2. Stream binary + cert → SRAM buffer (256-byte chunks)
   3. SHA-256 HW verify (streaming, per chunk)
   4. WOTS+/Merkle verify (on the cert)
   5. If VALID → SEAL into QRAM CODE region
@@ -232,7 +232,7 @@ Boot-relevant registers. For the full MMIO map, see: [osreq-002 — MMIO Memory 
 | QSPI config | `0xF0001000` | R/W | 4 bytes | Enable, SPI mode, clock divider |
 | QSPI flash addr | `0xF0001004` | R/W | 4 bytes | Flash read address |
 | QSPI binary size | `0xF0001008` | R/O | 4 bytes | Binary size (from flash header) |
-| QSPI data | `0xF000100C` | R/O | 64 bytes | Next 64-byte chunk from flash (= cell payload size) |
+| QSPI data | `0xF000100C` | R/O | 256 bytes | Next 256-byte chunk from flash (= cell payload size) |
 
 ### UART boot controller (boot source #1)
 
@@ -240,7 +240,7 @@ Boot-relevant registers. For the full MMIO map, see: [osreq-002 — MMIO Memory 
 |----------|---------|------|------|-------------|
 | UART config | `0xF0001100` | R/W | 4 bytes | Baud rate, parity, enable |
 | UART status | `0xF0001104` | R/O | 4 bytes | RX ready, TX empty, error flags |
-| UART data | `0xF0001108` | R/W | 64 bytes | RX/TX buffer (64-byte chunk) |
+| UART data | `0xF0001108` | R/W | 256 bytes | RX/TX buffer (256-byte chunk) |
 
 ### BRAM boot (boot source #2)
 
@@ -256,7 +256,7 @@ Boot-relevant registers. For the full MMIO map, see: [osreq-002 — MMIO Memory 
 | ETH config | `0xF0001300` | R/W | 4 bytes | PHY init, MAC address[31:0] |
 | ETH config2 | `0xF0001304` | R/W | 4 bytes | MAC address[47:32], VLAN, enable |
 | ETH status | `0xF0001308` | R/O | 4 bytes | Link up, RX ready, frame count |
-| ETH data | `0xF000130C` | R/O | 64 bytes | Next 64-byte chunk (from Ethernet frame payload) |
+| ETH data | `0xF000130C` | R/O | 256 bytes | Next 256-byte chunk (from Ethernet frame payload) |
 
 ### Core discovery and control
 
