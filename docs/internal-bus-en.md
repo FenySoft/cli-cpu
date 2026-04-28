@@ -2,7 +2,7 @@
 
 > Magyar verzió: [internal-bus-hu.md](internal-bus-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vision-level document.** The bus widths, area, and power figures presented here are working hypotheses extrapolated from documented sources (TSMC 5nm SRAM macro datasheets, AMD Zen, Apple M, NVIDIA H100 published parameters). Precise values can only be validated after F2.7 FPGA bring-up and F6 silicon. The document records design direction and decision trail, not final parameters.
 
@@ -99,6 +99,8 @@ Estimates at 5nm node, 1 mm bus length:
 
 ## Selected sizing — per core type
 
+> **Note on the NoC bus (v1.1):** The table distinguishes **two different layers**: (1) **intra-core** back-end bus (reg ↔ SRAM, toward MAC slice), (2) **NoC link** (cell forwarding between cores/tiles). The intra-core bus is designed in `internal-bus-en.md` (this document); NoC links are in `interconnect-en.md` v3.1. Do not conflate the parameters of the two layers.
+
 | Layer | Bus width | Reason |
 |---|---|---|
 | **Nano** internal reg ↔ SRAM | **256-bit** | 4–8 actor warm contexts, 4-cycle full move; minimal core, many actors |
@@ -106,9 +108,10 @@ Estimates at 5nm node, 1 mm bus length:
 | **Rich core** internal back-end | **512-bit** | 32 reg + multi-issue + headroom for 64-bit ISA option |
 | **ML/Matrix core (CFPU-ML MAC Slice)** | **1024-bit** | Tile-load baseline, vector pipe (32 elements × 32-bit / cycle) |
 | **Seal core** | **64-bit** | Auditability > speed, minimum logic |
-| **Tile-level NoC** (4–8 cores) | **256-bit** | Shared lane for mailbox + context spill |
-| **Chip-level NoC** (tile ↔ tile) | **128-bit** | Current value in `interconnect-en.md` v2.4, retained |
-| **Toward DDR5 hub** | **128-bit** (2 channels × 64-bit) | DDR5 physical limit |
+| **L0 cluster mesh** (16 cores, 4×4 mesh) | **128-bit** (v3.1) | Wormhole NoC link, header = 1 flit, payload = 8 flits. v3.1 default; `BUS_WIDTH` parameter for 256/512/1024 upscale |
+| **L1 tile crossbar link** (cluster GW → tile xbar) | **84-bit** parallel | Per `interconnect-en.md` v3.1 link types table |
+| **L2/L3 tile-tile / region-chip links** | **serial SerDes** (`SERIAL_WIRES` + `SERDES_RATIO`) | Cm-scale distances; parallel bus does not scale |
+| **Toward DDR5 hub** | **128-bit** (2 channels × 64-bit) | DDR5 physical limit, see `ddr5-architecture-en.md` |
 
 ## Alternatives — decision trail
 
@@ -165,4 +168,5 @@ Estimates at 5nm node, 1 mm bus length:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-04-28 | **NoC layer synchronization with `interconnect-en.md` v3.1.** Selected sizing table corrected: "Tile-level NoC (4–8 cores)" → **L0 cluster mesh (16 cores, 4×4 mesh, 128-bit v3.1)**; the incorrect "Chip-level NoC (tile↔tile) 128-bit" v2.4 reference replaced with the actual hierarchical link types (L1 = 84-bit parallel, L2/L3 = serial SerDes). New note: the intra-core bus and the NoC link are **two different layers**. Intra-core bus widths (Nano/Actor 256, Rich 512, ML 1024, Seal 64) unchanged |
 | 1.0 | 2026-04-25 | Initial version — port bottleneck analysis, context move cycle counting from 32–1024 bit, selected sizing per core type, decision trail (uniform 32 / uniform 256 / heterogeneous / uniform 1024) |

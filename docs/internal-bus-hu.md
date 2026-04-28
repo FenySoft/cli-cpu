@@ -2,7 +2,7 @@
 
 > English version: [internal-bus-en.md](internal-bus-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vízió-szintű dokumentum.** Az itt szereplő busz-szélesség, area- és power-becslések irodalmi adatokból (TSMC 5nm SRAM macro datasheet, AMD Zen, Apple M, NVIDIA H100 publikus paraméterek) extrapolált munkahipotézisek. A pontos értékek csak F2.7 FPGA bring-up és F6 szilícium után validálhatók. A dokumentum célja a tervezési irányt és a döntés-trail-t rögzíteni, nem a végleges paramétereket.
 
@@ -99,6 +99,8 @@ A 256–512 bit egy mai 5nm AI/many-core chip-en **ipari standard**, nem extrava
 
 ## Választott méretezés — core típusonként
 
+> **Megjegyzés a NoC busszal kapcsolatban (v1.1):** A táblázat **két különböző réteget** különböztet meg: (1) **core-on belüli** back-end busz (reg ↔ SRAM, MAC slice felé), (2) **NoC link** (csomag-továbbítás magok/tile-ok között). A core-belső buszt az `internal-bus-hu.md` (ez a dokumentum) tervezi; a NoC linkeket az `interconnect-hu.md` v3.1. A két réteg paramétereit ne keverd össze.
+
 | Réteg | Busz szélesség | Indok |
 |---|---|---|
 | **Nano** belső reg ↔ SRAM | **256-bit** | 4–8 aktor warm-context, 4-cycle full move; minimális mag, sok aktor |
@@ -106,9 +108,10 @@ A 256–512 bit egy mai 5nm AI/many-core chip-en **ipari standard**, nem extrava
 | **Rich core** belső back-end | **512-bit** | 32 reg + multi-issue + 64-bit ISA opcióhoz fejlécet ad |
 | **ML/Matrix core (CFPU-ML MAC Slice)** | **1024-bit** | Tile-load alapelvárás, vektor-pipe (32 elem × 32-bit / cycle) |
 | **Seal core** | **64-bit** | Auditálhatóság > sebesség, minimum logika |
-| **Tile-szintű NoC** (4–8 mag között) | **256-bit** | Mailbox + context-spill osztott sávja |
-| **Chip-szintű NoC** (tile ↔ tile) | **128-bit** | A `interconnect-hu.md` v2.4 jelenlegi értéke, marad |
-| **DDR5 hub felé** | **128-bit** (2 channel × 64-bit) | DDR5 fizikai limit |
+| **L0 cluster mesh** (16 core, 4×4 mesh) | **128-bit** (v3.1) | Wormhole NoC link, header = 1 flit, payload = 8 flit. v3.1 default; `BUS_WIDTH` paraméterrel 256/512/1024 upscale |
+| **L1 tile crossbar link** (cluster GW → tile xbar) | **84-bit** párhuzamos | `interconnect-hu.md` v3.1 link types tábla |
+| **L2/L3 tile-tile / régió-chip linkek** | **soros SerDes** (`SERIAL_WIRES` + `SERDES_RATIO`) | Cm-skálás távolságok, párhuzamos bus nem skálázódik |
+| **DDR5 hub felé** | **128-bit** (2 channel × 64-bit) | DDR5 fizikai limit, lásd `ddr5-architecture-hu.md` |
 
 ## Alternatívák — döntés-trail
 
@@ -165,4 +168,5 @@ A 256–512 bit egy mai 5nm AI/many-core chip-en **ipari standard**, nem extrava
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.1 | 2026-04-28 | **NoC réteg szinkronizáció `interconnect-hu.md` v3.1-gyel.** A "Választott méretezés" tábla pontosítva: a "Tile-szintű NoC (4–8 mag)" → **L0 cluster mesh (16 core, 4×4 mesh, 128-bit v3.1)**; a "Chip-szintű NoC (tile↔tile) 128-bit" hibás v2.4 hivatkozás kicserélve a tényleges hierarchikus link típusokra (L1 = 84-bit párhuzamos, L2/L3 = soros SerDes). Új megjegyzés: a core-belső busz és a NoC link **két különböző réteg**. Core-belső busz méretek (Nano/Actor 256, Rich 512, ML 1024, Seal 64) változatlanok |
 | 1.0 | 2026-04-25 | Kezdeti verzió — port-bottleneck elemzés, context move cycle-számolás 32–1024 bit között, választott méretezés core típusonként, döntés-trail (egységes 32 / egységes 256 / heterogén / egységes 1024) |

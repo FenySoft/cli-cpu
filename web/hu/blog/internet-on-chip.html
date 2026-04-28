@@ -315,7 +315,7 @@
     </blockquote>
 
     <p>
-      Az ATM 53 byte-os fix cell&aacute;kat haszn&aacute;lt. Mi 256 byte hasznos adatot v&aacute;lasztottunk (16 byte header + max 256 byte payload = max 272 byte) &mdash; de az elv ugyanaz. Fix cella = determinisztikus időz&iacute;t&eacute;s = egyszerű hardver = kevesebb tranzisztor = <strong>t&ouml;bb processzormag f&eacute;r a chipre</strong>.
+      Az ATM 53 byte-os fix cell&aacute;kat haszn&aacute;lt. Mi 128 byte hasznos adatot v&aacute;lasztottunk (16 byte header + max 128 byte payload = max 144 byte) &mdash; de az elv ugyanaz. Fix cella = determinisztikus időz&iacute;t&eacute;s = egyszerű hardver = kevesebb tranzisztor = <strong>t&ouml;bb processzormag f&eacute;r a chipre</strong>.
     </p>
 
     <p>
@@ -397,7 +397,7 @@
 
     <table class="comparison-table">
       <tr><th>Elem</th><th>V&aacute;laszt&aacute;s</th><th>Eredet</th></tr>
-      <tr><td>Cella</td><td><strong>16 byte header + max 256 byte payload (max 272 B)</strong></td><td>ATM (1985)</td></tr>
+      <tr><td>Cella</td><td><strong>16 byte header + max 128 byte payload (max 144 B)</strong></td><td>ATM (1985)</td></tr>
       <tr><td>Buffer</td><td><strong>Virtual Output Queuing</strong></td><td>Telefonk&ouml;zpont (1990-es &eacute;vek)</td></tr>
       <tr><td>Scheduler</td><td><strong>iSLIP</strong></td><td>Stanford (1999)</td></tr>
       <tr><td>Flow control</td><td><strong>Credit-based</strong></td><td>Telefonk&ouml;zpont</td></tr>
@@ -409,7 +409,7 @@
       <strong>Router m&eacute;ret:</strong> Turbo ~26 000 GE (0,006 mm&sup2;), Compact ~14 500 GE (0,003 mm&sup2;) &mdash; core t&iacute;pust&oacute;l f&uuml;gg&odblac;.<br>
       <strong>Throughput:</strong> ~98% (Turbo, VOQ + iSLIP), ~75% (Compact).<br>
       <strong>Max hop:</strong> 18 (worst-case, cross-r&eacute;gi&oacute;).<br>
-      <strong>Max latencia:</strong> ~317 ciklus worst-case (~634 ns @ 500 MHz, 256B payload).<br>
+      <strong>Max latencia:</strong> ~191 ciklus worst-case (~382 ns @ 500 MHz, 128B payload).<br>
       <strong>Deadlock:</strong> lehetetlen (Wormhole + XY + VCT + VOQ + credit).<br>
       <strong>Seal Core:</strong> chip k&ouml;zepe, l&aacute;t minden cross-r&eacute;gi&oacute; forgalmat.<br>
       <strong>Biztons&aacute;gi kompromisszum:</strong> nulla.

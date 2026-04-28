@@ -282,19 +282,19 @@ L3: 10 r&eacute;gi&oacute;, 10&times;10 crossbar + Seal Core
     <h2>A latencia &aacute;lland&oacute; marad</h2>
 
     <p>
-      A worst-case latencia <strong>~99&ndash;317 ciklus tartom&aacute;nyban</strong> mozog a node-t&oacute;l, a hierarchia m&eacute;lys&eacute;g&eacute;t&odblac;l &eacute;s a payload m&eacute;rett&odblac;l f&uuml;gg&odblac;en. 5nm-en a cross-r&eacute;gi&oacute; worst-case ~317 ciklus (~634 ns @ 500 MHz, 256B payload); tipikus kis &uuml;zenetek (~48B) ~103 ciklus (~206 ns) alatt &eacute;rkeznek. A kontextus: ez versenyképes a szoftveres aktor &uuml;zenetk&uuml;ld&eacute;ssel (Erlang/BEAM: ~0,5&ndash;2 &micro;s).
+      A worst-case latencia <strong>~99&ndash;191 ciklus tartom&aacute;nyban</strong> mozog a node-t&oacute;l, a hierarchia m&eacute;lys&eacute;g&eacute;t&odblac;l &eacute;s a payload m&eacute;rett&odblac;l f&uuml;gg&odblac;en. 5nm-en a cross-r&eacute;gi&oacute; worst-case ~191 ciklus (~382 ns @ 500 MHz, 128B payload); tipikus kis &uuml;zenetek (~48B) ~105 ciklus (~210 ns) alatt &eacute;rkeznek. A kontextus: ez versenyképes a szoftveres aktor &uuml;zenetk&uuml;ld&eacute;ssel (Erlang/BEAM: ~0,5&ndash;2 &micro;s).
     </p>
 
     <table class="comparison-table">
-      <tr><th>Node</th><th>Core sz&aacute;m (800 mm&sup2;)</th><th>SRAM/core</th><th>Szintek</th><th>L0 cluster m&eacute;ret</th><th>Worst-case latencia (256B)</th><th>Tipikus (48B)</th></tr>
-      <tr><td><strong>130nm</strong></td><td>576</td><td>16 KB</td><td>2</td><td>~5.3 mm</td><td><strong>~99 cyc</strong></td><td>~40 cyc</td></tr>
-      <tr><td><strong>28nm</strong></td><td>3 456</td><td>64 KB</td><td>3</td><td>~2.7 mm</td><td><strong>~210 cyc</strong></td><td>~75 cyc</td></tr>
-      <tr><td><strong>7nm</strong></td><td>8 192</td><td>256 KB</td><td>4</td><td>~1.4 mm</td><td><strong>~317 cyc</strong></td><td>~103 cyc</td></tr>
-      <tr><td><strong>5nm</strong></td><td>10 240</td><td>256 KB</td><td>4</td><td>~1.1 mm</td><td><strong>~317 cyc</strong></td><td>~103 cyc</td></tr>
+      <tr><th>Node</th><th>Core sz&aacute;m (800 mm&sup2;)</th><th>SRAM/core</th><th>Szintek</th><th>L0 cluster m&eacute;ret</th><th>Worst-case latencia (128B)</th><th>Tipikus (48B)</th></tr>
+      <tr><td><strong>130nm</strong></td><td>576</td><td>16 KB</td><td>2</td><td>~5.3 mm</td><td><strong>~99 cyc</strong></td><td>~42 cyc</td></tr>
+      <tr><td><strong>28nm</strong></td><td>3 456</td><td>64 KB</td><td>3</td><td>~2.7 mm</td><td><strong>~140 cyc</strong></td><td>~78 cyc</td></tr>
+      <tr><td><strong>7nm</strong></td><td>8 192</td><td>256 KB</td><td>4</td><td>~1.4 mm</td><td><strong>~191 cyc</strong></td><td>~105 cyc</td></tr>
+      <tr><td><strong>5nm</strong></td><td>10 240</td><td>256 KB</td><td>4</td><td>~1.1 mm</td><td><strong>~191 cyc</strong></td><td>~105 cyc</td></tr>
     </table>
 
     <div class="highlight-box">
-      <strong>Ugyanaz az RTL, 130nm-t&odblac;l 5nm-ig.</strong> A 130nm-es 576 core-os első szil&iacute;cium pontosan ugyanazt a k&oacute;dot futtatja, mint az 5nm-es 10 000+ core-os &mdash; csak a param&eacute;terek m&aacute;sok. Az F3-on valid&aacute;lt router design F7-ig v&aacute;ltozatlan marad. A worst-case cross-r&eacute;gi&oacute; latencia ~317 ciklus (~634 ns @ 500 MHz, 256B payload), ami versenyképes a szoftveres aktor keretrendszerekkel.
+      <strong>Ugyanaz az RTL, 130nm-t&odblac;l 5nm-ig.</strong> A 130nm-es 576 core-os első szil&iacute;cium pontosan ugyanazt a k&oacute;dot futtatja, mint az 5nm-es 10 000+ core-os &mdash; csak a param&eacute;terek m&aacute;sok. Az F3-on valid&aacute;lt router design F7-ig v&aacute;ltozatlan marad. A worst-case cross-r&eacute;gi&oacute; latencia ~191 ciklus (~382 ns @ 500 MHz, 128B payload, v3.1), ami versenyképes a szoftveres aktor keretrendszerekkel.
     </div>
 
     <h2>A Seal Core mindig a k&ouml;z&eacute;pen</h2>
