@@ -2,6 +2,8 @@
 
 > English version: [README.md](README.md)
 
+> Version: 1.0
+
 Az első CLI-CPU saját bitstream az A7-Lite 200T board-on: egy ~10 soros Verilog számláló villogtatja a két user LED-et eltérő ütemben. Célja a **FPGA → A7-Lite 200T** end-to-end bring-up flow validálása, mielőtt a valódi Nano core RTL-t szintetizálnánk (F2.7).
 
 ## Két párhuzamos toolchain, ugyanarra a Verilog-ra
@@ -56,3 +58,9 @@ A `led_blink.v` **egyetlen** shared fájl — 10 sor Verilog, 25-bit counter, k�
 Ez egy smoke-teszt, nem az igazi Nano core. A szimuláció 25-bit számlálóra ~33 millió ciklus lenne — értelmetlen. A „teszt" maga a fizikai LED villogás.
 
 A valódi RTL modulok (ALU, decoder, microcode) mind cocotb testbench-el vannak fedve a `rtl/tb/` alatt.
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-24 | Kezdeti kiadás |

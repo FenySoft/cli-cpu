@@ -2,6 +2,8 @@
 
 > English version: [README.md](README.md)
 
+> Version: 1.0
+
 A CLI-CPU F2.7 smoke-teszt **Vivado toolchain**-en: ugyanaz a `led_blink.v` mint az OpenXC7 build-ben, de a hagyományos AMD/Xilinx zárt forráskódú tool-lánccal. A „kényelmes" út — gyorsabb build (45 sec vs 15 perc), jobb timing report, GUI.
 
 **Státusz (2026-04-24):** ✅ Sikeres build és programozás az A7-Lite 200T-re. WNS = 17.972 ns 50 MHz-en.
@@ -84,3 +86,9 @@ Semmit nem kell javítani.
 Ez egy smoke-teszt, nem az igazi Nano core. A szimuláció 25-bit számlálóra ~33 millió ciklus lenne — értelmetlen. A „teszt" maga a fizikai LED villogás.
 
 A valódi RTL modulok (ALU, decoder, microcode) mind cocotb testbench-el vannak fedve a `rtl/tb/` alatt.
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-24 | Kezdeti kiadás |

@@ -2,6 +2,8 @@
 
 > Magyar verzió: [README-hu.md](README-hu.md)
 
+> Version: 1.0
+
 The first CLI-CPU bitstream of our own on the A7-Lite 200T board: a ~10-line Verilog counter blinks the two user LEDs at different rates. Its purpose is to validate the **FPGA → A7-Lite 200T** end-to-end bring-up flow before we synthesize the real Nano core RTL (F2.7).
 
 ## Two parallel toolchains, same Verilog
@@ -56,3 +58,9 @@ rtl/fpga/smoke_test/
 This is a smoke test, not the real Nano core. Simulating a 25-bit counter would take ~33 million cycles — pointless. The "test" is the physical LED blinking itself.
 
 Real RTL modules (ALU, decoder, microcode) are all covered by cocotb testbenches under `rtl/tb/`.
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-24 | Initial release |

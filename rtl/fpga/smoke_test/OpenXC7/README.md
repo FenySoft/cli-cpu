@@ -2,6 +2,8 @@
 
 > Magyar verzió: [README-hu.md](README-hu.md)
 
+> Version: 1.0
+
 Same `led_blink.v` as the Vivado build, but through an **open-source toolchain**: **Yosys + nextpnr-xilinx + Project X-Ray**. The goal is to show that the CLI-CPU F2.7 smoke test isn't Vivado-specific, and to lay groundwork for parallel CI around F4.
 
 **Status (2026-04-24):** ✅ Build and programming successful on A7-Lite 200T (`xc7a200tfbg484-2`). Bitstream: 9.3 MB, chipdb: 331 MB. Programming done with openFPGALoader v1.1.1 without Vivado — LEDs blink.
@@ -132,3 +134,9 @@ A7-Lite USB-JTAG uses an FTDI FT232H (VID:PID `0403:6014`). The `--cable ft232` 
 **`libffi.so.7: cannot open shared object file`** — warning in `fasm2frames`, not an error. Slower Python parser fallback is used. To speed up: `pip install -v fasm` — but not needed for LED blink.
 
 **P&R takes much longer than expected** — XC7A200T is large, first P&R is ~1–2 minutes. If much longer, likely XDC error (e.g., nonexistent pin).
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-24 | Initial release |

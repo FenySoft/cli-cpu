@@ -2,6 +2,8 @@
 
 > Magyar verzió: [CONTRIBUTING-hu.md](CONTRIBUTING-hu.md)
 
+> Version: 1.0
+
 Thank you for your interest in contributing to CLI-CPU!
 
 ## Getting Started
@@ -110,3 +112,9 @@ See [docs/architecture-en.md](docs/architecture-en.md) for the full architecture
 ## License
 
 By contributing, you agree that your contributions will be licensed under [CERN-OHL-S v2](LICENSE).
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-14 | Initial release |

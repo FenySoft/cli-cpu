@@ -2,6 +2,8 @@
 
 > Magyar verzió: [README-hu.md](README-hu.md)
 
+> Version: 1.0
+
 The CLI-CPU F2.7 smoke test on the **Vivado toolchain**: same `led_blink.v` as the OpenXC7 build, but through the traditional AMD/Xilinx closed-source tool chain. The "convenient" path — faster build (45 sec vs 15 min), better timing report, GUI.
 
 **Status (2026-04-24):** ✅ Build and programming successful on A7-Lite 200T. WNS = 17.972 ns at 50 MHz.
@@ -84,3 +86,9 @@ Nothing needs fixing.
 This is a smoke test, not the real Nano core. Simulating a 25-bit counter would take ~33 million cycles — pointless. The "test" is the physical LED blinking itself.
 
 Real RTL modules (ALU, decoder, microcode) are all covered by cocotb testbenches under `rtl/tb/`.
+
+## Changelog
+
+| Version | Date | Summary |
+|---------|------|---------|
+| 1.0 | 2026-04-24 | Initial release |

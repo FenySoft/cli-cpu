@@ -2,6 +2,8 @@
 
 > English version: [README.md](README.md)
 
+> Version: 1.0
+
 Ugyanaz a `led_blink.v` mint a Vivado build-ben, csak **nyílt forráskódú toolchain**-en át: **Yosys + nextpnr-xilinx + Project X-Ray**. Célja megmutatni, hogy a CLI-CPU F2.7 smoke-tesztje nem Vivado-specifikus, és megalapozni az F4 körüli párhuzamos CI-t.
 
 **Státusz (2026-04-24):** ✅ Sikeres build és programozás az A7-Lite 200T-re (`xc7a200tfbg484-2`). Bitstream: 9.3 MB, chipdb: 331 MB. Programozás openFPGALoader v1.1.1-gyel Vivado nélkül — LED-ek villognak.
@@ -132,3 +134,9 @@ Az A7-Lite USB-JTAG-ja egy FTDI FT232H (VID:PID `0403:6014`). Az `--cable ft232`
 **`libffi.so.7: cannot open shared object file`** — figyelmeztetés a `fasm2frames`-nél, nem hiba. Lassabb Python parser fallback használódik. Ha gyorsítani akarod: `pip install -v fasm` — de a LED blink tesztre nem szükséges.
 
 **Sokkal hosszabb P&R mint várt** — Az XC7A200T nagy, az első P&R ~1–2 perc. Ha sokkal több, valami XDC hiba (pl. nem létező pin).
+
+## Changelog
+
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
+| 1.0 | 2026-04-24 | Kezdeti kiadás |

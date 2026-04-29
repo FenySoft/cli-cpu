@@ -4,7 +4,7 @@
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum.
 >
-> **Verzió:** 1.0 — 2026-04-28
+> Version: 1.0
 
 ## Cél
 

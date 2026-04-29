@@ -4,7 +4,7 @@
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum. A publikus ISA spec a `docs/ISA-CIL-T0-{hu,en}.md`.
 >
-> **Verzió:** 1.1 — 2026-04-27
+> Version: 1.1
 
 ## Cél
 
@@ -189,7 +189,7 @@ A teszt-sorrend (a 2. taskban):
 
 ## Changelog
 
-| Verzió | Dátum | Változás |
-|--------|-------|---------|
-| 1.0 | 2026-04-27 | Első verzió — 4-elem TOS cache, SPILL/FILL, 14 teszt-pont |
+| Verzió | Dátum | Összefoglaló |
+|--------|-------|-------------|
 | 1.1 | 2026-04-27 | Devil's Advocate review után: trap pulzus pontos timing, pop_data validity ablak, peek OOB saturating 0, sram_ready handshake, busy alatti *_en ignorálás, concurrent prioritás-enkóder, sp_init word-aligned, kibővített reset, sram_addr IDLE-ban don't-care; +11 teszt (test_15..test_25) |
+| 1.0 | 2026-04-27 | Első verzió — 4-elem TOS cache, SPILL/FILL, 14 teszt-pont |
