@@ -47,4 +47,7 @@ test_microcode:
 test_stack_cache:
 	$(MAKE) MODULE=test_stack_cache TOPLEVEL=cilcpu_stack_cache VERILOG_SOURCES="$(PWD)/../src/cilcpu_stack_cache.v"
 
-.PHONY: test_alu test_sram test_decoder test_microcode test_stack_cache
+test_qspi_controller:
+	$(MAKE) MODULE=test_qspi_controller TOPLEVEL=cilcpu_qspi_controller VERILOG_SOURCES="$(PWD)/../src/cilcpu_qspi_controller.v"
+
+.PHONY: test_alu test_sram test_decoder test_microcode test_stack_cache test_qspi_controller
