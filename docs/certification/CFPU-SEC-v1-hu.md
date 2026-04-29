@@ -2,7 +2,7 @@
 
 > Version: 1.0 | Datum: 2026-04-17
 
-> English version: CFPU-SEC-v1-en.md (TODO)
+> English version: [CFPU-SEC-v1-en.md](CFPU-SEC-v1-en.md)
 
 Ez a dokumentum a **CFPU Certified** tanusito vedjegy (certification mark) technikai alapjat kepezi. Meghatarozza azokat a **kotelezo biztonsagi elemeket**, amelyek teljesuleset a CFPU Foundation ellenorzi es tanusitja. A dokumentum egyben az EUIPO tanusito vedjegy bejelenteshez szukseges **Regulations of Use** vazat is tartalmazza.
 

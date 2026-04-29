@@ -1,5 +1,7 @@
 # F2.4 QSPI Controller — Kontrakt és Portspec
 
+> English version: [QSPI_CONTROLLER_SPEC-en.md](QSPI_CONTROLLER_SPEC-en.md)
+
 > Belső munka-spec a TDD ciklushoz. Az architekturális kontextus a `docs/architecture-hu.md`-ben.
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum.

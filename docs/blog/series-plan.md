@@ -2,6 +2,8 @@
 
 > Internal planning document — not published on the website.
 
+> Magyar verzió: [series-plan-hu.md](series-plan-hu.md)
+
 > Version: 1.0
 
 ## Strategy

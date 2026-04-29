@@ -1,5 +1,7 @@
 # F2.3 Stack Cache — Kontrakt és Portspec
 
+> English version: [STACK_CACHE_SPEC-en.md](STACK_CACHE_SPEC-en.md)
+
 > Belső munka-spec a TDD ciklushoz. Aranypélda: `TCpuNano.EvalPush/EvalPop/EvalPeek` (`src/CilCpu.Sim/TCpuNano.cs`).
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum. A publikus ISA spec a `docs/ISA-CIL-T0-{hu,en}.md`.
