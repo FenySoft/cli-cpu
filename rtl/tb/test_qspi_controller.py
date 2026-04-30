@@ -170,8 +170,16 @@ async def qspi_slave_driver(dut, flash_model, psram_model):
 
         if cs_flash == 0:
             await _handle_transaction(dut, flash_model, is_flash=True)
+            # hu: Várjuk meg, amíg CS# valóban magasra megy — phantom re-entry elkerülése
+            # en: Wait until CS# actually goes high — prevents phantom re-entry
+            while int(dut.qspi_cs_flash_n.value) == 0:
+                await RisingEdge(dut.clk)
         elif cs_psram == 0:
             await _handle_transaction(dut, psram_model, is_flash=False)
+            # hu: Várjuk meg, amíg CS# valóban magasra megy — phantom re-entry elkerülése
+            # en: Wait until CS# actually goes high — prevents phantom re-entry
+            while int(dut.qspi_cs_psram_n.value) == 0:
+                await RisingEdge(dut.clk)
 
 
 # ============================================================
@@ -912,3 +920,216 @@ async def test_25_random_read_write_sequence(dut):
 
     assert len(errors) == 0, \
         f"Random R/W test failed with {len(errors)} errors:\n" + "\n".join(errors[:10])
+
+
+# ============================================================
+# hu: Új tesztek (26–29) — 2. iteráció audit javítások
+# en: New tests (26–29) — 2nd iteration audit fixes
+# ============================================================
+
+
+@cocotb.test()
+async def test_26_cmd_dq_high_bits_idle(dut):
+    """hu: CMD fázis alatt DQ[3:1] = 0b111 (WP#/HOLD#/MISO inaktív).
+           A teljes 8-ciklus CMD alatt minden rising edge-en ellenőrzött.
+    en: During CMD phase DQ[3:1] = 0b111 (WP#/HOLD#/MISO inactive).
+           Checked on every rising edge throughout the 8-cycle CMD phase."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await reset_dut(dut)
+
+    # hu: Elindítunk egy Flash olvasást (CODE szegmens)
+    # en: Start a Flash read (CODE segment)
+    await FallingEdge(dut.clk)
+    dut.cpu_addr.value = make_addr(SEG_CODE, 0x000100)
+    dut.cpu_re.value = 1
+    await RisingEdge(dut.clk)
+    dut.cpu_re.value = 0
+
+    # hu: CMD fázisban várunk — 8 QSPI CLK rising edge-ét mintázzuk
+    # en: Wait in CMD phase — sample 8 QSPI CLK rising edges
+    violations = []
+    cmd_edges = 0
+    in_cmd = False
+
+    for _ in range(60):
+        await RisingEdge(dut.clk)
+        try:
+            cs_flash = int(dut.qspi_cs_flash_n.value)
+            oe = int(dut.qspi_dq_oe.value)
+            clk_out = int(dut.qspi_clk.value)
+            dq = int(dut.qspi_dq_out.value)
+        except ValueError:
+            continue
+
+        if cs_flash == 0 and oe == 1 and clk_out == 1:
+            in_cmd = True
+            cmd_edges += 1
+            high_bits = (dq >> 1) & 0x7
+            if high_bits != 0x7:
+                violations.append(f"edge {cmd_edges}: DQ[3:1]=0b{high_bits:03b} (expected 0b111)")
+            if cmd_edges >= 8:
+                break
+
+    assert in_cmd, "CMD fázis nem detektálható (CS# soha nem ment le)"
+    assert cmd_edges >= 8, f"CMD fázisban csak {cmd_edges} rising edge-t láttunk (várható: 8)"
+    assert len(violations) == 0, \
+        f"DQ[3:1] nem volt 0b111 a CMD fázisban:\n" + "\n".join(violations)
+
+    # hu: Befejeztetjük a tranzakciót (cpu_ready)
+    # en: Let the transaction finish (cpu_ready)
+    for _ in range(300):
+        await RisingEdge(dut.clk)
+        try:
+            if int(dut.cpu_ready.value) == 1:
+                break
+        except ValueError:
+            pass
+
+
+@cocotb.test()
+async def test_27_idle_dq_out_default(dut):
+    """hu: IDLE állapotban qspi_dq_out = 4'hF — reset után és tranzakció után is.
+    en: In IDLE state qspi_dq_out = 4'hF — both after reset and after a transaction."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await reset_dut(dut)
+
+    # hu: 1. ellenőrzés: reset utáni IDLE
+    # en: Check 1: IDLE right after reset
+    await RisingEdge(dut.clk)
+    try:
+        dq = int(dut.qspi_dq_out.value)
+    except ValueError:
+        dq = -1
+    assert dq == 0xF, f"Reset utáni IDLE: qspi_dq_out=0x{dq:X} (várt: 0xF)"
+
+    # hu: 2. ellenőrzés: egyetlen tranzakció befejezése után
+    # en: Check 2: after one complete transaction
+    result = await do_read(dut, make_addr(SEG_STACK, 0x000004))
+
+    # hu: 2 ciklusot várunk IDLE-be való visszatérésre
+    # en: Wait 2 cycles for return to IDLE
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)
+    try:
+        dq2 = int(dut.qspi_dq_out.value)
+    except ValueError:
+        dq2 = -1
+    assert dq2 == 0xF, f"Tranzakció utáni IDLE: qspi_dq_out=0x{dq2:X} (várt: 0xF)"
+
+
+@cocotb.test()
+async def test_28_default_segment_nop(dut):
+    """hu: Érvénytelen szegmens (cpu_addr[23:20]=0x7) esetén cpu_ready azonnal
+           visszajön (1–3 ciklus), CS# soha nem aktiválódik — read és write mindkettőre.
+    en: Invalid segment (cpu_addr[23:20]=0x7) gives immediate cpu_ready (1–3 cycles),
+           CS# never activates — tested for both read and write."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await reset_dut(dut)
+
+    invalid_addr = (0x7 << 20) | 0x0000FF  # hu: 0x7xxxxx — ismeretlen szegmens
+
+    for op_name, is_write in [("read", False), ("write", True)]:
+        # hu: Tranzakció indítása
+        # en: Start transaction
+        await FallingEdge(dut.clk)
+        dut.cpu_addr.value = invalid_addr & 0xFFFFFF
+        if is_write:
+            dut.cpu_wdata.value = 0xABCD1234
+            dut.cpu_we.value = 1
+        else:
+            dut.cpu_re.value = 1
+        await RisingEdge(dut.clk)
+        dut.cpu_re.value = 0
+        dut.cpu_we.value = 0
+
+        # hu: Legfeljebb 5 cikluson belül cpu_ready=1-et várunk
+        # en: Expect cpu_ready=1 within at most 5 cycles
+        ready_seen = False
+        cs_ever_low = False
+        for _ in range(5):
+            await RisingEdge(dut.clk)
+            try:
+                cs_f = int(dut.qspi_cs_flash_n.value)
+                cs_p = int(dut.qspi_cs_psram_n.value)
+                rdy = int(dut.cpu_ready.value)
+            except ValueError:
+                continue
+            if cs_f == 0 or cs_p == 0:
+                cs_ever_low = True
+            if rdy == 1:
+                ready_seen = True
+                break
+
+        assert not cs_ever_low, \
+            f"[{op_name}] Érvénytelen szegmensen CS# lement! (flash={cs_f} psram={cs_p})"
+        assert ready_seen, \
+            f"[{op_name}] cpu_ready nem érkezett 5 cikluson belül érvénytelen szegmensre"
+
+        # hu: 2 ciklus szünet a tesztek között
+        # en: 2-cycle pause between tests
+        await RisingEdge(dut.clk)
+        await RisingEdge(dut.clk)
+
+
+@cocotb.test()
+async def test_29_busy_ignores_new_request(dut):
+    """hu: Folyamatban lévő tranzakció közepén érkező második cpu_re=1 pulzus
+           nem indít új tranzakciót. Az első tranzakció helyesen fejeződik be
+           (cpu_ready=1 a várt rdata-val), utána cpu_busy=0 és nincs aktív CS#.
+    en: A second cpu_re=1 pulse arriving mid-transaction does not start a new
+           transaction. The first transaction completes correctly (cpu_ready=1 with
+           expected rdata), then cpu_busy=0 and no CS# is active."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    expected_val = 0x12345678
+    flash_mem = {0: 0x12, 1: 0x34, 2: 0x56, 3: 0x78}
+    await reset_dut(dut, flash_mem=flash_mem)
+
+    # hu: Első olvasás indítása
+    # en: Start first read
+    await FallingEdge(dut.clk)
+    dut.cpu_addr.value = make_addr(SEG_CODE, 0x000000)
+    dut.cpu_re.value = 1
+    await RisingEdge(dut.clk)
+    dut.cpu_re.value = 0
+
+    # hu: ~10 ciklus várakozás (tranzakció közepe), majd második cpu_re pulzus
+    # en: Wait ~10 cycles (mid-transaction), then fire a second cpu_re pulse
+    for _ in range(10):
+        await RisingEdge(dut.clk)
+
+    await FallingEdge(dut.clk)
+    dut.cpu_addr.value = make_addr(SEG_CODE, 0x000004)  # hu: más cím
+    dut.cpu_re.value = 1
+    await RisingEdge(dut.clk)
+    dut.cpu_re.value = 0
+
+    # hu: Az első tranzakció befejezésére várunk
+    # en: Wait for the first transaction to complete
+    rdata = None
+    for _ in range(300):
+        await RisingEdge(dut.clk)
+        try:
+            if int(dut.cpu_ready.value) == 1:
+                rdata = int(dut.cpu_rdata.value)
+                break
+        except ValueError:
+            pass
+
+    assert rdata is not None, "cpu_ready soha nem jött — timeout"
+    assert rdata == expected_val, \
+        f"Első tranzakció rdata=0x{rdata:08X} (várt: 0x{expected_val:08X}) — rossz cím mintázva"
+
+    # hu: cpu_ready után: cpu_busy=0 és CS# inaktív
+    # en: After cpu_ready: cpu_busy=0 and CS# inactive
+    await RisingEdge(dut.clk)
+    try:
+        busy = int(dut.cpu_busy.value)
+        cs_f = int(dut.qspi_cs_flash_n.value)
+        cs_p = int(dut.qspi_cs_psram_n.value)
+    except ValueError:
+        busy, cs_f, cs_p = -1, -1, -1
+
+    assert busy == 0, f"cpu_busy={busy} (várt: 0) a tranzakció befejezése után"
+    assert cs_f == 1, f"qspi_cs_flash_n={cs_f} (várt: 1) a tranzakció befejezése után"
+    assert cs_p == 1, f"qspi_cs_psram_n={cs_p} (várt: 1) a tranzakció befejezése után"

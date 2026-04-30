@@ -6,7 +6,7 @@
 >
 > **Scope:** Internal RTL work spec, not a public document.
 >
-> Version: 1.0
+> Version: 1.1
 
 ## Goal
 
@@ -181,6 +181,8 @@ ST_IDLE -> ST_CMD -> ST_ADDR -> ST_DUMMY -> ST_DATA_RD -> ST_DONE -> ST_IDLE
 - `qspi_clk=0`, `qspi_dq_oe=0`, `qspi_dq_out=4'hF`
 - `cpu_re`/`cpu_we` during reset are ignored
 
+**HW interlock requirement:** Reset assertion is only allowed while `cpu_busy=0`. A reset arriving mid-transaction may leave the external QSPI device (PSRAM) with a partially written word — the CPU-side bus arbiter must enforce this.
+
 ### `cpu_re`/`cpu_we` During `cpu_busy`
 
 - Any request during `cpu_busy=1` is **silently ignored**
@@ -257,3 +259,4 @@ Python cocotb coroutine simulating a QSPI slave device:
 | Version | Date | Summary |
 |---------|------|---------|
 | 1.0 | 2026-04-28 | First version -- QSPI Flash + PSRAM controller, 0x6B/0xEB/0x38, 25 test points |
+| 1.1 | 2026-04-30 | HW interlock requirement for reset during transactions; CS# deassert strictly in ST_DONE |

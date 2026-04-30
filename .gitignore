@@ -24,6 +24,7 @@ sim-build/
 sim_build/
 __pycache__/
 results.xml
+cocotb.pstat
 work/
 transcript
 

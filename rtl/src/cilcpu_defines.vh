@@ -240,4 +240,18 @@
 // en: Helper notes for cond_type encoding — bgt = !(<=) = swap+lt,
 //     ble = !(>) = swap+ge. The swap logic lives in the sequencer.
 
+// ============================================================
+// hu: QSPI parancs kódok és szegmens azonosítók (F2.4)
+// en: QSPI command codes and segment IDs (F2.4)
+// ============================================================
+
+`define QSPI_CMD_FLASH_READ    8'h6B   // Quad Output Read (cmd+addr SPI, data Quad)
+`define QSPI_CMD_PSRAM_READ    8'hEB   // Fast Read Quad I/O (cmd SPI, addr+data Quad)
+`define QSPI_CMD_PSRAM_WRITE   8'h38   // Quad Write (cmd SPI, addr+data Quad)
+`define QSPI_DUMMY_FLASH       6'd8    // 0x6B: 8 dummy QSPI ciklus
+`define QSPI_DUMMY_PSRAM       6'd6    // 0xEB: 6 dummy QSPI ciklus
+`define SEG_CODE               4'h0    // CODE szegmens azonosító
+`define SEG_DATA               4'h1    // DATA szegmens azonosító
+`define SEG_STACK              4'h2    // STACK szegmens azonosító
+
 `endif

@@ -6,7 +6,7 @@
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum.
 >
-> Version: 1.0
+> Version: 1.1
 
 ## Cél
 
@@ -181,6 +181,8 @@ ST_IDLE ─→ ST_CMD ─→ ST_ADDR ─→ ST_DUMMY ─→ ST_DATA_RD ─→ ST
 - `qspi_clk=0`, `qspi_dq_oe=0`, `qspi_dq_out=4'hF`
 - Reset alatt érkező `cpu_re`/`cpu_we` ignorálva
 
+**HW interlock követelmény:** A reset assertálását csak `cpu_busy=0` állapotban szabad kezdeményezni. Tranzakció közepén érkező reset esetén a külső QSPI eszköz (PSRAM) félig megírt szót láthat — ezt a CPU-oldali bus arbiter-nek kell garantálnia.
+
 ### `cpu_busy` alatti `cpu_re`/`cpu_we`
 
 - Bármely kérés `cpu_busy=1` alatt **csendben ignorálva**
@@ -257,3 +259,4 @@ Python cocotb koroutin, ami QSPI slave eszközt szimulál:
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
 | 1.0 | 2026-04-28 | Első verzió — QSPI Flash + PSRAM controller, 0x6B/0xEB/0x38, 25 teszt-pont |
+| 1.1 | 2026-04-30 | HW interlock kikötés reset alatti tranzakcióhoz; CS# deassert szigorítva ST_DONE-ban |
