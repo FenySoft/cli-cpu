@@ -2,7 +2,7 @@
 
 > English version: [hw-boot-en.md](hw-boot-en.md)
 
-> Version: 1.0
+> Version: 1.5
 
 A CFPU chip bekapcsolásától a Rich core indulásáig tartó **tisztán hardveres** folyamat. Ez a szekvencia az operációs rendszer (Symphact) indulása **előtt** történik — szoftver nem vesz részt benne.
 
@@ -34,6 +34,7 @@ A CFPU chip bekapcsolásától a Rich core indulásáig tartó **tisztán hardve
      │                     Self-test, eFuse root hash olvasás
      │                     QSPI flash → SRAM másolás
      │                     SHA-256 + WOTS+/LMS HW verifikáció
+     │                     Initial CST GRANT_ALL → OS root aktor
      │
      ├── FAIL → ZEROIZATION + HALT
      │
@@ -180,8 +181,41 @@ A tanúsítvány formátumot és az aláírási modellt (PQC, WOTS+/LMS) lásd: 
 
 | Eredmény | Mi történik |
 |----------|-------------|
-| **VALID** | A verified kód a **Quench-RAM CODE régióba** kerül, SEAL-elődik (immutable), Seal Core jelzi a Rich core-nak: indulhat. |
+| **VALID** | A verified kód a **Quench-RAM CODE régióba** kerül, SEAL-elődik (immutable). Folytatás → 2e. lépés (Initial CST GRANT_ALL). |
 | **INVALID** | **ZEROIZATION** — minden RAM és cache törlődik. Chip **lockdown** módba kerül. Semmilyen kód nem fut. |
+
+### 2e. Initial CST GRANT_ALL — runtime authority átadás
+
+Mielőtt a Rich core reset elengedődik, a Seal Core a Rich core **QGate**-jének NoC mailbox üzenetet küld, ami az OS root aktornak (`kernel_io_sup`) **GRANT_ALL** capability-t ír a Rich core saját CST QSRAM-jába. Ez a kezdeti delegáció — innentől a runtime CST policy az OS root aktor felelőssége (lásd [`sealcore-hu.md`](sealcore-hu.md#authority) v1.4 "Authority delegáció — runtime CST policy" + "A három SEAL érintési pont" + "A QGate komponens").
+
+```
+Seal Core firmware (boot final step):
+
+  1. Compose NoC mailbox SEAL_CST_INSTALL message:
+       dst     = (Rich_core, 0)          ← Rich core QGate mailbox
+       src     = (Seal_core, 0)          ← Seal Core hardwired cím (HW-attested)
+       op      = SEAL_CST_INSTALL
+       payload = (target_actor=1, perms=GRANT_ALL, supervisor=(Seal_core, 0))
+
+  2. NoC mailbox send:
+       (üzenet befut a Rich core QGate-jéhez)
+
+  3. Rich core QGate:
+       (a) ellenőrzi CRC-8 (header) + CRC-16 (payload)
+       (b) ha OK: CST[1] = (perms=GRANT_ALL, supervisor=(Seal_core, 0))
+       (c) ha CRC fail: silent drop (SEU ellen, valódi támadás nem éri el — CST router-szinten szűrt)
+
+  4. Set Rich core start signal:
+       0xF0002024 ← 1 (verified + go)
+```
+
+A `(Seal_core, 0)` és `(Rich_core, *)` címek **hardwired** értékek (eFuse / mask ROM beégetve) — ez a runtime authority "root of trust"-ja. Boot után az OS root aktor üzenetekkel kérhet további CST-műveleteket a Seal Core-tól (spawn / delegate / revoke), amit a Seal Core `SEAL_CST_INSTALL` / `SEAL_CST_UPDATE` / `RELEASE_CST_ENTRY` üzenetekkel továbbít a célcore-ok **QGate**-jeihez. A konkrét CIL-Seal üzenet-ISA F4-F5 RTL döntés.
+
+**HW követelmény:**
+- Per-core CST QSRAM tábla (lásd `interconnect-hu.md` v3.0)
+- Per-core **QGate** FSM, ami SEAL_CST_INSTALL / SEAL_CST_UPDATE / RELEASE_CST_ENTRY mailbox üzenetekre aktiválódik, és kizárólag CRC-8 + CRC-16 ellenőrzést végez (lásd `sealcore-hu.md` v1.5 "A QGate komponens" + "Miért nincs logikai validáció")
+- A QGate authority-szűrése **a CST router-szintű filterben** valósul meg, nem a QGate-en — a nem-authority aktor a saját core HW-jénél küldéskor elakad (nincs CST entry-je a `(target_core, 0)` célhoz)
+- Hardwired `(Seal_core, 0)` cím (eFuse / mask ROM)
 
 ---
 
@@ -314,5 +348,9 @@ Részletes core leírás: [core-types-hu.md](core-types-hu.md)
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.5 | 2026-05-02 | **2e. lépés QGate logika egyszerűsítve a CFPU single-layer trust elv szerint.** A korábbi "ha nem OK (auth fail): trap, írás megtagadva" pont törölve — az authority szűrés a CST router-szinten történik, nem a QGate-en. A QGate kizárólag CRC-8 + CRC-16 ellenőrzést végez; CRC fail → silent drop (SEU ellen). HW követelmény lista frissítve. Lásd: `sealcore-hu.md` v1.5 "A QGate komponens" + "Miért nincs logikai validáció". |
+| 1.4 | 2026-05-02 | **QGate brand-név átvezetve.** A 2e. lépésben a "Rich core lokális SEAL FSM" megnevezés **QGate**-re cserélve, az új brand-név a `sealcore-hu.md` v1.4 "A QGate komponens" alszekciójában került bevezetésre. A flow szemantikai változás nélkül, csak elnevezés. |
+| 1.3 | 2026-05-02 | **2e. lépés átírva NoC mailbox szemantikára** (SEAL érintési pontok szétválasztása). Korábbi v1.2 megfogalmazás "HW config port write" pontatlan volt — a per-core CST QSRAM-ot **a célcore lokális SEAL FSM-je** írja, NoC mailbox `SEAL_CST_INSTALL` üzenetre. A "hardwired config port" csak a single-instance peripheria config-jához tartozik (lásd `sealcore-hu.md` v1.3 "A három SEAL érintési pont"). HW követelmény lista frissítve. |
+| 1.2 | 2026-05-02 | **2e. lépés hozzáadva — Initial CST GRANT_ALL.** Mielőtt a Rich core reset elengedődik, a Seal Core a NoC CST tábla első entry-jét írja: `(Rich_core, 1)` aktor (`kernel_io_sup`) GRANT_ALL capability-t kap. Innentől a runtime CST policy az OS root aktor felelőssége (lásd `sealcore-hu.md` v1.2 "Authority delegáció — runtime CST policy"). Header Version mező javítva 1.0-ról 1.2-re (a korábbi v1.1 changelog bejegyzés a fejlécben nem volt átvezetve). |
 | 1.1 | 2026-04-20 | Boot forrás kiválasztás: 5 forrás (QSPI, UART, BRAM, Ethernet, JTAG) az XC7A200T FPGA képességeihez igazítva. MMIO regiszterek bővítése minden boot forráshoz. 64-byte chunk-os adatolvasás (= cella payload méret). |
 | 1.0 | 2026-04-19 | Első verzió — HW boot szétválasztva a Symphact boot-sequence-hu.md-ből |

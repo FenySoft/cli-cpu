@@ -2,7 +2,7 @@
 
 > Magyar verzió: [hw-boot-hu.md](hw-boot-hu.md)
 
-> Version: 1.0
+> Version: 1.5
 
 The purely **hardware-driven** process from CFPU chip power-on to Rich core start. This sequence occurs **before** the operating system (Symphact) — no software is involved.
 
@@ -34,6 +34,7 @@ The purely **hardware-driven** process from CFPU chip power-on to Rich core star
      │                    Self-test, eFuse root hash read
      │                    QSPI flash → SRAM copy
      │                    SHA-256 + WOTS+/LMS HW verification
+     │                    Initial CST GRANT_ALL → OS root actor
      │
      ├── FAIL → ZEROIZATION + HALT
      │
@@ -180,8 +181,41 @@ For the certificate format and signing model (PQC, WOTS+/LMS), see: [authcode-en
 
 | Result | Action |
 |--------|--------|
-| **VALID** | Verified code is written to the **Quench-RAM CODE region**, SEAL-ed (immutable), Seal Core signals the Rich core: start. |
+| **VALID** | Verified code is written to the **Quench-RAM CODE region**, SEAL-ed (immutable). Continue → step 2e (Initial CST GRANT_ALL). |
 | **INVALID** | **ZEROIZATION** — all RAM and caches cleared. Chip enters **lockdown** mode. No code runs. |
+
+### 2e. Initial CST GRANT_ALL — runtime authority handoff
+
+Before the Rich core's reset is released, the Seal Core sends a NoC mailbox message to the Rich core's **QGate**, which writes a **GRANT_ALL** capability for the OS root actor (`kernel_io_sup`) into the Rich core's own CST QSRAM. This is the initial delegation — from this point on, runtime CST policy is the OS root actor's responsibility (see [`sealcore-en.md`](sealcore-en.md#authority) v1.4 "Authority delegation — runtime CST policy" + "The three SEAL touchpoints" + "The QGate component").
+
+```
+Seal Core firmware (boot final step):
+
+  1. Compose NoC mailbox SEAL_CST_INSTALL message:
+       dst     = (Rich_core, 0)          ← Rich core QGate mailbox
+       src     = (Seal_core, 0)          ← Seal Core hardwired address (HW-attested)
+       op      = SEAL_CST_INSTALL
+       payload = (target_actor=1, perms=GRANT_ALL, supervisor=(Seal_core, 0))
+
+  2. NoC mailbox send:
+       (message arrives at the Rich core's QGate)
+
+  3. Rich core QGate:
+       (a) verifies CRC-8 (header) + CRC-16 (payload)
+       (b) if OK: CST[1] = (perms=GRANT_ALL, supervisor=(Seal_core, 0))
+       (c) if CRC fail: silent drop (SEU defense — actual attacks blocked at CST router level)
+
+  4. Set Rich core start signal:
+       0xF0002024 ← 1 (verified + go)
+```
+
+The `(Seal_core, 0)` and `(Rich_core, *)` addresses are **hardwired** values (eFuse / mask ROM burned) — this is the runtime authority "root of trust". After boot, the OS root actor may request further CST operations (spawn / delegate / revoke) from the Seal Core via messages, which the Seal Core relays as `SEAL_CST_INSTALL` / `SEAL_CST_UPDATE` / `RELEASE_CST_ENTRY` messages to the target cores' **QGate**s. The concrete CIL-Seal message ISA is an F4-F5 RTL decision.
+
+**HW requirement:**
+- Per-core CST QSRAM table (see `interconnect-en.md` v3.0)
+- Per-core **QGate** FSM that activates on SEAL_CST_INSTALL / SEAL_CST_UPDATE / RELEASE_CST_ENTRY mailbox messages and performs only CRC-8 + CRC-16 checking (see `sealcore-en.md` v1.5 "The QGate component" + "Why no logical validation")
+- The QGate's authority filtering is realized at **the CST router-level filter**, not at the QGate — non-authority actors are blocked at their own core's HW at send time (no CST entry for the `(target_core, 0)` destination)
+- Hardwired `(Seal_core, 0)` address (eFuse / mask ROM)
 
 ---
 
@@ -314,5 +348,9 @@ Detailed core description: [core-types-en.md](core-types-en.md)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5 | 2026-05-02 | **Step 2e QGate logic simplified per the CFPU single-layer trust principle.** The earlier "if not OK (auth fail): trap, write rejected" point removed — authority filtering happens at the CST router level, not at the QGate. The QGate performs only CRC-8 + CRC-16 checks; CRC fail → silent drop (SEU defense). HW requirement list updated. See: `sealcore-en.md` v1.5 "The QGate component" + "Why no logical validation". |
+| 1.4 | 2026-05-02 | **QGate brand name propagated.** In step 2e, the term "Rich core local SEAL FSM" is replaced by **QGate**; the new brand name is introduced in `sealcore-en.md` v1.4 "The QGate component" subsection. Semantics unchanged — naming only. |
+| 1.3 | 2026-05-02 | **Step 2e rewritten with NoC mailbox semantics** (SEAL touchpoints separated). The earlier v1.2 phrasing "HW config port write" was inaccurate — the per-core CST QSRAM is written by **the target core's local SEAL FSM** in response to a NoC mailbox `SEAL_CST_INSTALL` message. The "hardwired config port" applies only to single-instance peripheral config (see `sealcore-en.md` v1.3 "The three SEAL touchpoints"). HW requirement list updated. |
+| 1.2 | 2026-05-02 | **Step 2e added — Initial CST GRANT_ALL.** Before the Rich core's reset is released, the Seal Core writes the first NoC CST entry: actor `(Rich_core, 1)` (`kernel_io_sup`) receives GRANT_ALL capability. From here on, runtime CST policy is the OS root actor's responsibility (see `sealcore-en.md` v1.2 "Authority delegation — runtime CST policy"). Header Version field corrected from 1.0 to 1.2 (the earlier v1.1 changelog entry had not been propagated to the header). |
 | 1.1 | 2026-04-20 | Boot source selection: 5 sources (QSPI, UART, BRAM, Ethernet, JTAG) aligned to XC7A200T FPGA capabilities. MMIO registers extended for all boot sources. 64-byte chunk data reads (= cell payload size). |
 | 1.0 | 2026-04-19 | Initial version — HW boot separated from Symphact boot-sequence-hu.md |

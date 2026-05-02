@@ -2,7 +2,7 @@
 
 > English version: [sealcore-en.md](sealcore-en.md)
 
-> Version: 1.1
+> Version: 1.5
 
 Ez a dokumentum a **Seal Core** komponenst írja le: egy dedikált, egyszerű, hardware-burned firmware-rel működő core-t, ami a CFPU chipen a **kódbetöltés hitelességét** biztosítja. A Seal Core két különböző mechanizmussal működik a CFPU fejlesztési fázisától függően — **pre-QRAM érában** (F3-F5) fizikai WE-pin routing révén, **QRAM érában** (F5+) AuthCode verifikációs gatekeeper szerepben. Ez a két megközelítés **külön mechanizmus**, amelyeket ez a doksi tudatosan szétválasztva tárgyal.
 
@@ -14,17 +14,19 @@ Ez a dokumentum a **Seal Core** komponenst írja le: egy dedikált, egyszerű, h
 2. [Mi a Seal Core](#mi-a-sealcore)
 3. [Kapcsolódás a CFPU brand-családfához](#brand)
 4. [Általános architektúra](#architektura)
-5. [Seal Core a pre-QRAM érában (F3-F5)](#preqram)
-6. [Seal Core a QRAM érában (F5+)](#qram)
-7. [Az átmeneti pont](#atmenet)
-8. [Boot és firmware immutability](#boot)
-9. [Többszörözés és graceful degradation](#redundancia)
-10. [Gyorsító funkciók](#gyorsitok)
-11. [Biztonsági garanciák](#biztonsag)
-12. [Nyitott kérdések](#nyitott)
-13. [F-fázis bevezetés](#fazisok)
-14. [Referenciák](#referenciak)
-15. [Changelog](#changelog)
+5. [A három SEAL érintési pont](#seal-points)
+6. [Seal Core a pre-QRAM érában (F3-F5)](#preqram)
+7. [Seal Core a QRAM érában (F5+)](#qram)
+8. [Az átmeneti pont](#atmenet)
+9. [Boot és firmware immutability](#boot)
+10. [Authority delegáció — runtime CST policy](#authority)
+11. [Többszörözés és graceful degradation](#redundancia)
+12. [Gyorsító funkciók](#gyorsitok)
+13. [Biztonsági garanciák](#biztonsag)
+14. [Nyitott kérdések](#nyitott)
+15. [F-fázis bevezetés](#fazisok)
+16. [Referenciák](#referenciak)
+17. [Changelog](#changelog)
 
 ## Motiváció <a name="motivacio"></a>
 
@@ -59,8 +61,10 @@ A Seal Core **nem fut alkalmazás-kódot**. A saját firmware-e hardveresen beé
 - **AuthCode verifikáció** — bejövő `.acode` konténerek aláírás-ellenőrzése (lásd `docs/authcode-hu.md`)
 - **Code-loader feladatok** — ellenőrzött bytecode beírása a CODE régióba
 - **Heartbeat jel** egy központi health monitor-nak (redundancia-célra)
-- **DDR5 capability slot kezelés** — `kernel_io_sup` policy alapján SEAL/RELEASE-eli a per-core capability slot-okat (lásd `ddr5-architecture-hu.md` v1.3, "5.e) HW Capability Slot")
-- **CST (Capability Slot Table) kezelés** — a NoC aktor-aktor capability tábla írása dedikált hardwired config porton (lásd `interconnect-hu.md` v3.0, `quench-ram-hu.md`)
+- **DDR5 capability slot kezelés** — `kernel_io_sup` policy alapján SEAL/RELEASE-eli a per-core capability slot-okat NoC mailbox üzenettel a célcore **QGate**-jén keresztül (lásd `ddr5-architecture-hu.md` v1.3, "5.e) HW Capability Slot")
+- **CST (Capability Slot Table) kezelés** — a NoC aktor-aktor capability tábla SEAL/RELEASE-e szintén NoC mailbox üzenettel a célcore **QGate**-jén keresztül (lásd `interconnect-hu.md` v3.0, `quench-ram-hu.md`)
+- **Single-instance peripheria config** — a DDR5 Controller, QSPI Controller stb. **egész peripheria** konfigurációja **dedikált hardwired config porton** (1 cél, lásd `ddr5-architecture-hu.md` v1.3 line 85-86) — itt **nem** QGate, mert a peripheria nem core
+- **Authority delegation gatekeeper** — boot-időben az OS root aktornak GRANT_ALL CST entry-t ír; runtime alatt az OS root aktor (vagy delegáltjai) felől érkező spawn / revoke / delegate kérelmeket ellenőrzi a supervisor link és a kérelmező saját CST capability-je alapján, majd a célcore **QGate**-jének NoC mailbox üzenetet küld. Részletek: ["Authority delegáció — runtime CST policy"](#authority) és ["A három SEAL érintési pont"](#seal-points).
 
 ## Kapcsolódás a CFPU brand-családfához <a name="brand"></a>
 
@@ -71,17 +75,28 @@ A Seal Core beilleszkedik a CFPU komplementer biztonsági mechanizmusok családj
                │              CFPU biztonsági család       │
                └───────────────────────────────────────────┘
                                     │
-       ┌────────────────┬───────────┼───────────┬───────────────┐
-       │                │           │           │               │
-  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [Symphact
-   memóriacella   kód-aláírás   runtime W⊕X   gatekeeper    HSM Card]
-                                              core          crypto + signing
+   ┌──────────────┬──────────┬──────────┬──────────────┬──────────┬──────────────┐
+   │              │          │          │              │          │              │
+[Quench-RAM] [AuthCode] [CodeLock] [Seal Core]    [QGate]   [Symphact
+ memória-     kód-       runtime    globális       per-core    HSM Card]
+ cella        aláírás    W⊕X        gatekeeper     Quench-RAM  crypto +
+                                    core           kapuőr      signing
 ```
+
+| Komponens | Hatókör | Szerep |
+|-----------|---------|--------|
+| **Quench-RAM** | per-bit | Memóriacella, status-bit alapú immutability |
+| **AuthCode** | per-bináris | CIL kód aláírás-verifikáció (LMS+WOTS+) |
+| **CodeLock** | per-régió | Runtime W⊕X (pre-QRAM: WE-pin routing) |
+| **Seal Core** | chip-szintű | Globális gatekeeper, AuthCode flow, capability authority root |
+| **QGate** | **per-core** | **Lokális Quench-RAM kapuőr — az egyetlen írási út a core CST QSRAM-hoz / DDR5 cap-slot QRAM-hoz; NoC mailbox SEAL/RELEASE üzenetekre aktiválódik** |
+| **Symphact HSM Card** | rendszer-szintű | Külső kulcs-management, signing |
 
 A Seal Core az a **fizikai komponens**, amelyik a többi mechanizmust **gyakorlatilag aktiválja**:
 - Az **AuthCode** verifikációs flow itt fut
 - A **CodeLock** W⊕X kényszerítés (pre-QRAM érában) itt származik a WE-pin routing-ból
 - A **Quench-RAM** CODE régió SEAL HW-triggerét itt indítják
+- A per-core **QGate**-eket NoC mailbox üzenetekkel vezérli (CST/cap-slot SEAL/RELEASE)
 
 ## Általános architektúra <a name="architektura"></a>
 
@@ -118,6 +133,100 @@ A Seal Core belső komponensei (bármelyik fázisban azonos):
 ```
 
 Az **"Output interface"** az egyetlen rész, ami fázisonként **érdemben változik** — a többi (firmware, SRAM, SHA-256 HW, verifier-ek) minden érában azonos.
+
+## A három SEAL érintési pont <a name="seal-points"></a>
+
+A Seal Core **három különböző SEAL/RELEASE eseménytípust** vezérel, és ezek **három különböző csatornán és három különböző végrehajtón** futnak. Ezek explicit szétválasztása fontos, mert korábbi doc-verziók (sealcore-hu v1.1–v1.2) keverték a "hardwired config port" megfogalmazást — az csak az 1. és 3. eseményre igaz, a 2.-ra **nem**.
+
+> **Brand-név bevezetés (v1.4):** a 2. eseménytípus végrehajtóját — a per-core lokális SEAL/RELEASE FSM-et — innentől **QGate**-nek nevezzük (Quench-RAM Gate). Ez a CFPU biztonsági brand-családjának új eleme; lásd ["Kapcsolódás a CFPU brand-családfához"](#brand) szekció új sora.
+
+| # | Esemény | Authority | Csatorna | Végrehajtó | Sebesség |
+|---|---------|-----------|----------|------------|----------|
+| 1. | **CODE régió SEAL** (boot / hot-load) | Seal Core | Lokális (Seal Core saját címterében — write-port + SEAL trigger) | Seal Core HW FSM | Slow path (kódbetöltésenként egyszer) |
+| 2. | **Capability slot SEAL/RELEASE** (per-core CST, per-core DDR5 cap slot) | Seal Core / supervisor aktor | **NoC mailbox** üzenet a célcore felé | **QGate** (per-core lokális Quench-RAM kapuőr FSM) | Fast path (gyakori, runtime) |
+| 3. | **Single-instance peripheria config** (DDR5 Controller, QSPI Controller stb.) | Seal Core / `root_supervisor` | **Hardwired config port** (1 küldő → 1 cél, kulcs nélküli, csak engedély) | Periféria HW | Slow path (config-only, ritka) |
+
+### Miért nem hardwired config port a CST/capability slot íráshoz?
+
+A per-core CST és a per-core DDR5 capability slot tábla **fizikailag a célcore QSRAM-jában él** (lásd `ddr5-architecture-hu.md` v1.3 §2.b, "Tárolás: per core, QRAM-ban"). Nincs központi capability tábla. Ha ezt egy globális hardwired config bus-szal írnánk, akkor:
+
+- ~10 000 core × n_slots × m_bit-es vezeték = **fizikailag kivitelezhetetlen** routing
+- Minden core-nak külön config-port-ja lenne a Seal Core felé → óriási area + power
+- A shared-nothing chip elv sérülne (központi adatút)
+
+Ehelyett a per-core SEAL/RELEASE **NoC mailbox üzenet**-ként utazik: a küldő (Seal Core vagy supervisor aktor) `dst=(target_core, 0)` címre küld egy SEAL parancsot, és a célcore **QGate**-je írja a saját QSRAM-jába. Ez:
+
+- **Skálázódik** a meglévő NoC-on, nem igényel új vezetékeket
+- **HW-attested** — a QGate ellenőrzi, hogy a `(src, src_actor)` páros a Seal Core hardwired címe vagy egy felhatalmazott supervisor (lásd `interconnect-hu.md` v3.0, header v3.1)
+- **Lokális végrehajtás** — a QGate kizárólagos hozzáféréssel ír a saját CST/cap-slot QSRAM-jába; más core-nak nincs vezetéke az adott QSRAM-hoz
+
+### A QGate komponens
+
+A **QGate** (Quench-RAM Gate) egy **per-core HW állapotgép**, amely egyetlen funkciót lát el: CRC-gate-eli a write-portot a core saját Quench-RAM-alapú capability tábláihoz (CST QSRAM, DDR5 cap-slot QRAM). A QGate brand-családi pozícióját lásd a 3. szekcióban ["Kapcsolódás a CFPU brand-családfához"](#brand).
+
+```
+┌──────────────────────────── core_i ───────────────────────────┐
+│                                                                │
+│   NoC inbox ──► [QGate] ──► CST QSRAM (per-actor capability)  │
+│                  │     └──► DDR5 cap-slot QRAM (per-actor)    │
+│                  │                                             │
+│                  ├─ CRC-8 header check                         │
+│                  ├─ CRC-16 payload check                       │
+│                  └─ op decode (SEAL_INSTALL / UPDATE / RELEASE)│
+│                  │                                             │
+│                  └─ ha CRC fail → silent drop                  │
+│                                                                │
+│   core SW ────────X─► (NINCS út a QSRAM íráshoz)              │
+└────────────────────────────────────────────────────────────────┘
+```
+
+| Tulajdonság | Érték |
+|-------------|-------|
+| Példányszám | **1 / core** (Nano, Actor, Rich-en mind van) |
+| Tárolt belső állapot | minimális (FSM állapot + CRC checker shift-regiszter) |
+| Bemenet | NoC inbox dedikált port (csak SEAL/RELEASE üzenet típusok) |
+| Kimenet | CST QSRAM write-port, DDR5 cap-slot QRAM write-port |
+| Validáció | **kizárólag CRC-8 (header) + CRC-16 (payload)** — logikai validáció nincs |
+| Drop-feltétel | CRC mismatch → silent drop, counter inkrement |
+| Becsült terület (5nm) | **~600–800 gate / core** (CRC-8 ~200 + CRC-16 ~400 + write-mux + FSM ~150) |
+
+### Miért nincs logikai validáció — CFPU single-layer trust elv
+
+A QGate **nem ellenőriz** semmit a következő dimenziókban:
+
+- ❌ `src` mező authority komparátor (eFuse cím vs. supervisor capability)
+- ❌ Payload range check (`target_actor` ∈ [0..255], `perms` értelmes maszk)
+- ❌ Op-validitás (érvényes opcode-érték)
+- ❌ Supervisor link well-formedness
+
+**Ez tudatos tervezés, nem hiányosság.** A CFPU single-layer trust elve szerint:
+
+> Bízz az immutable + HW-managed forrásban; csak a fizikai hibákra védj.
+
+A QGate-hez érkező üzenetek mindig a Seal Core firmware-éből (vagy felhatalmazott supervisor aktortól) származnak — más aktor nem tud küldeni, mert a CST router-szintű filter szűri (a saját CST entry-jében nincs capability a QGate-célhoz). Tehát:
+
+- A küldő **definíció szerint authority** (mert a CST garantálja)
+- A Seal Core firmware **immutable** (mask ROM / eFuse) → nem küld rosszul formált payload-ot
+- Az egyetlen reális hibalehetőség: **fizikai bit-flip a NoC tranzit során** (SEU, kozmikus sugárzás)
+- Erre a CRC-8 (header) és CRC-16 (payload) **elegendő védelem**
+
+A logikai validáció hozzáadása **defense-in-depth retorika** lenne — az ellentéte annak az elvnek, ami miatt:
+- A header v3.0-ból a HMAC mezőt **töröltük** (`interconnect-hu.md` v3.0): "a CST HW-managed, a szoftver nem manipulálhatja"
+- A küldő core HW-ja oldja fel a CST indexet → nem aktor SW
+
+Ugyanez itt: ha logikai bug van a Seal Core firmware-ben (rossz `target_actor`-t küld), az **threat model-en kívül** van. Nincs olyan threat model, amiben az immutable mask ROM hibás kódot futtat — ha az lenne, sokkal súlyosabb gondunk volna.
+
+**Konzekvencia:** a QGate gyakorlatilag egy **CRC-gate-elt write-port**, semmi több. Ez a minimális HW, ami a Quench-RAM SEAL/RELEASE szemantikát garantálja a NoC-mailbox csatornán.
+
+### Miért hardwired config port a single-instance peripheriához?
+
+A DDR5 Controller, QSPI Controller stb. **egyetlen példányos** komponens a chip-en — a config információ (PHY paraméterek, bank policy stb.) szintén egyetlen helyen él. Itt:
+
+- A "1 küldő → 1 cél" topológia triviális (egy darab vezeték a Seal Core-tól)
+- Boot-időben kell konfigurálni, runtime alatt csak ritka módosítás
+- A NoC mailbox over-kill volna egy ilyen alacsony frekvenciájú config-csatornához
+
+Ezért a single-instance peripheria config **hardwired, kulcs nélküli, csak engedély** porton fut a Seal Core-tól (lásd `ddr5-architecture-hu.md` v1.3 line 85-86). Ez **nem** ugyanaz a mechanizmus, mint a per-core CST/cap slot SEAL/RELEASE.
 
 ## Seal Core a pre-QRAM érában (F3-F5) <a name="preqram"></a>
 
@@ -338,6 +447,115 @@ A Seal Core saját kódja **nem tölthető be aláírt bináris formájában** �
 6. Parent supervisor értesítés: "Seal Core aktív"
 ```
 
+## Authority delegáció — runtime CST policy <a name="authority"></a>
+
+Ez a szekció rögzíti, **hogyan oszlik meg a felelősség** a Seal Core (HW mechanizmus) és az OS root aktor (runtime policy) között a CST tábla írásakor és az aktor-szintű capability delegálás során. A modell a [`feedback_mechanism_separation`](../docs/architecture-hu.md) elvet követi: **a Seal Core firmware-e nem érti az OS struktúráját** — a Seal Core csak ellenőrző és író mechanizmus, a tényleges policy az OS root aktor kezében van.
+
+### Alapelv
+
+> A per-core CST-be **kizárólag** az adott core **QGate**-je írhat, és a QGate-hez csak authority forrásból érkezhet üzenet — ezt a CST router-szintű filter garantálja: a QGate-célhoz capability-t csak Seal Core / felhatalmazott supervisor adhat, így nem-authority aktor a saját core HW-jénél küldéskor elakad. A QGate maga **csak CRC-t ellenőriz** (single-layer trust elv, lásd ["A QGate komponens"](#seal-points) szekció v1.5). Más core-nak **nincs vezetéke** a célcore CST QSRAM-jához. Ez fizikailag érvényesített, nem szoftveresen konfigurálható. Lásd: ["A három SEAL érintési pont"](#seal-points) — a per-core CST a 2. eseménytípus (NoC mailbox + QGate), nem a 3. (hardwired config port).
+
+A Seal Core firmware-e azonban **nem dönti el saját maga**, kit milyen capability illet. A boot utáni runtime CST-változtatásokat **az OS root aktor** kéri üzenetekkel — a Seal Core firmware policy-ja csak a kérelem **hitelességét** és **konzisztenciáját** ellenőrzi. Ez egy klasszikus mechanizmus / policy szétválasztás (microkernel filozófia).
+
+### Boot-idő delegáció — kezdeti GRANT_ALL
+
+A `hw-boot-hu.md` 2. lépés végén, mielőtt a Rich core reset elengedődik:
+
+```
+1. Seal Core verifikálja az OS root binárist (LMS+WOTS+ aláírás)
+2. Seal Core NoC mailbox üzenetet küld a Rich core QGate-jének:
+     dst   = (Rich_core, 0)    ← Rich core QGate mailbox címe
+     src   = (Seal_core, 0)    ← Seal Core hardwired HW címe (HW-attested)
+     op    = SEAL_CST_INSTALL
+     entry = (target_actor=1, perms=GRANT_ALL, supervisor=(Seal_core, 0))
+3. Rich core QGate ellenőrzi CRC-8 + CRC-16, és (ha OK) beírja a saját CST QSRAM-jába:
+     CST[1] = (perms=GRANT_ALL, supervisor=(Seal_core, 0))
+4. Seal Core jelzi a Rich core-nak: 0xF0002024 ← 1 (verified + go)
+5. Rich core indul, az OS root aktor (actor_id=1) felveszi a runtime authority szerepét
+```
+
+A QGate **nem ellenőrzi** a `src` mezőt — ezt a CST router-szintű filter már megtette küldéskor (a Seal Core hardwired címére minden core-nak van capability-je, mások meg nem küldhetnek a QGate-célre). A QGate csak CRC-8 + CRC-16 ellenőrzést végez, és ha OK, beírja a CST-t. Lásd: ["A QGate komponens"](#seal-points) "Miért nincs logikai validáció" alszekció.
+
+A boot utáni CST tábla tehát **egyetlen** entry-vel indul: az OS root aktor mindent lát és mindent delegálhat. Innentől a CFPU runtime policy-ja **az OS root aktor felelőssége**, nem a Seal Core firmware-éé.
+
+### Runtime delegáció — üzenet-API
+
+> **Pontosítás — NoC-attested, nem kriptografikusan aláírt:** a CFPU üzenet-szinten **nem használ HMAC-et vagy digitális aláírást** (lásd `interconnect-hu.md` v3.0: a HMAC mező a header v3.0-ban TÖRÖLVE lett). Az authority command hitelességét **kizárólag a HW által attribuált eredet** adja: a header `src_actor[8]` mezőjét a küldő core HW context regisztere tölti (nem hamisítható), a `src[24]` mezőt pedig a NoC router HW tölti a küldő fizikai pozíciója alapján. A CRC-16 / CRC-8 mezők **csak integritás-ellenőrzésre** szolgálnak, **nem auth-ra**. Tehát az alábbi műveletek **NoC-attested authority command**-ok, nem aláírt üzenetek.
+
+Az OS root aktor (vagy egy delegáltja, akinek megfelelő capability-je van) üzenetet küld a Seal Core-nak (`(Seal_core, 0)` címre), hogy CST-műveletet kérjen. Az üzenet típusok funkcionálisan:
+
+| Művelet | Kérelem tartalma | Seal Core ellenőrzése |
+|---------|------------------|------------------------|
+| **Spawn** — új aktor létrehozása | `target_core, code_hash, parent, perms` | (a) `parent == src_actor` (a kérelmező a leendő szülő), (b) `perms ⊆ kérelmező CST entry-je`, (c) `code_hash` AuthCode-verifikált |
+| **Delegate** — meglévő aktornak capability adás | `target_actor, perms_subset` | (a) `target_actor` parentje a kérelmező (supervisor link), (b) `perms_subset ⊆ kérelmező delegate-jogai` |
+| **Revoke** — capability visszavonás | `target_actor` | (a) `target_actor` parentje a kérelmező, vagy a kérelmező az OS root aktor |
+
+A konkrét üzenet-opcode-ok és payload-formátumok **F4-F5 RTL döntés** — ezt a `CIL-Seal ISA` definiálja majd (lásd [Nyitott kérdések](#nyitott) #1).
+
+A kérelmező identitása **nem hamisítható**: a `src_actor` mező a header v3.1-ben a core HW context regiszteréből származik (lásd `specs/cell-format-hu.md` v2.2, "3. döntés"), a `src` mezőt pedig a NoC router HW tölti a fizikai eredet alapján. A Seal Core firmware ezt a (HW-attested) `(src, src_actor)` párost veti össze a kérelem `parent` / `target_actor` mezőivel — **nincs kripto, csak HW-attribuált eredet**.
+
+### Validációs algoritmus (Seal Core firmware)
+
+```
+on_request(MsgCstOp from src):
+    1. lookup CST[src_core, src_actor] → caller_perms, caller_supervisor
+       (ha nincs entry → REJECT, src nem aktív aktor)
+
+    2. switch(op):
+         case Spawn:
+             if request.parent != src                    → REJECT
+             if request.perms ⊄ caller_perms             → REJECT
+             if AuthCodeVerify(request.code_hash) fails  → REJECT
+             allocate target_actor on target_core
+             send NoC mailbox: SEAL_CST_INSTALL →
+                  dst=(target_core, 0),
+                  payload=(target_actor, request.perms, supervisor=src)
+             # célcore QGate:
+             #   CRC-8 + CRC-16 ellenőrzés
+             #   beírja: CST[target_actor] = (perms, supervisor=src)
+
+         case Delegate:
+             if supervisor_link[request.target] != src   → REJECT
+             if request.perms_subset ⊄ caller_perms      → REJECT
+             send NoC mailbox: SEAL_CST_UPDATE →
+                  dst=(target.core, 0),
+                  payload=(target.actor, perms_or=request.perms_subset)
+
+         case Revoke:
+             if supervisor_link[request.target] != src
+                AND src != OS_root_actor                 → REJECT
+             send NoC mailbox: RELEASE_CST_ENTRY →
+                  dst=(target.core, 0),
+                  payload=(target.actor)
+             cascade revoke children (supervision tree-walk + RELEASE üzenetek)
+
+    3. reply MsgCstOpResult(success / error_code)
+```
+
+A **cascade revoke** szemantika a klasszikus actor supervision tree-t követi: ha egy parent-et revoke-olunk, a children CST-jét is törölni kell. A Seal Core firmware végigjárja a supervision tree-t, és minden érintett célcore-nak külön RELEASE_CST_ENTRY üzenetet küld — minden egyes érintett core **QGate**-je hajtja végre a saját QSRAM-jában. A sweep maga firmware-vezérelt (nem egyetlen HW broadcast), de a végrehajtás a célcore-okban kizárólag HW (QGate).
+
+### Miért nem a Seal Core firmware tartalmazza a policy-t
+
+A Seal Core firmware **mask ROM-ban / eFuse-ban** él, és nem frissíthető a chip élete során. Ha a delegation policy itt lenne:
+
+- Az OS struktúra változásai (új aktor-típusok, új capability-osztályok) **chip re-tape-out** árán lennének követhetők
+- A microkernel filozófia sérülne: a Seal Core "értené" a magas-szintű OS fogalmakat, nem csak a HW mechanizmust
+- Egy bug a policy-ban nem javítható szoftveres update-tel
+
+Ezért a Seal Core firmware-e **csak a mechanizmust** implementálja (CST írás, kérelem-validáció ellenőrzött szabályok szerint), és a magas-szintű döntéseket (ki kapjon mit, mikor, miért) az OS root aktor hozza meg. Az OS root aktor **frissíthető** (új AuthCode-verifikált bináris egy új OS verzióhoz), így a policy evolúciója sosem igényel új szilíciumot.
+
+### Threat model — mit zár ki
+
+| Támadás | Védelem |
+|---------|---------|
+| Rosszindulatú aktor próbál közvetlenül a saját core CST QSRAM-jába írni | A CST QSRAM-ot csak a core **QGate**-je írhatja (write-port szigorúan FSM-vezérelt). Az aktor SW-jének nincs címterhez illeszkedő utasítása a CST QSRAM-ra. |
+| Rosszindulatú aktor a célcore-nak hamis `SEAL_CST_INSTALL` üzenetet próbál küldeni | **Fizikailag nem lehetséges.** A küldéshez szükség van CST entry-re a `(target_core, 0)` célhoz, és a QGate-célt csak Seal Core / authority delegate adhat capability-ként. A nem-authority aktornak nincs CST entry-je → a saját core HW-ja küldéskor elutasítja. A QGate-hez csak authority-tól érkezhet üzenet. |
+| Aktor hamis `src_actor` mezővel kér capability-t | A küldő core HW tölti a `src_actor` mezőt context regiszterből, nem hamisítható (lásd `cell-format-hu.md` v2.2 3. döntés). |
+| Bit-flip / SEU a NoC tranzit során | CRC-8 (header) és CRC-16 (payload) — a QGate silent drop-pal kezeli. |
+| Rosszindulatú aktor szülőként ad capability-t nem-gyermeknek | A Seal Core firmware ellenőrzi a `supervisor_link[target] == src` invariánst minden delegálásnál (a saját firmware-belső supervisor tree alapján). |
+| Aktor próbál önmagának capability-t adni | Az aktor saját `src_actor`-ja nem lehet egyidejűleg a kérelem `parent` mezője és a `target` is — a Seal Core firmware kizárja. |
+| Az OS root aktor kompromittálódik | Threat model-en kívül: az OS root aktor AuthCode-verifikált, és a Seal Core mechanizmusként továbbra is érvényesíti a strukturális invariánsokat. A teljes rendszer-takeover egy AuthCode-verified rosszindulatú OS-t igényelne. |
+
 ## Többszörözés és graceful degradation <a name="redundancia"></a>
 
 A CFPU chip típusától és méretétől függően **1-64+ Seal Core** lehet jelen. A többszörözés célja:
@@ -497,5 +715,9 @@ Ez a v1.0 doksi a vízió-szintű architektúrát rögzíti. A részletek a megf
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.5 | 2026-05-02 | **QGate single-layer trust elv — drasztikus egyszerűsítés.** A v1.4-es QGate spec redundáns logikai validációt tartalmazott (`src` authority komparátor, payload range check, op-validitás, trap-flit) — ezek **CFPU single-layer trust elv** szerint feleslegesek: a CST router-szintű filter már garantálja, hogy csak authority küldhet a QGate-nek, és a Seal Core firmware immutable (mask ROM), ezért definíció szerint korrekt. A QGate v1.5-ben **kizárólag CRC-8 + CRC-16 ellenőrzést végez**; CRC mismatch → silent drop. Becsült terület 500–2000 gate → **600–800 gate**. Új alszekció: "Miért nincs logikai validáció — CFPU single-layer trust elv". Threat model frissítve: a "rosszindulatú aktor hamis SEAL_CST_INSTALL üzenete" sor **nem reális fenyegetés** (CST router-szinten kizárt), helyette "bit-flip / SEU NoC tranzit" sor (CRC fogja). Konzisztens a header v3.0 HMAC-törlés indoklásával. |
+| 1.4 | 2026-05-02 | **QGate brand-név bevezetve** a per-core lokális Quench-RAM kapuőr FSM-re. Korábban "lokális SEAL FSM" / "célcore lokális SEAL FSM" / "MailBox SEAL trigger" néven futott — ezek mind ugyanazt a komponenst jelölik, és most egységesen **QGate**. A brand-családi diagram (3. szekció) bővült új sorral, az új ["A QGate komponens"](#seal-points) alszekció a komponens tulajdonságait rögzíti (1 / core, ~500–2000 gate, NoC inbox bemenet, CST QSRAM + DDR5 cap-slot QRAM kimenet). A QGate brand-pozíciója: per-core kapuőr a **Quench-RAM** alapú capability tábláknál, szemben a Seal Core globális AuthCode-gatekeeper szerepével. Hivatkozások végig átvezetve. |
+| 1.3 | 2026-05-02 | **"A három SEAL érintési pont" szekció hozzáadva** (1. CODE régió SEAL — lokális Seal Core HW; 2. per-core CST/cap slot SEAL/RELEASE — NoC mailbox + célcore lokális SEAL FSM; 3. single-instance peripheria config — hardwired config port). **Korrigálva a v1.1–v1.2 hibás megfogalmazás:** korábban a per-core CST írást "dedikált hardwired config porton"-ként írtuk le; ez **HIBÁS**, mert a CST QSRAM per core él, és NoC mailbox üzenettel + célcore lokális SEAL FSM-mel íródik. A hardwired config port csak a single-instance peripheriához (DDR5 Controller stb.) tartozik. Boot 2e. lépés és validációs algoritmus átírva NoC mailbox-os szemantikára (`SEAL_CST_INSTALL`, `SEAL_CST_UPDATE`, `RELEASE_CST_ENTRY` üzenetek). Threat model frissítve: a védelem a célcore lokális SEAL FSM `src` mező ellenőrzéséből jön, nem hardwired vezeték hiányából. |
+| 1.2 | 2026-05-02 | **"Authority delegáció — runtime CST policy" szekció hozzáadva.** A Seal Core mint mechanizmus (HW config port írás + kérelem-validáció) és az OS root aktor mint runtime policy szétválasztva. Boot-időben a Seal Core egyetlen GRANT_ALL CST entry-t ír az OS root aktornak; a runtime CST-műveleteket (spawn / delegate / revoke) az OS root aktor (vagy delegáltja) üzenetekkel kéri, a Seal Core firmware a supervisor link és a kérelmező saját CST capability-je alapján validálja. A konkrét üzenet-opcode-ok F4-F5 RTL döntésnek hagyva (CIL-Seal ISA). |
 | 1.1 | 2026-04-28 | **DDR5 capability slot kezelés és CST írás hozzáadva** a Seal Core feladataihoz. A `ddr5-architecture-hu.md` v1.3 HW Capability Slot modellje szerint a Seal Core dedikált hardwired config porton SEAL/RELEASE-eli a per-core 8 KB capability slot táblát (256 actor × 4 slot × 8 byte). A NoC oldali CST (Capability Slot Table, `interconnect-hu.md` v3.0) is hasonlóan hardwired porton íródik. |
 | 1.0 | 2026-04-16 | Kezdeti vízió-szintű kiadás. A Seal Core két különálló mechanizmusként: (1) pre-QRAM érában fizikai WE-pin routing a CODE RAM chipre; (2) QRAM érában AuthCode verifikációs gatekeeper a SEAL HW-trigger forrással. Explicit szeparáció a két érá között, nincs cross-contamination. Ring és 2D mesh failover topológiák, graceful degradation. Firmware immutability mask ROM / eFuse alapon. |

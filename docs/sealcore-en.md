@@ -2,7 +2,7 @@
 
 > Magyar verzió: [sealcore-hu.md](sealcore-hu.md)
 
-> Version: 1.1
+> Version: 1.5
 
 This document describes the **Seal Core** component: a dedicated, simple, hardware-burned-firmware core that ensures **code-loading authenticity** on the CFPU chip. The Seal Core operates via two distinct mechanisms depending on CFPU phase — **pre-QRAM era** (F3-F5) through physical WE-pin routing, **QRAM era** (F5+) as an AuthCode verification gatekeeper. These are **two distinct mechanisms**, which this document treats in deliberately separated sections.
 
@@ -14,17 +14,19 @@ This document describes the **Seal Core** component: a dedicated, simple, hardwa
 2. [What is the Seal Core](#what-is-sealcore)
 3. [Role in the CFPU brand family](#brand)
 4. [General architecture](#architecture)
-5. [Seal Core in the pre-QRAM era (F3-F5)](#preqram)
-6. [Seal Core in the QRAM era (F5+)](#qram)
-7. [The transition point](#transition)
-8. [Boot and firmware immutability](#boot)
-9. [Redundancy and graceful degradation](#redundancy)
-10. [Accelerator functions](#accelerators)
-11. [Security guarantees](#security)
-12. [Open questions](#open)
-13. [Phase introduction](#phases)
-14. [References](#references)
-15. [Changelog](#changelog)
+5. [The three SEAL touchpoints](#seal-points)
+6. [Seal Core in the pre-QRAM era (F3-F5)](#preqram)
+7. [Seal Core in the QRAM era (F5+)](#qram)
+8. [The transition point](#transition)
+9. [Boot and firmware immutability](#boot)
+10. [Authority delegation — runtime CST policy](#authority)
+11. [Redundancy and graceful degradation](#redundancy)
+12. [Accelerator functions](#accelerators)
+13. [Security guarantees](#security)
+14. [Open questions](#open)
+15. [Phase introduction](#phases)
+16. [References](#references)
+17. [Changelog](#changelog)
 
 ## Motivation <a name="motivation"></a>
 
@@ -59,8 +61,10 @@ The Seal Core **does not run application code**. Its firmware is hardware-burned
 - **AuthCode verification** — signature checking of incoming `.acode` containers (see `docs/authcode-en.md`)
 - **Code-loader duties** — writing verified bytecode into the CODE region
 - **Heartbeat signal** to a central health monitor (for redundancy)
-- **DDR5 capability slot management** — SEAL/RELEASE per-core capability slots based on `kernel_io_sup` policy (see `ddr5-architecture-hu.md` v1.3, "5.e) HW Capability Slot")
-- **CST (Capability Slot Table) writes** — write the NoC actor-to-actor capability table via a dedicated hardwired config port (see `interconnect-en.md` v3.0, `quench-ram-en.md`)
+- **DDR5 capability slot management** — SEAL/RELEASE per-core capability slots via NoC mailbox messages handled by the target core's **QGate**, based on `kernel_io_sup` policy (see `ddr5-architecture-hu.md` v1.3, "5.e) HW Capability Slot")
+- **CST (Capability Slot Table) management** — SEAL/RELEASE of the NoC actor-to-actor capability table likewise via NoC mailbox messages handled by the target core's **QGate** (see `interconnect-en.md` v3.0, `quench-ram-en.md`)
+- **Single-instance peripheral config** — the **whole-peripheral** configuration of the DDR5 Controller, QSPI Controller, etc. via a **dedicated hardwired config port** (1 destination, see `ddr5-architecture-hu.md` v1.3 line 85-86) — **not** a QGate, since the peripheral is not a core
+- **Authority delegation gatekeeper** — at boot time the Seal Core writes a GRANT_ALL CST entry to the OS root actor; at runtime it validates spawn / revoke / delegate requests originating from the OS root actor (or its delegates) against the supervisor link and the requester's own CST capability, then sends a NoC mailbox message to the target core's **QGate**. Details: ["Authority delegation — runtime CST policy"](#authority) and ["The three SEAL touchpoints"](#seal-points).
 
 ## Role in the CFPU brand family <a name="brand"></a>
 
@@ -71,17 +75,28 @@ The Seal Core fits into the family of complementary CFPU security mechanisms:
                │           CFPU security family            │
                └───────────────────────────────────────────┘
                                     │
-       ┌────────────────┬───────────┼───────────┬───────────────┐
-       │                │           │           │               │
-  [Quench-RAM]    [AuthCode]   [CodeLock]   [Seal Core]   [Symphact
-   memory cell     code sign.   runtime W⊕X   gatekeeper    HSM Card]
-                                              core          crypto + signing
+   ┌──────────────┬──────────┬──────────┬──────────────┬──────────┬──────────────┐
+   │              │          │          │              │          │              │
+[Quench-RAM] [AuthCode] [CodeLock] [Seal Core]    [QGate]   [Symphact
+ memory       code        runtime    chip-wide      per-core    HSM Card]
+ cell         signing     W⊕X        gatekeeper     Quench-RAM  crypto +
+                                     core           gate        signing
 ```
+
+| Component | Scope | Role |
+|-----------|-------|------|
+| **Quench-RAM** | per-bit | Memory cell, status-bit-based immutability |
+| **AuthCode** | per-binary | CIL code signature verification (LMS+WOTS+) |
+| **CodeLock** | per-region | Runtime W⊕X (pre-QRAM: WE-pin routing) |
+| **Seal Core** | chip-wide | Global gatekeeper, AuthCode flow, capability authority root |
+| **QGate** | **per-core** | **Local Quench-RAM gate — the only write path to the core's CST QSRAM / DDR5 cap-slot QRAM; activated by NoC mailbox SEAL/RELEASE messages** |
+| **Symphact HSM Card** | system-wide | External key management, signing |
 
 The Seal Core is the **physical component** that **practically activates** the other mechanisms:
 - The **AuthCode** verification flow runs here
 - The **CodeLock** W⊕X enforcement (in pre-QRAM era) originates from WE-pin routing here
 - The **Quench-RAM** CODE-region SEAL HW trigger is invoked here
+- The per-core **QGate**s are driven via NoC mailbox messages (CST/cap-slot SEAL/RELEASE)
 
 ## General architecture <a name="architecture"></a>
 
@@ -118,6 +133,100 @@ Seal Core internal components (identical across phases):
 ```
 
 The **"Output interface"** is the only part that **materially changes** between phases — everything else (firmware, SRAM, SHA-256 HW, verifiers) is identical across phases.
+
+## The three SEAL touchpoints <a name="seal-points"></a>
+
+The Seal Core drives **three distinct SEAL/RELEASE event types**, each running on **a different channel and a different executor**. Their explicit separation matters because earlier doc versions (sealcore-en v1.1–v1.2) conflated the term "hardwired config port" — that applies only to event types 1 and 3, **not** to type 2.
+
+> **Brand-name introduction (v1.4):** the executor of event type 2 — the per-core local SEAL/RELEASE FSM — is hereafter called **QGate** (Quench-RAM Gate). This is a new member of the CFPU security brand family; see ["Role in the CFPU brand family"](#brand) for its position.
+
+| # | Event | Authority | Channel | Executor | Speed |
+|---|-------|-----------|---------|----------|-------|
+| 1. | **CODE region SEAL** (boot / hot-load) | Seal Core | Local (in the Seal Core's own address space — write port + SEAL trigger) | Seal Core HW FSM | Slow path (once per code load) |
+| 2. | **Capability slot SEAL/RELEASE** (per-core CST, per-core DDR5 cap slot) | Seal Core / supervisor actor | **NoC mailbox** message to the target core | **QGate** (per-core local Quench-RAM gate FSM) | Fast path (frequent, runtime) |
+| 3. | **Single-instance peripheral config** (DDR5 Controller, QSPI Controller, etc.) | Seal Core / `root_supervisor` | **Hardwired config port** (1 source → 1 destination, key-less, enable-only) | Peripheral HW | Slow path (config-only, rare) |
+
+### Why no hardwired config port for CST/capability-slot writes?
+
+The per-core CST and per-core DDR5 capability slot table **physically live in the target core's QSRAM** (see `ddr5-architecture-hu.md` v1.3 §2.b, "Storage: per core, in QRAM"). There is no central capability table. If we wrote these via a global hardwired config bus:
+
+- ~10,000 cores × n_slots × m_bit-wide wires = **physically infeasible** routing
+- Every core would need its own config port to the Seal Core → enormous area + power
+- The shared-nothing chip principle would be violated (central data path)
+
+Instead, per-core SEAL/RELEASE travels as a **NoC mailbox message**: the sender (Seal Core or supervisor actor) sends a SEAL command to `dst=(target_core, 0)`, and the target core's **QGate** writes its own QSRAM. This:
+
+- **Scales** on the existing NoC; no new wires required
+- **HW-attested** — the QGate checks that the `(src, src_actor)` pair is the Seal Core's hardwired address or a delegated supervisor (see `interconnect-en.md` v3.0, header v3.1)
+- **Local execution** — the QGate has exclusive write access to its own CST/cap-slot QSRAM; no other core has a wire to that QSRAM
+
+### The QGate component
+
+The **QGate** (Quench-RAM Gate) is a **per-core HW state machine** with a single function: CRC-gating the write port to the core's own Quench-RAM-based capability tables (CST QSRAM, DDR5 cap-slot QRAM). For QGate's brand-family position, see section 3 ["Role in the CFPU brand family"](#brand).
+
+```
+┌──────────────────────────── core_i ───────────────────────────┐
+│                                                                │
+│   NoC inbox ──► [QGate] ──► CST QSRAM (per-actor capability)  │
+│                  │     └──► DDR5 cap-slot QRAM (per-actor)    │
+│                  │                                             │
+│                  ├─ CRC-8 header check                         │
+│                  ├─ CRC-16 payload check                       │
+│                  └─ op decode (SEAL_INSTALL / UPDATE / RELEASE)│
+│                  │                                             │
+│                  └─ on CRC fail → silent drop                  │
+│                                                                │
+│   core SW ────────X─► (NO path to write the QSRAM)            │
+└────────────────────────────────────────────────────────────────┘
+```
+
+| Property | Value |
+|----------|-------|
+| Instances | **1 / core** (present on Nano, Actor, Rich) |
+| Internal state | minimal (FSM state + CRC checker shift register) |
+| Input | NoC inbox dedicated port (only SEAL/RELEASE message types) |
+| Output | CST QSRAM write port, DDR5 cap-slot QRAM write port |
+| Validation | **CRC-8 (header) + CRC-16 (payload) only** — no logical validation |
+| Drop condition | CRC mismatch → silent drop, counter increment |
+| Estimated area (5nm) | **~600–800 gates / core** (CRC-8 ~200 + CRC-16 ~400 + write-mux + FSM ~150) |
+
+### Why no logical validation — CFPU single-layer trust principle
+
+The QGate **does not check** anything along the following dimensions:
+
+- ❌ `src` field authority comparator (eFuse address vs. supervisor capability)
+- ❌ Payload range check (`target_actor` ∈ [0..255], `perms` valid mask)
+- ❌ Op validity (valid opcode value)
+- ❌ Supervisor link well-formedness
+
+**This is deliberate design, not an oversight.** The CFPU single-layer trust principle states:
+
+> Trust the immutable + HW-managed source; defend only against physical errors.
+
+Messages reaching the QGate always originate from the Seal Core firmware (or a delegated supervisor actor) — no other actor can send, because the CST router-level filter screens them out (a non-authority actor has no capability for the QGate target in its own CST entry). Therefore:
+
+- The sender is **authority by construction** (the CST guarantees it)
+- The Seal Core firmware is **immutable** (mask ROM / eFuse) → it does not send malformed payloads
+- The only realistic failure mode: **physical bit-flip during NoC transit** (SEU, cosmic radiation)
+- For this, **CRC-8 (header) and CRC-16 (payload) are sufficient**
+
+Adding logical validation would be **defense-in-depth rhetoric** — the opposite of the principle that:
+- Removed the HMAC field from header v3.0 (`interconnect-en.md` v3.0): "the CST is HW-managed, software cannot manipulate it"
+- The sending core's HW resolves the CST index → not actor SW
+
+Same applies here: if the Seal Core firmware has a logical bug (sends the wrong `target_actor`), that is **out of threat model**. There is no threat model in which immutable mask ROM runs faulty code — if it did, we would have far worse problems.
+
+**Consequence:** the QGate is essentially a **CRC-gated write port**, nothing more. This is the minimal HW that guarantees Quench-RAM SEAL/RELEASE semantics on the NoC mailbox channel.
+
+### Why a hardwired config port for single-instance peripherals?
+
+The DDR5 Controller, QSPI Controller, etc. are **single-instance** components on the chip — their config (PHY parameters, bank policy, etc.) likewise lives in one place. Here:
+
+- The "1 source → 1 destination" topology is trivial (a single wire from the Seal Core)
+- Config happens at boot; runtime modifications are rare
+- The NoC mailbox would be overkill for such a low-frequency config channel
+
+Therefore single-instance peripheral config runs on a **hardwired, key-less, enable-only** port from the Seal Core (see `ddr5-architecture-hu.md` v1.3 line 85-86). This is **not** the same mechanism as per-core CST/cap-slot SEAL/RELEASE.
 
 ## Seal Core in the pre-QRAM era (F3-F5) <a name="preqram"></a>
 
@@ -338,6 +447,115 @@ The Seal Core's own code **cannot be loaded as a signed binary** — that would 
 6. Parent supervisor notification: "Seal Core active"
 ```
 
+## Authority delegation — runtime CST policy <a name="authority"></a>
+
+This section captures **how responsibility is split** between the Seal Core (HW mechanism) and the OS root actor (runtime policy) for CST table writes and actor-level capability delegation. The model follows the [`feedback_mechanism_separation`](../docs/architecture-en.md) principle: **the Seal Core firmware does not understand OS structure** — the Seal Core is only a check-and-write mechanism, while the actual policy lies with the OS root actor.
+
+### Core principle
+
+> A per-core CST is writable **exclusively** by that core's **QGate**, and the QGate only ever receives messages from authority sources — guaranteed by the CST router-level filter: capability for the QGate target is grantable only by the Seal Core / delegated supervisor, so a non-authority actor's send is rejected at its own core HW. The QGate itself **only checks CRC** (single-layer trust principle, see ["The QGate component"](#seal-points) section v1.5). No other core **has a wire** to the target core's CST QSRAM. This is physically enforced, not software-configurable. See: ["The three SEAL touchpoints"](#seal-points) — per-core CST is event type 2 (NoC mailbox + QGate), not type 3 (hardwired config port).
+
+The Seal Core firmware, however, **does not decide on its own** who deserves which capability. Post-boot runtime CST changes are **requested by the OS root actor** via messages — the Seal Core firmware policy only validates the **authenticity** and **consistency** of those requests. This is a classic mechanism / policy separation (microkernel philosophy).
+
+### Boot-time delegation — initial GRANT_ALL
+
+At the end of step 2 in `hw-boot-en.md`, before the Rich core reset is released:
+
+```
+1. Seal Core verifies the OS root binary (LMS+WOTS+ signature)
+2. Seal Core sends a NoC mailbox message to the Rich core's QGate:
+     dst   = (Rich_core, 0)    ← Rich core QGate mailbox address
+     src   = (Seal_core, 0)    ← Seal Core hardwired HW address (HW-attested)
+     op    = SEAL_CST_INSTALL
+     entry = (target_actor=1, perms=GRANT_ALL, supervisor=(Seal_core, 0))
+3. Rich core QGate verifies CRC-8 + CRC-16, and (if OK) writes its own CST QSRAM:
+     CST[1] = (perms=GRANT_ALL, supervisor=(Seal_core, 0))
+4. Seal Core signals the Rich core: 0xF0002024 ← 1 (verified + go)
+5. Rich core starts; the OS root actor (actor_id=1) takes on the runtime authority role
+```
+
+The QGate **does not check** the `src` field — that has already been screened by the CST router-level filter at send time (every core has capability for the Seal Core's hardwired address; non-authority actors have none for the QGate target). The QGate only verifies CRC-8 + CRC-16, and on OK, writes the CST. See: ["The QGate component"](#seal-points) "Why no logical validation" subsection.
+
+The post-boot CST table thus starts with a **single** entry: the OS root actor sees everything and may delegate everything. From there, CFPU runtime policy is the **OS root actor's responsibility**, not the Seal Core firmware's.
+
+### Runtime delegation — message API
+
+> **Clarification — NoC-attested, not cryptographically signed:** the CFPU does **not use HMAC or digital signatures at the message level** (see `interconnect-en.md` v3.0: the HMAC field was REMOVED in header v3.0). Authority-command authenticity is provided **exclusively by HW-attributed origin**: the `src_actor[8]` field in the header is filled by the sending core's HW context register (not forgeable), and the `src[24]` field is filled by the NoC router HW from the sender's physical position. The CRC-16 / CRC-8 fields serve **integrity only**, **not authentication**. The operations below are therefore **NoC-attested authority commands**, not signed messages.
+
+The OS root actor (or a delegate holding appropriate capability) sends a message to the Seal Core (`(Seal_core, 0)` address) to request a CST operation. Functionally, the message types are:
+
+| Operation | Request payload | Seal Core check |
+|-----------|-----------------|-----------------|
+| **Spawn** — create new actor | `target_core, code_hash, parent, perms` | (a) `parent == src_actor` (requester is the to-be parent), (b) `perms ⊆ requester's CST entry`, (c) `code_hash` AuthCode-verified |
+| **Delegate** — grant capability to existing actor | `target_actor, perms_subset` | (a) `target_actor`'s parent is the requester (supervisor link), (b) `perms_subset ⊆ requester's delegate rights` |
+| **Revoke** — revoke capability | `target_actor` | (a) `target_actor`'s parent is the requester, or the requester is the OS root actor |
+
+The concrete message opcodes and payload formats are an **F4-F5 RTL decision** — to be defined by the `CIL-Seal ISA` (see [Open questions](#open) #1).
+
+The requester's identity is **not forgeable**: in header v3.1, the `src_actor` field originates from the core HW context register (see `specs/cell-format-en.md` v2.2, "Decision 3"), and the `src` field is filled by the NoC router HW from the physical origin. The Seal Core firmware compares this (HW-attested) `(src, src_actor)` pair against the request's `parent` / `target_actor` fields — **no crypto, only HW-attributed origin**.
+
+### Validation algorithm (Seal Core firmware)
+
+```
+on_request(MsgCstOp from src):
+    1. lookup CST[src_core, src_actor] → caller_perms, caller_supervisor
+       (if no entry → REJECT, src is not an active actor)
+
+    2. switch(op):
+         case Spawn:
+             if request.parent != src                    → REJECT
+             if request.perms ⊄ caller_perms             → REJECT
+             if AuthCodeVerify(request.code_hash) fails  → REJECT
+             allocate target_actor on target_core
+             send NoC mailbox: SEAL_CST_INSTALL →
+                  dst=(target_core, 0),
+                  payload=(target_actor, request.perms, supervisor=src)
+             # target core QGate:
+             #   verifies CRC-8 + CRC-16
+             #   writes: CST[target_actor] = (perms, supervisor=src)
+
+         case Delegate:
+             if supervisor_link[request.target] != src   → REJECT
+             if request.perms_subset ⊄ caller_perms      → REJECT
+             send NoC mailbox: SEAL_CST_UPDATE →
+                  dst=(target.core, 0),
+                  payload=(target.actor, perms_or=request.perms_subset)
+
+         case Revoke:
+             if supervisor_link[request.target] != src
+                AND src != OS_root_actor                 → REJECT
+             send NoC mailbox: RELEASE_CST_ENTRY →
+                  dst=(target.core, 0),
+                  payload=(target.actor)
+             cascade revoke children (supervision tree-walk + RELEASE messages)
+
+    3. reply MsgCstOpResult(success / error_code)
+```
+
+The **cascade revoke** semantics follow the classic actor supervision tree: revoking a parent must clear children's CST entries as well. The Seal Core firmware walks the supervision tree and sends a separate RELEASE_CST_ENTRY message to each affected target core — each target core's **QGate** performs the write in its own QSRAM. The sweep itself is firmware-driven (not a single HW broadcast), but execution at the target cores is HW-only (QGate).
+
+### Why the Seal Core firmware does not contain the policy
+
+The Seal Core firmware lives in **mask ROM / eFuse** and is not updatable across the chip's lifetime. If the delegation policy lived here:
+
+- OS structural changes (new actor types, new capability classes) would require **chip re-tape-out** to track
+- The microkernel philosophy would be violated: the Seal Core would "understand" high-level OS concepts, not just the HW mechanism
+- A policy bug would be unfixable via software update
+
+Therefore, the Seal Core firmware implements **only the mechanism** (CST write, request validation per fixed rules), and high-level decisions (who gets what, when, why) are made by the OS root actor. The OS root actor is **updatable** (a new AuthCode-verified binary for a new OS version), so policy evolution never requires new silicon.
+
+### Threat model — what is excluded
+
+| Attack | Defense |
+|--------|---------|
+| Malicious actor tries to write its own core's CST QSRAM directly | The CST QSRAM is writable only by the core's **QGate** (write-port strictly FSM-controlled). The actor's SW has no instruction in its address space targeting the CST QSRAM. |
+| Malicious actor tries to send a forged `SEAL_CST_INSTALL` to a target core | **Physically impossible.** Sending requires a CST entry for the `(target_core, 0)` destination, and capability for the QGate target is grantable only by the Seal Core / authority delegate. A non-authority actor has no CST entry → its own core HW rejects the send. The QGate only ever receives messages from authority sources. |
+| Actor sends a forged `src_actor` field to request capability | The sending core's HW fills the `src_actor` field from a context register; not forgeable (see `cell-format-en.md` v2.2 Decision 3). |
+| Bit-flip / SEU during NoC transit | CRC-8 (header) and CRC-16 (payload) — the QGate handles via silent drop. |
+| Malicious actor delegates capability as a parent to a non-child | The Seal Core firmware validates the `supervisor_link[target] == src` invariant at every delegation (against its firmware-internal supervisor tree). |
+| Actor tries to grant capability to itself | The actor's own `src_actor` cannot simultaneously be the request's `parent` and `target` — the Seal Core firmware excludes this. |
+| OS root actor is compromised | Out of threat model: the OS root actor is AuthCode-verified, and the Seal Core mechanism still enforces structural invariants. A full system takeover would require an AuthCode-verified malicious OS. |
+
 ## Redundancy and graceful degradation <a name="redundancy"></a>
 
 Depending on CFPU chip type and size, **1-64+ Seal Cores** may be present. Redundancy goals:
@@ -497,5 +715,9 @@ This v1.0 document captures the vision-level architecture. Details are to be res
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5 | 2026-05-02 | **QGate single-layer trust principle — drastic simplification.** The v1.4 QGate spec carried redundant logical validation (`src` authority comparator, payload range check, op validity, trap-flit) — these are unnecessary under the **CFPU single-layer trust principle**: the CST router-level filter already guarantees that only authority can send to the QGate, and the Seal Core firmware is immutable (mask ROM), hence correct by construction. The QGate v1.5 performs **only CRC-8 + CRC-16 checks**; CRC mismatch → silent drop. Estimated area 500–2000 → **600–800 gates**. New subsection: "Why no logical validation — CFPU single-layer trust principle". Threat model updated: the "malicious actor sends a forged SEAL_CST_INSTALL" row is **not a realistic threat** (excluded at CST router level); replaced with "bit-flip / SEU during NoC transit" (CRC handles). Consistent with the header v3.0 HMAC-removal rationale. |
+| 1.4 | 2026-05-02 | **QGate brand name introduced** for the per-core local Quench-RAM gate FSM. Previously called "local SEAL FSM" / "target core's local SEAL FSM" / "MailBox SEAL trigger" — these all refer to the same component, now uniformly **QGate**. The brand-family diagram (section 3) gained a new row, and the new ["The QGate component"](#seal-points) subsection records component properties (1 / core, ~500–2000 gates, NoC inbox input, CST QSRAM + DDR5 cap-slot QRAM output). QGate's brand position: per-core gate at **Quench-RAM**-based capability tables, complementing the Seal Core's chip-wide AuthCode-gatekeeper role. References propagated throughout. |
+| 1.3 | 2026-05-02 | **"The three SEAL touchpoints" section added** (1. CODE region SEAL — local Seal Core HW; 2. per-core CST/cap-slot SEAL/RELEASE — NoC mailbox + target core's local SEAL FSM; 3. single-instance peripheral config — hardwired config port). **Corrected v1.1–v1.2 misformulation:** earlier we described per-core CST writes as happening "via a dedicated hardwired config port"; this is **WRONG**, because the CST QSRAM lives per-core and is written via NoC mailbox messages handled by the target core's local SEAL FSM. The hardwired config port belongs only to single-instance peripherals (DDR5 Controller, etc.). Boot step 2e and the validation algorithm rewritten with NoC mailbox semantics (`SEAL_CST_INSTALL`, `SEAL_CST_UPDATE`, `RELEASE_CST_ENTRY` messages). Threat model updated: protection comes from the target core's local SEAL FSM `src` field check, not from the absence of a hardwired wire. |
+| 1.2 | 2026-05-02 | **"Authority delegation — runtime CST policy" section added.** The Seal Core as mechanism (HW config port write + request validation) is split from the OS root actor as runtime policy. At boot, the Seal Core writes a single GRANT_ALL CST entry to the OS root actor; runtime CST operations (spawn / delegate / revoke) are requested by the OS root actor (or its delegate) via messages, validated by the Seal Core firmware against the supervisor link and the requester's own CST capability. Concrete message opcodes left as F4-F5 RTL decision (CIL-Seal ISA). |
 | 1.1 | 2026-04-28 | **DDR5 capability slot management and CST writes added** to Seal Core duties. Per the `ddr5-architecture-hu.md` v1.3 HW Capability Slot model, the Seal Core SEAL/RELEASE-s the per-core 8 KB capability slot table (256 actors × 4 slots × 8 bytes) via a dedicated hardwired config port. The NoC-side CST (Capability Slot Table, `interconnect-en.md` v3.0) is similarly written via a hardwired port. |
 | 1.0 | 2026-04-16 | Initial vision-level release. Seal Core as two distinct mechanisms: (1) pre-QRAM era physical WE pin routing to the CODE RAM chip; (2) QRAM era AuthCode verification gatekeeper acting as SEAL HW-trigger source. Explicit separation between eras, no cross-contamination. Ring and 2D mesh failover topologies, graceful degradation. Firmware immutability via mask ROM / eFuse. |
