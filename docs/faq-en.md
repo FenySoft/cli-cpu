@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CLI-CPU -- Frequently Asked Questions (FAQ)
 
 > Magyar verzio: [faq-hu.md](faq-hu.md)

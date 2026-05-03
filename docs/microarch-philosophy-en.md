@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Microarchitecture Philosophy
 
 > Magyar verzió: [microarch-philosophy-hu.md](microarch-philosophy-hu.md)

@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Seal Core — The CFPU Authentication Gatekeeper Core
 
 > Magyar verzió: [sealcore-hu.md](sealcore-hu.md)

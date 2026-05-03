@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # NLnet Submission — Public Record
 
 > **Public metadata only.** Personal data (contact details, phone, email) and the full submission confirmation are archived privately in a GDPR-controlled location and are **not** included in this public repository.

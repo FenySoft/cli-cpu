@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Internal Bus Sizing
 
 > Magyar verzió: [internal-bus-hu.md](internal-bus-hu.md)

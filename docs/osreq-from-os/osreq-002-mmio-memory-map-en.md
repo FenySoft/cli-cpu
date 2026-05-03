@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-002: MMIO memory map — OS↔HW register interface
 
 > **Source:** [FenySoft/Symphact — osreq-002](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-en.md)

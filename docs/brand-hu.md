@@ -1,3 +1,7 @@
+---
+status: policy
+---
+
 # Brand- és elnevezési útmutató — Cognitive Fabric, CFPU, CLI-CPU
 
 > English version: [brand-en.md](brand-en.md)

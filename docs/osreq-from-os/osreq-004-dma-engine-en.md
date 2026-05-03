@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-004: DMA engine — non-blocking persistence support
 
 > **Source:** [FenySoft/Symphact — osreq-004](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-en.md)

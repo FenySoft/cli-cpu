@@ -1,3 +1,7 @@
+---
+status: living
+---
+
 # CLI-CPU — Roadmap
 
 > English version: [roadmap-en.md](roadmap-en.md)

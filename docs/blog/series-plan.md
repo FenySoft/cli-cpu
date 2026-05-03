@@ -1,3 +1,7 @@
+---
+status: policy
+---
+
 # CLI-CPU Blog Series Plan
 
 > Internal planning document — not published on the website.

@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Core Family
 
 > Magyar verzió: [core-types-hu.md](core-types-hu.md)

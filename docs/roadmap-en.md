@@ -1,3 +1,7 @@
+---
+status: living
+---
+
 # CLI-CPU — Roadmap
 
 > Magyar verzió: [roadmap-hu.md](roadmap-hu.md)

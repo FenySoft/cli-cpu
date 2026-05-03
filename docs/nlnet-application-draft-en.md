@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # NLnet NGI Zero Commons Fund — Application Draft
 
 > **Deadline:** June 1, 2026, 12:00 CEST

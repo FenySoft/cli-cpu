@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CLI-CPU — Gyakori Kérdések (FAQ)
 
 > English version: [faq-en.md](faq-en.md)

@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Chiplet Packaging Architecture
 
 > Magyar verzió: [chiplet-packaging-hu.md](chiplet-packaging-hu.md)

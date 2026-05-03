@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU — HW Attack Immunity Reference
 
 > English version: [hw-attack-immunity-en.md](hw-attack-immunity-en.md)

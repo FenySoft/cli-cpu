@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Cognitive Fabric Processing Unit (CFPU) — Architektúra Áttekintés
 
 > English version: [architecture-en.md](architecture-en.md)

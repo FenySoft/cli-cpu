@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # NLnet Beadás — Nyilvános rekord
 
 > **Csak nyilvánosan vállalható metaadat.** A személyes adatok (kontakt, telefon, email) és a teljes beadási visszaigazolás GDPR-kontrollált privát helyen van archiválva, és **nincs** benne ebben a nyilvános repóban.

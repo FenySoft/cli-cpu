@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Mikroarchitektúra Filozófia
 
 > English version: [microarch-philosophy-en.md](microarch-philosophy-en.md)

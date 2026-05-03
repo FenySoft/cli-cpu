@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Interconnect Architektúra
 
 > English version: [interconnect-en.md](interconnect-en.md)

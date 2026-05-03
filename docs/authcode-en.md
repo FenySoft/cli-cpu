@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # AuthCode + CodeLock — Authenticated Code Loading and Hardware-Enforced W⊕X
 
 > Magyar verzió: [authcode-hu.md](authcode-hu.md)

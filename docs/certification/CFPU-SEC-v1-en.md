@@ -1,3 +1,7 @@
+---
+status: draft
+---
+
 # CFPU-SEC-v1 -- Mandatory Security Elements Specification
 
 > Version: 1.0 | Date: 2026-04-17

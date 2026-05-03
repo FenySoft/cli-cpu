@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU — Biztonsági Modell és Threat Analízis
 
 > English version: [security-en.md](security-en.md)

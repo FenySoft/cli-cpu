@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Chiplet Packaging Architektúra
 
 > English version: [chiplet-packaging-en.md](chiplet-packaging-en.md)

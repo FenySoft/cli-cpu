@@ -1,3 +1,7 @@
+---
+status: policy
+---
+
 # CLI-CPU Blog sorozat terv
 
 > Belső tervező dokumentum — nem publikált a weboldalon.

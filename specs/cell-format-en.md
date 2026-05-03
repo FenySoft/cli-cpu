@@ -2,7 +2,7 @@
 
 > Magyar verzió: [cell-format-hu.md](cell-format-hu.md)
 
-> Version: 2.2
+> Version: 2.3
 
 > Source: `docs/interconnect-en.md` v3.1 (2026-04-28)
 
@@ -110,12 +110,21 @@ The scaling rule: the **header is exactly 1 flit** on the 128-bit link (16 bytes
 
 When the `BUS_WIDTH` RTL parameter is upscaled, the header size and max payload scale proportionally to keep the `header = 1 flit, payload = 8 flits` rule valid:
 
-| `BUS_WIDTH` | Header | Max payload | Cell | Cell flits |
-|---|---|---|---|---|
-| **128 (v3.1)** | **16 bytes** | **128 bytes** | **144 bytes** | **9 flits** |
-| 256 (future) | 32 bytes | 256 bytes | 288 bytes | 9 flits |
-| 512 (future) | 64 bytes | 512 bytes | 576 bytes | 9 flits |
-| 1024 (future) | 128 bytes | 1024 bytes | 1152 bytes | 9 flits |
+| `BUS_WIDTH` | Header | Max payload | Cell | Cell flits | **@ 50 MHz** | **@ 500 MHz** | **@ 1 GHz** |
+|---|---|---|---|---|---|---|---|
+| **128 (v3.1)** | **16 bytes** | **128 bytes** | **144 bytes** | **9 flits** | **0.8 GB/s** | **8 GB/s** | **16 GB/s** |
+| 256 (future) | 32 bytes | 256 bytes | 288 bytes | 9 flits | 1.6 GB/s | 16 GB/s | 32 GB/s |
+| 512 (future) | 64 bytes | 512 bytes | 576 bytes | 9 flits | 3.2 GB/s | 32 GB/s | 64 GB/s |
+| 1024 (future) | 128 bytes | 1024 bytes | 1152 bytes | 9 flits | 6.4 GB/s | 64 GB/s | 128 GB/s |
+
+> **Bandwidth formula:** `BUS_WIDTH / 8 × f` — one flit per cycle, raw link capacity (header + payload combined, SI: 1 GB/s = 10⁹ bytes/s).
+>
+> **Frequency columns rationale:**
+> - **50 MHz** — F3 Tiny Tapeout / Sky130 I/O target (see [`docs/architecture-en.md`](../docs/architecture-en.md) § OPI Octal SPI)
+> - **500 MHz** — CFPU reference core clock (see [`docs/architecture-en.md`](../docs/architecture-en.md) § OPI PSRAM transfer rates, "core cycle @ 500 MHz")
+> - **1 GHz** — aspirational F6+ silicon target
+>
+> **Effective payload bandwidth:** worst-case 9-flit cell (1 header + 8 payload) yields ~**88.9% × raw** (constant 11% header overhead). For a typical 48-byte actor message (1 header + 3 payload flits) this drops to ~75% × raw — but with variable link occupancy, the remaining time is reusable by other cells.
 
 Details: [`docs/decision-bus-rollback-en.md`](../docs/decision-bus-rollback-en.md).
 
@@ -221,6 +230,7 @@ With future `BUS_WIDTH=256` upscale, a 256B payload will fit 4× BL16 (or 1× BL
 
 | Version | Date | Change |
 |---------|------|--------|
+| 2.3 | 2026-05-03 | **Bandwidth table expansion** in the "Future upscale" section — for every `BUS_WIDTH` value (128/256/512/1024 bit) raw link bandwidth at 50 MHz / 500 MHz / 1 GHz clocks. Rationale for the frequency columns: 50 MHz Sky130 I/O target, 500 MHz CFPU reference core clock, 1 GHz aspirational F6+. Effective payload bandwidth (~88.9% raw worst-case) recorded as a note. Additive change only; format spec unchanged. |
 | 2.2 | 2026-04-28 | **`flags.ddr5_cap` HW-only bit allocated.** From the former `reserved[3]` field, one bit (bit 2) was named `ddr5_cap` with the meaning: the first 8 bytes of payload are a HW-attached DDR5 capability slot. The bit can **only be set by the core HW request assembler**; the actor SW `send` opcode has it masked to 0. The flags table now has a "Writable by" column. Details: [`docs/ddr5-architecture-hu.md`](../docs/ddr5-architecture-hu.md) v1.3 |
 | 2.1 | 2026-04-28 | **v3.1 interconnect rollback synchronization:** L0 bus 256→128 bits, max payload 256→128 bytes (`CELL_SIZE = 128`), buffer slot 272→144 bytes. Header layout **unchanged** (16 bytes, 4×32 bits). `len[8]` semantics unchanged (`len+1`), but v3.1 max is 128 (`len ≤ 127`); the upper 128 values reserved for future `BUS_WIDTH` upscale. `BUS_WIDTH` RTL parameter introduced (default 128, future 256/512/1024). DDR5 burst alignment updated (BL32 = 128 bytes native). Rationale: [`docs/decision-bus-rollback-en.md`](../docs/decision-bus-rollback-en.md) |
 | 2.0 | 2026-04-28 | Header reorganization: 4 × 32-bit word layout; src_actor/dst_actor 16→8 bits (HW-managed CST); seq 8→16 bits; len[9]→len[8] (len+1 encoding); CRC-16 added (payload integrity); flags expansion (pri, zero_len); 256-bit link flit table; decision log update (decisions 3–5) |

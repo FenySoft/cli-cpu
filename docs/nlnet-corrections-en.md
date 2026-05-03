@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # NLnet Application — Post-Submission Corrections
 
 > **Purpose:** This document records internal-review corrections identified AFTER the CLI-CPU NLnet NGI Zero Commons Fund application was submitted. The submitted file ([`nlnet-application-draft-en.md`](nlnet-application-draft-en.md)) is preserved unchanged as the authoritative record of what NLnet received.

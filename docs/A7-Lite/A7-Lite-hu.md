@@ -1,3 +1,7 @@
+---
+status: reference
+---
+
 # MicroPhase A7-Lite XC7A200T — board referencia
 
 > English version: [A7-Lite-en.md](A7-Lite-en.md)

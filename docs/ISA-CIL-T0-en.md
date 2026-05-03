@@ -1,3 +1,7 @@
+---
+status: spec-candidate
+---
+
 # CIL-T0 — ISA Specification
 
 > Magyar verzió: [ISA-CIL-T0-hu.md](ISA-CIL-T0-hu.md)

@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # AuthCode + CodeLock — Hitelesített kódbetöltés és W⊕X hardveres kényszerítés
 
 > English version: [authcode-en.md](authcode-en.md)

@@ -1,3 +1,7 @@
+---
+status: policy
+---
+
 # Brand and Naming Guide — Cognitive Fabric, CFPU, CLI-CPU
 
 > Magyar verzió: [brand-hu.md](brand-hu.md)

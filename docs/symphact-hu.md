@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # Symphact
 
 > **📦 A Symphact vízió dokumentuma átköltözött a saját repójába.**

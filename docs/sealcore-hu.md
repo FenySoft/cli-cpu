@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Seal Core — A CFPU hitelesítési gatekeeper magja
 
 > English version: [sealcore-en.md](sealcore-en.md)

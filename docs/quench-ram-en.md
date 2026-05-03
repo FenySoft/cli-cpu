@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Quench-RAM — Self-Quenching, Per-Block Immutable Hardware Memory Cell
 
 > Magyar verzió: [quench-ram-hu.md](quench-ram-hu.md)

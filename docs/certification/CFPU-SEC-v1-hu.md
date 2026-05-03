@@ -1,3 +1,7 @@
+---
+status: draft
+---
+
 # CFPU-SEC-v1 -- Kotelező Biztonsagi Elemek Specifikacioja
 
 > Version: 1.0 | Datum: 2026-04-17

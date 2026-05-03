@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-001: Tree-structured interconnect between cores
 
 > **Source:** [FenySoft/Symphact — osreq-001](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-en.md)

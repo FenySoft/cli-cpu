@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-002: MMIO memória térkép — OS↔HW regiszter interfész
 
 > **Forrás:** [FenySoft/Symphact — osreq-002](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-002-mmio-memory-map-hu.md)

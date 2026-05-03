@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Use Case: 4K videó feldolgozás CFPU-n — core-igény becslés
 
 > English version: [use-case-video-en.md](use-case-video-en.md)

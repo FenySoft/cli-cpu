@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-001: Fa topológiájú interconnect a core-ok között
 
 > **Forrás:** [FenySoft/Symphact — osreq-001](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-hu.md)

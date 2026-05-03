@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-005: Mailbox interrupt vs polling — core notification mechanism
 
 > **Source:** [FenySoft/Symphact — osreq-005](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-005-mailbox-interrupt-en.md)

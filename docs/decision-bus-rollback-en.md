@@ -1,3 +1,7 @@
+---
+status: decision
+---
+
 # Decision: L0 Bus Rollback 256→128 bit (v3.1)
 
 > Magyar verzió: [decision-bus-rollback-hu.md](decision-bus-rollback-hu.md)

@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # Symphact
 
 > **📦 The Symphact vision document has moved to its own repository.**

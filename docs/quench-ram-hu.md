@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Quench-RAM — Önműködő, blokkonkénti immutability hardveres memóriacella
 
 > English version: [quench-ram-en.md](quench-ram-en.md)

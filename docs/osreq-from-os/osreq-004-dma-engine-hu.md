@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-004: DMA engine — nem-blokkoló persistence támogatás
 
 > **Forrás:** [FenySoft/Symphact — osreq-004](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-004-dma-engine-hu.md)

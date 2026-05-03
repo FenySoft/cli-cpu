@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Interconnect Architecture
 
 > Magyar verzió: [interconnect-hu.md](interconnect-hu.md)

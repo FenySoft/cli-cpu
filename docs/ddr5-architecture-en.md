@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU DDR5 Memory Architecture — Hardware Design Decisions
 
 > Magyar verzió: [ddr5-architecture-hu.md](ddr5-architecture-hu.md)

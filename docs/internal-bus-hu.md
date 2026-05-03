@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Belső Busz Méretezés
 
 > English version: [internal-bus-en.md](internal-bus-en.md)

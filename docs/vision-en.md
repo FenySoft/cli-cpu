@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Cognitive Fabric — Vision: The Shared-Nothing Future
 
 > Magyar verzió: [vision-hu.md](vision-hu.md)

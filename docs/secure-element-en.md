@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Secure Edition — Open Secure Element / TEE / JavaCard Successor
 
 > **Strategic positioning document.** This is the third market track alongside Cognitive Fabric and Trustworthy Silicon. It describes a separate chip family built on the same base architecture, augmented with Secure Element-specific hardware components, targeting the JavaCard / TEE / Secure Element market.

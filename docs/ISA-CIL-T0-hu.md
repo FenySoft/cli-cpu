@@ -1,3 +1,7 @@
+---
+status: spec-candidate
+---
+
 # CIL-T0 — ISA Specifikáció
 
 > English version: [ISA-CIL-T0-en.md](ISA-CIL-T0-en.md)

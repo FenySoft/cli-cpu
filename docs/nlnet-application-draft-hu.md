@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # NLnet NGI Zero Commons Fund — Pályázati vázlat
 
 > **Deadline:** 2026. június 1., 12:00 CEST

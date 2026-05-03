@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Hardveres Boot Szekvencia (HW Boot)
 
 > English version: [hw-boot-en.md](hw-boot-en.md)

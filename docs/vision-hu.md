@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Cognitive Fabric — Vízió: A Shared-Nothing Jövő
 
 > English version: [vision-en.md](vision-en.md)

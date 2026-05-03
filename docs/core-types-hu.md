@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU Core Család
 
 > English version: [core-types-en.md](core-types-en.md)

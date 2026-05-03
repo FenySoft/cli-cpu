@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU vs RISC-V — Single-thread teljesítmény-elemzés
 
 > English version: [perf-vs-riscv-en.md](perf-vs-riscv-en.md)

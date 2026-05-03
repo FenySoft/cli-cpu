@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # Hardware Boot Sequence (HW Boot)
 
 > Magyar verzió: [hw-boot-hu.md](hw-boot-hu.md)

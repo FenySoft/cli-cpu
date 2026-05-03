@@ -2,7 +2,7 @@
 
 > English version: [cell-format-en.md](cell-format-en.md)
 
-> Version: 2.2
+> Version: 2.3
 
 > Forrás: `docs/interconnect-hu.md` v3.1 (2026-04-28)
 
@@ -110,12 +110,21 @@ A skálázási elv: a **header pontosan 1 flit** a 128-bit linken (16 byte = 128
 
 A `BUS_WIDTH` RTL paraméter felfelé skálázásakor a header-méret és a max payload arányosan nő, hogy a `header = 1 flit, payload = 8 flit` szabály érvényben maradjon:
 
-| `BUS_WIDTH` | Header | Max payload | Cella | Cella flit |
-|---|---|---|---|---|
-| **128 (v3.1)** | **16 byte** | **128 byte** | **144 byte** | **9 flit** |
-| 256 (jövőbeli) | 32 byte | 256 byte | 288 byte | 9 flit |
-| 512 (jövőbeli) | 64 byte | 512 byte | 576 byte | 9 flit |
-| 1024 (jövőbeli) | 128 byte | 1024 byte | 1152 byte | 9 flit |
+| `BUS_WIDTH` | Header | Max payload | Cella | Cella flit | **@ 50 MHz** | **@ 500 MHz** | **@ 1 GHz** |
+|---|---|---|---|---|---|---|---|
+| **128 (v3.1)** | **16 byte** | **128 byte** | **144 byte** | **9 flit** | **0,8 GB/s** | **8 GB/s** | **16 GB/s** |
+| 256 (jövőbeli) | 32 byte | 256 byte | 288 byte | 9 flit | 1,6 GB/s | 16 GB/s | 32 GB/s |
+| 512 (jövőbeli) | 64 byte | 512 byte | 576 byte | 9 flit | 3,2 GB/s | 32 GB/s | 64 GB/s |
+| 1024 (jövőbeli) | 128 byte | 1024 byte | 1152 byte | 9 flit | 6,4 GB/s | 64 GB/s | 128 GB/s |
+
+> **Sávszélesség képlet:** `BUS_WIDTH / 8 × f` — egy flit per ciklus, raw link kapacitás (header + payload együtt, SI: 1 GB/s = 10⁹ byte/s).
+>
+> **Frekvencia oszlopok indoklása:**
+> - **50 MHz** — F3 Tiny Tapeout / Sky130 I/O target (lásd [`docs/architecture-hu.md`](../docs/architecture-hu.md) § OPI Octal SPI)
+> - **500 MHz** — CFPU referencia core órajel (lásd [`docs/architecture-hu.md`](../docs/architecture-hu.md) § OPI PSRAM átviteli sebességek, "core ciklus @ 500 MHz")
+> - **1 GHz** — aspirációs F6+ silicon target
+>
+> **Effektív payload sávszélesség:** worst-case 9 flit cella (1 header + 8 payload) esetén ~**88,9% × raw** (konstans 11% header overhead). Tipikus 48 byte aktor üzenet (1 header + 3 payload flit) esetén ~75% × raw — a változó link foglalás miatt a többi időt más cellák használhatják.
 
 Részletek: [`docs/decision-bus-rollback-hu.md`](../docs/decision-bus-rollback-hu.md).
 
@@ -221,6 +230,7 @@ A jövőbeli `BUS_WIDTH=256` upscale-nél a 256B payload egyetlen cellában fog 
 
 | Verzió | Dátum | Változás |
 |--------|-------|---------|
+| 2.3 | 2026-05-03 | **Sávszélesség táblázat-bővítés** a "Jövőbeli upscale" szekcióban — minden `BUS_WIDTH` értékhez (128/256/512/1024 bit) raw link sávszélesség 50 MHz / 500 MHz / 1 GHz órajeleken. Frekvencia oszlopok indoklása: 50 MHz Sky130 I/O target, 500 MHz CFPU referencia core órajel, 1 GHz aspirációs F6+. Effektív payload sávszélesség (~88,9% raw worst-case) megjegyzésben rögzítve. Tartalmi változás csak additív; a formátum spec változatlan. |
 | 2.2 | 2026-04-28 | **`flags.ddr5_cap` HW-only bit allokálva.** A korábbi `reserved[3]` bit-ből egyet (bit 2) elneveztük `ddr5_cap`-nek, jelentés: a payload első 8 byte-ja egy HW-attached DDR5 capability slot. A bitet **CSAK a core HW request assembler-e állíthatja be**; az aktor SW `send` opkódja maszkolva 0-ra. A flags tábla "Ki írhatja?" oszloppal bővült. Részletek: [`docs/ddr5-architecture-hu.md`](../docs/ddr5-architecture-hu.md) v1.3 |
 | 2.1 | 2026-04-28 | **v3.1 interconnect rollback szinkronizáció:** L0 busz 256→128 bit, max payload 256→128 byte (`CELL_SIZE = 128`), buffer slot 272→144 byte. Header layout **változatlan** (16 byte, 4×32 bit). `len[8]` szemantika változatlan (`len+1`), de v3.1-ben max 128 (`len ≤ 127`); a felső 128 érték a jövőbeli `BUS_WIDTH` upscale-re fenntartva. `BUS_WIDTH` RTL paraméter bevezetve (default 128, jövőbeli 256/512/1024). DDR5 burst illeszkedés frissítve (BL32 = 128 byte natív). Indoklás: [`docs/decision-bus-rollback-hu.md`](../docs/decision-bus-rollback-hu.md) |
 | 2.0 | 2026-04-28 | Header átszervezés: 4 × 32 bit szó layout; src_actor/dst_actor 16→8 bit (HW-managed CST); seq 8→16 bit; len[9]→len[8] (len+1 kódolás); CRC-16 hozzáadva (payload integritás); flags bővítés (pri, zero_len); 256-bit link flit táblázat; döntési napló frissítés (3–5. döntés) |

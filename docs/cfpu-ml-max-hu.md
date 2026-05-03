@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU-ML-Max v2.0 — ML Inference Accelerator (500 MHz, chiplet)
 
 > Version: 2.0-draft

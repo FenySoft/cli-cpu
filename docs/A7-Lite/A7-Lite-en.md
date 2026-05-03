@@ -1,3 +1,7 @@
+---
+status: reference
+---
+
 # MicroPhase A7-Lite XC7A200T — board reference
 
 > Magyar verzió: [A7-Lite-hu.md](A7-Lite-hu.md)

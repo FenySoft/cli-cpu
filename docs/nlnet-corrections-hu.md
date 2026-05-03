@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # NLnet Pályázat — Beadás utáni korrekciók
 
 > **Cél:** Ez a dokumentum a CLI-CPU NLnet NGI Zero Commons Fund pályázat **beadása UTÁN** azonosított belső review korrekciókat rögzíti. A beadott fájl ([`nlnet-application-draft-hu.md`](nlnet-application-draft-hu.md) ill. `-en.md`) **változatlanul** megőrzi, mint az NLnet-hez beérkezett szöveg hiteles rekordját.

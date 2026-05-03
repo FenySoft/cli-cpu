@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-006: Inter-chip link protokoll — elosztott fabric kommunikáció
 
 > **Forrás:** [FenySoft/Symphact — osreq-006](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-006-interchip-link-hu.md)

@@ -1,3 +1,7 @@
+---
+status: draft
+---
+
 # CIL-Seal — ISA Specification
 
 > Magyar verzió: [ISA-CIL-Seal-hu.md](ISA-CIL-Seal-hu.md)

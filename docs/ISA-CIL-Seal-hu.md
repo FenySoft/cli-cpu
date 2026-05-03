@@ -1,3 +1,7 @@
+---
+status: draft
+---
+
 # CIL-Seal — ISA Specifikáció
 
 > English version: [ISA-CIL-Seal-en.md](ISA-CIL-Seal-en.md)

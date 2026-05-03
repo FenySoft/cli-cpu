@@ -1,3 +1,7 @@
+---
+status: mirror
+---
+
 # OSREQ-003: Core reset mechanism — supervisor restart support
 
 > **Source:** [FenySoft/Symphact — osreq-003](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-003-core-reset-en.md)

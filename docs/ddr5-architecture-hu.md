@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU DDR5 Memória Architektúra — Hardveres Tervezési Döntések
 
 > English version: [ddr5-architecture-en.md](ddr5-architecture-en.md)

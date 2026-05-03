@@ -1,3 +1,7 @@
+---
+status: policy
+---
+
 # CLI-CPU — Eszközök nyitottsága és a „libre silicon" stratégia
 
 > English version: [tool-openness-en.md](tool-openness-en.md)

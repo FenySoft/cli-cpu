@@ -1,3 +1,7 @@
+---
+status: decision
+---
+
 # Döntés: L0 busz visszaléptetés 256→128 bit (v3.1)
 
 > English version: [decision-bus-rollback-en.md](decision-bus-rollback-en.md)

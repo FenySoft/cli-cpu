@@ -1,3 +1,7 @@
+---
+status: vision
+---
+
 # CFPU — HW Attack Immunity Reference
 
 > Magyar verzió: [hw-attack-immunity-hu.md](hw-attack-immunity-hu.md)
