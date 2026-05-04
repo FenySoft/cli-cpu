@@ -6,7 +6,7 @@ status: living
 
 > Magyar verzió: [roadmap-hu.md](roadmap-hu.md)
 
-> Version: 1.2
+> Version: 1.3
 
 The CLI-CPU project is built in **seven phases**, from the specification document to the first working, hand-held silicon and beyond, to a full ECMA-335 CIL implementation.
 
@@ -510,7 +510,7 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ DONE |
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ DONE |
 | — F2.4 | QSPI controller | ~70 | | ✅ DONE |
-| — F2.5a | Top-level Nano core integration (`cilcpu_core.v`) | ~30 | | 🔧 In progress (spec done) |
+| — F2.5a | Top-level Nano core integration (`cilcpu_core.v`) | ~30 | | 🔧 In progress (Sub1..4+6 ✅, Sub5 CALL/RET open — 41 cocotb green) |
 | — F2.5b | Golden vector harness | ~25 | | ⬜ Planned |
 | — F2.6 | Yosys synthesis (Sky130) | ~30 | | ⬜ Planned |
 | — F2.7 | FPGA validation (A7-Lite) | ~45 | | ⬜ Planned |
@@ -631,9 +631,9 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 
 **F2 — RTL in progress.** F2.1 ALU, F2.2a Decoder, F2.2b Microcode ROM, F2.3 Stack Cache, F2.4 QSPI Controller **closed** — 5 submodules total, ~150+ green cocotb tests, Devil's Advocate review for each subsection.
 
-**F2.5a — Top-level Nano core integration spec closed.** `rtl/src/CORE_SPEC-{hu,en}.md` captures the integration of all 5 submodules (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) into a single `cilcpu_core` module: fetch/decode/execute pipeline, frame manager, internal 16 KB SRAM, trap aggregator, 10-state top-level FSM. The spec mandates 30+ cocotb tests (10 groups, all 13 trap codes covered), with `TCpuNano` F1 as the golden reference.
+**F2.5a — Top-level Nano core integration: Sub1..4 + Sub6 done.** `rtl/src/cilcpu_core.v` integrates the 5 submodules (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) into a single Nano core: fetch/decode/execute pipeline, frame manager, internal 16 KB SRAM, trap aggregator, 10-state top-level FSM. **41 cocotb tests green, 0 FAIL, 0 Verilator warning.** Done: reset/boot/halt, all LDC.I4 forms, ALU arithmetic (ADD/SUB/MUL/DIV/REM/AND/OR/XOR/SHL/NEG/NOT) + div0/overflow trap, fetch addressing (Sub2.1 Verilator NBA fix + Sub2.2 APPEND general count), LDARG/STARG/LDLOC/STLOC + range trap (Sub3, ST_MEM_WAIT 2-phase), branch BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE (Sub4, 1-op and 2-op cond decision), Stack Cache trap aggregator stack overflow/underflow (Sub6), debug_break + invalid_opcode trap. **Sub5 (CALL/RET non-root frame) — OPEN, deferred to next session** (header read + args pop loop + frame push/pop sequencer is complex).
 
-**Next substantive step:** **F2.5a TDD red** — cocotb tests in `test_core.py` (Reset/Boot smoke → LDC+RET → arithmetic → branch → call/ret), then the `cilcpu_core.v` implementation.
+**Next substantive step:** **F2.5a Sub5 — CALL/RET non-root frame manager** (8-byte header read, args reverse-pop, PushCallFrame, RET PopCallFrame, CALL_DEPTH_EXCEEDED + INVALID_CALL_TARGET traps; golden reference: TExecutor.cs ExecuteCall/ExecuteRet).
 
 ## Funding Action Plan
 
@@ -688,6 +688,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.3 | 2026-05-04 | F2.5a Sub1..Sub4 + Sub6 DONE — 41 cocotb tests green (LDC, ALU, fetch fix, LDARG/STARG/LDLOC/STLOC, branch, stack/break/invalid traps). Sub5 (CALL/RET non-root) OPEN, deferred to next session. Current Status updated. |
 | 1.2 | 2026-05-04 | F2.5 subsection split into F2.5a (top-level Nano core) + F2.5b (golden vector harness). F2.4 marked DONE. F2 total ~370 hours. Current Status updated to F2.5a spec closed. |
 | 1.1 | 2026-04-17 | Added estimated work hours summary + NLnet grant alignment section. AI-assisted development estimates. |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

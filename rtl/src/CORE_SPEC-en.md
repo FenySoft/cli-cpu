@@ -6,7 +6,7 @@
 >
 > **Scope:** Internal RTL working spec, not a public document. The public ISA spec is `docs/ISA-CIL-T0-{hu,en}.md`, the public architecture is `docs/architecture-en.md`.
 >
-> Version: 1.1
+> Version: 1.2
 
 ## Goal
 
@@ -353,5 +353,6 @@ When running `make test_core`:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2 | 2026-05-04 | Sub-iteration status: Sub1 (skeleton, LDC+RET) ✅, Sub2 (arithmetic + ALU phase) ✅, Sub2.1 (`r_qspi_inflight`+`r_next_fetch_addr` Verilator NBA fetch addr fix) ✅, Sub2.2 (APPEND general count 0..4) ✅, Sub3 (LDARG/STARG/LDLOC/STLOC + 2-phase ST_MEM_WAIT + SRAM bus arbiter) ✅, Sub4 (BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE branch decision) ✅, Sub6 (Stack Cache trap aggregator) ✅. **Sub5 (CALL/RET non-root) — OPEN, deferred to next session.** Verilator gotchas documented: SRAM read 1-cycle latency requires ST_MEM_WAIT 2 cycles (X = r_sram_re=1, X+1 = `if (r_sram_re)` runs → r_sram_rdata_latched <= sram NBA, X+2 = fresh value visible). 41 cocotb tests green, 0 FAIL, 0 expect_fail, 0 Verilator warning. |
 | 1.1 | 2026-05-04 | Devil's Advocate audit: TMethodHeader format clarified (4 fields: arg_count, local_count, max_stack, code_size). F2.5a HW only consumes the first 3 bytes; max_stack and code_size deferred to F5+. Confirmation that no fetch abort is needed mid-branch (branch only runs in ST_EXECUTE, when QSPI is IDLE). |
 | 1.0 | 2026-05-04 | Initial F2.5a top-level Nano core spec — 5-submodule integration, fetch/decode/execute pipeline, frame manager, trap aggregator |

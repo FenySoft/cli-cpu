@@ -6,7 +6,7 @@
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum. A publikus ISA spec a `docs/ISA-CIL-T0-{hu,en}.md`, a publikus architektúra a `docs/architecture-hu.md`.
 >
-> Version: 1.1
+> Version: 1.2
 
 ## Cél
 
@@ -353,5 +353,6 @@ A `make test_core` futtatás esetén:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.2 | 2026-05-04 | Sub-iteráció állapot: Sub1 (skeleton, LDC+RET) ✅, Sub2 (aritmetika+ALU phase) ✅, Sub2.1 (`r_qspi_inflight`+`r_next_fetch_addr` Verilator NBA fetch addr fix) ✅, Sub2.2 (APPEND general count 0..4) ✅, Sub3 (LDARG/STARG/LDLOC/STLOC + ST_MEM_WAIT 2-fázisú + SRAM bus arbiter) ✅, Sub4 (BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE branch eldöntés) ✅, Sub6 (Stack Cache trap aggregátor) ✅. **Sub5 (CALL/RET nem-root) — NYITOTT, a következő ülésre marad.** Verilator gotcha-k dokumentálva: SRAM read 1-ciklus latency miatt ST_MEM_WAIT 2 ciklus kell (X = r_sram_re=1, X+1 = `if (r_sram_re)` lefut → r_sram_rdata_latched <= sram NBA, X+2 = friss érték látszik). 41 cocotb teszt zöld, 0 FAIL, 0 expect_fail, Verilator 0 warning. |
 | 1.1 | 2026-05-04 | Devil's Advocate audit: TMethodHeader formátum pontosítás (4 mező: arg_count, local_count, max_stack, code_size). F2.5a HW csak az első 3 byte-ot dolgozza, max_stack és code_size F5+-re marad. Megerősítés, hogy branch közbeni fetch abort nincs (a branch csak ST_EXECUTE-ban fut, QSPI ekkor IDLE). |
 | 1.0 | 2026-05-04 | Kezdeti F2.5a top-level Nano core spec — 5 részegység integráció, fetch/decode/execute pipeline, frame manager, trap aggregátor |

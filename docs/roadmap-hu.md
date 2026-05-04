@@ -6,7 +6,7 @@ status: living
 
 > English version: [roadmap-en.md](roadmap-en.md)
 
-> Version: 1.2
+> Version: 1.3
 
 A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első működő, kezedben tartható szilíciumig és tovább, a teljes ECMA-335 CIL implementációig.
 
@@ -510,7 +510,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ KÉSZ |
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ KÉSZ |
 | — F2.4 | QSPI vezérlő | ~70 | | ✅ KÉSZ |
-| — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | 🔧 Folyamatban (spec kész) |
+| — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | 🔧 Folyamatban (Sub1..4+6 ✅, Sub5 CALL/RET nyitott — 41 cocotb zöld) |
 | — F2.5b | Golden vector harness | ~25 | | ⬜ Tervezett |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
 | — F2.7 | FPGA validáció (A7-Lite) | ~45 | | ⬜ Tervezett |
@@ -633,9 +633,9 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **F2 — RTL folyamatban.** F2.1 ALU, F2.2a Decoder, F2.2b Microcode ROM, F2.3 Stack Cache, F2.4 QSPI Controller **lezárva** — összesen 5 részegység, ~150+ cocotb zöld teszt, minden alszakaszhoz Devil's Advocate review.
 
-**F2.5a — Top-level Nano core integráció spec lezárva.** Az `rtl/src/CORE_SPEC-{hu,en}.md` rögzíti az 5 részegység (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) integrációját egyetlen `cilcpu_core` modulba: fetch/decode/execute pipeline, frame manager, belső 16 KB SRAM, trap aggregátor, 10-állapotú top-level FSM. A spec 30+ cocotb tesztet ír elő (10 csoport, 13 trap kód lefedés), aranypéldaként a TCpuNano F1 szimulátor szolgál.
+**F2.5a — Top-level Nano core integráció: Sub1..4 + Sub6 készen.** Az `rtl/src/cilcpu_core.v` az 5 részegység (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) integrációja egyetlen Nano core-rá: fetch/decode/execute pipeline, frame manager, belső 16 KB SRAM, trap aggregátor, 10-állapotú top-level FSM. **41 cocotb teszt zöld, 0 FAIL, Verilator 0 warning.** Készen: reset/boot/halt, LDC.I4 minden formája, ALU aritmetika (ADD/SUB/MUL/DIV/REM/AND/OR/XOR/SHL/NEG/NOT) + div0/overflow trap, fetch addresszálás (Sub2.1 Verilator NBA fix + Sub2.2 APPEND general count), LDARG/STARG/LDLOC/STLOC + range trap (Sub3, ST_MEM_WAIT 2-fázisú), branch BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE (Sub4, 1-op és 2-op cond eldöntés), Stack Cache trap aggregátor stack overflow/underflow (Sub6), debug_break + invalid_opcode trap. **Sub5 (CALL/RET nem-root frame) — NYITOTT, a következő ülésre marad** (header read + args pop loop + frame push/pop sequencer komplex).
 
-**Következő érdemi lépés:** **F2.5a TDD piros** — cocotb tesztek a `test_core.py`-ben (Reset/Boot smoke → LDC+RET → aritmetika → branch → call/ret), majd a `cilcpu_core.v` implementáció.
+**Következő érdemi lépés:** **F2.5a Sub5 — CALL/RET non-root frame manager** (8-byte header read, args reverse-pop, PushCallFrame, RET PopCallFrame, CALL_DEPTH_EXCEEDED + INVALID_CALL_TARGET trap-ek; aranypélda: TExecutor.cs ExecuteCall/ExecuteRet).
 
 ## Finanszírozási akcióterv
 
@@ -690,6 +690,7 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.3 | 2026-05-04 | F2.5a Sub1..Sub4 + Sub6 KÉSZ — 41 cocotb teszt zöld (LDC, ALU, fetch fix, LDARG/STARG/LDLOC/STLOC, branch, stack/break/invalid trap-ek). Sub5 (CALL/RET nem-root) NYITOTT, a következő ülésre marad. Mai státusz frissítve. |
 | 1.2 | 2026-05-04 | F2.5 alszakasz F2.5a (top-level Nano core) + F2.5b (golden vector harness) bontásra. F2.4 KÉSZ státuszra váltva. F2 össz. ~370 óra. Mai státusz frissítve F2.5a spec lezártra. |
 | 1.1 | 2026-04-17 | Becsült munkaóra összesítő + NLnet pályázati összehangolás hozzáadva. AI-asszisztált fejlesztési becslések. |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |
