@@ -548,45 +548,61 @@ module cilcpu_core (
                 if (r_fetch_count >= 4'd5) begin
                     r_state <= ST_DECODE;
                 end else if (w_qspi_ready) begin
-                    // hu: 4-byte append a packed buffer-be. cnt=0 → byte
-                    //     0..3, cnt=4 → byte 4..7. Az r_fetch_count ÚJ
-                    //     értékét explicit konstanssal írjuk (4 vagy 8),
-                    //     nem self-referenciával — Verilator NBA self-ref
-                    //     egy bug-ot okozott.
-                    //     Sub2.1: az APPEND zárja le a tranzakciót
-                    //     (r_qspi_inflight <= 0), és a következő fetch
-                    //     címét explicit konstanssal léptetjük (+4),
-                    //     független r_pc / r_fetch_count NBA-tól.
-                    // en: 4-byte append to packed buffer. cnt=0 → byte
-                    //     0..3, cnt=4 → byte 4..7. Write r_fetch_count's
-                    //     new value via an explicit constant (4 or 8),
-                    //     not self-reference — Verilator NBA self-ref
-                    //     caused a bug.
-                    //     Sub2.1: the APPEND closes the transaction
-                    //     (r_qspi_inflight <= 0), and the next fetch
-                    //     address is bumped by +4 explicitly, independent
-                    //     of r_pc / r_fetch_count NBA scheduling.
+                    // hu: 4-byte append a packed buffer-be tetszőleges
+                    //     r_fetch_count (0..4) értéknél. A korábbi 0/4-csak
+                    //     verzió a Sub2.2 előtt: 5-byte LDC.I4 után
+                    //     r_fetch_count=3 maradt (slide-down nem 4-byte
+                    //     aligned), és a default ág eldobta a következő
+                    //     fetch eredményét → timeout.
+                    //     Sub2.2: explicit case minden cnt=0..4 értékre,
+                    //     mindegyik a `cnt*8` bit ofszetre illeszti a
+                    //     little-endian 4-byte word-öt. cnt>=5 esetén nem
+                    //     indulhatott volna fetch (lásd ST_FETCH felső ág),
+                    //     ezért default ágra nem futhatunk.
+                    // en: 4-byte append to the packed buffer at any
+                    //     r_fetch_count (0..4). The earlier 0/4-only form:
+                    //     after 5-byte LDC.I4, r_fetch_count=3 (slide is
+                    //     not 4-byte aligned) and the default arm dropped
+                    //     the next fetch result → timeout.
+                    //     Sub2.2: explicit case for every cnt=0..4, each
+                    //     inserting the little-endian 4-byte word at the
+                    //     `cnt*8` bit offset. cnt>=5 cannot start a fetch
+                    //     (see top branch in ST_FETCH), so default cannot
+                    //     fire.
                     case (r_fetch_count)
-                        4'd0: begin
-                            r_fetch_buf[31:0] <= {
-                                w_qspi_rdata[7:0],
-                                w_qspi_rdata[15:8],
+                        4'd0: r_fetch_buf[31: 0] <= {
+                                w_qspi_rdata[ 7: 0],
+                                w_qspi_rdata[15: 8],
                                 w_qspi_rdata[23:16],
                                 w_qspi_rdata[31:24]
                             };
-                            r_fetch_count <= 4'd4;
-                        end
-                        4'd4: begin
-                            r_fetch_buf[63:32] <= {
-                                w_qspi_rdata[7:0],
-                                w_qspi_rdata[15:8],
+                        4'd1: r_fetch_buf[39: 8] <= {
+                                w_qspi_rdata[ 7: 0],
+                                w_qspi_rdata[15: 8],
                                 w_qspi_rdata[23:16],
                                 w_qspi_rdata[31:24]
                             };
-                            r_fetch_count <= 4'd8;
-                        end
+                        4'd2: r_fetch_buf[47:16] <= {
+                                w_qspi_rdata[ 7: 0],
+                                w_qspi_rdata[15: 8],
+                                w_qspi_rdata[23:16],
+                                w_qspi_rdata[31:24]
+                            };
+                        4'd3: r_fetch_buf[55:24] <= {
+                                w_qspi_rdata[ 7: 0],
+                                w_qspi_rdata[15: 8],
+                                w_qspi_rdata[23:16],
+                                w_qspi_rdata[31:24]
+                            };
+                        4'd4: r_fetch_buf[63:32] <= {
+                                w_qspi_rdata[ 7: 0],
+                                w_qspi_rdata[15: 8],
+                                w_qspi_rdata[23:16],
+                                w_qspi_rdata[31:24]
+                            };
                         default: ;
                     endcase
+                    r_fetch_count     <= r_fetch_count + 4'd4;
                     r_qspi_inflight   <= 1'b0;
                     r_next_fetch_addr <= r_next_fetch_addr + 24'd4;
                 end else if (!r_qspi_inflight) begin

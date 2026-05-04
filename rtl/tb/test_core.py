@@ -337,23 +337,15 @@ async def test_07_ldc_i4_s_negative(dut):
     assert rv == 0xFFFFFFFD, f"return_value = 0x{rv:08X}, expected 0xFFFFFFFD"
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_08_ldc_i4_full(dut):
     """hu: LDC.I4 0xDEADBEEF + RET → 0xDEADBEEF (4-byte LE immediate).
-        Sub2.1 NEM fixálja: a 5-byte slide után r_fetch_count=3 marad,
-        és az APPEND case csak a 0/4 értékeket kezeli — emiatt a buffer
-        nem töltődik tovább és timeout. Sub2.2-ben az APPEND-et igazítjuk
-        a tetszőleges count-hoz, vagy a slide-ot 4-byte hatáŕokra
-        szigorítjuk. (A timeout-ot AssertionError-ré alakítjuk, hogy
-        cocotb expect_fail szigorúan illeszkedjen — különben "unexpected
-        type" miatt FAIL-nek számít.)
+        Sub2.2: az APPEND általánosított minden r_fetch_count értékre
+        (0..4), így az 5-byte slide utáni cnt=3-ra is felülír 4-byte
+        ablakot.
     en: LDC.I4 0xDEADBEEF + RET → 0xDEADBEEF (4-byte LE immediate).
-        Sub2.1 does NOT fix this: after 5-byte slide r_fetch_count=3,
-        and APPEND case only handles 0/4 — buffer never refills and the
-        run times out. Sub2.2 will adapt APPEND to arbitrary counts, or
-        constrain slide to 4-byte boundaries. (We map timeout to
-        AssertionError so cocotb expect_fail strictly matches — otherwise
-        the run is reported as FAIL with "unexpected type".)"""
+        Sub2.2: APPEND is generalized for any r_fetch_count (0..4),
+        so cnt=3 (after a 5-byte slide) accepts the next 4-byte word."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
 
     program = bytes([
@@ -361,16 +353,33 @@ async def test_08_ldc_i4_full(dut):
         0xEF, 0xBE, 0xAD, 0xDE,  # LE
         OP_RET,
     ])
-    try:
-        rv, tc, halt, trap, pc = await boot_and_run(dut, program)
-    except TimeoutError as ex:
-        raise AssertionError(
-            f"Sub2.1 known-fail: 5-byte LDC.I4 slide leaves count=3 "
-            f"unaligned with APPEND 0/4 case ({ex})"
-        )
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
 
     assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
     assert rv == 0xDEADBEEF, f"return_value = 0x{rv:08X}, expected 0xDEADBEEF"
+
+
+@cocotb.test()
+async def test_08b_ldc_i4_with_slide(dut):
+    """hu: Két LDC.I4 egymás után — kifejezetten az APPEND general count
+        utat triggereli. Az 1. LDC.I4 (5 byte) elfogyasztásával cnt=3
+        marad, a 2. LDC.I4 dekódolásához +4 byte appendelendő cnt=3 → 7
+        eredménnyel. Sub2.1 ezt nem tudná, Sub2.2 igen.
+    en: Two LDC.I4 in a row — specifically triggers the APPEND
+        general-count path. The first LDC.I4 (5 bytes) leaves cnt=3,
+        the second LDC.I4 needs +4 bytes appended at cnt=3 → 7."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    program = bytes([
+        OP_LDC_I4, 0x01, 0x00, 0x00, 0x00,  # push 1
+        OP_LDC_I4, 0x02, 0x00, 0x00, 0x00,  # push 2
+        OP_ADD,                              # 1 + 2
+        OP_RET,
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert rv == 3, f"return_value = {rv}, expected 3"
 
 
 @cocotb.test()
