@@ -1,0 +1,22 @@
+# hu: Sub-make Makefile — a Makefile.sim include-ot itt végzi, ahol a PATH
+#     már a venv bin-jét tartalmazza (a parent Makefile target ezt
+#     gondoskodik). A parent Makefile NEM include-olja a Makefile.sim-et,
+#     hogy elkerüljük a `cocotb-config` parent shell-en hiányát.
+# en: Sub-make Makefile — does the Makefile.sim include here, where PATH
+#     already contains the venv bin (arranged by the parent Makefile target).
+#     The parent Makefile does NOT include Makefile.sim, to avoid the missing
+#     `cocotb-config` in the parent shell.
+
+SIM ?= verilator
+TOPLEVEL_LANG ?= verilog
+EXTRA_ARGS += --trace -I$(PWD)/../src
+
+VENV_PY     ?= /usr/local/bin/python3.13
+VENV_SITE   ?= $(PWD)/../.venv/lib/python3.13/site-packages
+COCOTB_MAKEFILES ?= $(shell PYTHONPATH="$(VENV_SITE)" $(VENV_PY) -c \
+	"from cocotb_tools.config import main; import sys; sys.argv=['c','--makefiles']; main()" 2>/dev/null \
+	|| echo "$(VENV_SITE)/cocotb_tools/makefiles")
+
+export PYTHONPATH := $(VENV_SITE)
+
+include $(COCOTB_MAKEFILES)/Makefile.sim
