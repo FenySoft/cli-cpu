@@ -270,7 +270,7 @@ Boot-relevant registers. For the full MMIO map, see: [osreq-002 — MMIO Memory 
 | QSPI config | `0xF0001000` | R/W | 4 bytes | Enable, SPI mode, clock divider |
 | QSPI flash addr | `0xF0001004` | R/W | 4 bytes | Flash read address |
 | QSPI binary size | `0xF0001008` | R/O | 4 bytes | Binary size (from flash header) |
-| QSPI data | `0xF000100C` | R/O | 256 bytes | Next 256-byte chunk from flash (= cell payload size) |
+| QSPI data | `0xF000100C` | R/O | 128 bytes | Next 128-byte chunk from flash (= v3.1 cell payload size, see `specs/cell-format-en.md` v2.3) |
 
 ### UART boot controller (boot source #1)
 
@@ -294,7 +294,7 @@ Boot-relevant registers. For the full MMIO map, see: [osreq-002 — MMIO Memory 
 | ETH config | `0xF0001300` | R/W | 4 bytes | PHY init, MAC address[31:0] |
 | ETH config2 | `0xF0001304` | R/W | 4 bytes | MAC address[47:32], VLAN, enable |
 | ETH status | `0xF0001308` | R/O | 4 bytes | Link up, RX ready, frame count |
-| ETH data | `0xF000130C` | R/O | 256 bytes | Next 256-byte chunk (from Ethernet frame payload) |
+| ETH data | `0xF000130C` | R/O | 128 bytes | Next 128-byte chunk (from Ethernet frame payload, = v3.1 cell payload size) |
 
 ### Core discovery and control
 

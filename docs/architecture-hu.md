@@ -1316,20 +1316,23 @@ SRAM (on-chip, QRAM-védett)
 - **QRAM** véd a szoftver-szintű manipuláció ellen (capability tagek, immutability)
 - **QRAM External Extension** véd a fizikai szintű manipuláció ellen (busz-lehallgatás, PSRAM-módosítás)
 
-### Actor címzés — szoftveres dispatch
+### Actor címzés — HW dispatch (header-ben)
 
-Az [interconnect](interconnect-hu.md) 24 bites hardveres cím a cellát egy **core-hoz** irányítja, nem egy egyedi actorhoz:
+Az [interconnect](interconnect-hu.md) v3.0+ modellben a cella header **mind a HW címet, mind az actor ID-t** tartalmazza, így a célcore HW dispatch-et végez (nem szoftveres):
 
 ```
-HW cím: [régió:4-6].[tile:3-4].[cluster:3-4].[core:4] = 18 bit (a 24-ből)
-Actor ID: a payload első 1–2 bájtja (szoftveres dispatch a célcore-on)
+HW cím (dst):       [régió].[tile].[cluster].[core] = 24 bit  (Word 0 felső)
+Actor ID (dst_actor):                                  8 bit  (Word 0 alsó)
+                                                  Összesen: 32 bit (1 szó)
 ```
+
+A részletes header layoutot lásd: [`specs/cell-format-hu.md`](../specs/cell-format-hu.md) v2.3.
 
 **Indoklás:**
-- A maximális actor szám core-onként változik core típus, SRAM méret és workload szerint — egy fix HW bitmező vagy túl szűk (4-bit = 16 actor), vagy pazarló lenne
-- A core-nak egyetlen mailbox interruptja van (lásd [Power domain-ek](#power-management)) — a hálózat a core-nak kézbesít, nem az actornak
-- A core-on belüli dispatcher triviális: actor ID olvasása a cella payload-ból, lookup egy lokális táblában → route az actor kontextusához. Költség: ~1–5 ciklus, elhanyagolható a 29–229 ciklusos hálózati tranzithoz képest
-- A maradék 6 bit (24 − 18) jövőbeli címzési bővítésekre van fenntartva (több régió, nagyobb klaszterek)
+- A `dst_actor[8]` mező 256 aktor/core-t fed le, ami a warm-context cache (4–8 aktív + 248 alvó) számára bőven elegendő
+- A core-nak egyetlen mailbox interruptja van (lásd [Power domain-ek](#power-management)) — a hálózat a core-nak kézbesít, a HW dispatcher pedig az aktornak
+- A core-on belüli dispatcher triviális: actor ID olvasása a cella header-ből (`dst_actor` mező), lookup egy lokális táblában → route az actor kontextusához. Költség: ~1–5 ciklus, elhanyagolható a 29–229 ciklusos hálózati tranzithoz képest. A payload **teljes egészében alkalmazásadat** (v2.4 óta)
+- A `src_actor[8]` mezőt a küldő core HW tölti ki az aktív actor context regiszterből — **nem hamisítható** (a szoftver nem írhatja felül)
 
 ### Fázis-elérhetőség
 

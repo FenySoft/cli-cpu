@@ -270,7 +270,7 @@ Boot-releváns regiszterek. A teljes MMIO térképet lásd: [osreq-002 — MMIO 
 | QSPI config | `0xF0001000` | R/W | 4 byte | Enable, SPI mode, clock divider |
 | QSPI flash addr | `0xF0001004` | R/W | 4 byte | Flash olvasási cím |
 | QSPI binary size | `0xF0001008` | R/O | 4 byte | Binary méret (flash header-ből) |
-| QSPI data | `0xF000100C` | R/O | 256 byte | Következő 256 byte-os chunk a flash-ről (cella payload méret) |
+| QSPI data | `0xF000100C` | R/O | 128 byte | Következő 128 byte-os chunk a flash-ről (= v3.1 cella payload méret, lásd `specs/cell-format-hu.md` v2.3) |
 
 ### UART boot controller (boot forrás #1)
 
@@ -294,7 +294,7 @@ Boot-releváns regiszterek. A teljes MMIO térképet lásd: [osreq-002 — MMIO 
 | ETH config | `0xF0001300` | R/W | 4 byte | PHY init, MAC address[31:0] |
 | ETH config2 | `0xF0001304` | R/W | 4 byte | MAC address[47:32], VLAN, enable |
 | ETH status | `0xF0001308` | R/O | 4 byte | Link up, RX ready, frame count |
-| ETH data | `0xF000130C` | R/O | 256 byte | Következő 256 byte-os chunk (Ethernet frame payload-ból) |
+| ETH data | `0xF000130C` | R/O | 128 byte | Következő 128 byte-os chunk (Ethernet frame payload-ból, = v3.1 cella payload méret) |
 
 ### Core discovery és vezérlés
 

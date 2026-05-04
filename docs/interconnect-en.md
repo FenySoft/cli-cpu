@@ -832,6 +832,7 @@ This document addresses the following Symphact hardware requirements:
 
 ## Related Documents
 
+- [Topology scaling](topology-scaling-en.md) — general NoC topology comparison (Bus/Ring/Mesh/Torus/Crossbar/Fat-tree/Hierarchical) with area + BW + latency formulas; mathematical justification for the hierarchical choice
 - [Quench-RAM](quench-ram-en.md) — per-block immutability, atomic wipe-on-release, QRAM + network symbiosis
 - [AuthCode](authcode-en.md) — code authentication; the Seal Core verifies the signature of every loaded code block
 - [Architecture](architecture-en.md) — full CFPU microarchitecture overview

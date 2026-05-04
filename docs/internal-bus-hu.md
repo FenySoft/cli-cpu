@@ -175,6 +175,7 @@ A **128-bit** a NoC link szélességére iparilag standard kis-közepes chipekhe
 - [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) — TLP > ILP filozófia, ami a busz méretezés indoklása
 - [`core-types-hu.md`](core-types-hu.md) — core típusok, ahol a busz méret core-onként eltér
 - [`interconnect-hu.md`](interconnect-hu.md) — chip-szintű NoC busz (külön réteg)
+- [`topology-scaling-hu.md`](topology-scaling-hu.md) — általános NoC topológia skálázás (area, BW, latencia képletek N függvényében)
 - [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) — memória hub szűk keresztmetszet
 - [`cfpu-ml-max-hu.md`](cfpu-ml-max-hu.md) — ML core 1024-bit busz indoklása
 

@@ -438,7 +438,7 @@ A single F6 Rich core may support **multiple granularities** simultaneously acro
 | `DATA-fine` | 16 byte | capability registry, ActorRef pool |
 | `DATA-medium` | 256 byte | actor state objects |
 | `STACK` | n/a | no Quench-RAM (per-frame allocation is fast) |
-| `MAILBOX` | 256 byte | sealed message payloads (= cell payload size) |
+| `MAILBOX` | 128 byte | sealed message payloads (= v3.1 cell payload size, see `specs/cell-format-en.md` v2.3) |
 
 The Nano core (F4) is simpler: only **256 byte block** granularity, designed for simplicity.
 

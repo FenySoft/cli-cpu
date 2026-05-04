@@ -438,7 +438,7 @@ Egy F6 Rich core **több granularitást** támogathat egyidejűleg, különböz�
 | `DATA-fine` | 16 byte | capability registry, ActorRef pool |
 | `DATA-medium` | 256 byte | aktor state objektumok |
 | `STACK` | n/a | nincs Quench-RAM (per-frame allokáció gyors) |
-| `MAILBOX` | 256 byte | sealed üzenet-payload-ok (= cella payload méret) |
+| `MAILBOX` | 128 byte | sealed üzenet-payload-ok (= v3.1 cella payload méret, lásd `specs/cell-format-hu.md` v2.3) |
 
 A Nano core (F4) egyszerűbb: csak **256 byte blokk** granularitás, mert az egyszerűségre tervezve.
 

@@ -832,6 +832,7 @@ Ez a dokumentum az alábbi Symphact hardware requirement-ekre válaszol:
 
 ## Kapcsolódó dokumentumok
 
+- [Topológia skálázás](topology-scaling-hu.md) — általános NoC topológia összehasonlítás (Bus/Ring/Mesh/Torus/Crossbar/Fat-tree/Hierarchikus) area + BW + latencia képletekkel, a hierarchikus választás matematikai indoklása
 - [Quench-RAM](quench-ram-hu.md) — per-blokk immutability, atomi wipe-on-release, QRAM+hálózat szimbiózis
 - [AuthCode](authcode-hu.md) — kód-hitelesítés, a Seal Core ellenőrzi minden betöltött kód aláírását
 - [Architektúra](architecture-hu.md) — a teljes CFPU mikroarchitektúra áttekintés

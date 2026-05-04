@@ -175,6 +175,7 @@ Estimates at 5nm node, 1 mm bus length:
 - [`microarch-philosophy-en.md`](microarch-philosophy-en.md) — TLP > ILP philosophy that motivates bus sizing
 - [`core-types-en.md`](core-types-en.md) — core types, where bus size differs per core
 - [`interconnect-en.md`](interconnect-en.md) — chip-level NoC bus (separate layer)
+- [`topology-scaling-en.md`](topology-scaling-en.md) — general NoC topology scaling (area, BW, latency formulas as a function of N)
 - [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) — memory hub bottleneck
 - [`cfpu-ml-max-en.md`](cfpu-ml-max-en.md) — ML core 1024-bit bus rationale
 

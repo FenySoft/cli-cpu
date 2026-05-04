@@ -1316,20 +1316,23 @@ SRAM (on-chip, QRAM-protected)
 - **QRAM** protects against software-level tampering (capability tags, immutability)
 - **QRAM External Extension** protects against physical-level tampering (bus probing, PSRAM modification)
 
-### Actor Address — Software Dispatch
+### Actor Address — HW Dispatch (in Header)
 
-The [interconnect](interconnect-en.md) 24-bit hardware address routes cells to a **core**, not to an individual actor:
+In the [interconnect](interconnect-en.md) v3.0+ model, the cell header carries **both the HW address and the actor ID**, so the destination core performs HW dispatch (not software):
 
 ```
-HW address: [region:4-6].[tile:3-4].[cluster:3-4].[core:4] = 18 bits (of 24)
-Actor ID:   payload first 1–2 bytes (software dispatch on the destination core)
+HW address (dst):       [region].[tile].[cluster].[core] = 24 bits (Word 0 upper)
+Actor ID (dst_actor):                                       8 bits (Word 0 lower)
+                                                       Total: 32 bits (1 word)
 ```
+
+For the detailed header layout see [`specs/cell-format-en.md`](../specs/cell-format-en.md) v2.3.
 
 **Rationale:**
-- The maximum actor count per core varies by core type, SRAM size, and workload — a fixed HW bit field would be either too narrow (4-bit = 16 actors) or wasteful
-- The core already has a single mailbox interrupt (see [Power Domains](#power-management)) — the network delivers to the core, not to an actor
-- The on-core dispatcher is trivial: read actor ID from the cell payload, lookup in a local table → route to the actor's context. Cost: ~1–5 cycles, negligible vs. 27–215 cycle network transit
-- The 6 remaining bits (24 − 18) are reserved for future addressing extensions (more regions, larger clusters)
+- The `dst_actor[8]` field covers 256 actors/core, plenty for the warm-context cache (4–8 active + 248 sleeping)
+- The core already has a single mailbox interrupt (see [Power Domains](#power-management)) — the network delivers to the core, the HW dispatcher routes to the actor
+- The on-core dispatcher is trivial: read actor ID from the cell header (`dst_actor` field), lookup in a local table → route to the actor's context. Cost: ~1–5 cycles, negligible vs. 27–215 cycle network transit. The payload is **entirely application data** (since v2.4)
+- The `src_actor[8]` field is filled by the sending core's HW from the active actor context register — **not forgeable** (software cannot overwrite it)
 
 ### Phase Availability
 
