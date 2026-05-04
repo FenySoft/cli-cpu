@@ -42,6 +42,18 @@ OP_SHR_UN     = 0x64
 OP_NEG        = 0x65
 OP_NOT        = 0x66
 
+# hu: Branch opcodes (Sub4) — mind 2-byte: opcode + signed offset
+# en: Branch opcodes (Sub4) — all 2-byte: opcode + signed offset
+OP_BR_S       = 0x2B
+OP_BRFALSE_S  = 0x2C
+OP_BRTRUE_S   = 0x2D
+OP_BEQ_S      = 0x2E
+OP_BGE_S      = 0x2F
+OP_BGT_S      = 0x30
+OP_BLE_S      = 0x31
+OP_BLT_S      = 0x32
+OP_BNE_UN_S   = 0x33
+
 # hu: Argument / local opcodes (Sub3) / en: Argument / local opcodes (Sub3)
 OP_LDARG_0    = 0x02
 OP_LDARG_1    = 0x03
@@ -718,3 +730,119 @@ async def test_36_invalid_local_trap(dut):
     assert trap == 1, f"expected trap, got halt={halt}"
     assert tc == TRAP_INVALID_LOCAL, \
         f"trap_code = 0x{tc:02X}, expected 0x{TRAP_INVALID_LOCAL:02X}"
+
+
+# ============================================================
+# hu: Sub4 — Branch (BR_S / BRFALSE_S / BRTRUE_S / BEQ_S / BLT_S / BGE_S)
+# en: Sub4 — Branch (BR_S / BRFALSE_S / BRTRUE_S / BEQ_S / BLT_S / BGE_S)
+# ============================================================
+
+
+@cocotb.test()
+async def test_40_br_s_forward(dut):
+    """hu: BR_S +3 átugorja a 3 byte-ot (LDC.I4_S 99 + RET), majd LDC 42.
+        Layout:
+          @0: BR_S +3       (offset = 3 byte = +3 a következő utasítástól)
+          @2: LDC.I4_S 99   (3 byte átugorva: ezt nem éri el)
+          @4: RET           (... és ezt sem)
+          @5: LDC.I4_S 42   (ide ugrik)
+          @7: RET           (és ez ad vissza 42-t)
+    en: BR_S +3 skips 3 bytes (LDC.I4_S 99 + RET), executes LDC 42."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_BR_S, 3,            # @0: branch +3 (target @5)
+        OP_LDC_I4_S, 99,       # @2: skipped
+        OP_RET,                # @4: skipped
+        OP_LDC_I4_S, 42,       # @5: target
+        OP_RET,                # @7
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 42, f"return_value = {rv}, expected 42"
+
+
+@cocotb.test()
+async def test_41_brtrue_taken(dut):
+    """hu: LDC.I4_1 + BRTRUE_S +2 → branch (1 != 0).
+    en: LDC.I4_1 + BRTRUE_S +2 → branch (1 != 0)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4_1,           # @0: push 1
+        OP_BRTRUE_S, 2,        # @1: branch +2 (target @5)
+        OP_LDC_I4_S, 99,       # @3: skipped
+        OP_LDC_I4_S, 42,       # @5: target
+        OP_RET,                # @7
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 42, f"return_value = {rv}, expected 42"
+
+
+@cocotb.test()
+async def test_42_brfalse_not_taken(dut):
+    """hu: LDC.I4_1 + BRFALSE_S +2 → fall-through (1 != 0).
+    en: LDC.I4_1 + BRFALSE_S +2 → fall-through (1 != 0)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4_1,           # @0: push 1
+        OP_BRFALSE_S, 2,       # @1: NOT taken
+        OP_LDC_I4_S, 42,       # @3: fall-through
+        OP_RET,                # @5
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 42, f"return_value = {rv}, expected 42"
+
+
+@cocotb.test()
+async def test_43_beq_s_taken(dut):
+    """hu: LDC.I4_5 + LDC.I4_5 + BEQ_S +2 → branch (5==5).
+    en: LDC.I4_5 + LDC.I4_5 + BEQ_S +2 → branch (5==5)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4_5,           # @0: push 5
+        OP_LDC_I4_5,           # @1: push 5
+        OP_BEQ_S, 2,           # @2: a==b → branch +2 (target @6)
+        OP_LDC_I4_S, 99,       # @4: skipped
+        OP_LDC_I4_S, 42,       # @6: target
+        OP_RET,                # @8
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 42, f"return_value = {rv}, expected 42"
+
+
+@cocotb.test()
+async def test_44_blt_s_signed(dut):
+    """hu: -1 < 1 → branch. LDC.I4_M1 + LDC.I4_1 + BLT_S +2.
+    en: -1 < 1 → branch. LDC.I4_M1 + LDC.I4_1 + BLT_S +2."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4_M1,          # @0: push -1
+        OP_LDC_I4_1,           # @1: push 1
+        OP_BLT_S, 2,           # @2: -1 < 1 → branch
+        OP_LDC_I4_S, 99,       # @4: skipped
+        OP_LDC_I4_S, 42,       # @6: target
+        OP_RET,                # @8
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 42, f"return_value = {rv}, expected 42"
+
+
+@cocotb.test()
+async def test_45_bge_s_signed(dut):
+    """hu: 5 >= 5 → branch. LDC.I4_5 + LDC.I4_5 + BGE_S +2.
+    en: 5 >= 5 → branch. LDC.I4_5 + LDC.I4_5 + BGE_S +2."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4_5,           # @0: push 5
+        OP_LDC_I4_5,           # @1: push 5
+        OP_BGE_S, 2,           # @2: 5 >= 5 → branch
+        OP_LDC_I4_S, 99,       # @4: skipped
+        OP_LDC_I4_S, 42,       # @6: target
+        OP_RET,                # @8
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 42, f"return_value = {rv}, expected 42"

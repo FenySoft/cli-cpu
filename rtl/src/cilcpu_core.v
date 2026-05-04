@@ -347,17 +347,49 @@ module cilcpu_core (
 
     // ============================================================
     // hu: PC update mux
+    //     PC_SRC_BRANCH: rövid branch — operand[7:0] sign-extend a
+    //       pc + length-hez. (A decoder már sign-extend-el 32 bitre.)
     // en: PC update mux
+    //     PC_SRC_BRANCH: short branch — sign-extend operand[7:0] added
+    //       to pc + length. (Decoder already sign-extends to 32 bits.)
     // ============================================================
     reg [23:0] pc_next;
+
+    wire signed [23:0] branch_offset_ext = {{16{r_operand[7]}}, r_operand[7:0]};
 
     always @(*) begin
         case (uc_pc_src)
             `PC_SRC_NEXT:   pc_next = r_pc + {21'd0, r_length};
+            `PC_SRC_BRANCH: pc_next = r_pc + {21'd0, r_length} + branch_offset_ext;
             `PC_SRC_RET:    pc_next = r_sram[r_fp[13:2]][23:0];
-            default:        pc_next = r_pc;  // PC_SRC_BRANCH, PC_SRC_CALL: Sub2+
+            default:        pc_next = r_pc;  // PC_SRC_CALL: Sub5
         endcase
     end
+
+    // ============================================================
+    // hu: Branch eldöntés — Sub4
+    //     1-operand branches (BRFALSE_S / BRTRUE_S): a cond_type a TOS
+    //       alapján:
+    //         COND_EQ → branch ha TOS == 0 (BRFALSE)
+    //         COND_NE → branch ha TOS != 0 (BRTRUE)
+    //     2-operand branches (BEQ/BLT/BGE/BGT/BLE/BNE): az ALU eredménye
+    //       (CEQ/CLT/CGT) 0/1, és a cond_type ezt fordítja vissza:
+    //         COND_NE → branch ha alu_result != 0 (alapértelmezett)
+    //         COND_EQ → branch ha alu_result == 0 (BGE = !CLT, BLE = !CGT)
+    //     Az `r_alu_result_latched` a phase 0-ban beolvasott ALU eredmény.
+    // en: Branch decision — Sub4
+    //     1-operand branches: cond_type vs TOS;
+    //     2-operand branches: ALU result via cond_type inversion.
+    // ============================================================
+    wire branch_taken_1op = uc_cond_en && (uc_stack_pop == 2'd1) && (
+        (uc_cond_type == `COND_EQ && w_sc_tos == 32'd0) ||
+        (uc_cond_type == `COND_NE && w_sc_tos != 32'd0)
+    );
+
+    wire branch_taken_2op_phase1 = uc_cond_en && uc_alu_en && (
+        (uc_cond_type == `COND_NE && r_alu_result_latched != 32'd0) ||
+        (uc_cond_type == `COND_EQ && r_alu_result_latched == 32'd0)
+    );
 
     // ============================================================
     // hu: SRAM rdata/ready wireing a Stack Cache felé.
@@ -808,9 +840,36 @@ module cilcpu_core (
                             r_state <= ST_FETCH;
                         end
                     end
+                end else if (uc_alu_en && uc_cond_en && r_alu_phase == 2'd1) begin
+                    // hu: 2-operand branch phase 1 (Sub4) — második pop,
+                    //     branch eldöntés r_alu_result_latched alapján.
+                    //     NEM replace_top, mert a stack-en már nincs
+                    //     szükség az eredményre (az ALU comp BEQ/BLT/...
+                    //     csak a feltételhez kellett).
+                    // en: 2-operand branch phase 1 (Sub4) — second pop,
+                    //     branch decision based on r_alu_result_latched.
+                    //     No replace_top — the stack no longer needs the
+                    //     comparison result.
+                    r_sc_pop_en <= 1'b1;
+                    r_alu_phase <= 2'd0;
+                    if (branch_taken_2op_phase1) begin
+                        r_pc          <= pc_next;
+                        r_fetch_count <= 4'd0;
+                        r_fetch_pc    <= pc_next;
+                        r_next_fetch_addr <= pc_next;
+                    end else begin
+                        r_pc          <= r_pc + {21'd0, r_length};
+                        r_fetch_count <= 4'd0;
+                        r_fetch_pc    <= r_pc + {21'd0, r_length};
+                        r_next_fetch_addr <= r_pc + {21'd0, r_length};
+                    end
+                    r_step  <= 4'd0;
+                    r_state <= ST_FETCH;
                 end else if (uc_alu_en && r_alu_phase == 2'd1) begin
-                    // hu: ALU phase 1 (binary) — replace_top a latch-elt
-                    //     eredménnyel, uc_done flow.
+                    // hu: ALU phase 1 (binary, NEM cond) — replace_top a
+                    //     latch-elt eredménnyel, uc_done flow.
+                    // en: ALU phase 1 (binary, non-cond) — replace_top
+                    //     with latched result, uc_done flow.
                     r_sc_replace_top_en   <= 1'b1;
                     r_sc_replace_top_data <= r_alu_result_latched;
                     r_alu_phase           <= 2'd0;
@@ -952,14 +1011,26 @@ module cilcpu_core (
                         //     (r_length)`-szel — a generic `for` loop +
                         //     dynamic index Verilator regiszter-array-en
                         //     nem viselkedik megbízhatóan.
+                        //     Sub4 — 1-operand branch (BRFALSE/BRTRUE):
+                        //     a fall-through esetén (cond_en=1, branch
+                        //     nem teljesül) pc_next-et felülírjuk pc+len-re.
                         // en: Normal opcode end — PC update + buffer slide-down
                         //     (warm-path opt). On branch/call we full-flush.
-                        //     Slide is explicit `case (r_length)` — the
-                        //     generic `for` loop with dynamic index does
-                        //     not behave reliably on Verilator reg arrays.
+                        //     Sub4 — 1-operand branch: on fall-through, override
+                        //     pc_next with pc+len (no taken).
                         if (uc_pc_wr) begin
-                            r_pc <= pc_next;
-                            if (uc_pc_src != `PC_SRC_NEXT) begin
+                            if (uc_cond_en && (uc_stack_pop == 2'd1) &&
+                                !branch_taken_1op) begin
+                                // hu: BRFALSE_S/BRTRUE_S nem teljesült feltétel
+                                //     → fall-through, NEM branch.
+                                // en: BRFALSE_S/BRTRUE_S condition false →
+                                //     fall-through, no branch.
+                                r_pc          <= r_pc + {21'd0, r_length};
+                                r_fetch_count <= 4'd0;
+                                r_fetch_pc    <= r_pc + {21'd0, r_length};
+                                r_next_fetch_addr <= r_pc + {21'd0, r_length};
+                            end else if (uc_pc_src != `PC_SRC_NEXT) begin
+                                r_pc <= pc_next;
                                 r_fetch_count <= 4'd0;
                                 r_fetch_pc    <= pc_next;
                                 // hu: Sub2.1 — branch/call full-flush:
@@ -968,6 +1039,7 @@ module cilcpu_core (
                                 //     next fetch starts from pc_next.
                                 r_next_fetch_addr <= pc_next;
                             end else if (r_fetch_count >= {1'b0, r_length}) begin
+                                r_pc <= pc_next;
                                 // hu: Packed buffer slide: lefelé (byte 0 a
                                 //     legalsó), `r_length * 8` bit jobbra
                                 //     shift, felülre 0. Verilator
