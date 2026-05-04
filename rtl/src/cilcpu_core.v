@@ -391,6 +391,27 @@ module cilcpu_core (
         (uc_cond_type == `COND_EQ && r_alu_result_latched == 32'd0)
     );
 
+    // hu: Sub4 hiánypótlás — Branch target validáció (TRAP_INVALID_BRANCH).
+    //     A spec szerint a branch target `target < 0` esetén trap-elt.
+    //     F2.5a egyszerűsítés: csak negatív cím (felső bit = 1) trap-elt;
+    //     pozitív túlcsordulás (24-bit címterén túl) NEM detektálódik itt,
+    //     hanem a következő ciklus fetch-én (0xFF byte → INVALID_OPCODE).
+    //     Mivel `pc_next` 24-bit unsigned, a `branch_offset_ext` 24-bit
+    //     signed → ha pc_next felső bitje 1, az -8M..-1 tartomány = negatív.
+    //     Csak akkor érvényes a vizsgálat, ha PC_SRC_BRANCH (1-op vagy 2-op
+    //     branch); call/ret nem ide tartozik (Sub5).
+    // en: Sub4 hardening — Branch target validation (TRAP_INVALID_BRANCH).
+    //     Per spec, the branch is invalid if `target < 0`. F2.5a simplifies
+    //     to: only negative target (top bit set in 24-bit) traps; positive
+    //     overflow (above 24-bit address space) is NOT detected here, but
+    //     on next-cycle fetch (0xFF byte → INVALID_OPCODE).
+    //     `pc_next` is 24-bit unsigned; `branch_offset_ext` is 24-bit
+    //     signed → if pc_next's top bit is 1, the value is in -8M..-1.
+    //     Only valid when PC_SRC_BRANCH (1-op or 2-op branch); call/ret
+    //     are out of scope (Sub5).
+    wire branch_target_invalid = (uc_pc_src == `PC_SRC_BRANCH) &&
+                                  (pc_next[23] == 1'b1);
+
     // ============================================================
     // hu: SRAM rdata/ready wireing a Stack Cache felé.
     //     A regisztrált SRAM-olvasás eredménye a következő ciklus elején
@@ -858,25 +879,37 @@ module cilcpu_core (
                     //     NEM replace_top, mert a stack-en már nincs
                     //     szükség az eredményre (az ALU comp BEQ/BLT/...
                     //     csak a feltételhez kellett).
+                    //     Sub4 hiánypótlás: ha a branch teljesül és a
+                    //     target negatív → TRAP_INVALID_BRANCH a PC update
+                    //     előtt (a pop-ot már megengedjük, mert az állapot
+                    //     ettől függetlenül halad).
                     // en: 2-operand branch phase 1 (Sub4) — second pop,
                     //     branch decision based on r_alu_result_latched.
                     //     No replace_top — the stack no longer needs the
                     //     comparison result.
+                    //     Sub4 hardening: if branch is taken and target is
+                    //     negative → TRAP_INVALID_BRANCH before PC update.
                     r_sc_pop_en <= 1'b1;
                     r_alu_phase <= 2'd0;
-                    if (branch_taken_2op_phase1) begin
+                    if (branch_taken_2op_phase1 && branch_target_invalid) begin
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_INVALID_BRANCH;
+                        r_state     <= ST_TRAP;
+                    end else if (branch_taken_2op_phase1) begin
                         r_pc          <= pc_next;
                         r_fetch_count <= 4'd0;
                         r_fetch_pc    <= pc_next;
                         r_next_fetch_addr <= pc_next;
+                        r_step  <= 4'd0;
+                        r_state <= ST_FETCH;
                     end else begin
                         r_pc          <= r_pc + {21'd0, r_length};
                         r_fetch_count <= 4'd0;
                         r_fetch_pc    <= r_pc + {21'd0, r_length};
                         r_next_fetch_addr <= r_pc + {21'd0, r_length};
+                        r_step  <= 4'd0;
+                        r_state <= ST_FETCH;
                     end
-                    r_step  <= 4'd0;
-                    r_state <= ST_FETCH;
                 end else if (uc_alu_en && r_alu_phase == 2'd1) begin
                     // hu: ALU phase 1 (binary, NEM cond) — replace_top a
                     //     latch-elt eredménnyel, uc_done flow.
@@ -1041,6 +1074,19 @@ module cilcpu_core (
                                 r_fetch_count <= 4'd0;
                                 r_fetch_pc    <= r_pc + {21'd0, r_length};
                                 r_next_fetch_addr <= r_pc + {21'd0, r_length};
+                            end else if (branch_target_invalid) begin
+                                // hu: Sub4 hiánypótlás — BR_S / BRFALSE_S /
+                                //     BRTRUE_S taken ágban negatív cél
+                                //     → TRAP_INVALID_BRANCH a PC update
+                                //     előtt. (A 2-op branchet külön kezeljük
+                                //     a phase 1 ágban.)
+                                // en: Sub4 hardening — BR_S / BRFALSE_S /
+                                //     BRTRUE_S taken with negative target
+                                //     → TRAP_INVALID_BRANCH before PC update.
+                                //     (2-op branch is handled in phase 1.)
+                                o_trap      <= 1'b1;
+                                o_trap_code <= `TRAP_INVALID_BRANCH;
+                                r_state     <= ST_TRAP;
                             end else if (uc_pc_src != `PC_SRC_NEXT) begin
                                 r_pc <= pc_next;
                                 r_fetch_count <= 4'd0;

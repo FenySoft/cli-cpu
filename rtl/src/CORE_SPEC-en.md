@@ -6,7 +6,7 @@
 >
 > **Scope:** Internal RTL working spec, not a public document. The public ISA spec is `docs/ISA-CIL-T0-{hu,en}.md`, the public architecture is `docs/architecture-en.md`.
 >
-> Version: 1.2
+> Version: 1.3
 
 ## Goal
 
@@ -193,6 +193,14 @@ The fetch is this slow because of the small model, which is why the fetch buffer
 
 ### Frame manager (ST_CALL and ST_RET)
 
+> **F2.5a status:** The `ST_CALL` and `ST_RET` states are **placeholders** in this
+> version — for non-root `call_depth` they trap with `TRAP_INVALID_OPCODE`. The
+> full CALL/RET frame manager is **deferred to the next F2.5a session**, where the
+> implementation will be preceded by 5+ tests anchored to the `TCpuNano` F1
+> golden reference (`test_50..54`): simple CALL/RET, recursive Fibonacci(5),
+> `call_depth_exceeded`, `invalid_call_target`. The sequence descriptions below
+> capture the contract for that deferred implementation.
+
 #### ST_CALL (after `UC_FRAME_PUSH=1`, in the context of the `call` opcode)
 
 The `call` opcode operand is the new method header RVA. Sequence:
@@ -353,6 +361,7 @@ When running `make test_core`:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.3 | 2026-05-04 | Devil's Advocate final-audit gap fixes: (1) Sub4 `TRAP_INVALID_BRANCH` (0x06) — negative branch target (`pc_next[23] == 1`) detection in BR_S / BRFALSE_S / BRTRUE_S / BEQ_S / BLT_S / BGE_S taken arms, new `branch_target_invalid` wire + 2 trap points (1-op and 2-op branch). F2.5a simplification: positive overflow detected on fetch (0xFF → INVALID_OPCODE). (2) Sub2 OVERFLOW trap (0x09) — `INT_MIN/-1` was already HW-supported in the ALU; only the test was missing (`test_25_div_overflow`). (3) Frame manager section gets an explicit "F2.5a status" callout: `ST_CALL`/`ST_RET` placeholder, Sub5 deferred to next session (5+ tests: simple CALL/RET, Fibonacci(5), `call_depth_exceeded`, `invalid_call_target`). 43 cocotb tests green (41 + 2 new), 9/13 trap codes covered (Sub5 deferred 4 traps), 0 Verilator warning. |
 | 1.2 | 2026-05-04 | Sub-iteration status: Sub1 (skeleton, LDC+RET) ✅, Sub2 (arithmetic + ALU phase) ✅, Sub2.1 (`r_qspi_inflight`+`r_next_fetch_addr` Verilator NBA fetch addr fix) ✅, Sub2.2 (APPEND general count 0..4) ✅, Sub3 (LDARG/STARG/LDLOC/STLOC + 2-phase ST_MEM_WAIT + SRAM bus arbiter) ✅, Sub4 (BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE branch decision) ✅, Sub6 (Stack Cache trap aggregator) ✅. **Sub5 (CALL/RET non-root) — OPEN, deferred to next session.** Verilator gotchas documented: SRAM read 1-cycle latency requires ST_MEM_WAIT 2 cycles (X = r_sram_re=1, X+1 = `if (r_sram_re)` runs → r_sram_rdata_latched <= sram NBA, X+2 = fresh value visible). 41 cocotb tests green, 0 FAIL, 0 expect_fail, 0 Verilator warning. |
 | 1.1 | 2026-05-04 | Devil's Advocate audit: TMethodHeader format clarified (4 fields: arg_count, local_count, max_stack, code_size). F2.5a HW only consumes the first 3 bytes; max_stack and code_size deferred to F5+. Confirmation that no fetch abort is needed mid-branch (branch only runs in ST_EXECUTE, when QSPI is IDLE). |
 | 1.0 | 2026-05-04 | Initial F2.5a top-level Nano core spec — 5-submodule integration, fetch/decode/execute pipeline, frame manager, trap aggregator |

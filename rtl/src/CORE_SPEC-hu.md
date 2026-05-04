@@ -6,7 +6,7 @@
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum. A publikus ISA spec a `docs/ISA-CIL-T0-{hu,en}.md`, a publikus architektúra a `docs/architecture-hu.md`.
 >
-> Version: 1.2
+> Version: 1.3
 
 ## Cél
 
@@ -193,6 +193,14 @@ A fetch ennyire lassú a kis modell miatt, ezért a fetch buffer kritikus: **az 
 
 ### Frame manager (ST_CALL és ST_RET)
 
+> **F2.5a státusz:** Az `ST_CALL` és `ST_RET` állapotok **placeholder-ek** ebben
+> a verzióban — non-root `call_depth` esetén `TRAP_INVALID_OPCODE`-pal trap-elnek.
+> A teljes CALL/RET frame manager **F2.5a következő ülésére** halasztva, ahol
+> a `TCpuNano` F1 aranypéldához kötött 5+ teszt (`test_50..54`) szigorúan
+> TDD-vel íródik az implementáció előtt: simple CALL/RET, recursive Fibonacci(5),
+> `call_depth_exceeded`, `invalid_call_target`. Az alábbi szekvencia-leírások
+> a halasztott implementáció kontraktját rögzítik.
+
 #### ST_CALL (a `UC_FRAME_PUSH=1` után, a `call` opcode kontextusában)
 
 A `call` opcode operandusa az új method header RVA. A szekvencia:
@@ -353,6 +361,7 @@ A `make test_core` futtatás esetén:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.3 | 2026-05-04 | Devil's Advocate végaudit hiánypótlás: (1) Sub4 `TRAP_INVALID_BRANCH` (0x06) — negatív branch target (`pc_next[23] == 1`) detektálása BR_S / BRFALSE_S / BRTRUE_S / BEQ_S / BLT_S / BGE_S taken ágban, új `branch_target_invalid` wire + 2 trap pont (1-op és 2-op branch). F2.5a egyszerűsítés: pozitív túlcsordulás a fetch-en detektálódik (0xFF → INVALID_OPCODE). (2) Sub2 OVERFLOW trap (0x09) — `INT_MIN/-1` eset már HW-támogatott az ALU-ban, csak a teszt hiányzott (`test_25_div_overflow`). (3) Frame manager szekció elejére explicit „F2.5a státusz" doboz: `ST_CALL`/`ST_RET` placeholder, Sub5 a következő ülésre halasztva (5+ teszt: simple CALL/RET, Fibonacci(5), `call_depth_exceeded`, `invalid_call_target`). 43 cocotb teszt zöld (41 + 2 új), 9/13 trap kód lefedett (Sub5 halasztott 4 trap-pel), 0 Verilator warning. |
 | 1.2 | 2026-05-04 | Sub-iteráció állapot: Sub1 (skeleton, LDC+RET) ✅, Sub2 (aritmetika+ALU phase) ✅, Sub2.1 (`r_qspi_inflight`+`r_next_fetch_addr` Verilator NBA fetch addr fix) ✅, Sub2.2 (APPEND general count 0..4) ✅, Sub3 (LDARG/STARG/LDLOC/STLOC + ST_MEM_WAIT 2-fázisú + SRAM bus arbiter) ✅, Sub4 (BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE branch eldöntés) ✅, Sub6 (Stack Cache trap aggregátor) ✅. **Sub5 (CALL/RET nem-root) — NYITOTT, a következő ülésre marad.** Verilator gotcha-k dokumentálva: SRAM read 1-ciklus latency miatt ST_MEM_WAIT 2 ciklus kell (X = r_sram_re=1, X+1 = `if (r_sram_re)` lefut → r_sram_rdata_latched <= sram NBA, X+2 = friss érték látszik). 41 cocotb teszt zöld, 0 FAIL, 0 expect_fail, Verilator 0 warning. |
 | 1.1 | 2026-05-04 | Devil's Advocate audit: TMethodHeader formátum pontosítás (4 mező: arg_count, local_count, max_stack, code_size). F2.5a HW csak az első 3 byte-ot dolgozza, max_stack és code_size F5+-re marad. Megerősítés, hogy branch közbeni fetch abort nincs (a branch csak ST_EXECUTE-ban fut, QSPI ekkor IDLE). |
 | 1.0 | 2026-05-04 | Kezdeti F2.5a top-level Nano core spec — 5 részegység integráció, fetch/decode/execute pipeline, frame manager, trap aggregátor |

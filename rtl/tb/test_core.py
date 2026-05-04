@@ -57,6 +57,9 @@ OP_BNE_UN_S   = 0x33
 # hu: Speciális opkódok / en: Special opcodes
 OP_BREAK      = 0xDD
 OP_POP        = 0x26
+OP_CALL       = 0x28
+TRAP_INVALID_CALL_TARGET = 0x07
+TRAP_CALL_DEPTH_EXCEEDED = 0x0A
 
 # hu: Argument / local opcodes (Sub3) / en: Argument / local opcodes (Sub3)
 OP_LDARG_0    = 0x02
@@ -82,6 +85,7 @@ TRAP_STACK_UNDERFLOW     = 0x02
 TRAP_INVALID_OPCODE      = 0x03
 TRAP_INVALID_LOCAL       = 0x04
 TRAP_INVALID_ARG         = 0x05
+TRAP_INVALID_BRANCH      = 0x06
 TRAP_DIV_BY_ZERO         = 0x08
 TRAP_OVERFLOW            = 0x09
 TRAP_DEBUG_BREAK         = 0x0B
@@ -598,6 +602,25 @@ async def test_22_not_0(dut):
     await _run_unary_op(dut, OP_NOT, 0, 0xFFFFFFFF)
 
 
+@cocotb.test()
+async def test_25_div_overflow(dut):
+    """hu: INT_MIN / -1 = overflow trap (0x80000000 / 0xFFFFFFFF).
+        Az ALU detektálja az aritmetikai overflow-t, és TRAP_OVERFLOW-t emel.
+    en: INT_MIN / -1 = overflow trap (0x80000000 / 0xFFFFFFFF).
+        ALU catches the arithmetic overflow and raises TRAP_OVERFLOW."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4, 0x00, 0x00, 0x00, 0x80,  # LDC.I4 INT_MIN (0x80000000, LE)
+        OP_LDC_I4_M1,                        # LDC.I4_M1 = -1
+        OP_DIV,
+        OP_RET,
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert trap == 1, f"expected overflow trap, got halt={halt}"
+    assert tc == TRAP_OVERFLOW, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_OVERFLOW:02X} (OVERFLOW)"
+
+
 # ============================================================
 # hu: Boot args streaming (Sub3-ra vár LDARG impl)
 # en: Boot args streaming (waits for Sub3 LDARG impl)
@@ -850,6 +873,27 @@ async def test_45_bge_s_signed(dut):
     rv, tc, halt, trap, pc = await boot_and_run(dut, program)
     assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
     assert rv == 42, f"return_value = {rv}, expected 42"
+
+
+@cocotb.test()
+async def test_46_branch_negative_target(dut):
+    """hu: BR_S -100 (PC=0+2-100 = negatív) → TRAP_INVALID_BRANCH.
+        F2.5a egyszerűsítés: csak negatív branch target trap-elt;
+        pozitív túlcsordulás a következő ciklus fetch-én detektálódik
+        (0xFF byte → TRAP_INVALID_OPCODE).
+    en: BR_S -100 (PC=0+2-100 = negative) → TRAP_INVALID_BRANCH.
+        F2.5a simplification: only negative branch target traps;
+        positive overflow detected on next-cycle fetch (0xFF byte →
+        TRAP_INVALID_OPCODE)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_BR_S, 0x9C,  # BR_S -100 (signed: 0x9C = -100)
+        OP_RET,
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert trap == 1, f"expected trap, got halt={halt}"
+    assert tc == TRAP_INVALID_BRANCH, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_INVALID_BRANCH:02X} (INVALID_BRANCH)"
 
 
 # ============================================================
