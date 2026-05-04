@@ -6,7 +6,7 @@ status: living
 
 > English version: [roadmap-en.md](roadmap-en.md)
 
-> Version: 1.1
+> Version: 1.2
 
 A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első működő, kezedben tartható szilíciumig és tovább, a teljes ECMA-335 CIL implementációig.
 
@@ -108,7 +108,8 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - F2.2b Decoder — microcode ROM komplex opkódokhoz (következő sprint)
 - F2.3 Stack cache — 4×32-bit TOS + spill logika
 - F2.4 QSPI vezérlő — kód + adat fetch
-- F2.5 Golden vector harness — cocotb vs C# szimulátor
+- F2.5a Top-level Nano core integráció (`cilcpu_core.v`) — 5 részegység + fetch unit + frame manager + memory bus arbiter
+- F2.5b Golden vector harness — cocotb vs C# szimulátor (CilCpu.Sim trace export, lépésről-lépésre összehasonlítás)
 - F2.6 Yosys szintézis — Sky130 PDK, terület becslés
 - F2.7 FPGA validáció — egymagos Nano core, valós hardveren (A7-Lite)
 
@@ -503,13 +504,14 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | **F0** | Specifikáció (3 dokumentum, ~3500+ sor) | ~60 | ~0.4 | ✅ KÉSZ |
 | **F1** | C# referencia szimulátor (48 opkód, 218 teszt, 4 iteráció TDD) | ~120 | ~0.8 | ✅ KÉSZ |
 | **F1.5** | Linker, Runner, Samples (259 teszt) | ~80 | ~0.5 | ✅ KÉSZ |
-| **F2** | RTL (Verilog + cocotb, 7 alszakasz) | ~350 | ~2.2 | 🔧 Folyamatban |
+| **F2** | RTL (Verilog + cocotb, 8 alszakasz) | ~370 | ~2.3 | 🔧 Folyamatban |
 | — F2.1 | ALU (32-bit egész) | ~30 | | ✅ KÉSZ |
 | — F2.2a | Decoder (hossz + opkód) | ~40 | | ✅ KÉSZ |
 | — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ KÉSZ |
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ KÉSZ |
-| — F2.4 | QSPI vezérlő | ~70 | | ⬜ Tervezett |
-| — F2.5 | Golden vector harness | ~35 | | ⬜ Tervezett |
+| — F2.4 | QSPI vezérlő | ~70 | | ✅ KÉSZ |
+| — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | 🔧 Folyamatban (spec kész) |
+| — F2.5b | Golden vector harness | ~25 | | ⬜ Tervezett |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
 | — F2.7 | FPGA validáció (A7-Lite) | ~45 | | ⬜ Tervezett |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Tervezett |
@@ -629,7 +631,11 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **F1.5 — Linker, Runner, Samples lezárva.** A `CilCpu.Linker` Roslyn .dll → CIL-T0 pipeline, a `CilCpu.Sim.Runner` CLI futtatóeszköz (`run` / `link` parancsok), és a `samples/PureMath` példaprogram kész. **259 zöld xUnit teszt**, **0 warning, 0 error**. A teljes pipeline (C# → Roslyn → linker → szimulátor) end-to-end tesztelve, TDD-vel fejlesztve, Devil's Advocate review-val.
 
-**Következő érdemi lépés:** **F2 — RTL** kezdete (Verilog vagy Amaranth HDL döntés, cocotb testbench infrastruktúra).
+**F2 — RTL folyamatban.** F2.1 ALU, F2.2a Decoder, F2.2b Microcode ROM, F2.3 Stack Cache, F2.4 QSPI Controller **lezárva** — összesen 5 részegység, ~150+ cocotb zöld teszt, minden alszakaszhoz Devil's Advocate review.
+
+**F2.5a — Top-level Nano core integráció spec lezárva.** Az `rtl/src/CORE_SPEC-{hu,en}.md` rögzíti az 5 részegység (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) integrációját egyetlen `cilcpu_core` modulba: fetch/decode/execute pipeline, frame manager, belső 16 KB SRAM, trap aggregátor, 10-állapotú top-level FSM. A spec 30+ cocotb tesztet ír elő (10 csoport, 13 trap kód lefedés), aranypéldaként a TCpuNano F1 szimulátor szolgál.
+
+**Következő érdemi lépés:** **F2.5a TDD piros** — cocotb tesztek a `test_core.py`-ben (Reset/Boot smoke → LDC+RET → aritmetika → branch → call/ret), majd a `cilcpu_core.v` implementáció.
 
 ## Finanszírozási akcióterv
 
@@ -684,5 +690,6 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.2 | 2026-05-04 | F2.5 alszakasz F2.5a (top-level Nano core) + F2.5b (golden vector harness) bontásra. F2.4 KÉSZ státuszra váltva. F2 össz. ~370 óra. Mai státusz frissítve F2.5a spec lezártra. |
 | 1.1 | 2026-04-17 | Becsült munkaóra összesítő + NLnet pályázati összehangolás hozzáadva. AI-asszisztált fejlesztési becslések. |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

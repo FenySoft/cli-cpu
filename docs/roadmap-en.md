@@ -6,7 +6,7 @@ status: living
 
 > Magyar verzió: [roadmap-hu.md](roadmap-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 The CLI-CPU project is built in **seven phases**, from the specification document to the first working, hand-held silicon and beyond, to a full ECMA-335 CIL implementation.
 
@@ -108,7 +108,8 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - F2.2b Decoder — microcode ROM for complex opcodes (next sprint)
 - F2.3 Stack cache — 4×32-bit TOS + spill logic
 - F2.4 QSPI controller — code + data fetch
-- F2.5 Golden vector harness — cocotb vs C# simulator
+- F2.5a Top-level Nano core integration (`cilcpu_core.v`) — 5 submodules + fetch unit + frame manager + memory bus arbiter
+- F2.5b Golden vector harness — cocotb vs C# simulator (CilCpu.Sim trace export, step-by-step comparison)
 - F2.6 Yosys synthesis — Sky130 PDK, area estimate
 - F2.7 FPGA validation — single Nano core on real hardware (A7-Lite)
 
@@ -503,13 +504,14 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | **F0** | Specification (3 documents, ~3500+ lines) | ~60 | ~0.4 | ✅ DONE |
 | **F1** | C# reference simulator (48 opcodes, 218 tests, 4 TDD iterations) | ~120 | ~0.8 | ✅ DONE |
 | **F1.5** | Linker, Runner, Samples (259 tests) | ~80 | ~0.5 | ✅ DONE |
-| **F2** | RTL (Verilog + cocotb, 7 subsections) | ~350 | ~2.2 | 🔧 In Progress |
+| **F2** | RTL (Verilog + cocotb, 8 subsections) | ~370 | ~2.3 | 🔧 In Progress |
 | — F2.1 | ALU (32-bit integer) | ~30 | | ✅ DONE |
 | — F2.2a | Decoder (length + opcode) | ~40 | | ✅ DONE |
 | — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ DONE |
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ DONE |
-| — F2.4 | QSPI controller | ~70 | | ⬜ Planned |
-| — F2.5 | Golden vector harness | ~35 | | ⬜ Planned |
+| — F2.4 | QSPI controller | ~70 | | ✅ DONE |
+| — F2.5a | Top-level Nano core integration (`cilcpu_core.v`) | ~30 | | 🔧 In progress (spec done) |
+| — F2.5b | Golden vector harness | ~25 | | ⬜ Planned |
 | — F2.6 | Yosys synthesis (Sky130) | ~30 | | ⬜ Planned |
 | — F2.7 | FPGA validation (A7-Lite) | ~45 | | ⬜ Planned |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Planned |
@@ -627,7 +629,11 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 
 **F1.5 — Linker, Runner, Samples closed.** The `CilCpu.Linker` Roslyn .dll -> CIL-T0 pipeline, the `CilCpu.Sim.Runner` CLI runner tool (`run` / `link` commands), and the `samples/PureMath` sample program are done. **259 green xUnit tests**, **0 warnings, 0 errors**. The full pipeline (C# -> Roslyn -> linker -> simulator) is end-to-end tested, developed via TDD, with Devil's Advocate review.
 
-**Next substantive step:** **F2 — RTL** kickoff (Verilog or Amaranth HDL decision, cocotb testbench infrastructure).
+**F2 — RTL in progress.** F2.1 ALU, F2.2a Decoder, F2.2b Microcode ROM, F2.3 Stack Cache, F2.4 QSPI Controller **closed** — 5 submodules total, ~150+ green cocotb tests, Devil's Advocate review for each subsection.
+
+**F2.5a — Top-level Nano core integration spec closed.** `rtl/src/CORE_SPEC-{hu,en}.md` captures the integration of all 5 submodules (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) into a single `cilcpu_core` module: fetch/decode/execute pipeline, frame manager, internal 16 KB SRAM, trap aggregator, 10-state top-level FSM. The spec mandates 30+ cocotb tests (10 groups, all 13 trap codes covered), with `TCpuNano` F1 as the golden reference.
+
+**Next substantive step:** **F2.5a TDD red** — cocotb tests in `test_core.py` (Reset/Boot smoke → LDC+RET → arithmetic → branch → call/ret), then the `cilcpu_core.v` implementation.
 
 ## Funding Action Plan
 
@@ -682,5 +688,6 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2 | 2026-05-04 | F2.5 subsection split into F2.5a (top-level Nano core) + F2.5b (golden vector harness). F2.4 marked DONE. F2 total ~370 hours. Current Status updated to F2.5a spec closed. |
 | 1.1 | 2026-04-17 | Added estimated work hours summary + NLnet grant alignment section. AI-assisted development estimates. |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |
