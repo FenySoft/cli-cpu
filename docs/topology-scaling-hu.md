@@ -6,7 +6,7 @@ status: vision
 
 > English version: [topology-scaling-en.md](topology-scaling-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vízió-szintű háttérdokumentum.** Az itt szereplő area-, BW- és latencia-becslések irodalmi adatokból (akadémiai NoC mérések, ARM CoreLink CMN, Synopsys/Cadence NoC IP, Adapteva Epiphany, Tenstorrent Tensix) extrapolált munkahipotézisek 5 nm node-ra. Általános háttéranyag a CFPU-tól elvonatkoztatva — a tényleges CFPU paraméterezést lásd [`interconnect-hu.md`](interconnect-hu.md) és [`internal-bus-hu.md`](internal-bus-hu.md).
 
@@ -194,6 +194,74 @@ A bisection BW a **legfontosabb skálázási mérőszám**, mert ez korlátozza 
 
 A crossbar **N = 256-tól nem szintetizálható** észszerű chipméretben.
 
+## Forgalom-mintázat — aggregát vs per-core BW
+
+> **Fontos:** A fenti "Per-core BW" tábla **uniform random forgalmat** feltételez (minden core minden core-ral azonos valószínűséggel kommunikál) — ez **worst case**. Lokális forgalommal és párhuzamosítással a tényleges per-core BW nagyságrendekkel jobb.
+
+### Aggregát BW — minden link egyszerre dolgozik
+
+Egy mesh-ben (vagy hierarchikusban) **minden link párhuzamosan** képes egyszerre üzenetet hordozni — a teljes hálózat aggregát maximuma a linkek kapacitásainak összege:
+
+| Topológia | Aggregát BW képlet | Indoklás |
+|---|---|---|
+| Shared bus | B | Egyetlen vezeték, szerializált |
+| Ring | 2N · B | 2N link, mindegyik B |
+| 2D Mesh √N×√N | **2N · B** (~ 2(N − √N) · B pontosan) | Minden link párhuzamosan |
+| 2D Torus | 2N · B | Mint mesh + wraparound |
+| Crossbar | N · B | N output port × B (1 hop, de szegmentálatlan) |
+| Hierarchikus | ≥ N · B (cluster-lokálisan) + felső szintek | Cluster-lokális forgalomra ~teljes link kapacitás |
+
+### Konkrét aggregát számok (B = 16 GB/s)
+
+| N | Bus aggregát | **Mesh aggregát** | Crossbar aggregát | Hierarchikus (cluster-lokális) |
+|---|---|---|---|---|
+| **16** | 16 GB/s | **384 GB/s** | 256 GB/s | 384 GB/s |
+| **64** | 16 GB/s | **1,8 TB/s** | 1,0 TB/s | ~1,5 TB/s |
+| **256** | 16 GB/s | **7,7 TB/s** | 4,1 TB/s | ~6 TB/s |
+| **1 024** | 16 GB/s | **31,7 TB/s** | 16,4 TB/s | ~25 TB/s |
+| **10 240** | 16 GB/s | **~324 TB/s** | nem építhető | ~250 TB/s |
+
+**Érdekes észrevétel:** a mesh aggregát BW > crossbar aggregát BW azonos N-re. A crossbar 1 hop-pal kapcsolja össze bármely két core-t, miközben a mesh-ben **több link párhuzamosan dolgozik** (több hop, de szegmentálható — minden link saját üzenetet tud vinni egyszerre).
+
+### Forgalom-lokalitás faktor
+
+A tényleges per-core BW erősen függ a forgalom-mintázattól. Példa **1024-core mesh**-re:
+
+| Forgalom-mintázat | Bisection terhelés | Per-core BW | Skálázás |
+|---|---|---|---|
+| Csak szomszéd-kommunikáció (90%+ lokális) | minimális | **~16 GB/s** = B | konstans |
+| Cluster-lokális (4×4 belül) | minimális | ~12 GB/s | konstans |
+| Tile-lokális (~64 core) | mérsékelt | ~5 GB/s | lassú csökkenés |
+| Régió-lokális (~256 core) | jelentős | ~2 GB/s | √N csökkenés |
+| Uniform random | telített | **~0,75 GB/s** ← korábbi tábla | 1/√N |
+| Adversariális (anti-pattern) | kritikus | ~0,4 GB/s | 1/√N + congestion |
+
+**A különbség 40× a két szélső eset között.** Egy lokalitás-tudatos aktor-placement (pl. szorosan kommunikáló aktorok ugyanabba a clusterbe) **közel B** per-core BW-t tart fenn, miközben a worst-case forgalom 1/√N skálázással gyengít.
+
+### Mikor érvényes a "Per-core BW" tábla 1/√N skálázása?
+
+A korábbi 1/√N skálázás **csak akkor** korlátoz, ha a bisection BW a szűk keresztmetszet — vagyis amikor a forgalom **átlag minden iránya egyenletes**. A három tipikus eset:
+
+1. **Lokális kommunikáció dominál** (>80% szomszéd vagy cluster-lokális) → per-core BW ≈ B (konstans)
+2. **Vegyes forgalom** (~50% lokális, 50% távoli) → per-core BW ≈ B/√(N/k) ahol k a lokális tartomány mérete
+3. **Tisztán uniform random** → per-core BW = (3/2)B/√N (a tábla képlete)
+
+A CFPU aktor-modellje az 1. esetre tervez: a HW címek hierarchikusak, a NoC router topológia szomszéd-tudatos, az aktor-placement OS-szintű feladata a lokalitás biztosítása.
+
+### Crossbar vs mesh — más megvilágításban
+
+A crossbar nem a "tökéletes" megoldás minden szempontból:
+
+| Mérőszám | Crossbar (N=1024) | Mesh (N=1024) |
+|---|---|---|
+| Aggregát BW | 16 TB/s | **31,7 TB/s** (2×) |
+| Per-core BW (uniform) | **16 GB/s** | 0,75 GB/s |
+| Per-core BW (lokális) | 16 GB/s | **~16 GB/s** (egyenlő) |
+| Latencia | **11 ns** | 51 ns |
+| Area | 25-35 mm² ❌ | **3,2 mm²** |
+
+A crossbar a **latencia és uniform-random per-core BW** szempontjából nyer; a mesh az **aggregát BW és area** szempontjából. **Lokális forgalom esetén a két topológia per-core BW-je gyakorlatilag azonos**, miközben a mesh-é töredék area-n.
+
 ## Elfoglalt szilícium terület (5 nm)
 
 ### Egységnyi költségek
@@ -327,7 +395,7 @@ Tehát N = 1024 core-nál a hierarchikus:
 - **~186× kevesebb crosspoint** mint a crossbar (5,6k vs 1M)
 - **10× jobb per-core BW** mint a tiszta mesh
 - **csak 2× rosszabb per-core BW** mint a (megépíthetetlen) crossbar
-- **~25% kevesebb area** mint a tiszta mesh (3,2 vs 4 mm²) — nőtt a router count miatt
+- **~25%-kal több area** mint a tiszta mesh (4 vs 3,2 mm²) — több router miatt, de a 10× jobb per-core BW és 2,4× jobb latencia bőven kompenzálja
 - **2,4× jobb latencia** mint a tiszta mesh (21 vs 51 ns)
 
 A hierarchikus topológia ezért a **CFPU választása** is (lásd `interconnect-hu.md` 4-szintű hierarchia).
@@ -378,4 +446,5 @@ A hierarchikus topológia ezért a **CFPU választása** is (lásd `interconnect
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.1 | 2026-05-03 | **Új szekció: "Forgalom-mintázat — aggregát vs per-core BW"**. A v1.0 csak uniform random forgalmat mutatott (worst case); a v1.1 hozzáadja az aggregát BW képletet (mesh: 2N · B), konkrét aggregát számokat (16-core mesh 384 GB/s, 1024-core mesh 31,7 TB/s), forgalom-lokalitás faktor táblát (40× különbség szomszéd vs uniform), és a crossbar vs mesh közvetlen összehasonlítást azonos N-en. Kulcs konklúzió: lokális forgalom esetén a mesh per-core BW ≈ B (mint a crossbar), miközben a mesh aggregát > crossbar aggregát. A korábbi 1/√N skálázás csak a bisection-limited (uniform random) esetben érvényes |
 | 1.0 | 2026-05-03 | Kezdeti verzió — általános NoC topológia skálázás CFPU-tól elvonatkoztatva. Bus/Ring/Mesh/Torus/Crossbar/Fat-tree/Hierarchikus összehasonlítás 144 byte üzenetegységgel. Per-core BW, bisection BW, area (5 nm), latencia képletek és konkrét számok N = 16, 64, 256, 1024, 10240 core-ra. Topológia választás algoritmus. A hierarchikus választás matematikai indoklása N ≥ 64-től |

@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [topology-scaling-hu.md](topology-scaling-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vision-level background document.** The area, BW, and latency figures presented here are working hypotheses extrapolated from documented sources (academic NoC measurements, ARM CoreLink CMN, Synopsys/Cadence NoC IP, Adapteva Epiphany, Tenstorrent Tensix) for a 5 nm node. General background, decoupled from CFPU specifics — for the actual CFPU parameterization see [`interconnect-en.md`](interconnect-en.md) and [`internal-bus-en.md`](internal-bus-en.md).
 
@@ -194,6 +194,74 @@ Bisection BW is the **most important scaling metric** because it caps aggregate 
 
 The crossbar is **not synthesizable from N = 256 onward** at reasonable chip area.
 
+## Traffic pattern — aggregate vs per-core BW
+
+> **Important:** the "Per-core BW" table above assumes **uniform random traffic** (every core communicates with every other core with equal probability) — this is **worst case**. Under local traffic with parallelism, the actual per-core BW is orders of magnitude better.
+
+### Aggregate BW — all links operating in parallel
+
+In a mesh (or hierarchical network), **every link can carry a message simultaneously** — the network's aggregate maximum is the sum of link capacities:
+
+| Topology | Aggregate BW formula | Reasoning |
+|---|---|---|
+| Shared bus | B | Single wire, serialized |
+| Ring | 2N · B | 2N links, each B |
+| 2D Mesh √N×√N | **2N · B** (~ 2(N − √N) · B precisely) | All links in parallel |
+| 2D Torus | 2N · B | Like mesh + wraparound |
+| Crossbar | N · B | N output ports × B (1 hop, but unsegmented) |
+| Hierarchical | ≥ N · B (cluster-locally) + upper levels | For cluster-local traffic ~full link capacity |
+
+### Concrete aggregate numbers (B = 16 GB/s)
+
+| N | Bus aggregate | **Mesh aggregate** | Crossbar aggregate | Hierarchical (cluster-local) |
+|---|---|---|---|---|
+| **16** | 16 GB/s | **384 GB/s** | 256 GB/s | 384 GB/s |
+| **64** | 16 GB/s | **1.8 TB/s** | 1.0 TB/s | ~1.5 TB/s |
+| **256** | 16 GB/s | **7.7 TB/s** | 4.1 TB/s | ~6 TB/s |
+| **1 024** | 16 GB/s | **31.7 TB/s** | 16.4 TB/s | ~25 TB/s |
+| **10 240** | 16 GB/s | **~324 TB/s** | not buildable | ~250 TB/s |
+
+**Notable observation:** mesh aggregate BW > crossbar aggregate BW for the same N. A crossbar links any two cores in 1 hop, but the mesh has **multiple links operating in parallel** (more hops, but segmentable — every link can carry its own message simultaneously).
+
+### Traffic locality factor
+
+The actual per-core BW depends strongly on traffic pattern. Example for a **1024-core mesh**:
+
+| Traffic pattern | Bisection load | Per-core BW | Scaling |
+|---|---|---|---|
+| Neighbour-only (90%+ local) | minimal | **~16 GB/s** = B | constant |
+| Cluster-local (within 4×4) | minimal | ~12 GB/s | constant |
+| Tile-local (~64 cores) | moderate | ~5 GB/s | slow decrease |
+| Region-local (~256 cores) | significant | ~2 GB/s | √N decrease |
+| Uniform random | saturated | **~0.75 GB/s** ← earlier table | 1/√N |
+| Adversarial (anti-pattern) | critical | ~0.4 GB/s | 1/√N + congestion |
+
+**The difference is 40× between the two extremes.** Locality-aware actor placement (e.g., tightly communicating actors placed in the same cluster) sustains **~B** per-core BW, while the worst-case traffic degrades with 1/√N scaling.
+
+### When does the "Per-core BW" table's 1/√N scaling apply?
+
+The earlier 1/√N scaling **only** caps when bisection BW is the bottleneck — i.e., when traffic direction is **on average uniform**. The three typical regimes:
+
+1. **Local communication dominates** (>80% neighbour or cluster-local) → per-core BW ≈ B (constant)
+2. **Mixed traffic** (~50% local, 50% remote) → per-core BW ≈ B/√(N/k) where k is the local domain size
+3. **Pure uniform random** → per-core BW = (3/2)B/√N (the table formula)
+
+The CFPU actor model targets case 1: HW addresses are hierarchical, NoC router topology is neighbour-aware, and actor placement is the OS's responsibility for ensuring locality.
+
+### Crossbar vs mesh — a different angle
+
+The crossbar is not the "perfect" solution from every perspective:
+
+| Metric | Crossbar (N=1024) | Mesh (N=1024) |
+|---|---|---|
+| Aggregate BW | 16 TB/s | **31.7 TB/s** (2×) |
+| Per-core BW (uniform) | **16 GB/s** | 0.75 GB/s |
+| Per-core BW (local) | 16 GB/s | **~16 GB/s** (equal) |
+| Latency | **11 ns** | 51 ns |
+| Area | 25-35 mm² ❌ | **3.2 mm²** |
+
+The crossbar wins on **latency and uniform-random per-core BW**; the mesh wins on **aggregate BW and area**. **Under local traffic, the per-core BW of the two topologies is practically equal**, while the mesh achieves it on a fraction of the area.
+
 ## Silicon area (5 nm)
 
 ### Unit costs
@@ -327,7 +395,7 @@ So at N = 1024 cores the hierarchical:
 - **~186× fewer crosspoints** than crossbar (5.6k vs 1M)
 - **10× better per-core BW** than pure mesh
 - **only 2× worse per-core BW** than the (un-buildable) crossbar
-- **~25% less area** than pure mesh (3.2 vs 4 mm²) — slightly higher router count
+- **~25% more area** than pure mesh (4 vs 3.2 mm²) — slightly higher router count, but the 10× better per-core BW and 2.4× better latency more than compensate
 - **2.4× better latency** than pure mesh (21 vs 51 ns)
 
 The hierarchical topology is therefore also the **CFPU choice** (see `interconnect-en.md` 4-level hierarchy).
@@ -378,4 +446,5 @@ The hierarchical topology is therefore also the **CFPU choice** (see `interconne
 
 | Version | Date | Summary |
 |---------|------|--------|
+| 1.1 | 2026-05-03 | **New section: "Traffic pattern — aggregate vs per-core BW"**. v1.0 only showed uniform random traffic (worst case); v1.1 adds the aggregate BW formula (mesh: 2N · B), concrete aggregate numbers (16-core mesh 384 GB/s, 1024-core mesh 31.7 TB/s), traffic locality factor table (40× difference neighbour vs uniform), and a direct crossbar-vs-mesh comparison at equal N. Key conclusion: under local traffic, mesh per-core BW ≈ B (like crossbar), while mesh aggregate > crossbar aggregate. The earlier 1/√N scaling only applies in the bisection-limited (uniform random) case |
 | 1.0 | 2026-05-03 | Initial version — general NoC topology scaling decoupled from CFPU. Bus/Ring/Mesh/Torus/Crossbar/Fat-tree/Hierarchical comparison with the 144-byte message unit. Per-core BW, bisection BW, area (5 nm), latency formulas and concrete numbers for N = 16, 64, 256, 1024, 10240 cores. Topology selection algorithm. Mathematical justification for the hierarchical choice from N ≥ 64 |
