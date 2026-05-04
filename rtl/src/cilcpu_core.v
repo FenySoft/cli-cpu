@@ -520,6 +520,18 @@ module cilcpu_core (
             o_boot_arg_ready    <= 1'b0;
             o_pc                <= r_pc;
 
+            // hu: Sub6 — Stack Cache trap aggregátor: az SC pulzusos trap
+            //     jele (overflow / underflow) bármelyik állapotban
+            //     detektálható; átáll ST_TRAP-be, latch-eli a trap_code-ot.
+            // en: Sub6 — Stack Cache trap aggregator: SC pulses trap on
+            //     overflow / underflow, detectable from any state →
+            //     ST_TRAP, latch trap_code.
+            if (w_sc_trap && r_state != ST_TRAP && r_state != ST_HALT) begin
+                o_trap      <= 1'b1;
+                o_trap_code <= w_sc_trap_code;
+                r_state     <= ST_TRAP;
+            end
+
             // hu: SRAM bus arbiter — a Stack Cache spill/fill PRIORITÁS-T
             //     kap. A microcode kontrakt biztosítja, hogy uc_sram_rd/wr
             //     csak akkor fut le, amikor w_sc_busy=0 (a Stack Cache

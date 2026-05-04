@@ -54,6 +54,10 @@ OP_BLE_S      = 0x31
 OP_BLT_S      = 0x32
 OP_BNE_UN_S   = 0x33
 
+# hu: Speciális opkódok / en: Special opcodes
+OP_BREAK      = 0xDD
+OP_POP        = 0x26
+
 # hu: Argument / local opcodes (Sub3) / en: Argument / local opcodes (Sub3)
 OP_LDARG_0    = 0x02
 OP_LDARG_1    = 0x03
@@ -846,3 +850,57 @@ async def test_45_bge_s_signed(dut):
     rv, tc, halt, trap, pc = await boot_and_run(dut, program)
     assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
     assert rv == 42, f"return_value = {rv}, expected 42"
+
+
+# ============================================================
+# hu: Sub6 — Trap aggregátor + speciális trap-ek
+# en: Sub6 — Trap aggregator + special traps
+# ============================================================
+
+
+@cocotb.test()
+async def test_60_stack_overflow(dut):
+    """hu: 65 db LDC.I4_0 → TRAP_STACK_OVERFLOW (a max eval mélység 64).
+    en: 65 LDC.I4_0 → TRAP_STACK_OVERFLOW (max eval depth 64)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([OP_LDC_I4_0] * 65 + [OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program, max_cycles=5000)
+    assert trap == 1, f"expected trap, got halt={halt}"
+    assert tc == TRAP_STACK_OVERFLOW, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_STACK_OVERFLOW:02X}"
+
+
+@cocotb.test()
+async def test_61_stack_underflow(dut):
+    """hu: POP üres stack-en → TRAP_STACK_UNDERFLOW.
+    en: POP on empty stack → TRAP_STACK_UNDERFLOW."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([OP_POP, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert trap == 1, f"expected trap, got halt={halt}"
+    assert tc == TRAP_STACK_UNDERFLOW, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_STACK_UNDERFLOW:02X}"
+
+
+@cocotb.test()
+async def test_62_op_break(dut):
+    """hu: OP_BREAK (0xDD) → TRAP_DEBUG_BREAK (0x0B).
+    en: OP_BREAK (0xDD) → TRAP_DEBUG_BREAK (0x0B)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([OP_BREAK, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert trap == 1, f"expected trap, got halt={halt}"
+    assert tc == TRAP_DEBUG_BREAK, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_DEBUG_BREAK:02X}"
+
+
+@cocotb.test()
+async def test_63_invalid_opcode(dut):
+    """hu: 0xFF byte → TRAP_INVALID_OPCODE (0x03).
+    en: 0xFF byte → TRAP_INVALID_OPCODE (0x03)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([0xFF, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert trap == 1, f"expected trap, got halt={halt}"
+    assert tc == TRAP_INVALID_OPCODE, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_INVALID_OPCODE:02X}"
