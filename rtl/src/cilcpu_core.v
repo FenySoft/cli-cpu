@@ -49,6 +49,7 @@ module cilcpu_core (
     localparam [3:0] ST_FETCH    = 4'd2;
     localparam [3:0] ST_DECODE   = 4'd3;
     localparam [3:0] ST_EXECUTE  = 4'd4;
+    localparam [3:0] ST_MEM_WAIT = 4'd5;   // Sub3: SRAM read 1-ciklus latencia / Sub3: SRAM read 1-cycle latency
     localparam [3:0] ST_HALT     = 4'd8;
     localparam [3:0] ST_TRAP     = 4'd9;
 
@@ -79,6 +80,8 @@ module cilcpu_core (
     reg  [4:0]  r_boot_local_idx;
     reg  [1:0]  r_alu_phase;       // 0 = latch+pop (binary), 1 = replace_top
     reg  [31:0] r_alu_result_latched;
+    reg         r_mem_phase;       // Sub3: 0 = pop1, 1 = SRAM write a pop_data-val
+    reg  [13:0] r_mem_addr_latched;
 
     // hu: Fetch buffer (8 byte, packed FIFO). A packed register a Verilator
     //     non-blocking assignment-jén megbízhatóbb mint a reg array
@@ -207,10 +210,15 @@ module cilcpu_core (
     wire [1:0]  uc_push_src   = w_uc_ctrl[`UC_PUSH_SRC_HI:`UC_PUSH_SRC_LO];
     wire        uc_alu_en     = w_uc_ctrl[`UC_ALU_EN];
     wire [4:0]  uc_alu_op     = w_uc_ctrl[`UC_ALU_OP_HI:`UC_ALU_OP_LO];
+    wire        uc_sram_rd    = w_uc_ctrl[`UC_SRAM_RD];
+    wire        uc_sram_wr    = w_uc_ctrl[`UC_SRAM_WR];
+    wire [1:0]  uc_addr_src   = w_uc_ctrl[`UC_ADDR_SRC_HI:`UC_ADDR_SRC_LO];
     wire        uc_pc_wr      = w_uc_ctrl[`UC_PC_WR];
     wire [1:0]  uc_pc_src     = w_uc_ctrl[`UC_PC_SRC_HI:`UC_PC_SRC_LO];
     wire        uc_frame_pop  = w_uc_ctrl[`UC_FRAME_POP];
     wire        uc_halt_en    = w_uc_ctrl[`UC_HALT];
+    wire        uc_cond_en    = w_uc_ctrl[`UC_COND_EN];
+    wire [1:0]  uc_cond_type  = w_uc_ctrl[`UC_COND_TYPE_HI:`UC_COND_TYPE_LO];
     wire        uc_cond_pop   = w_uc_ctrl[`UC_COND_POP];
 
     // ============================================================
@@ -233,16 +241,21 @@ module cilcpu_core (
     wire        w_sc_trap;
     wire [7:0]  w_sc_trap_code;
 
-    // hu: A Stack Cache SRAM master portja Sub1-ben még NEM csatlakozik
-    //     a belső SRAM-ra — a cache nem tölti meg, a programok < 4 elem
-    //     mélyek. Sub3-ban dedikált bus mux köti össze.
-    // en: The Stack Cache SRAM master port is NOT connected to the
-    //     internal SRAM in Sub1 — the cache won't overflow on <4 element
-    //     programs. A dedicated bus mux wires it up in Sub3.
+    // hu: A Stack Cache SRAM master portjai Sub3-ban kapcsolódnak a belső
+    //     16 KB SRAM-ra egy egyszerű prioritásos arbiter-en át (lásd
+    //     lentebb). A microcode kontrakt szerint uc_sram_rd/wr csak akkor
+    //     aktív, ha w_sc_busy=0 — ezért a busy-priority arbitrálás
+    //     determinisztikus, race-mentes.
+    // en: The Stack Cache SRAM master ports are wired to the internal
+    //     16 KB SRAM in Sub3 via a simple priority arbiter (see below).
+    //     Per microcode contract, uc_sram_rd/wr fires only when w_sc_busy=0
+    //     — hence busy-priority arbitration is deterministic and race-free.
     wire [13:0] w_sc_sram_addr;
     wire [31:0] w_sc_sram_wdata;
     wire        w_sc_sram_we;
     wire        w_sc_sram_re;
+    wire [31:0] w_sc_sram_rdata;
+    wire        w_sc_sram_ready;
 
     cilcpu_stack_cache u_stack_cache (
         .clk              (clk),
@@ -269,10 +282,10 @@ module cilcpu_core (
         .trap_code        (w_sc_trap_code),
         .sram_addr        (w_sc_sram_addr),
         .sram_wdata       (w_sc_sram_wdata),
-        .sram_rdata       (32'd0),
+        .sram_rdata       (w_sc_sram_rdata),
         .sram_we          (w_sc_sram_we),
         .sram_re          (w_sc_sram_re),
-        .sram_ready       (1'b1)
+        .sram_ready       (w_sc_sram_ready)
     );
 
     // ============================================================
@@ -347,6 +360,66 @@ module cilcpu_core (
     end
 
     // ============================================================
+    // hu: SRAM rdata/ready wireing a Stack Cache felé.
+    //     A regisztrált SRAM-olvasás eredménye a következő ciklus elején
+    //     érvényes; a Stack Cache 1-ciklus latencia + sram_ready-vel
+    //     szinkronizál. Az SRAM mindig 1-ciklus alatt válaszol →
+    //     sram_ready statikusan 1.
+    // en: SRAM rdata/ready wiring to Stack Cache.
+    //     Registered SRAM read result is valid at the next cycle's start;
+    //     the Stack Cache uses 1-cycle latency + sram_ready handshake.
+    //     SRAM always responds in 1 cycle → sram_ready is static 1.
+    // ============================================================
+    assign w_sc_sram_rdata = r_sram_rdata_latched;
+    assign w_sc_sram_ready = 1'b1;
+
+    // ============================================================
+    // hu: Sub3 — SRAM cím számítás (frame layout):
+    //     ARG:   FP + 12 + idx*4
+    //     LOCAL: FP + 12 + arg_count*4 + idx*4
+    //     A range check a microcode-szervezésben már megelőzi az SRAM
+    //     hozzáférést (lásd ST_EXECUTE → uc_sram_rd/wr ág).
+    // en: Sub3 — SRAM address calculation (frame layout):
+    //     ARG:   FP + 12 + idx*4
+    //     LOCAL: FP + 12 + arg_count*4 + idx*4
+    //     Range check precedes SRAM access in the sequencer.
+    // ============================================================
+    // hu: Hatásos arg/local index — az LDARG.0..3 / LDLOC.0..3 / STLOC.0..3
+    //     opkódok az indexet az opcode byte-ban hordozzák (operand=0):
+    //       0x02..0x05 LDARG.0..3 → idx = opcode - 0x02
+    //       0x06..0x09 LDLOC.0..3 → idx = opcode - 0x06
+    //       0x0A..0x0D STLOC.0..3 → idx = opcode - 0x0A
+    //     Az LDARG.S/STARG.S/LDLOC.S/STLOC.S esetén az operandus tartalmazza
+    //     az indexet (8-bit unsigned).
+    // en: Effective arg/local index — short opcodes carry the index in the
+    //     opcode byte itself (operand=0):
+    //       0x02..0x05 LDARG.0..3 → idx = opcode - 0x02
+    //       0x06..0x09 LDLOC.0..3 → idx = opcode - 0x06
+    //       0x0A..0x0D STLOC.0..3 → idx = opcode - 0x0A
+    //     The .S forms carry the index in the operand.
+    wire [7:0]  eff_idx =
+        (r_opcode[7:0] >= 8'h02 && r_opcode[7:0] <= 8'h05) ? (r_opcode[7:0] - 8'h02) :
+        (r_opcode[7:0] >= 8'h06 && r_opcode[7:0] <= 8'h09) ? (r_opcode[7:0] - 8'h06) :
+        (r_opcode[7:0] >= 8'h0A && r_opcode[7:0] <= 8'h0D) ? (r_opcode[7:0] - 8'h0A) :
+        r_operand[7:0];
+
+    function [13:0] addr_calc;
+        input [1:0]  fc_addr_src;
+        input [7:0]  fc_idx;
+        reg [13:0] base;
+        begin
+            base = r_fp + 14'd12;
+            case (fc_addr_src)
+                `ADDR_SRC_ARG:   addr_calc = base + {4'd0, fc_idx, 2'd0};
+                `ADDR_SRC_LOCAL: addr_calc = base + {7'd0, r_arg_count, 2'd0}
+                                                   + {4'd0, fc_idx, 2'd0};
+                `ADDR_SRC_FRAME: addr_calc = r_fp + {4'd0, fc_idx, 2'd0};
+                default:         addr_calc = base;
+            endcase
+        end
+    endfunction
+
+    // ============================================================
     // hu: Fő FSM
     // en: Main FSM
     // ============================================================
@@ -392,6 +465,8 @@ module cilcpu_core (
             r_sc_replace_top_data <= 32'd0;
             r_alu_phase           <= 2'd0;
             r_alu_result_latched  <= 32'd0;
+            r_mem_phase           <= 1'b0;
+            r_mem_addr_latched    <= 14'd0;
             o_halt           <= 1'b0;
             o_trap           <= 1'b0;
             o_trap_code      <= 8'd0;
@@ -413,14 +488,33 @@ module cilcpu_core (
             o_boot_arg_ready    <= 1'b0;
             o_pc                <= r_pc;
 
-            // hu: SRAM olvasás (1-ciklus latencia regisztrálva)
-            if (r_sram_re) begin
-                r_sram_rdata_latched <= r_sram[r_sram_addr[13:2]];
-            end
-
-            // hu: SRAM írás
-            if (r_sram_we) begin
-                r_sram[r_sram_addr[13:2]] <= r_sram_wdata;
+            // hu: SRAM bus arbiter — a Stack Cache spill/fill PRIORITÁS-T
+            //     kap. A microcode kontrakt biztosítja, hogy uc_sram_rd/wr
+            //     csak akkor fut le, amikor w_sc_busy=0 (a Stack Cache
+            //     egyszerre csak egyfajta műveletet csinál). Tehát a busy-
+            //     priority race-mentes és determinisztikus.
+            //     SRAM olvasás 1-ciklus latency: r_sram_rdata_latched a
+            //     következő ciklus elején érvényes.
+            // en: SRAM bus arbiter — Stack Cache spill/fill takes PRIORITY.
+            //     Per microcode contract, uc_sram_rd/wr fires only when
+            //     w_sc_busy=0 (Stack Cache runs one op at a time), so
+            //     busy-priority is race-free and deterministic.
+            //     SRAM read 1-cycle latency: r_sram_rdata_latched valid at
+            //     the next cycle's start.
+            if (w_sc_busy) begin
+                if (w_sc_sram_re) begin
+                    r_sram_rdata_latched <= r_sram[w_sc_sram_addr[13:2]];
+                end
+                if (w_sc_sram_we) begin
+                    r_sram[w_sc_sram_addr[13:2]] <= w_sc_sram_wdata;
+                end
+            end else begin
+                if (r_sram_re) begin
+                    r_sram_rdata_latched <= r_sram[r_sram_addr[13:2]];
+                end
+                if (r_sram_we) begin
+                    r_sram[r_sram_addr[13:2]] <= r_sram_wdata;
+                end
             end
 
             case (r_state)
@@ -730,6 +824,84 @@ module cilcpu_core (
                     end
                     r_step  <= 4'd0;
                     r_state <= ST_FETCH;
+                end else if (uc_sram_rd) begin
+                    // hu: Sub3 — SRAM olvasás (LDARG / LDLOC).
+                    //     1. Range check: ARG → idx < arg_count, LOCAL →
+                    //        idx < local_count. Hibás esetén megfelelő trap.
+                    //     2. SRAM read indítás (1-ciklus latency), átmenet
+                    //        ST_MEM_WAIT-re — ott push_data <= rdata és
+                    //        uc_done flow.
+                    //     A hatásos indexet `eff_idx` szolgáltatja: az
+                    //     LDARG.0..3 / LDLOC.0..3 az opcode byte alsó 2
+                    //     bitjéből, az .S formák az r_operand[7:0]-ból.
+                    // en: Sub3 — SRAM read (LDARG / LDLOC).
+                    //     1. Range check: ARG → idx < arg_count, LOCAL →
+                    //        idx < local_count; trap on mismatch.
+                    //     2. Start SRAM read (1-cycle latency), transition
+                    //        to ST_MEM_WAIT for push_data <= rdata + uc_done.
+                    //     `eff_idx` derives the index: short opcodes from
+                    //     opcode[1:0], .S forms from r_operand[7:0].
+                    if (uc_addr_src == `ADDR_SRC_ARG &&
+                        eff_idx >= {3'd0, r_arg_count}) begin
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_INVALID_ARG;
+                        r_state     <= ST_TRAP;
+                    end else if (uc_addr_src == `ADDR_SRC_LOCAL &&
+                                 eff_idx >= {3'd0, r_local_count}) begin
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_INVALID_LOCAL;
+                        r_state     <= ST_TRAP;
+                    end else begin
+                        r_sram_addr <= addr_calc(uc_addr_src, eff_idx);
+                        r_sram_re   <= 1'b1;
+                        r_state     <= ST_MEM_WAIT;
+                    end
+                end else if (uc_sram_wr && r_mem_phase == 1'b0) begin
+                    // hu: Sub3 — SRAM írás (STARG / STLOC) phase 0:
+                    //     range check (mint az olvasásnál), majd pop_en=1
+                    //     és cím latch — phase 1-ben írunk.
+                    //     A range check megelőzi a pop-ot az ISA spec
+                    //     szerinti trap sorrendnek (lásd TExecutor.cs:
+                    //     index check BEFORE pop).
+                    // en: Sub3 — SRAM write (STARG / STLOC) phase 0:
+                    //     range check (same as read), then pop_en=1 and
+                    //     latch the address — phase 1 performs the write.
+                    //     Range check precedes pop per ISA spec (see
+                    //     TExecutor.cs: index check BEFORE pop).
+                    if (uc_addr_src == `ADDR_SRC_ARG &&
+                        eff_idx >= {3'd0, r_arg_count}) begin
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_INVALID_ARG;
+                        r_state     <= ST_TRAP;
+                    end else if (uc_addr_src == `ADDR_SRC_LOCAL &&
+                                 eff_idx >= {3'd0, r_local_count}) begin
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_INVALID_LOCAL;
+                        r_state     <= ST_TRAP;
+                    end else begin
+                        r_mem_addr_latched <= addr_calc(uc_addr_src, eff_idx);
+                        r_sc_pop_en        <= 1'b1;
+                        r_mem_phase        <= 1'b1;
+                    end
+                end else if (uc_sram_wr && r_mem_phase == 1'b1) begin
+                    // hu: Sub3 — SRAM írás phase 1: a Stack Cache 1-ciklus
+                    //     regisztrált pop_data-ját az SRAM-ba írjuk.
+                    //     Ezután uc_done flow + ST_FETCH.
+                    // en: Sub3 — SRAM write phase 1: write the Stack Cache's
+                    //     1-cycle registered pop_data to SRAM. Then uc_done
+                    //     flow + ST_FETCH.
+                    r_sram_addr  <= r_mem_addr_latched;
+                    r_sram_wdata <= w_sc_pop_data;
+                    r_sram_we    <= 1'b1;
+                    r_mem_phase  <= 1'b0;
+                    if (uc_pc_wr) begin
+                        r_pc          <= pc_next;
+                        r_fetch_count <= 4'd0;
+                        r_fetch_pc    <= pc_next;
+                        r_next_fetch_addr <= pc_next;
+                    end
+                    r_step  <= 4'd0;
+                    r_state <= ST_FETCH;
                 end else begin
                     // hu: Stack műveletek a vezérlőszó alapján
                     if (uc_stack_pop > 2'd0) begin
@@ -840,6 +1012,37 @@ module cilcpu_core (
                         // hu: Multi-step opcode — folytatás
                         r_step <= r_step + 4'd1;
                     end
+                end
+            end
+
+            // ====================================================
+            // ST_MEM_WAIT — Sub3: 2-fázisú SRAM read wait
+            //   phase 0: r_sram_rdata_latched még előző érték (NBA).
+            //            Ekkor csak phase++.
+            //   phase 1: r_sram_rdata_latched már friss → push, PC update,
+            //            ST_FETCH.
+            //   Verilog NBA: r_sram_re <= 1 cycle X-ben → X+1 ciklus elején
+            //   `if (r_sram_re)` lefut → X+2 ciklus elején r_sram_rdata_
+            //   latched friss. Ezért 2 ciklus (phase 0 + phase 1) kell.
+            // en: ST_MEM_WAIT — Sub3: 2-phase SRAM read wait
+            //   phase 0: r_sram_rdata_latched is still old (NBA timing).
+            //   phase 1: r_sram_rdata_latched is fresh → push + uc_done.
+            // ====================================================
+            ST_MEM_WAIT: begin
+                if (r_mem_phase == 1'b0) begin
+                    r_mem_phase <= 1'b1;
+                end else begin
+                    r_mem_phase    <= 1'b0;
+                    r_sc_push_en   <= 1'b1;
+                    r_sc_push_data <= r_sram_rdata_latched;
+                    if (uc_pc_wr) begin
+                        r_pc          <= pc_next;
+                        r_fetch_count <= 4'd0;
+                        r_fetch_pc    <= pc_next;
+                        r_next_fetch_addr <= pc_next;
+                    end
+                    r_step  <= 4'd0;
+                    r_state <= ST_FETCH;
                 end
             end
 

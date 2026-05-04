@@ -42,9 +42,33 @@ OP_SHR_UN     = 0x64
 OP_NEG        = 0x65
 OP_NOT        = 0x66
 
+# hu: Argument / local opcodes (Sub3) / en: Argument / local opcodes (Sub3)
+OP_LDARG_0    = 0x02
+OP_LDARG_1    = 0x03
+OP_LDARG_2    = 0x04
+OP_LDARG_3    = 0x05
+OP_LDARG_S    = 0x0E
+OP_STARG_S    = 0x10
+OP_LDLOC_0    = 0x06
+OP_LDLOC_1    = 0x07
+OP_LDLOC_2    = 0x08
+OP_LDLOC_3    = 0x09
+OP_LDLOC_S    = 0x11
+OP_STLOC_0    = 0x0A
+OP_STLOC_1    = 0x0B
+OP_STLOC_2    = 0x0C
+OP_STLOC_3    = 0x0D
+OP_STLOC_S    = 0x13
+
 # hu: Trap kódok / en: Trap codes
-TRAP_DIV_BY_ZERO = 0x08
-TRAP_OVERFLOW    = 0x09
+TRAP_STACK_OVERFLOW      = 0x01
+TRAP_STACK_UNDERFLOW     = 0x02
+TRAP_INVALID_OPCODE      = 0x03
+TRAP_INVALID_LOCAL       = 0x04
+TRAP_INVALID_ARG         = 0x05
+TRAP_DIV_BY_ZERO         = 0x08
+TRAP_OVERFLOW            = 0x09
+TRAP_DEBUG_BREAK         = 0x0B
 
 # ============================================================
 # hu: QSPI Flash slave modell — a CODE szegmens betöltése
@@ -591,3 +615,106 @@ async def test_10_boot_args_streaming_no_deadlock(dut):
     # hu: Sub1: halt VAGY trap elfogadott. Sub3: csak halt + rv==99.
     # en: Sub1: halt OR trap accepted. Sub3: halt + rv==99 only.
     assert halt == 1 or trap == 1, "neither halt nor trap"
+
+
+# ============================================================
+# hu: Sub3 — LDARG / STARG / LDLOC / STLOC + range trap
+# en: Sub3 — LDARG / STARG / LDLOC / STLOC + range trap
+# ============================================================
+
+
+@cocotb.test()
+async def test_30_ldarg_0_returns(dut):
+    """hu: boot args=[99], LDARG.0 + RET → 99.
+    en: boot args=[99], LDARG.0 + RET → 99."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([OP_LDARG_0, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program, args=[99])
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 99, f"return_value = {rv}, expected 99"
+
+
+@cocotb.test()
+async def test_31_ldarg_3_returns(dut):
+    """hu: boot args=[10,20,30,40], LDARG.3 + RET → 40.
+    en: boot args=[10,20,30,40], LDARG.3 + RET → 40."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([OP_LDARG_3, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, args=[10, 20, 30, 40]
+    )
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 40, f"return_value = {rv}, expected 40"
+
+
+@cocotb.test()
+async def test_32_ldarg_s_returns(dut):
+    """hu: boot args=[0..15], LDARG.S 15 + RET → 15.
+    en: boot args=[0..15], LDARG.S 15 + RET → 15."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([OP_LDARG_S, 15, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, args=list(range(16))
+    )
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 15, f"return_value = {rv}, expected 15"
+
+
+@cocotb.test()
+async def test_33_starg_s_then_ldarg(dut):
+    """hu: STARG.S 0 felülírja args[0]-t 7-tel, aztán LDARG.0 visszaolvas.
+    en: STARG.S 0 overwrites args[0] with 7, then LDARG.0 reads back."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4_S, 7,  # push 7
+        OP_STARG_S, 0,   # args[0] = 7
+        OP_LDARG_0,      # push args[0]
+        OP_RET,
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program, args=[5])
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 7, f"return_value = {rv}, expected 7"
+
+
+@cocotb.test()
+async def test_34_stloc_ldloc_roundtrip(dut):
+    """hu: STLOC.0 42, LDLOC.0, RET → 42.
+    en: STLOC.0 42, LDLOC.0, RET → 42."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4_S, 42,  # push 42
+        OP_STLOC_0,       # locals[0] = 42
+        OP_LDLOC_0,       # push locals[0]
+        OP_RET,
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, locals_count=1
+    )
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 42, f"return_value = {rv}, expected 42"
+
+
+@cocotb.test()
+async def test_35_invalid_arg_trap(dut):
+    """hu: LDARG.S 5 amikor arg_count=2 → TRAP_INVALID_ARG (0x05).
+    en: LDARG.S 5 with arg_count=2 → TRAP_INVALID_ARG (0x05)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([OP_LDARG_S, 5, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program, args=[1, 2])
+    assert trap == 1, f"expected trap, got halt={halt}"
+    assert tc == TRAP_INVALID_ARG, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_INVALID_ARG:02X}"
+
+
+@cocotb.test()
+async def test_36_invalid_local_trap(dut):
+    """hu: LDLOC.S 5 amikor local_count=2 → TRAP_INVALID_LOCAL (0x04).
+    en: LDLOC.S 5 with local_count=2 → TRAP_INVALID_LOCAL (0x04)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([OP_LDLOC_S, 5, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, locals_count=2
+    )
+    assert trap == 1, f"expected trap, got halt={halt}"
+    assert tc == TRAP_INVALID_LOCAL, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_INVALID_LOCAL:02X}"
