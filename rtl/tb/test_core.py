@@ -340,13 +340,20 @@ async def test_07_ldc_i4_s_negative(dut):
 @cocotb.test(expect_fail=True)
 async def test_08_ldc_i4_full(dut):
     """hu: LDC.I4 0xDEADBEEF + RET → 0xDEADBEEF (4-byte LE immediate).
-        Sub1 ISMERT FAIL: a fetch buffer csúsztatás 5-byte instrukcióra
-        Verilog bit-szélesség problémát mutat. Sub2-ben fixáljuk az
-        aritmetika ciklus mellett.
+        Sub2.1 NEM fixálja: a 5-byte slide után r_fetch_count=3 marad,
+        és az APPEND case csak a 0/4 értékeket kezeli — emiatt a buffer
+        nem töltődik tovább és timeout. Sub2.2-ben az APPEND-et igazítjuk
+        a tetszőleges count-hoz, vagy a slide-ot 4-byte hatáŕokra
+        szigorítjuk. (A timeout-ot AssertionError-ré alakítjuk, hogy
+        cocotb expect_fail szigorúan illeszkedjen — különben "unexpected
+        type" miatt FAIL-nek számít.)
     en: LDC.I4 0xDEADBEEF + RET → 0xDEADBEEF (4-byte LE immediate).
-        Sub1 KNOWN FAIL: fetch buffer slide-down has a Verilog bit-width
-        issue on 5-byte instructions. Sub2 will fix it alongside the
-        arithmetic cycle."""
+        Sub2.1 does NOT fix this: after 5-byte slide r_fetch_count=3,
+        and APPEND case only handles 0/4 — buffer never refills and the
+        run times out. Sub2.2 will adapt APPEND to arbitrary counts, or
+        constrain slide to 4-byte boundaries. (We map timeout to
+        AssertionError so cocotb expect_fail strictly matches — otherwise
+        the run is reported as FAIL with "unexpected type".)"""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
 
     program = bytes([
@@ -354,7 +361,13 @@ async def test_08_ldc_i4_full(dut):
         0xEF, 0xBE, 0xAD, 0xDE,  # LE
         OP_RET,
     ])
-    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    try:
+        rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    except TimeoutError as ex:
+        raise AssertionError(
+            f"Sub2.1 known-fail: 5-byte LDC.I4 slide leaves count=3 "
+            f"unaligned with APPEND 0/4 case ({ex})"
+        )
 
     assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
     assert rv == 0xDEADBEEF, f"return_value = 0x{rv:08X}, expected 0xDEADBEEF"
@@ -375,6 +388,34 @@ async def test_09_halt_latched(dut):
         assert int(dut.o_halt.value) == 1, "o_halt dropped after halt"
         assert int(dut.o_return_value.value) == 5, \
             "return_value changed after halt"
+
+
+# ============================================================
+# hu: Sub2.1 — Fetch addresszálás reprodukciós teszt (TDD piros)
+# en: Sub2.1 — Fetch addressing reproduction test (TDD red)
+# ============================================================
+
+
+@cocotb.test()
+async def test_2x_two_fetch_correct_addressing(dut):
+    """hu: Két fetch egymás után — a 2. addr-nek 4-nek kell lennie, nem 0.
+        A program 8 byte: LDC.I4.S 2 + LDC.I4.S 3 + RET + 3x NOP filler.
+        A teszt sikeres ha 2 LDC + RET fut le helyes return_value-val (3).
+        Ez a Sub2.1 fetch addresszálás bug minimális reprodukciója.
+    en: Two consecutive fetches — 2nd addr must be 4, not 0. Program is
+        8 bytes: LDC.I4.S 2 + LDC.I4.S 3 + RET + 3x NOP filler.
+        Passes if 2 LDC + RET runs with return_value=3.
+        Minimal reproduction for Sub2.1 fetch addressing bug."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    program = bytes([
+        OP_LDC_I4_S, 2,     # 2 byte
+        OP_LDC_I4_S, 3,     # 2 byte
+        OP_RET,             # 1 byte (visszaad TOS=3)
+        OP_NOP, OP_NOP, OP_NOP,  # filler hogy 8 byte legyen
+    ])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert halt == 1, f"core didn't halt (trap={trap}, code=0x{tc:02X})"
+    assert rv == 3, f"return_value = {rv}, expected 3 (TOS=3 RET-kor)"
 
 
 # ============================================================
@@ -420,31 +461,29 @@ async def _run_unary_op(dut, op_code, a, expected_rv):
         f"return_value = 0x{rv:08X}, expected 0x{expected_rv & 0xFFFFFFFF:08X}"
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_11_add_2_3(dut):
-    """hu: 2 + 3 = 5. Sub2 known fail — fetch addresszálás második
-        tranzakciónál Verilator-ban nem-determinisztikus.
-    en: 2 + 3 = 5. Sub2 known fail — second-fetch addressing is
-        non-deterministic on Verilator."""
+    """hu: 2 + 3 = 5. Sub2.1 fix után megbízhatóan zöld.
+    en: 2 + 3 = 5. Reliably green after Sub2.1 fix."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _run_binary_op(dut, OP_ADD, 2, 3, 5)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_12_sub_10_4(dut):
     """hu: 10 - 4 = 6. en: 10 - 4 = 6."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _run_binary_op(dut, OP_SUB, 10, 4, 6)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_13_mul_7_8(dut):
     """hu: 7 * 8 = 56. en: 7 * 8 = 56."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _run_binary_op(dut, OP_MUL, 7, 8, 56)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_14_div_20_5(dut):
     """hu: 20 / 5 = 4. en: 20 / 5 = 4."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
@@ -459,42 +498,42 @@ async def test_15_div_zero_trap(dut):
                           expected_trap_code=TRAP_DIV_BY_ZERO)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_16_rem_17_5(dut):
     """hu: 17 % 5 = 2. en: 17 % 5 = 2."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _run_binary_op(dut, OP_REM, 17, 5, 2)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_17_and_0xC_0xA(dut):
     """hu: 0xC AND 0xA = 0x8. en: 0xC AND 0xA = 0x8."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _run_binary_op(dut, OP_AND, 0x0C, 0x0A, 0x08)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_18_or_0xC_0xA(dut):
     """hu: 0xC OR 0xA = 0xE. en: 0xC OR 0xA = 0xE."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _run_binary_op(dut, OP_OR, 0x0C, 0x0A, 0x0E)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_19_xor_0xC_0xA(dut):
     """hu: 0xC XOR 0xA = 0x6. en: 0xC XOR 0xA = 0x6."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _run_binary_op(dut, OP_XOR, 0x0C, 0x0A, 0x06)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_20_shl_1_4(dut):
     """hu: 1 << 4 = 16. en: 1 << 4 = 16."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _run_binary_op(dut, OP_SHL, 1, 4, 16)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_21_neg_5(dut):
     """hu: -5 → 0xFFFFFFFB (unary).
     en: -5 → 0xFFFFFFFB (unary)."""
@@ -502,7 +541,7 @@ async def test_21_neg_5(dut):
     await _run_unary_op(dut, OP_NEG, 5, 0xFFFFFFFB)
 
 
-@cocotb.test(expect_fail=True)
+@cocotb.test()
 async def test_22_not_0(dut):
     """hu: ~0 = 0xFFFFFFFF (unary).
     en: ~0 = 0xFFFFFFFF (unary)."""

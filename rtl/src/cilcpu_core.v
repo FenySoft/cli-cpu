@@ -120,6 +120,25 @@ module cilcpu_core (
     wire        w_qspi_ready;
     wire        w_qspi_busy;
 
+    // hu: Fetch addresszálás Sub2.1-ben bevezetett regiszterek.
+    //     r_qspi_inflight = 1, ha épp folyamatban van fetch tranzakció;
+    //     r_next_fetch_addr = a következő fetch cél címe (független
+    //     r_pc/r_fetch_count NBA scheduling-jétől). A korábbi
+    //     `r_qspi_addr <= r_pc + r_fetch_count` képlet Verilator NBA-ban
+    //     racy volt: az 1. APPEND után cycle X+1-ben r_fetch_count még
+    //     0-n látszott egyes path-eken, ezért a 2. fetch addr=0-t kapott
+    //     4 helyett. Itt explicit állapotot tartunk fenn.
+    // en: Fetch addressing registers introduced in Sub2.1.
+    //     r_qspi_inflight = 1 when a fetch transaction is currently in
+    //     flight; r_next_fetch_addr = target address of the next fetch
+    //     (independent of r_pc/r_fetch_count NBA scheduling). The earlier
+    //     `r_qspi_addr <= r_pc + r_fetch_count` was racy on Verilator NBA:
+    //     after the 1st APPEND, cycle X+1 sometimes still saw r_fetch_count
+    //     as 0 on certain paths, so the 2nd fetch got addr=0 instead of 4.
+    //     Here we keep explicit state.
+    reg         r_qspi_inflight;
+    reg  [23:0] r_next_fetch_addr;
+
     cilcpu_qspi_controller u_qspi (
         .clk             (clk),
         .rst_n           (rst_n),
@@ -355,6 +374,10 @@ module cilcpu_core (
             r_operand        <= 32'd0;
             r_qspi_addr      <= 24'd0;
             r_qspi_re        <= 1'b0;
+            // hu: Sub2.1 — fetch addresszálás állapot reset
+            // en: Sub2.1 — fetch addressing state reset
+            r_qspi_inflight  <= 1'b0;
+            r_next_fetch_addr <= 24'd0;
             r_sram_addr      <= 14'd0;
             r_sram_wdata     <= 32'd0;
             r_sram_we        <= 1'b0;
@@ -493,6 +516,14 @@ module cilcpu_core (
                         r_state    <= ST_FETCH;
                         r_fetch_count <= 4'd0;
                         r_fetch_pc <= r_pc;
+                        // hu: Sub2.1 — a fetch állapot inicializálása az
+                        //     i_boot_pc-re; a soron következő ST_FETCH ettől
+                        //     a címtől indítja az 1. tranzakciót.
+                        // en: Sub2.1 — initialize fetch state to i_boot_pc;
+                        //     the next ST_FETCH will start the 1st
+                        //     transaction from this address.
+                        r_next_fetch_addr <= i_boot_pc;
+                        r_qspi_inflight   <= 1'b0;
                     end
                     default: begin
                         r_state <= ST_TRAP;
@@ -522,11 +553,19 @@ module cilcpu_core (
                     //     értékét explicit konstanssal írjuk (4 vagy 8),
                     //     nem self-referenciával — Verilator NBA self-ref
                     //     egy bug-ot okozott.
+                    //     Sub2.1: az APPEND zárja le a tranzakciót
+                    //     (r_qspi_inflight <= 0), és a következő fetch
+                    //     címét explicit konstanssal léptetjük (+4),
+                    //     független r_pc / r_fetch_count NBA-tól.
                     // en: 4-byte append to packed buffer. cnt=0 → byte
                     //     0..3, cnt=4 → byte 4..7. Write r_fetch_count's
                     //     new value via an explicit constant (4 or 8),
                     //     not self-reference — Verilator NBA self-ref
-                    //     was causing a bug.
+                    //     caused a bug.
+                    //     Sub2.1: the APPEND closes the transaction
+                    //     (r_qspi_inflight <= 0), and the next fetch
+                    //     address is bumped by +4 explicitly, independent
+                    //     of r_pc / r_fetch_count NBA scheduling.
                     case (r_fetch_count)
                         4'd0: begin
                             r_fetch_buf[31:0] <= {
@@ -548,13 +587,26 @@ module cilcpu_core (
                         end
                         default: ;
                     endcase
-                end else if (!w_qspi_busy && !r_qspi_re) begin
-                    // hu: Új fetch indítása (csak ha nincs ready és nincs
-                    //     folyamatban lévő tranzakció).
-                    r_qspi_addr <= 24'h00_0000
-                                   + r_pc
-                                   + {20'd0, r_fetch_count};
-                    r_qspi_re   <= 1'b1;
+                    r_qspi_inflight   <= 1'b0;
+                    r_next_fetch_addr <= r_next_fetch_addr + 24'd4;
+                end else if (!r_qspi_inflight) begin
+                    // hu: Új fetch indítása. A feltétel a Sub2.1 fix után
+                    //     egyetlen állapot-bittől függ (r_qspi_inflight),
+                    //     a w_qspi_busy redundáns volt és Verilator NBA
+                    //     race-t okozott. A cím a r_next_fetch_addr-ból
+                    //     jön — ezt a Boot finalize r_pc-re inicializálja,
+                    //     APPEND után +4-gyel léptetjük, full-flush-nál
+                    //     pedig pc_next-re állítjuk.
+                    // en: Start a new fetch. After the Sub2.1 fix, the
+                    //     condition depends on a single state bit
+                    //     (r_qspi_inflight); w_qspi_busy was redundant
+                    //     and caused a Verilator NBA race. The address
+                    //     comes from r_next_fetch_addr — initialized to
+                    //     r_pc on Boot finalize, advanced by +4 after
+                    //     APPEND, and reset to pc_next on full flush.
+                    r_qspi_addr     <= r_next_fetch_addr;
+                    r_qspi_re       <= 1'b1;
+                    r_qspi_inflight <= 1'b1;
                 end
             end
 
@@ -629,6 +681,18 @@ module cilcpu_core (
                                 r_pc <= pc_next;
                                 r_fetch_count <= 4'd0;
                                 r_fetch_pc    <= pc_next;
+                                // hu: Sub2.1 — full-flush a fetch címet
+                                //     pc_next-re állítja. Az esetlegesen
+                                //     in-flight tranzakciót hagyjuk
+                                //     befejeződni, az adat eldobódik
+                                //     (a következő ST_FETCH a friss címet
+                                //     fogja használni).
+                                // en: Sub2.1 — full-flush sets the fetch
+                                //     address to pc_next. Any in-flight
+                                //     transaction is allowed to finish;
+                                //     its data is discarded (the next
+                                //     ST_FETCH uses the fresh address).
+                                r_next_fetch_addr <= pc_next;
                             end
                             r_step  <= 4'd0;
                             r_state <= ST_FETCH;
@@ -644,6 +708,9 @@ module cilcpu_core (
                         r_pc <= pc_next;
                         r_fetch_count <= 4'd0;
                         r_fetch_pc    <= pc_next;
+                        // hu: Sub2.1 — lásd unary ág kommentje.
+                        // en: Sub2.1 — see unary branch comment.
+                        r_next_fetch_addr <= pc_next;
                     end
                     r_step  <= 4'd0;
                     r_state <= ST_FETCH;
@@ -707,14 +774,25 @@ module cilcpu_core (
                             if (uc_pc_src != `PC_SRC_NEXT) begin
                                 r_fetch_count <= 4'd0;
                                 r_fetch_pc    <= pc_next;
+                                // hu: Sub2.1 — branch/call full-flush:
+                                //     a következő fetch pc_next-ről indul.
+                                // en: Sub2.1 — branch/call full-flush:
+                                //     next fetch starts from pc_next.
+                                r_next_fetch_addr <= pc_next;
                             end else if (r_fetch_count >= {1'b0, r_length}) begin
                                 // hu: Packed buffer slide: lefelé (byte 0 a
                                 //     legalsó), `r_length * 8` bit jobbra
                                 //     shift, felülre 0. Verilator
                                 //     megbízhatóan kezeli.
+                                //     A warm-path slide NEM állítja
+                                //     r_next_fetch_addr-t — az APPEND
+                                //     +4-es léptetése független a slide-tól.
                                 // en: Packed buffer slide: down-shift by
                                 //     r_length*8 bits (byte 0 is LSB), zero
                                 //     fill upper. Verilator handles reliably.
+                                //     The warm-path slide does NOT touch
+                                //     r_next_fetch_addr — APPEND's +4
+                                //     bump is independent of slide.
                                 case (r_length)
                                     3'd1: r_fetch_buf <= {8'h00,
                                                           r_fetch_buf[63:8]};
@@ -733,8 +811,11 @@ module cilcpu_core (
                                 r_fetch_pc <= r_fetch_pc
                                               + {21'd0, r_length};
                             end else begin
+                                // hu: Sub2.1 — slide-vesztett full-flush.
+                                // en: Sub2.1 — slide-fallback full-flush.
                                 r_fetch_count <= 4'd0;
                                 r_fetch_pc    <= pc_next;
+                                r_next_fetch_addr <= pc_next;
                             end
                         end
                         r_step <= 4'd0;
