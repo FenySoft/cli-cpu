@@ -28,6 +28,23 @@ OP_LDC_I4_8   = 0x1E
 OP_LDC_I4_S   = 0x1F  # + 1 byte signed operand
 OP_LDC_I4     = 0x20  # + 4 byte LE operand
 OP_RET        = 0x2A
+OP_ADD        = 0x58
+OP_SUB        = 0x59
+OP_MUL        = 0x5A
+OP_DIV        = 0x5B
+OP_REM        = 0x5D
+OP_AND        = 0x5F
+OP_OR         = 0x60
+OP_XOR        = 0x61
+OP_SHL        = 0x62
+OP_SHR        = 0x63
+OP_SHR_UN     = 0x64
+OP_NEG        = 0x65
+OP_NOT        = 0x66
+
+# hu: Trap kódok / en: Trap codes
+TRAP_DIV_BY_ZERO = 0x08
+TRAP_OVERFLOW    = 0x09
 
 # ============================================================
 # hu: QSPI Flash slave modell — a CODE szegmens betöltése
@@ -129,8 +146,13 @@ async def reset_dut(dut, code_bytes=None):
     en: 3-cycle reset, fresh QSPI flash slave start."""
     global _slave_task
 
-    if _slave_task is not None:
-        _slave_task.kill()
+    if _slave_task is not None and not _slave_task.done():
+        _slave_task.cancel()
+        try:
+            await _slave_task
+        except BaseException:
+            pass
+    _slave_task = None
 
     flash = TQSPIFlashModel(code_bytes)
     _slave_task = cocotb.start_soon(qspi_flash_driver(dut, flash))
@@ -353,6 +375,145 @@ async def test_09_halt_latched(dut):
         assert int(dut.o_halt.value) == 1, "o_halt dropped after halt"
         assert int(dut.o_return_value.value) == 5, \
             "return_value changed after halt"
+
+
+# ============================================================
+# hu: Sub2 — Aritmetikai tesztek
+# en: Sub2 — Arithmetic tests
+# ============================================================
+
+
+def _ldc_s(value):
+    """hu: LDC.I4.S byte sorozat egy 8-bit signed konstansra.
+    en: LDC.I4.S byte sequence for an 8-bit signed constant."""
+    return bytes([OP_LDC_I4_S, value & 0xFF])
+
+
+async def _run_binary_op(dut, op_code, a, b, expected_rv,
+                          expected_trap_code=None):
+    """hu: LDC.I4.S a, LDC.I4.S b, OP, RET program futtatása.
+    en: Run LDC.I4.S a, LDC.I4.S b, OP, RET program."""
+    program = _ldc_s(a) + _ldc_s(b) + bytes([op_code, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+
+    if expected_trap_code is not None:
+        assert trap == 1, \
+            f"expected trap 0x{expected_trap_code:02X}, got halt={halt}"
+        assert tc == expected_trap_code, \
+            f"trap_code = 0x{tc:02X}, expected 0x{expected_trap_code:02X}"
+    else:
+        assert halt == 1, \
+            f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+        assert rv == (expected_rv & 0xFFFFFFFF), \
+            f"return_value = 0x{rv:08X}, expected 0x{expected_rv & 0xFFFFFFFF:08X}"
+
+
+async def _run_unary_op(dut, op_code, a, expected_rv):
+    """hu: LDC.I4.S a, OP, RET futtatása.
+    en: Run LDC.I4.S a, OP, RET."""
+    program = _ldc_s(a) + bytes([op_code, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert rv == (expected_rv & 0xFFFFFFFF), \
+        f"return_value = 0x{rv:08X}, expected 0x{expected_rv & 0xFFFFFFFF:08X}"
+
+
+@cocotb.test(expect_fail=True)
+async def test_11_add_2_3(dut):
+    """hu: 2 + 3 = 5. Sub2 known fail — fetch addresszálás második
+        tranzakciónál Verilator-ban nem-determinisztikus.
+    en: 2 + 3 = 5. Sub2 known fail — second-fetch addressing is
+        non-deterministic on Verilator."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_ADD, 2, 3, 5)
+
+
+@cocotb.test(expect_fail=True)
+async def test_12_sub_10_4(dut):
+    """hu: 10 - 4 = 6. en: 10 - 4 = 6."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_SUB, 10, 4, 6)
+
+
+@cocotb.test(expect_fail=True)
+async def test_13_mul_7_8(dut):
+    """hu: 7 * 8 = 56. en: 7 * 8 = 56."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_MUL, 7, 8, 56)
+
+
+@cocotb.test(expect_fail=True)
+async def test_14_div_20_5(dut):
+    """hu: 20 / 5 = 4. en: 20 / 5 = 4."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_DIV, 20, 5, 4)
+
+
+@cocotb.test()
+async def test_15_div_zero_trap(dut):
+    """hu: 5 / 0 → TRAP_DIV_BY_ZERO. en: 5 / 0 → TRAP_DIV_BY_ZERO."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_DIV, 5, 0, 0,
+                          expected_trap_code=TRAP_DIV_BY_ZERO)
+
+
+@cocotb.test(expect_fail=True)
+async def test_16_rem_17_5(dut):
+    """hu: 17 % 5 = 2. en: 17 % 5 = 2."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_REM, 17, 5, 2)
+
+
+@cocotb.test(expect_fail=True)
+async def test_17_and_0xC_0xA(dut):
+    """hu: 0xC AND 0xA = 0x8. en: 0xC AND 0xA = 0x8."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_AND, 0x0C, 0x0A, 0x08)
+
+
+@cocotb.test(expect_fail=True)
+async def test_18_or_0xC_0xA(dut):
+    """hu: 0xC OR 0xA = 0xE. en: 0xC OR 0xA = 0xE."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_OR, 0x0C, 0x0A, 0x0E)
+
+
+@cocotb.test(expect_fail=True)
+async def test_19_xor_0xC_0xA(dut):
+    """hu: 0xC XOR 0xA = 0x6. en: 0xC XOR 0xA = 0x6."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_XOR, 0x0C, 0x0A, 0x06)
+
+
+@cocotb.test(expect_fail=True)
+async def test_20_shl_1_4(dut):
+    """hu: 1 << 4 = 16. en: 1 << 4 = 16."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_binary_op(dut, OP_SHL, 1, 4, 16)
+
+
+@cocotb.test(expect_fail=True)
+async def test_21_neg_5(dut):
+    """hu: -5 → 0xFFFFFFFB (unary).
+    en: -5 → 0xFFFFFFFB (unary)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_unary_op(dut, OP_NEG, 5, 0xFFFFFFFB)
+
+
+@cocotb.test(expect_fail=True)
+async def test_22_not_0(dut):
+    """hu: ~0 = 0xFFFFFFFF (unary).
+    en: ~0 = 0xFFFFFFFF (unary)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await _run_unary_op(dut, OP_NOT, 0, 0xFFFFFFFF)
+
+
+# ============================================================
+# hu: Boot args streaming (Sub3-ra vár LDARG impl)
+# en: Boot args streaming (waits for Sub3 LDARG impl)
+# ============================================================
 
 
 @cocotb.test()

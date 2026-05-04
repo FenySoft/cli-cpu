@@ -77,9 +77,18 @@ module cilcpu_core (
     reg  [3:0]  r_step;
     reg  [4:0]  r_boot_arg_idx;
     reg  [4:0]  r_boot_local_idx;
+    reg  [1:0]  r_alu_phase;       // 0 = latch+pop (binary), 1 = replace_top
+    reg  [31:0] r_alu_result_latched;
 
-    // hu: Fetch buffer (8 byte, FIFO)
-    reg  [7:0]  r_fetch_buf [0:7];
+    // hu: Fetch buffer (8 byte, packed FIFO). A packed register a Verilator
+    //     non-blocking assignment-jén megbízhatóbb mint a reg array
+    //     (`reg [7:0] arr [0:7]`), amivel a slide-during-multi-NBA esetén
+    //     a forrás-byte-okat néha hibás (cycle-X+1) értékkel olvasta.
+    // en: Fetch buffer (8 byte, packed FIFO). Packed register is more
+    //     reliable in Verilator NBA than the reg array form, where slides
+    //     across multiple NBAs sometimes saw the wrong (cycle-X+1) source
+    //     bytes.
+    reg  [63:0] r_fetch_buf;    // byte 0 = [7:0], byte 7 = [63:56]
     reg  [3:0]  r_fetch_count;
     reg  [23:0] r_fetch_pc;     // a buffer első byte-jának PC-je
 
@@ -141,11 +150,11 @@ module cilcpu_core (
                                     r_fetch_count[2:0];
 
     cilcpu_decoder u_decoder (
-        .i_byte0           (r_fetch_buf[0]),
-        .i_byte1           (r_fetch_buf[1]),
-        .i_byte2           (r_fetch_buf[2]),
-        .i_byte3           (r_fetch_buf[3]),
-        .i_byte4           (r_fetch_buf[4]),
+        .i_byte0           (r_fetch_buf[ 7: 0]),
+        .i_byte1           (r_fetch_buf[15: 8]),
+        .i_byte2           (r_fetch_buf[23:16]),
+        .i_byte3           (r_fetch_buf[31:24]),
+        .i_byte4           (r_fetch_buf[39:32]),
         .i_bytes_available (w_dec_bytes_avail),
         .o_opcode          (w_dec_opcode),
         .o_length          (w_dec_length),
@@ -177,6 +186,8 @@ module cilcpu_core (
     wire [1:0]  uc_stack_pop  = w_uc_ctrl[`UC_STACK_POP_HI:`UC_STACK_POP_LO];
     wire        uc_stack_push = w_uc_ctrl[`UC_STACK_PUSH];
     wire [1:0]  uc_push_src   = w_uc_ctrl[`UC_PUSH_SRC_HI:`UC_PUSH_SRC_LO];
+    wire        uc_alu_en     = w_uc_ctrl[`UC_ALU_EN];
+    wire [4:0]  uc_alu_op     = w_uc_ctrl[`UC_ALU_OP_HI:`UC_ALU_OP_LO];
     wire        uc_pc_wr      = w_uc_ctrl[`UC_PC_WR];
     wire [1:0]  uc_pc_src     = w_uc_ctrl[`UC_PC_SRC_HI:`UC_PC_SRC_LO];
     wire        uc_frame_pop  = w_uc_ctrl[`UC_FRAME_POP];
@@ -192,7 +203,10 @@ module cilcpu_core (
     reg         r_sc_push_en;
     reg  [31:0] r_sc_push_data;
     reg         r_sc_pop_en;
+    reg         r_sc_replace_top_en;
+    reg  [31:0] r_sc_replace_top_data;
     wire [31:0] w_sc_tos;
+    wire [31:0] w_sc_tos1;
     wire [31:0] w_sc_pop_data;
     wire [6:0]  w_sc_depth;
     wire        w_sc_busy;
@@ -221,12 +235,12 @@ module cilcpu_core (
         .pop_en           (r_sc_pop_en),
         .dup_en           (1'b0),
         .swap_en          (1'b0),
-        .replace_top_en   (1'b0),
-        .replace_top_data (32'd0),
+        .replace_top_en   (r_sc_replace_top_en),
+        .replace_top_data (r_sc_replace_top_data),
         .peek_index       (2'd0),
         .peek_data        (),
         .tos              (w_sc_tos),
-        .tos1             (),
+        .tos1             (w_sc_tos1),
         .pop_data         (w_sc_pop_data),
         .depth            (w_sc_depth),
         .cache_count      (),
@@ -243,10 +257,35 @@ module cilcpu_core (
     );
 
     // ============================================================
-    // hu: ALU bekötése (Sub1: nincs használat, csak Sub2-ben aritmetikához)
-    // en: ALU wiring (Sub1: unused, Sub2 will use it for arithmetic)
+    // hu: ALU bekötése — i_op_a = TOS1, i_op_b = TOS (a CIL-T0 stack
+    //     konvenciója: push a, push b, ALU(op_a=a, op_b=b)). Az ALU
+    //     kombinációs, az eredmény azonnal érvényes.
+    // en: ALU wiring — i_op_a = TOS1, i_op_b = TOS (CIL-T0 stack
+    //     convention: push a, push b, ALU(op_a=a, op_b=b)). The ALU is
+    //     combinational, result valid immediately.
     // ============================================================
-    // (kihagyva Sub1-ben — placeholder)
+    wire [31:0] w_alu_result;
+    wire        w_alu_trap_div_zero;
+    wire        w_alu_trap_overflow;
+
+    // hu: ALU operandus mux — binary (pop=2): i_op_a=TOS1, i_op_b=TOS;
+    //     unary (pop=1): i_op_a=TOS (a stack tetején lévő érték), i_op_b
+    //     nem használt. A microcode `alu_unary` UC_STACK_POP=1, az ALU
+    //     NEG/NOT az i_op_a-t veszi.
+    // en: ALU operand mux — binary (pop=2): i_op_a=TOS1, i_op_b=TOS;
+    //     unary (pop=1): i_op_a=TOS (the value on top), i_op_b unused.
+    //     The `alu_unary` microcode has UC_STACK_POP=1; ALU NEG/NOT use
+    //     i_op_a.
+    wire [31:0] w_alu_op_a = (uc_stack_pop == 2'd1) ? w_sc_tos : w_sc_tos1;
+
+    cilcpu_alu u_alu (
+        .i_op_a          (w_alu_op_a),
+        .i_op_b          (w_sc_tos),
+        .i_alu_op        (uc_alu_op),
+        .o_result        (w_alu_result),
+        .o_trap_div_zero (w_alu_trap_div_zero),
+        .o_trap_overflow (w_alu_trap_overflow)
+    );
 
     // ============================================================
     // hu: Push data mux — a microcode UC_PUSH_SRC = IMM esetén az
@@ -292,7 +331,8 @@ module cilcpu_core (
     // hu: Fő FSM
     // en: Main FSM
     // ============================================================
-    integer i;
+    // hu: A buffer csúsztatás explicit case-szel megy — nem kell loop index.
+    // en: Buffer slide uses explicit case — no loop index needed.
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -309,6 +349,7 @@ module cilcpu_core (
             r_boot_local_idx <= 5'd0;
             r_fetch_count    <= 4'd0;
             r_fetch_pc       <= 24'd0;
+            r_fetch_buf      <= 64'd0;
             r_opcode         <= 16'd0;
             r_length         <= 3'd0;
             r_operand        <= 32'd0;
@@ -324,6 +365,10 @@ module cilcpu_core (
             r_sc_push_en     <= 1'b0;
             r_sc_push_data   <= 32'd0;
             r_sc_pop_en      <= 1'b0;
+            r_sc_replace_top_en   <= 1'b0;
+            r_sc_replace_top_data <= 32'd0;
+            r_alu_phase           <= 2'd0;
+            r_alu_result_latched  <= 32'd0;
             o_halt           <= 1'b0;
             o_trap           <= 1'b0;
             o_trap_code      <= 8'd0;
@@ -338,11 +383,12 @@ module cilcpu_core (
             r_qspi_re        <= 1'b0;
             r_sram_we        <= 1'b0;
             r_sram_re        <= 1'b0;
-            r_sc_sp_load     <= 1'b0;
-            r_sc_push_en     <= 1'b0;
-            r_sc_pop_en      <= 1'b0;
-            o_boot_arg_ready <= 1'b0;
-            o_pc             <= r_pc;
+            r_sc_sp_load        <= 1'b0;
+            r_sc_push_en        <= 1'b0;
+            r_sc_pop_en         <= 1'b0;
+            r_sc_replace_top_en <= 1'b0;
+            o_boot_arg_ready    <= 1'b0;
+            o_pc                <= r_pc;
 
             // hu: SRAM olvasás (1-ciklus latencia regisztrálva)
             if (r_sram_re) begin
@@ -471,19 +517,37 @@ module cilcpu_core (
                 if (r_fetch_count >= 4'd5) begin
                     r_state <= ST_DECODE;
                 end else if (w_qspi_ready) begin
-                    // hu: 4-byte append a buffer-be. A cpu_rdata a QSPI
-                    //     controller-től big-endian byte sorrendben jön
-                    //     (cpu_rdata[31:24] = byte0). A CIL-T0 a memóriában
-                    //     little-endian, ezért a fetch_buf-ba megfordítjuk.
-                    // en: 4-byte append to buffer. cpu_rdata from the QSPI
-                    //     controller is big-endian on the wire (cpu_rdata
-                    //     [31:24] = byte0). CIL-T0 is little-endian in
-                    //     memory, so we reverse into fetch_buf.
-                    r_fetch_buf[r_fetch_count[2:0] + 3'd0] <= w_qspi_rdata[31:24];
-                    r_fetch_buf[r_fetch_count[2:0] + 3'd1] <= w_qspi_rdata[23:16];
-                    r_fetch_buf[r_fetch_count[2:0] + 3'd2] <= w_qspi_rdata[15:8];
-                    r_fetch_buf[r_fetch_count[2:0] + 3'd3] <= w_qspi_rdata[7:0];
-                    r_fetch_count <= r_fetch_count + 4'd4;
+                    // hu: 4-byte append a packed buffer-be. cnt=0 → byte
+                    //     0..3, cnt=4 → byte 4..7. Az r_fetch_count ÚJ
+                    //     értékét explicit konstanssal írjuk (4 vagy 8),
+                    //     nem self-referenciával — Verilator NBA self-ref
+                    //     egy bug-ot okozott.
+                    // en: 4-byte append to packed buffer. cnt=0 → byte
+                    //     0..3, cnt=4 → byte 4..7. Write r_fetch_count's
+                    //     new value via an explicit constant (4 or 8),
+                    //     not self-reference — Verilator NBA self-ref
+                    //     was causing a bug.
+                    case (r_fetch_count)
+                        4'd0: begin
+                            r_fetch_buf[31:0] <= {
+                                w_qspi_rdata[7:0],
+                                w_qspi_rdata[15:8],
+                                w_qspi_rdata[23:16],
+                                w_qspi_rdata[31:24]
+                            };
+                            r_fetch_count <= 4'd4;
+                        end
+                        4'd4: begin
+                            r_fetch_buf[63:32] <= {
+                                w_qspi_rdata[7:0],
+                                w_qspi_rdata[15:8],
+                                w_qspi_rdata[23:16],
+                                w_qspi_rdata[31:24]
+                            };
+                            r_fetch_count <= 4'd8;
+                        end
+                        default: ;
+                    endcase
                 end else if (!w_qspi_busy && !r_qspi_re) begin
                     // hu: Új fetch indítása (csak ha nincs ready és nincs
                     //     folyamatban lévő tranzakció).
@@ -513,6 +577,18 @@ module cilcpu_core (
 
             // ====================================================
             // ST_EXECUTE — microcode sequencer
+            // hu: Az ALU opcode-okat 2 ciklusra bontjuk (binary) vagy
+            //     1 ciklusra (unary), mert a Stack Cache nem támogatja
+            //     a pop_en+push_en egyidejű kombinációt. Binary minta:
+            //       phase 0: latch ALU(tos1, tos), pop_en=1
+            //       phase 1: replace_top(r_alu_result_latched)
+            //     Unary minta: phase 0 csak: replace_top(alu_result).
+            // en: ALU opcodes split into 2 cycles (binary) or 1 cycle
+            //     (unary), since the Stack Cache disallows simultaneous
+            //     pop_en+push_en. Binary pattern:
+            //       phase 0: latch ALU(tos1, tos), pop_en=1
+            //       phase 1: replace_top(r_alu_result_latched)
+            //     Unary pattern: phase 0 only: replace_top(alu_result).
             // ====================================================
             ST_EXECUTE: begin
                 if (!w_uc_valid) begin
@@ -523,6 +599,54 @@ module cilcpu_core (
                     o_trap      <= 1'b1;
                     o_trap_code <= {4'd0, uc_trap_code};
                     r_state     <= ST_TRAP;
+                end else if (uc_alu_en && r_alu_phase == 2'd0) begin
+                    // hu: ALU phase 0 — kombinációs ALU eredmény latch-elése
+                    //     (TOS1, TOS még érvényes), trap-ek ellenőrzése.
+                    // en: ALU phase 0 — latch combinational ALU result
+                    //     (TOS1, TOS still valid), check traps.
+                    if (w_alu_trap_div_zero) begin
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_DIV_BY_ZERO;
+                        r_state     <= ST_TRAP;
+                    end else if (w_alu_trap_overflow) begin
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_OVERFLOW;
+                        r_state     <= ST_TRAP;
+                    end else begin
+                        r_alu_result_latched <= w_alu_result;
+                        if (uc_stack_pop == 2'd2) begin
+                            // hu: Binary — pop1 most, replace_top phase 1-ben
+                            r_sc_pop_en <= 1'b1;
+                            r_alu_phase <= 2'd1;
+                            // hu: NEM uc_done — phase 1-be megyünk
+                        end else begin
+                            // hu: Unary — replace_top egyciklus alatt,
+                            //     uc_done flow.
+                            r_sc_replace_top_en   <= 1'b1;
+                            r_sc_replace_top_data <= w_alu_result;
+                            // hu: uc_done flow lefut alább
+                            if (uc_pc_wr) begin
+                                r_pc <= pc_next;
+                                r_fetch_count <= 4'd0;
+                                r_fetch_pc    <= pc_next;
+                            end
+                            r_step  <= 4'd0;
+                            r_state <= ST_FETCH;
+                        end
+                    end
+                end else if (uc_alu_en && r_alu_phase == 2'd1) begin
+                    // hu: ALU phase 1 (binary) — replace_top a latch-elt
+                    //     eredménnyel, uc_done flow.
+                    r_sc_replace_top_en   <= 1'b1;
+                    r_sc_replace_top_data <= r_alu_result_latched;
+                    r_alu_phase           <= 2'd0;
+                    if (uc_pc_wr) begin
+                        r_pc <= pc_next;
+                        r_fetch_count <= 4'd0;
+                        r_fetch_pc    <= pc_next;
+                    end
+                    r_step  <= 4'd0;
+                    r_state <= ST_FETCH;
                 end else begin
                     // hu: Stack műveletek a vezérlőszó alapján
                     if (uc_stack_pop > 2'd0) begin
@@ -569,30 +693,48 @@ module cilcpu_core (
                     end else if (uc_done) begin
                         // hu: Normal opcode befejezés — PC update + buffer
                         //     csúsztatás (warm-path optimalizáció). Branch/call
-                        //     esetén full flush.
+                        //     esetén full flush. A csúsztatás explicit `case
+                        //     (r_length)`-szel — a generic `for` loop +
+                        //     dynamic index Verilator regiszter-array-en
+                        //     nem viselkedik megbízhatóan.
                         // en: Normal opcode end — PC update + buffer slide-down
                         //     (warm-path opt). On branch/call we full-flush.
+                        //     Slide is explicit `case (r_length)` — the
+                        //     generic `for` loop with dynamic index does
+                        //     not behave reliably on Verilator reg arrays.
                         if (uc_pc_wr) begin
                             r_pc <= pc_next;
                             if (uc_pc_src != `PC_SRC_NEXT) begin
                                 r_fetch_count <= 4'd0;
                                 r_fetch_pc    <= pc_next;
+                            end else if (r_fetch_count >= {1'b0, r_length}) begin
+                                // hu: Packed buffer slide: lefelé (byte 0 a
+                                //     legalsó), `r_length * 8` bit jobbra
+                                //     shift, felülre 0. Verilator
+                                //     megbízhatóan kezeli.
+                                // en: Packed buffer slide: down-shift by
+                                //     r_length*8 bits (byte 0 is LSB), zero
+                                //     fill upper. Verilator handles reliably.
+                                case (r_length)
+                                    3'd1: r_fetch_buf <= {8'h00,
+                                                          r_fetch_buf[63:8]};
+                                    3'd2: r_fetch_buf <= {16'h0000,
+                                                          r_fetch_buf[63:16]};
+                                    3'd3: r_fetch_buf <= {24'h0,
+                                                          r_fetch_buf[63:24]};
+                                    3'd4: r_fetch_buf <= {32'h0,
+                                                          r_fetch_buf[63:32]};
+                                    3'd5: r_fetch_buf <= {40'h0,
+                                                          r_fetch_buf[63:40]};
+                                    default: ;
+                                endcase
+                                r_fetch_count <=
+                                    r_fetch_count - {1'b0, r_length};
+                                r_fetch_pc <= r_fetch_pc
+                                              + {21'd0, r_length};
                             end else begin
-                                if (r_fetch_count >= {1'b0, r_length}) begin
-                                    for (i = 0; i < 8; i = i + 1) begin
-                                        if ((i + {29'd0, r_length}) < 8) begin
-                                            r_fetch_buf[i[2:0]] <=
-                                                r_fetch_buf[(i + {29'd0, r_length}) & 32'd7];
-                                        end
-                                    end
-                                    r_fetch_count <=
-                                        r_fetch_count - {1'b0, r_length};
-                                    r_fetch_pc <= r_fetch_pc
-                                                  + {21'd0, r_length};
-                                end else begin
-                                    r_fetch_count <= 4'd0;
-                                    r_fetch_pc    <= pc_next;
-                                end
+                                r_fetch_count <= 4'd0;
+                                r_fetch_pc    <= pc_next;
                             end
                         end
                         r_step <= 4'd0;
