@@ -511,7 +511,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ KÉSZ |
 | — F2.4 | QSPI vezérlő | ~70 | | ✅ KÉSZ |
 | — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | ✅ KÉSZ (Sub1..6 mind ✅, 48 cocotb zöld, 12/13 trap, 0 Verilator warning) |
-| — F2.5b | Golden vector harness | ~25 | | ⬜ Tervezett |
+| — F2.5b | Golden vector harness | ~25 | | 🔧 Folyamatban (Phase 1 ✅: C# trace API + JSONL — 10 xUnit zöld; Phase 2 hátra: cocotb harness) |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
 | — F2.7 | FPGA validáció (A7-Lite) | ~45 | | ⬜ Tervezett |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Tervezett |
@@ -637,7 +637,9 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **F2.5a teljes (Sub1..Sub6 + spec/roadmap update):** 48 cocotb teszt zöld, 12/13 trap kód lefedett (TRAP_SRAM_OVERFLOW implementált, F5+ stack PSRAM spill-ben tesztelt), 0 Verilator warning.
 
-**Következő érdemi lépés:** **F2.5b — Golden vector harness** (cocotb vs C# szimulátor lépésről-lépésre összehasonlítás): `CilCpu.Sim.Trace` export per-utasítás állapot (PC, eval stack, SP, FP, locals, args), cocotb-ban olvassuk és vetjük össze az RTL kimenettel. Ez bezárja az F2.5 fázist és előkészíti az F2.6 Yosys szintézist.
+**F2.5b Phase 1 KÉSZ (C# trace API):** A `TCpuNanoTracer` osztály a `TCpuNano` alosztálya, override-olja a `RunLoop`-ot és minden CIL-T0 utasítás végrehajtása ELŐTT egy `TCpuTraceEntry` snapshot-ot rögzít (Step, Pc, Sp, Fp, CallDepth, ArgCount, LocalCount, EvalDepth, Opcode, Operand, LengthInBytes). A `TCpuTraceJsonl` static class JSONL formátumban serializál és parsál (1 entry / sor, kompakt mező-kulcsok). Lefedettség: smoke (LDC+RET), aritmetika (Add 2+3), branch (BR_S forward), CALL/RET (Add(2,3) hívás 8 lépéses trace, CallDepth 1→2→1 tranzíció), JSONL roundtrip, end-to-end. **170 xUnit zöld** (10 új tracer/JSONL teszt).
+
+**Következő érdemi lépés:** **F2.5b Phase 2 — Cocotb golden harness**: `CilCpu.Sim.Runner --trace <path>` opció a JSONL fájl generálására, új `rtl/tb/test_core_golden.py` cocotb teszt ami beolvassa a trace-t, programot tölt az RTL-be, és lépésről-lépésre összevet (r_pc, r_sp, r_fp, r_call_depth, r_arg_count, r_local_count). Ez bezárja az F2.5 fázist és előkészíti az F2.6 Yosys szintézist.
 
 ## Finanszírozási akcióterv
 
