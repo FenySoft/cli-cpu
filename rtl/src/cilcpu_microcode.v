@@ -413,35 +413,24 @@ module cilcpu_microcode (
 
             // ============================================================
             // Call — frame push + PC=call_target
-            // hu: 2 lépés: step0=stack pop (args), step1=frame_push + PC=call.
-            //     A tényleges arg-pop N-t a sequencer kezeli (ismétlődő step0).
-            //     A microcode ROM csak a vezérlőjeleket definiálja.
+            // hu: F2.5a Sub5: 1-step opcode. A microcode csak az UC_FRAME_PUSH
+            //     + UC_PC_WR + UC_PC_SRC=PC_SRC_CALL jeleket állítja, a
+            //     tényleges szekvenciát (header read QSPI-ról, validáció,
+            //     args pop, header write, locals zero, finalize) a
+            //     top-level FSM ST_CALL állapota végzi több ciklus alatt.
+            // en: F2.5a Sub5: 1-step opcode. The microcode only asserts
+            //     UC_FRAME_PUSH + UC_PC_WR + UC_PC_SRC=PC_SRC_CALL; the
+            //     actual sequence (header read from QSPI, validation, args
+            //     pop, header write, locals zero, finalize) runs in the
+            //     top-level FSM's ST_CALL state across multiple cycles.
             // ============================================================
             {8'h00, `OP_CALL}: begin
                 o_valid  = 1;
-                o_nsteps = 4'd2;
-
-                case (i_step)
-                    // hu: Step 0: SRAM read a call target header-jéből (validáció).
-                    // en: Step 0: SRAM read from call target header (validation).
-                    4'd0: begin
-                        o_ctrl[`UC_SRAM_RD]                      = 1;
-                        o_ctrl[`UC_ADDR_SRC_HI:`UC_ADDR_SRC_LO] = `ADDR_SRC_FRAME;
-                    end
-
-                    // hu: Step 1: frame push, PC = call target.
-                    // en: Step 1: frame push, PC = call target.
-                    4'd1: begin
-                        o_ctrl[`UC_DONE]                        = 1;
-                        o_ctrl[`UC_FRAME_PUSH]                  = 1;
-                        o_ctrl[`UC_PC_WR]                       = 1;
-                        o_ctrl[`UC_PC_SRC_HI:`UC_PC_SRC_LO]    = `PC_SRC_CALL;
-                    end
-
-                    default: begin
-                        o_ctrl = 32'd0;
-                    end
-                endcase
+                o_nsteps = 4'd1;
+                o_ctrl[`UC_DONE]                        = 1;
+                o_ctrl[`UC_FRAME_PUSH]                  = 1;
+                o_ctrl[`UC_PC_WR]                       = 1;
+                o_ctrl[`UC_PC_SRC_HI:`UC_PC_SRC_LO]    = `PC_SRC_CALL;
             end
 
             // ============================================================

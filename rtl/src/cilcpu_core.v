@@ -50,8 +50,36 @@ module cilcpu_core (
     localparam [3:0] ST_DECODE   = 4'd3;
     localparam [3:0] ST_EXECUTE  = 4'd4;
     localparam [3:0] ST_MEM_WAIT = 4'd5;   // Sub3: SRAM read 1-ciklus latencia / Sub3: SRAM read 1-cycle latency
+    localparam [3:0] ST_CALL     = 4'd6;   // Sub5: CALL frame manager
+    localparam [3:0] ST_RET      = 4'd7;   // Sub5: RET frame manager
     localparam [3:0] ST_HALT     = 4'd8;
     localparam [3:0] ST_TRAP     = 4'd9;
+
+    // hu: Sub5 — ST_CALL sub-states (frame push szekvencia)
+    // en: Sub5 — ST_CALL sub-states (frame push sequence)
+    localparam [3:0] CALL_HDR_REQ      = 4'd0;
+    localparam [3:0] CALL_HDR_WAIT     = 4'd1;
+    localparam [3:0] CALL_VALIDATE     = 4'd2;
+    localparam [3:0] CALL_ARG_POP_REQ  = 4'd3;
+    localparam [3:0] CALL_ARG_POP_WAIT = 4'd4;
+    localparam [3:0] CALL_ARG_POP_WR   = 4'd5;
+    localparam [3:0] CALL_HDR_WR_RPC   = 4'd6;
+    localparam [3:0] CALL_HDR_WR_PFP   = 4'd7;
+    localparam [3:0] CALL_HDR_WR_AL    = 4'd8;
+    localparam [3:0] CALL_LOCAL_ZERO   = 4'd9;
+    localparam [3:0] CALL_FINALIZE     = 4'd10;
+
+    // hu: Sub5 — ST_RET sub-states (frame pop szekvencia)
+    // en: Sub5 — ST_RET sub-states (frame pop sequence)
+    localparam [3:0] RET_REQ_RPC    = 4'd0;
+    localparam [3:0] RET_WAIT_RPC   = 4'd1;
+    localparam [3:0] RET_LATCH_RPC  = 4'd2;
+    localparam [3:0] RET_WAIT_PFP   = 4'd3;
+    localparam [3:0] RET_LATCH_PFP  = 4'd4;
+    localparam [3:0] RET_WAIT_AL    = 4'd5;
+    localparam [3:0] RET_LATCH_AL   = 4'd6;
+    localparam [3:0] RET_FINALIZE   = 4'd7;
+    localparam [3:0] RET_PUSH_RV    = 4'd8;
 
     // hu: Boot szekvencia alállapotok
     // en: Boot sequence sub-states
@@ -82,6 +110,22 @@ module cilcpu_core (
     reg  [31:0] r_alu_result_latched;
     reg         r_mem_phase;       // Sub3: 0 = pop1, 1 = SRAM write a pop_data-val
     reg  [13:0] r_mem_addr_latched;
+
+    // hu: Sub5 — frame manager regiszterek (ST_CALL és ST_RET használja)
+    // en: Sub5 — frame manager registers (used by ST_CALL and ST_RET)
+    reg  [3:0]  r_call_sub;            // CALL sub-state
+    reg  [3:0]  r_ret_sub;             // RET sub-state
+    reg  [23:0] r_call_target_rva;     // CALL operand: callee header RVA
+    reg  [23:0] r_return_pc;           // CALL utáni PC (a caller folytatása)
+    reg  [4:0]  r_new_arg_count;       // CALL header-ből
+    reg  [4:0]  r_new_local_count;     // CALL header-ből
+    reg  [13:0] r_new_fp;              // FP_new = caller r_sp a CALL pillanatában
+    reg  [4:0]  r_arg_pop_idx;         // CALL: hányadik arg pop-jánál tartunk
+    reg  [4:0]  r_local_zero_idx;      // CALL: hányadik local nullázásánál
+    reg  [31:0] r_ret_value;           // RET: a step 0-ban pop-olt return value
+    reg  [13:0] r_callee_old_fp;       // RET: a callee r_fp-je (felszabadításhoz)
+    reg  [23:0] r_ret_return_pc;       // RET: visszatérési PC (header [FP+0]-ból)
+    reg  [13:0] r_ret_prev_fp;         // RET: caller FP (header [FP+4]-ből)
 
     // hu: Fetch buffer (8 byte, packed FIFO). A packed register a Verilator
     //     non-blocking assignment-jén megbízhatóbb mint a reg array
@@ -216,6 +260,7 @@ module cilcpu_core (
     wire        uc_pc_wr      = w_uc_ctrl[`UC_PC_WR];
     wire [1:0]  uc_pc_src     = w_uc_ctrl[`UC_PC_SRC_HI:`UC_PC_SRC_LO];
     wire        uc_frame_pop  = w_uc_ctrl[`UC_FRAME_POP];
+    wire        uc_frame_push = w_uc_ctrl[`UC_FRAME_PUSH];
     wire        uc_halt_en    = w_uc_ctrl[`UC_HALT];
     wire        uc_cond_en    = w_uc_ctrl[`UC_COND_EN];
     wire [1:0]  uc_cond_type  = w_uc_ctrl[`UC_COND_TYPE_HI:`UC_COND_TYPE_LO];
@@ -520,6 +565,21 @@ module cilcpu_core (
             r_alu_result_latched  <= 32'd0;
             r_mem_phase           <= 1'b0;
             r_mem_addr_latched    <= 14'd0;
+            // hu: Sub5 — frame manager regiszterek reset
+            // en: Sub5 — frame manager registers reset
+            r_call_sub            <= CALL_HDR_REQ;
+            r_ret_sub             <= RET_REQ_RPC;
+            r_call_target_rva     <= 24'd0;
+            r_return_pc           <= 24'd0;
+            r_new_arg_count       <= 5'd0;
+            r_new_local_count     <= 5'd0;
+            r_new_fp              <= 14'd0;
+            r_arg_pop_idx         <= 5'd0;
+            r_local_zero_idx      <= 5'd0;
+            r_ret_value           <= 32'd0;
+            r_callee_old_fp       <= 14'd0;
+            r_ret_return_pc       <= 24'd0;
+            r_ret_prev_fp         <= 14'd0;
             o_halt           <= 1'b0;
             o_trap           <= 1'b0;
             o_trap_code      <= 8'd0;
@@ -1044,11 +1104,51 @@ module cilcpu_core (
                             o_return_value <= w_sc_pop_data;
                             r_state <= ST_HALT;
                         end else begin
-                            // hu: Sub2+: frame pop, PC=ReturnPC, call_depth--
-                            o_trap      <= 1'b1;
-                            o_trap_code <= `TRAP_INVALID_OPCODE;
-                            r_state     <= ST_TRAP;
+                            // hu: Sub5 — non-root frame pop → ST_RET szekvencia.
+                            //     A return value a step 0-ban pop-olt érték
+                            //     (w_sc_pop_data); elmentjük r_ret_value-be.
+                            //     Az SRAM read indítása itt: [FP+0] = ReturnPC.
+                            // en: Sub5 — non-root frame pop → ST_RET sequence.
+                            //     Return value latched from step 0 pop_data.
+                            //     Initiate SRAM read of [FP+0] = ReturnPC.
+                            r_ret_value     <= w_sc_pop_data;
+                            r_callee_old_fp <= r_fp;
+                            r_sram_addr     <= r_fp;
+                            r_sram_re       <= 1'b1;
+                            r_ret_sub       <= RET_REQ_RPC;
+                            r_state         <= ST_RET;
                         end
+                    end else if (uc_frame_push) begin
+                        // hu: Sub5 — CALL → ST_CALL szekvencia.
+                        //     A microcode 1-step (UC_DONE + UC_FRAME_PUSH +
+                        //     UC_PC_WR + UC_PC_SRC=PC_SRC_CALL). A teljes
+                        //     frame felépítést a top-level végzi több
+                        //     ciklus alatt: header read QSPI-ról, validáció,
+                        //     args reverse-pop a Stack Cache-ből, header
+                        //     write az új frame-be, locals nullázás,
+                        //     regiszterek és Stack Cache reset.
+                        //     A return_pc = r_pc + r_length (5 byte: 1 op
+                        //     + 4 byte RVA). Az új FP = caller r_sp (a
+                        //     caller frame vége, ami egyben a callee frame
+                        //     kezdete).
+                        // en: Sub5 — CALL → ST_CALL sequence.
+                        //     Microcode is 1-step (UC_DONE + UC_FRAME_PUSH +
+                        //     UC_PC_WR + UC_PC_SRC=PC_SRC_CALL). The full
+                        //     frame setup runs in the top-level FSM across
+                        //     multiple cycles: header read from QSPI,
+                        //     validation, args reverse-pop from Stack Cache,
+                        //     header write into the new frame, locals zero,
+                        //     register and Stack Cache reset.
+                        //     return_pc = r_pc + r_length (5 byte). New FP =
+                        //     caller r_sp (caller frame end = callee frame
+                        //     start).
+                        r_call_target_rva <= r_operand[23:0];
+                        r_return_pc       <= r_pc + {21'd0, r_length};
+                        r_new_fp          <= r_sp;
+                        r_arg_pop_idx     <= 5'd0;
+                        r_local_zero_idx  <= 5'd0;
+                        r_call_sub        <= CALL_HDR_REQ;
+                        r_state           <= ST_CALL;
                     end else if (uc_done) begin
                         // hu: Normal opcode befejezés — PC update + buffer
                         //     csúsztatás (warm-path optimalizáció). Branch/call
@@ -1174,6 +1274,319 @@ module cilcpu_core (
                     r_step  <= 4'd0;
                     r_state <= ST_FETCH;
                 end
+            end
+
+            // ====================================================
+            // ST_CALL — Sub5 frame manager (CALL szekvencia)
+            // hu: Több ciklus alatt felépíti az új callee frame-et az
+            //     SRAM-ban. Sub-states (r_call_sub):
+            //     0 HDR_REQ      → call_depth check + QSPI read indítása
+            //                       a callee header címére
+            //     1 HDR_WAIT     → várja a w_qspi_ready-t, magic+arg+local
+            //                       latch-elése
+            //     2 VALIDATE     → SRAM overflow check (r_sp + frame_size)
+            //     3 ARG_POP_REQ  → pop_en=1 (vagy átmenet HDR_WR-be ha 0 arg)
+            //     4 ARG_POP_WAIT → várja !w_sc_busy állapotot
+            //     5 ARG_POP_WR   → SRAM write a frame [FP+12+i*4] címre
+            //     6 HDR_WR_RPC   → [FP+0] = return_pc
+            //     7 HDR_WR_PFP   → [FP+4] = prev_fp (régi r_fp)
+            //     8 HDR_WR_AL    → [FP+8] = {0, local_count, arg_count}
+            //     9 LOCAL_ZERO   → 0 írása minden local slotra
+            //    10 FINALIZE     → regiszterek + sc_sp_load + fetch flush
+            // en: Builds the new callee frame in SRAM across several cycles.
+            // ====================================================
+            ST_CALL: begin
+                case (r_call_sub)
+                    CALL_HDR_REQ: begin
+                        // hu: Call depth check (max 512). Itt trap-elünk,
+                        //     mielőtt a header read-et kérnénk.
+                        // en: Call depth check (max 512). Trap before
+                        //     issuing the header read request.
+                        if (r_call_depth >= 10'd512) begin
+                            o_trap      <= 1'b1;
+                            o_trap_code <= `TRAP_CALL_DEPTH_EXCEEDED;
+                            r_state     <= ST_TRAP;
+                        end else if (!w_qspi_busy && !r_qspi_inflight) begin
+                            // hu: QSPI szabad → új request a header címére
+                            //     (4 byte word: magic + arg + local + max).
+                            // en: QSPI idle → request header word
+                            //     (4 bytes: magic + arg + local + max).
+                            r_qspi_addr     <= r_call_target_rva;
+                            r_qspi_re       <= 1'b1;
+                            r_qspi_inflight <= 1'b1;
+                            r_call_sub      <= CALL_HDR_WAIT;
+                        end
+                    end
+
+                    CALL_HDR_WAIT: begin
+                        if (w_qspi_ready) begin
+                            r_qspi_inflight <= 1'b0;
+                            // hu: w_qspi_rdata layout (lásd a fetch
+                            //     byte-swapot): [31:24] = byte at addr
+                            //     (magic), [23:16] = arg_count, [15:8] =
+                            //     local_count, [7:0] = max_stack.
+                            // en: See fetch byte-swap: [31:24] = magic,
+                            //     [23:16] = arg_count, [15:8] = local_count,
+                            //     [7:0] = max_stack.
+                            if (w_qspi_rdata[31:24] != 8'hFE) begin
+                                o_trap      <= 1'b1;
+                                o_trap_code <= `TRAP_INVALID_CALL_TARGET;
+                                r_state     <= ST_TRAP;
+                            end else begin
+                                r_new_arg_count   <= w_qspi_rdata[20:16];
+                                r_new_local_count <= w_qspi_rdata[12:8];
+                                r_call_sub        <= CALL_VALIDATE;
+                            end
+                        end
+                    end
+
+                    CALL_VALIDATE: begin
+                        // hu: SRAM overflow check: r_sp + frame_size > 16384
+                        //     A 15-bit unsigned compare 14-bit r_sp + max
+                        //     frame_size (140 byte) eseteit kezeli.
+                        // en: SRAM overflow check: r_sp + frame_size > 16384.
+                        if ({1'b0, r_sp} +
+                            {1'b0, 14'd12} +
+                            {8'd0, r_new_arg_count, 2'd0} +
+                            {8'd0, r_new_local_count, 2'd0} > 15'h4000) begin
+                            o_trap      <= 1'b1;
+                            o_trap_code <= `TRAP_SRAM_OVERFLOW;
+                            r_state     <= ST_TRAP;
+                        end else begin
+                            r_call_sub <= CALL_ARG_POP_REQ;
+                        end
+                    end
+
+                    CALL_ARG_POP_REQ: begin
+                        // hu: Args reverse-pop: első pop = TOS = arg[N-1],
+                        //     második = arg[N-2], stb. Ha minden arg pop-olva,
+                        //     a header write fázisra megyünk.
+                        // en: Args reverse-pop: first pop = TOS = arg[N-1],
+                        //     second = arg[N-2], etc.
+                        if (r_arg_pop_idx >= r_new_arg_count) begin
+                            r_call_sub <= CALL_HDR_WR_RPC;
+                        end else if (!w_sc_busy) begin
+                            r_sc_pop_en <= 1'b1;
+                            r_call_sub  <= CALL_ARG_POP_WAIT;
+                        end
+                    end
+
+                    CALL_ARG_POP_WAIT: begin
+                        // hu: Stack Cache pop_data 1-cycle regisztrált.
+                        //     A spill miatt busy lehet — várjuk a !busy-t,
+                        //     aztán biztonságosan írhatunk az SRAM-ba.
+                        // en: Stack Cache registered pop_data; wait for
+                        //     !busy (potential spill) before SRAM write.
+                        if (!w_sc_busy) begin
+                            r_call_sub <= CALL_ARG_POP_WR;
+                        end
+                    end
+
+                    CALL_ARG_POP_WR: begin
+                        // hu: SRAM write a frame megfelelő arg slot-jára.
+                        //     Cím = FP_new + 12 + (N-1-pop_idx)*4
+                        // en: SRAM write to the frame's arg slot.
+                        r_sram_addr  <= r_new_fp + 14'd12 +
+                                        {7'd0,
+                                         (r_new_arg_count - 5'd1 - r_arg_pop_idx),
+                                         2'd0};
+                        r_sram_wdata <= w_sc_pop_data;
+                        r_sram_we    <= 1'b1;
+                        r_arg_pop_idx <= r_arg_pop_idx + 5'd1;
+                        r_call_sub    <= CALL_ARG_POP_REQ;
+                    end
+
+                    CALL_HDR_WR_RPC: begin
+                        r_sram_addr  <= r_new_fp;            // [FP+0]
+                        r_sram_wdata <= {8'd0, r_return_pc};
+                        r_sram_we    <= 1'b1;
+                        r_call_sub   <= CALL_HDR_WR_PFP;
+                    end
+
+                    CALL_HDR_WR_PFP: begin
+                        r_sram_addr  <= r_new_fp + 14'd4;    // [FP+4]
+                        r_sram_wdata <= {18'd0, r_fp};
+                        r_sram_we    <= 1'b1;
+                        r_call_sub   <= CALL_HDR_WR_AL;
+                    end
+
+                    CALL_HDR_WR_AL: begin
+                        r_sram_addr  <= r_new_fp + 14'd8;    // [FP+8]
+                        r_sram_wdata <= {16'd0,
+                                         3'd0, r_new_local_count,
+                                         3'd0, r_new_arg_count};
+                        r_sram_we    <= 1'b1;
+                        if (r_new_local_count > 5'd0) begin
+                            r_local_zero_idx <= 5'd0;
+                            r_call_sub <= CALL_LOCAL_ZERO;
+                        end else begin
+                            r_call_sub <= CALL_FINALIZE;
+                        end
+                    end
+
+                    CALL_LOCAL_ZERO: begin
+                        // hu: Locals nullázása: [FP_new + 12 + arg*4 + i*4]
+                        // en: Zero locals: [FP_new + 12 + arg*4 + i*4]
+                        r_sram_addr  <= r_new_fp + 14'd12 +
+                                        {7'd0, r_new_arg_count, 2'd0} +
+                                        {7'd0, r_local_zero_idx, 2'd0};
+                        r_sram_wdata <= 32'd0;
+                        r_sram_we    <= 1'b1;
+                        r_local_zero_idx <= r_local_zero_idx + 5'd1;
+                        if (r_local_zero_idx + 5'd1 >= r_new_local_count) begin
+                            r_call_sub <= CALL_FINALIZE;
+                        end
+                    end
+
+                    CALL_FINALIZE: begin
+                        // hu: Regiszterek frissítése a callee context-re,
+                        //     fetch flush, Stack Cache reset üres eval-re.
+                        // en: Update registers to callee context, fetch flush,
+                        //     Stack Cache reset to empty eval.
+                        r_fp          <= r_new_fp;
+                        r_sp          <= r_new_fp + 14'd12 +
+                                         {7'd0, r_new_arg_count, 2'd0} +
+                                         {7'd0, r_new_local_count, 2'd0};
+                        r_arg_count   <= r_new_arg_count;
+                        r_local_count <= r_new_local_count;
+                        r_call_depth  <= r_call_depth + 10'd1;
+                        r_pc          <= r_call_target_rva + 24'd8;
+                        r_fetch_count <= 4'd0;
+                        r_fetch_pc    <= r_call_target_rva + 24'd8;
+                        r_next_fetch_addr <= r_call_target_rva + 24'd8;
+                        r_qspi_inflight <= 1'b0;
+                        r_sc_sp_load <= 1'b1;
+                        r_sc_sp_init <= r_new_fp + 14'd12 +
+                                        {7'd0, r_new_arg_count, 2'd0} +
+                                        {7'd0, r_new_local_count, 2'd0};
+                        r_state <= ST_FETCH;
+                    end
+
+                    default: begin
+                        r_state <= ST_TRAP;
+                        o_trap  <= 1'b1;
+                        o_trap_code <= `TRAP_INVALID_OPCODE;
+                    end
+                endcase
+            end
+
+            // ====================================================
+            // ST_RET — Sub5 frame manager (RET szekvencia)
+            // hu: Sub-states (r_ret_sub):
+            //     0 REQ_RPC    → SRAM read már lefutott (ST_EXECUTE indította
+            //                    [FP+0] = ReturnPC). Csak átmenet.
+            //     1 WAIT_RPC   → 2-cycle SRAM latency: várjuk a friss adatot.
+            //     2 LATCH_RPC  → r_ret_return_pc latch + [FP+4] read indítás.
+            //     3 WAIT_PFP   → 2-cycle latency.
+            //     4 LATCH_PFP  → r_ret_prev_fp latch + [prev_fp+8] read.
+            //     5 WAIT_AL    → 2-cycle latency.
+            //     6 LATCH_AL   → caller arg/local count latch.
+            //     7 FINALIZE   → regiszterek caller-re + Stack Cache reset
+            //                    a caller eval bázisra.
+            //     8 PUSH_RV    → return value push a Stack Cache-be →
+            //                    ST_FETCH (caller folytatása).
+            // en: Frame pop sequence: 3× SRAM read (return_pc, prev_fp,
+            //     caller arg/local), then register/SP updates, push return
+            //     value back to caller eval stack.
+            // ====================================================
+            ST_RET: begin
+                case (r_ret_sub)
+                    RET_REQ_RPC: begin
+                        // hu: ST_EXECUTE már r_sram_re=1-et adott a [FP+0]-re.
+                        //     A 2-cycle latency miatt 1 cycle várás itt.
+                        // en: ST_EXECUTE already issued the read; here we
+                        //     just bridge the 1st of 2 cycles of latency.
+                        r_ret_sub <= RET_WAIT_RPC;
+                    end
+
+                    RET_WAIT_RPC: begin
+                        r_ret_sub <= RET_LATCH_RPC;
+                    end
+
+                    RET_LATCH_RPC: begin
+                        r_ret_return_pc <= r_sram_rdata_latched[23:0];
+                        r_sram_addr <= r_callee_old_fp + 14'd4;  // [FP+4]
+                        r_sram_re   <= 1'b1;
+                        r_ret_sub   <= RET_WAIT_PFP;
+                    end
+
+                    RET_WAIT_PFP: begin
+                        r_ret_sub <= RET_LATCH_PFP;
+                    end
+
+                    RET_LATCH_PFP: begin
+                        r_ret_prev_fp <= r_sram_rdata_latched[13:0];
+                        // hu: Indítsuk a [prev_fp + 8] olvasást azonnal,
+                        //     a friss r_sram_rdata_latched-ből nyerjük a
+                        //     prev_fp-t (a regiszter NBA miatt 1 cycle
+                        //     múlva érvényes, de a kombinációs cím
+                        //     számítás itt érvényes).
+                        // en: Start [prev_fp + 8] read using the freshly
+                        //     latched value (combinational use is OK).
+                        r_sram_addr <= r_sram_rdata_latched[13:0] + 14'd8;
+                        r_sram_re   <= 1'b1;
+                        r_ret_sub   <= RET_WAIT_AL;
+                    end
+
+                    RET_WAIT_AL: begin
+                        r_ret_sub <= RET_LATCH_AL;
+                    end
+
+                    RET_LATCH_AL: begin
+                        // hu: byte 0 = arg_count, byte 1 = local_count
+                        //     ([FP+8] formátum: {0, local_count, arg_count}).
+                        // en: byte 0 = arg_count, byte 1 = local_count.
+                        r_arg_count   <= r_sram_rdata_latched[4:0];
+                        r_local_count <= r_sram_rdata_latched[12:8];
+                        r_ret_sub     <= RET_FINALIZE;
+                    end
+
+                    RET_FINALIZE: begin
+                        // hu: Regiszterek caller context-re. A r_arg_count
+                        //     és r_local_count NBA-zott — a RET_FINALIZE
+                        //     ciklusában már a friss caller értékek.
+                        //     A callee SRAM (r_callee_old_fp .. r_sp-ig)
+                        //     felszabadul.
+                        // en: Registers reset to caller context. r_arg_count
+                        //     and r_local_count are NBA-fresh by this cycle.
+                        //     Callee SRAM region freed.
+                        r_pc          <= r_ret_return_pc;
+                        r_fp          <= r_ret_prev_fp;
+                        r_sp          <= r_callee_old_fp;
+                        r_call_depth  <= r_call_depth - 10'd1;
+                        r_fetch_count <= 4'd0;
+                        r_fetch_pc    <= r_ret_return_pc;
+                        r_next_fetch_addr <= r_ret_return_pc;
+                        r_qspi_inflight <= 1'b0;
+                        // hu: Stack Cache reset a caller eval bázisra. A
+                        //     return value push-ja külön ciklusban (RET_PUSH_RV),
+                        //     mert a sp_load és push_en egyszerre nem.
+                        // en: Stack Cache reset to caller eval base. Return
+                        //     value push runs in a separate cycle because
+                        //     sp_load and push_en don't combine.
+                        r_sc_sp_load <= 1'b1;
+                        r_sc_sp_init <= r_ret_prev_fp + 14'd12 +
+                                        {7'd0, r_arg_count, 2'd0} +
+                                        {7'd0, r_local_count, 2'd0};
+                        r_ret_sub <= RET_PUSH_RV;
+                    end
+
+                    RET_PUSH_RV: begin
+                        // hu: A return value push a Stack Cache-be a
+                        //     caller eval stack-jére, és ST_FETCH-re megyünk.
+                        // en: Push return value to Stack Cache (caller eval
+                        //     stack), transition to ST_FETCH.
+                        r_sc_push_en   <= 1'b1;
+                        r_sc_push_data <= r_ret_value;
+                        r_state        <= ST_FETCH;
+                    end
+
+                    default: begin
+                        r_state <= ST_TRAP;
+                        o_trap  <= 1'b1;
+                        o_trap_code <= `TRAP_INVALID_OPCODE;
+                    end
+                endcase
             end
 
             // ====================================================

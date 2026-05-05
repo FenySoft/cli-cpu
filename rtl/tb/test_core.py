@@ -948,3 +948,204 @@ async def test_63_invalid_opcode(dut):
     assert trap == 1, f"expected trap, got halt={halt}"
     assert tc == TRAP_INVALID_OPCODE, \
         f"trap_code = 0x{tc:02X}, expected 0x{TRAP_INVALID_OPCODE:02X}"
+
+
+# ============================================================
+# hu: Sub5 — CALL / RET non-root frame manager
+#     Az F1 aranypéldát követjük (TExecutor.cs ExecuteCall/ExecuteRet,
+#     TCpuNano.PushCallFrame/PopCallFrame). A callee header layout
+#     8 byte: magic(1) + arg_count(1) + local_count(1) + max_stack(1) +
+#     code_size(2 LE) + reserved(2). A HW az első 3 byte-ot dolgozza
+#     (magic, arg_count, local_count); max_stack és code_size F5+-re
+#     marad.
+# en: Sub5 — CALL / RET non-root frame manager
+#     Following the F1 golden reference (TExecutor.cs ExecuteCall/Ret,
+#     TCpuNano.Push/PopCallFrame). Callee 8-byte header: magic(1) +
+#     arg_count(1) + local_count(1) + max_stack(1) + code_size(2 LE) +
+#     reserved(2). The HW only consumes the first 3 bytes; max_stack
+#     and code_size are deferred to F5+.
+# ============================================================
+
+
+def _method_header(arg_count, local_count, max_stack=4, code_size=0):
+    """hu: 8-byte CIL-T0 method header (TMethodHeader formátum).
+    en: 8-byte CIL-T0 method header (TMethodHeader format)."""
+    return bytes([
+        0xFE,                                  # magic
+        arg_count & 0xFF,
+        local_count & 0xFF,
+        max_stack & 0xFF,
+        code_size & 0xFF, (code_size >> 8) & 0xFF,  # LE u16
+        0x00, 0x00,                            # reserved
+    ])
+
+
+def _call_op(rva):
+    """hu: OP_CALL + 4-byte LE RVA operand.
+    en: OP_CALL + 4-byte LE RVA operand."""
+    return bytes([
+        OP_CALL,
+        rva & 0xFF, (rva >> 8) & 0xFF, (rva >> 16) & 0xFF, (rva >> 24) & 0xFF,
+    ])
+
+
+@cocotb.test()
+async def test_50_call_simple_add_2_3(dut):
+    """hu: Add(a, b) hívás 2 arg-gal — Add(2, 3) = 5.
+        Layout:
+          @0..7:   add header (arg_count=2, local_count=0, code_size=4)
+          @8..11:  add body: LDARG.0, LDARG.1, ADD, RET
+          @12..19: caller (boot_pc=12, no args, no locals)
+                   LDC.I4_2, LDC.I4_3, CALL 0, RET
+    en: Add(a, b) call with 2 args — Add(2, 3) = 5."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    program = (
+        # @0..7: add() header
+        _method_header(arg_count=2, local_count=0, max_stack=2, code_size=4)
+        # @8..11: add body
+        + bytes([OP_LDARG_0, OP_LDARG_1, OP_ADD, OP_RET])
+        # @12..19: caller (boot_pc=12)
+        + bytes([OP_LDC_I4_2, OP_LDC_I4_3])
+        + _call_op(0)
+        + bytes([OP_RET])
+    )
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, boot_pc=12, max_cycles=10000
+    )
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert rv == 5, f"return_value = {rv}, expected 5 (Add(2,3))"
+
+
+@cocotb.test()
+async def test_51_call_returns_then_continues(dut):
+    """hu: Caller folytatja a CALL után — Add(2,3)+5 = 10.
+        A return value pop-ja a callee Stack Cache-ből, push a caller
+        eval stack-jére. A caller még egy LDC.I4_5 + ADD-t végrehajt.
+    en: Caller continues after CALL — Add(2,3) + 5 = 10."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    program = (
+        _method_header(arg_count=2, local_count=0, max_stack=2, code_size=4)
+        + bytes([OP_LDARG_0, OP_LDARG_1, OP_ADD, OP_RET])
+        # Caller (boot_pc=12): push 2, push 3, CALL add (RVA=0),
+        # push 5, ADD, RET
+        + bytes([OP_LDC_I4_2, OP_LDC_I4_3])
+        + _call_op(0)
+        + bytes([OP_LDC_I4_5, OP_ADD, OP_RET])
+    )
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, boot_pc=12, max_cycles=10000
+    )
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert rv == 10, f"return_value = {rv}, expected 10 (Add(2,3) + 5)"
+
+
+@cocotb.test()
+async def test_52_call_recursive_fib_5(dut):
+    """hu: Rekurzív Fibonacci(5) = 5.
+        fib(n): if n<2 return n; else return fib(n-1)+fib(n-2)
+        Layout:
+          @0..7:   fib header (arg_count=1, local_count=0, code_size=24)
+          @8..29:  fib body (rekurzív ágak + ADD + RET)
+          @30..31: base case (LDARG.0, RET) — BLT_S target
+          @32..38: caller (boot_pc=32): LDC.I4_5, CALL fib, RET
+    en: Recursive Fibonacci(5) = 5."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    program = (
+        # @0..7: fib header
+        _method_header(arg_count=1, local_count=0, max_stack=4, code_size=24)
+        # @8..11: BLT_S branch eldönti: n < 2 → return n
+        + bytes([
+            OP_LDARG_0,                   # @8: push n
+            OP_LDC_I4_2,                  # @9: push 2
+            OP_BLT_S, 18,                 # @10..11: if n<2 → @12+18=@30
+        ])
+        # @12..19: recursive call 1: fib(n-1)
+        + bytes([
+            OP_LDARG_0,                   # @12: push n
+            OP_LDC_I4_1,                  # @13: push 1
+            OP_SUB,                       # @14: n-1
+        ])
+        + _call_op(0)                     # @15..19: CALL fib (RVA=0)
+        # @20..27: recursive call 2: fib(n-2)
+        + bytes([
+            OP_LDARG_0,                   # @20: push n
+            OP_LDC_I4_2,                  # @21: push 2
+            OP_SUB,                       # @22: n-2
+        ])
+        + _call_op(0)                     # @23..27: CALL fib
+        # @28..29: combine + return
+        + bytes([OP_ADD, OP_RET])
+        # @30..31: base case
+        + bytes([OP_LDARG_0, OP_RET])
+        # @32..38: caller (boot_pc=32)
+        + bytes([OP_LDC_I4_5])
+        + _call_op(0)
+        + bytes([OP_RET])
+    )
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, boot_pc=32, max_cycles=200000
+    )
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert rv == 5, f"return_value = {rv}, expected 5 (fib(5))"
+
+
+@cocotb.test()
+async def test_53_invalid_call_target(dut):
+    """hu: CALL egy olyan címre, ahol nincs 0xFE magic
+        → TRAP_INVALID_CALL_TARGET (0x07).
+    en: CALL to address without 0xFE magic
+        → TRAP_INVALID_CALL_TARGET (0x07)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    program = (
+        # @0..7: NEM header (random), magic byte 0x00 ≠ 0xFE
+        bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        # @8..13: caller — CALL 0 (RVA=0, ott 0x00 magic, invalid)
+        + _call_op(0)
+        + bytes([OP_RET])
+    )
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, boot_pc=8, max_cycles=10000
+    )
+    assert trap == 1, \
+        f"expected trap, got halt={halt}, rv={rv}"
+    assert tc == TRAP_INVALID_CALL_TARGET, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_INVALID_CALL_TARGET:02X} (INVALID_CALL_TARGET)"
+
+
+@cocotb.test()
+async def test_54_call_depth_exceeded(dut):
+    """hu: Végtelen rekurzió önhívással — TRAP_CALL_DEPTH_EXCEEDED (0x0A)
+        a 512. mélységnél.
+        Layout:
+          @0..7:   recursive header (arg_count=0, local_count=0)
+          @8..12:  CALL 0 (önmagát hívja) — végtelen mélység
+          @13:     RET (sosem fut le)
+          @14..20: caller (boot_pc=14): CALL recursive_fn, RET
+    en: Infinite self-recursion — TRAP_CALL_DEPTH_EXCEEDED (0x0A)
+        at depth 512."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    program = (
+        # @0..7: recursive_fn header (no args, no locals)
+        _method_header(arg_count=0, local_count=0, max_stack=1, code_size=6)
+        # @8..13: recursive_fn body — CALL self, RET
+        + _call_op(0)
+        + bytes([OP_RET])
+        # @14..20: caller (boot_pc=14)
+        + _call_op(0)
+        + bytes([OP_RET])
+    )
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, program, boot_pc=14, max_cycles=500000
+    )
+    assert trap == 1, \
+        f"expected trap, got halt={halt}, rv={rv}"
+    assert tc == TRAP_CALL_DEPTH_EXCEEDED, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_CALL_DEPTH_EXCEEDED:02X} (CALL_DEPTH_EXCEEDED)"

@@ -510,7 +510,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ KÉSZ |
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ KÉSZ |
 | — F2.4 | QSPI vezérlő | ~70 | | ✅ KÉSZ |
-| — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | 🔧 Folyamatban (Sub5 + golden harness hátra — Sub1..4+6 ✅, 43 cocotb zöld, 9/13 trap, 0 Verilator warning) |
+| — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | ✅ KÉSZ (Sub1..6 mind ✅, 48 cocotb zöld, 12/13 trap, 0 Verilator warning) |
 | — F2.5b | Golden vector harness | ~25 | | ⬜ Tervezett |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
 | — F2.7 | FPGA validáció (A7-Lite) | ~45 | | ⬜ Tervezett |
@@ -633,11 +633,11 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **F2 — RTL folyamatban.** F2.1 ALU, F2.2a Decoder, F2.2b Microcode ROM, F2.3 Stack Cache, F2.4 QSPI Controller **lezárva** — összesen 5 részegység, ~150+ cocotb zöld teszt, minden alszakaszhoz Devil's Advocate review.
 
-**F2.5a — Top-level Nano core integráció: Sub1..4 + Sub6 készen.** Az `rtl/src/cilcpu_core.v` az 5 részegység (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) integrációja egyetlen Nano core-rá: fetch/decode/execute pipeline, frame manager, belső 16 KB SRAM, trap aggregátor, 10-állapotú top-level FSM. **43 cocotb teszt zöld, 0 FAIL, Verilator 0 warning.** Készen: reset/boot/halt, LDC.I4 minden formája, ALU aritmetika (ADD/SUB/MUL/DIV/REM/AND/OR/XOR/SHL/NEG/NOT) + div0/overflow trap, fetch addresszálás (Sub2.1 Verilator NBA fix + Sub2.2 APPEND general count), LDARG/STARG/LDLOC/STLOC + range trap (Sub3, ST_MEM_WAIT 2-fázisú), branch BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE (Sub4, 1-op és 2-op cond eldöntés) + INVALID_BRANCH (negatív target), Stack Cache trap aggregátor stack overflow/underflow (Sub6), debug_break + invalid_opcode trap. **Sub5 (CALL/RET nem-root frame) — NYITOTT, a következő ülésre marad** (header read + args pop loop + frame push/pop sequencer komplex).
+**F2.5a — Top-level Nano core integráció KÉSZ.** Az `rtl/src/cilcpu_core.v` az 5 részegység (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) integrációja egyetlen Nano core-rá: fetch/decode/execute pipeline, frame manager (CALL+RET szekvenciális ST_CALL/ST_RET állapotokkal), belső 16 KB SRAM, trap aggregátor, 12-állapotú top-level FSM. **48 cocotb teszt zöld, 0 FAIL, Verilator 0 warning.** Sub1..6 mind készen: reset/boot/halt; LDC.I4 minden formája; ALU aritmetika (ADD/SUB/MUL/DIV/REM/AND/OR/XOR/SHL/NEG/NOT) + div0/overflow trap; fetch addresszálás (Sub2.1 NBA fix + Sub2.2 APPEND general count); LDARG/STARG/LDLOC/STLOC + range trap (Sub3); branch BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE + INVALID_BRANCH (Sub4); Stack Cache trap aggregátor (Sub6); **CALL/RET non-root frame manager (Sub5)**: header read QSPI-ról magic+arg+local validációval, args reverse-pop, header write 3 ciklus, locals zero, finalize; rekurzív Fibonacci(5)→5 zöld; `TRAP_INVALID_CALL_TARGET`, `TRAP_CALL_DEPTH_EXCEEDED`, `TRAP_SRAM_OVERFLOW` lefedve.
 
-**F2.5a részlegesen kész (Sub1..Sub4 + Sub6 + spec/roadmap update):** 43 cocotb teszt zöld, 9/13 trap kód lefedett, 0 Verilator warning. **Sub5 (CALL/RET non-root frame manager) halasztva** — TDD-szigorúan a következő ülésen implementálódik 5+ teszttel (CALL/RET simple, Fibonacci(5), `call_depth_exceeded`, `invalid_call_target`).
+**F2.5a teljes (Sub1..Sub6 + spec/roadmap update):** 48 cocotb teszt zöld, 12/13 trap kód lefedett (TRAP_SRAM_OVERFLOW implementált, F5+ stack PSRAM spill-ben tesztelt), 0 Verilator warning.
 
-**Következő érdemi lépés:** **F2.5a Sub5 — CALL/RET non-root frame manager** (8-byte header read, args reverse-pop, PushCallFrame, RET PopCallFrame, CALL_DEPTH_EXCEEDED + INVALID_CALL_TARGET trap-ek; aranypélda: TExecutor.cs ExecuteCall/ExecuteRet).
+**Következő érdemi lépés:** **F2.5b — Golden vector harness** (cocotb vs C# szimulátor lépésről-lépésre összehasonlítás): `CilCpu.Sim.Trace` export per-utasítás állapot (PC, eval stack, SP, FP, locals, args), cocotb-ban olvassuk és vetjük össze az RTL kimenettel. Ez bezárja az F2.5 fázist és előkészíti az F2.6 Yosys szintézist.
 
 ## Finanszírozási akcióterv
 

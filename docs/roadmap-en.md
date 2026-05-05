@@ -510,7 +510,7 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | — F2.2b | Decoder (microcode ROM) | ~50 | | ✅ DONE |
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ DONE |
 | — F2.4 | QSPI controller | ~70 | | ✅ DONE |
-| — F2.5a | Top-level Nano core integration (`cilcpu_core.v`) | ~30 | | 🔧 In progress (Sub5 + golden harness pending — Sub1..4+6 ✅, 43 cocotb green, 9/13 traps, 0 Verilator warning) |
+| — F2.5a | Top-level Nano core integration (`cilcpu_core.v`) | ~30 | | ✅ DONE (Sub1..6 all ✅, 48 cocotb green, 12/13 traps, 0 Verilator warning) |
 | — F2.5b | Golden vector harness | ~25 | | ⬜ Planned |
 | — F2.6 | Yosys synthesis (Sky130) | ~30 | | ⬜ Planned |
 | — F2.7 | FPGA validation (A7-Lite) | ~45 | | ⬜ Planned |
@@ -631,11 +631,11 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 
 **F2 — RTL in progress.** F2.1 ALU, F2.2a Decoder, F2.2b Microcode ROM, F2.3 Stack Cache, F2.4 QSPI Controller **closed** — 5 submodules total, ~150+ green cocotb tests, Devil's Advocate review for each subsection.
 
-**F2.5a — Top-level Nano core integration: Sub1..4 + Sub6 done.** `rtl/src/cilcpu_core.v` integrates the 5 submodules (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) into a single Nano core: fetch/decode/execute pipeline, frame manager, internal 16 KB SRAM, trap aggregator, 10-state top-level FSM. **43 cocotb tests green, 0 FAIL, 0 Verilator warning.** Done: reset/boot/halt, all LDC.I4 forms, ALU arithmetic (ADD/SUB/MUL/DIV/REM/AND/OR/XOR/SHL/NEG/NOT) + div0/overflow trap, fetch addressing (Sub2.1 Verilator NBA fix + Sub2.2 APPEND general count), LDARG/STARG/LDLOC/STLOC + range trap (Sub3, ST_MEM_WAIT 2-phase), branch BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE (Sub4, 1-op and 2-op cond decision) + INVALID_BRANCH (negative target), Stack Cache trap aggregator stack overflow/underflow (Sub6), debug_break + invalid_opcode trap. **Sub5 (CALL/RET non-root frame) — OPEN, deferred to next session** (header read + args pop loop + frame push/pop sequencer is complex).
+**F2.5a — Top-level Nano core integration DONE.** `rtl/src/cilcpu_core.v` integrates the 5 submodules (`cilcpu_alu`, `cilcpu_decoder`, `cilcpu_microcode`, `cilcpu_stack_cache`, `cilcpu_qspi_controller`) into a single Nano core: fetch/decode/execute pipeline, frame manager (sequential ST_CALL/ST_RET states for CALL+RET), internal 16 KB SRAM, trap aggregator, 12-state top-level FSM. **48 cocotb tests green, 0 FAIL, 0 Verilator warning.** Sub1..6 all done: reset/boot/halt; all LDC.I4 forms; ALU arithmetic (ADD/SUB/MUL/DIV/REM/AND/OR/XOR/SHL/NEG/NOT) + div0/overflow trap; fetch addressing (Sub2.1 NBA fix + Sub2.2 APPEND general count); LDARG/STARG/LDLOC/STLOC + range trap (Sub3); branch BR_S/BRTRUE/BRFALSE/BEQ/BLT/BGE + INVALID_BRANCH (Sub4); Stack Cache trap aggregator (Sub6); **CALL/RET non-root frame manager (Sub5)**: header read from QSPI with magic+arg+local validation, args reverse-pop, 3-cycle header write, locals zero-fill, finalize; recursive Fibonacci(5)→5 green; `TRAP_INVALID_CALL_TARGET`, `TRAP_CALL_DEPTH_EXCEEDED`, `TRAP_SRAM_OVERFLOW` covered.
 
-**F2.5a partially complete (Sub1..Sub4 + Sub6 + spec/roadmap update):** 43 cocotb tests green, 9/13 trap codes covered, 0 Verilator warning. **Sub5 (CALL/RET non-root frame manager) deferred** — to be implemented next session under strict TDD with 5+ tests (CALL/RET simple, Fibonacci(5), `call_depth_exceeded`, `invalid_call_target`).
+**F2.5a complete (Sub1..Sub6 + spec/roadmap update):** 48 cocotb tests green, 12/13 trap codes covered (TRAP_SRAM_OVERFLOW implemented, validated under F5+ stack PSRAM spill), 0 Verilator warning.
 
-**Next substantive step:** **F2.5a Sub5 — CALL/RET non-root frame manager** (8-byte header read, args reverse-pop, PushCallFrame, RET PopCallFrame, CALL_DEPTH_EXCEEDED + INVALID_CALL_TARGET traps; golden reference: TExecutor.cs ExecuteCall/ExecuteRet).
+**Next substantive step:** **F2.5b — Golden vector harness** (cocotb vs C# simulator step-by-step comparison): `CilCpu.Sim.Trace` exports per-instruction state (PC, eval stack, SP, FP, locals, args); cocotb reads it and diffs against the RTL output. This closes F2.5 and prepares F2.6 Yosys synthesis.
 
 ## Funding Action Plan
 
