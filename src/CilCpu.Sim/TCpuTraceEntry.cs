@@ -25,13 +25,22 @@ namespace CilCpu.Sim;
 /// en: Program counter (byte address of the instruction to execute).
 /// </param>
 /// <param name="Sp">
-/// hu: A stack pointer (a frame vége; az eval stack ebben az SRAM-régióban
-/// van). Az F2.5a HW konvenció szerint <c>Sp = Fp + 12 + arg_count*4 +
-/// local_count*4</c> a frame felépítése után.
+/// hu: A frame END byte-címe az SRAM-ban (NEM az eval_top!). Az F2.5a HW
+/// konvenció szerint <c>Sp = Fp + 12 + arg_count*4 + local_count*4</c> és
+/// <b>nem mozdul</b> a stack műveletek hatására — a Stack Cache külön
+/// kezeli az eval mélységet (lásd <see cref="EvalDepth"/>). A C# TCpuNano
+/// belső <c>FSp</c>-je az eval_top-ra mutat, de a tracer ezt
+/// <c>FSp - EvalDepth * 4</c>-re normalizálja, hogy közvetlenül
+/// összevethető legyen az RTL <c>r_sp</c>-jével. Az eval_top a fogyasztó
+/// oldalon kiszámolható: <c>Sp + EvalDepth * 4</c>.
 /// <br />
-/// en: Stack pointer (end of frame; eval stack lives in this SRAM region).
-/// Per F2.5a HW convention, <c>Sp = Fp + 12 + arg_count*4 + local_count*4</c>
-/// after frame setup.
+/// en: Frame END byte address in SRAM (NOT eval_top!). Per F2.5a HW
+/// convention, <c>Sp = Fp + 12 + arg_count*4 + local_count*4</c> and
+/// <b>does not move</b> on stack ops — Stack Cache tracks eval depth
+/// separately (see <see cref="EvalDepth"/>). C# TCpuNano's internal
+/// <c>FSp</c> points to eval_top, but the tracer normalizes via
+/// <c>FSp - EvalDepth * 4</c> for direct comparison with RTL <c>r_sp</c>.
+/// Eval_top can be recomputed downstream as <c>Sp + EvalDepth * 4</c>.
 /// </param>
 /// <param name="Fp">
 /// hu: A frame pointer (az aktuális frame kezdő byte-címe az SRAM-ban).

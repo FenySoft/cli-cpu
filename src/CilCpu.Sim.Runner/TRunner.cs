@@ -58,6 +58,64 @@ public static class TRunner
     }
 
     /// <summary>
+    /// hu: Egy CIL-T0 bináris program futtatása trace-eléssel — a TCpuNanoTracer
+    /// minden CIL-T0 utasítás végrehajtása ELŐTT egy <see cref="TCpuTraceEntry"/>
+    /// snapshot-ot rögzít. Az F2.5b golden vector harness alapja: a cocotb
+    /// teszt parsolja a JSONL trace-t és lépésről-lépésre összeveti az RTL
+    /// belső jeleivel.
+    /// <br />
+    /// en: Runs a CIL-T0 binary program with tracing — TCpuNanoTracer records
+    /// a <see cref="TCpuTraceEntry"/> snapshot BEFORE each CIL-T0 instruction.
+    /// Foundation of the F2.5b golden vector harness: cocotb parses the JSONL
+    /// trace and compares it step-by-step against RTL internal signals.
+    /// </summary>
+    /// <param name="AProgram">
+    /// hu: A CIL-T0 bináris byte-tömb.
+    /// <br />
+    /// en: The CIL-T0 binary byte array.
+    /// </param>
+    /// <param name="AEntryRva">
+    /// hu: A belépési metódus header offszetje. Ha negatív, header nélküli
+    /// programként futtatja az <c>Execute(byte[])</c> overloaddal — ezt a
+    /// belső smoke tesztek használják (pl. nyers <c>LDC + RET</c>).
+    /// <br />
+    /// en: Entry method header offset. If negative, runs the program as
+    /// header-less via <c>Execute(byte[])</c> — used by internal smoke
+    /// tests (e.g. raw <c>LDC + RET</c>).
+    /// </param>
+    /// <param name="AArgs">
+    /// hu: Opcionális argumentumok a belépési metódusnak.
+    /// <br />
+    /// en: Optional arguments for the entry method.
+    /// </param>
+    public static (TRunResult Result, IReadOnlyList<TCpuTraceEntry> Trace) RunBinaryWithTrace(
+        byte[] AProgram, int AEntryRva, int[]? AArgs = null)
+    {
+        ArgumentNullException.ThrowIfNull(AProgram);
+
+        if (AProgram.Length == 0)
+            throw new ArgumentException("Program cannot be empty.", nameof(AProgram));
+
+        var tracer = new TCpuNanoTracer();
+
+        try
+        {
+            if (AEntryRva < 0)
+                tracer.Execute(AProgram);
+            else
+                tracer.Execute(AProgram, AEntryRva, AArgs);
+
+            var tos = tracer.StackDepth > 0 ? tracer.Peek(0) : (int?)null;
+
+            return (new TRunResult(tos, null, null), tracer.Entries);
+        }
+        catch (TTrapException ex)
+        {
+            return (new TRunResult(null, ex.Reason, ex.Message), tracer.Entries);
+        }
+    }
+
+    /// <summary>
     /// hu: Egy CIL-T0 bináris program futtatása fájlból.
     /// <br />
     /// en: Runs a CIL-T0 binary program from a file.

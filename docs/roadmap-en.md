@@ -511,7 +511,7 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ DONE |
 | — F2.4 | QSPI controller | ~70 | | ✅ DONE |
 | — F2.5a | Top-level Nano core integration (`cilcpu_core.v`) | ~30 | | ✅ DONE (Sub1..6 all ✅, 48 cocotb green, 12/13 traps, 0 Verilator warning) |
-| — F2.5b | Golden vector harness | ~25 | | 🔧 In progress (Phase 1 ✅: C# trace API + JSONL — 10 xUnit green; Phase 2 pending: cocotb harness) |
+| — F2.5b | Golden vector harness | ~25 | | ✅ DONE (Phase 1+2: C# trace API + JSONL + Runner --trace + cocotb harness — 172 xUnit + 51 cocotb green) |
 | — F2.6 | Yosys synthesis (Sky130) | ~30 | | ⬜ Planned |
 | — F2.7 | FPGA validation (A7-Lite) | ~45 | | ⬜ Planned |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Planned |
@@ -635,9 +635,13 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 
 **F2.5a complete (Sub1..Sub6 + spec/roadmap update):** 48 cocotb tests green, 12/13 trap codes covered (TRAP_SRAM_OVERFLOW implemented, validated under F5+ stack PSRAM spill), 0 Verilator warning.
 
-**F2.5b Phase 1 DONE (C# trace API):** `TCpuNanoTracer` is a subclass of `TCpuNano` that overrides `RunLoop` and records a `TCpuTraceEntry` snapshot BEFORE each CIL-T0 instruction (Step, Pc, Sp, Fp, CallDepth, ArgCount, LocalCount, EvalDepth, Opcode, Operand, LengthInBytes). The `TCpuTraceJsonl` static class serializes to and parses JSONL (1 entry per line, compact field keys). Coverage: smoke (LDC+RET), arithmetic (Add 2+3), branch (BR_S forward), CALL/RET (Add(2,3) 8-step trace with CallDepth 1→2→1 transition), JSONL roundtrip, end-to-end. **170 xUnit green** (10 new tracer/JSONL tests).
+**F2.5b DONE — Golden vector harness pipeline complete:**
+- **Phase 1 (C# trace API):** `TCpuNanoTracer` (a `TCpuNano` subclass overriding `RunLoop`) records a `TCpuTraceEntry` snapshot BEFORE each instruction. The `TCpuTraceJsonl` serializer/parser uses compact field keys (1 entry per line, BOM-less UTF-8). The tracer normalizes `Sp` to the RTL `r_sp` convention (frame_end, NOT eval_top).
+- **Phase 2 (Runner CLI + cocotb harness):** `CilCpu.Sim.Runner run --trace <path>` produces a JSONL file via `TCpuTraceJsonl.WriteAll`. The `rtl/tb/test_core_golden.py` cocotb harness parses the trace and compares 6 RTL internal signals (r_pc, r_sp, r_fp, r_call_depth, r_arg_count, r_local_count) at every `ST_DECODE` cycle. 3 golden tests: smoke (LDC+RET, 2 steps), Add(2,3) arithmetic (4 steps), Add(2,3) **CALL/RET** (8 steps with CallDepth 1→2→1 transition and ArgCount 0→2→0).
 
-**Next substantive step:** **F2.5b Phase 2 — Cocotb golden harness**: `CilCpu.Sim.Runner --trace <path>` option to generate the JSONL file, new `rtl/tb/test_core_golden.py` cocotb test that parses the trace, drives the program into RTL, and compares step-by-step (r_pc, r_sp, r_fp, r_call_depth, r_arg_count, r_local_count). This closes F2.5 and prepares F2.6 Yosys synthesis.
+**Coverage:** **172 xUnit green** (10 tracer/JSONL + 2 Runner trace), **48 cocotb test_core green** (regression OK), **3 cocotb test_core_golden green**. The RTL matches the F1 golden reference bit-for-bit on 6 architectural fields — this closes F2.5.
+
+**Next substantive step:** **F2.6 — Yosys synthesis** (Sky130 PDK, area and timing estimation). Last F2 sub-stage, followed by F2.7 FPGA validation and F3 Tiny Tapeout submission.
 
 ## Funding Action Plan
 

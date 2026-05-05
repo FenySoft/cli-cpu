@@ -473,6 +473,88 @@ public class TRunnerTests
     }
 
     // ==========================================================================
+    // 5b. F2.5b — Trace export (TRunner.RunBinaryWithTrace + --trace CLI flag)
+    // ==========================================================================
+
+    /// <summary>
+    /// hu: TRunner.RunBinaryWithTrace egy programot futtat és visszaad
+    /// egy (eredmény, trace) tuple-t. A 2-byte LDC+RET program 2 trace
+    /// entry-t generál (lépés 0: LDC, lépés 1: RET).
+    /// <br />
+    /// en: TRunner.RunBinaryWithTrace runs a program and returns a
+    /// (result, trace) tuple. A 2-byte LDC+RET program produces 2 trace
+    /// entries (step 0: LDC, step 1: RET).
+    /// </summary>
+    [Fact]
+    public void RunBinaryWithTrace_LdcRet_ReturnsTraceEntries()
+    {
+        // hu: LDC.I4_5 + RET egyszerű program (2 byte, no header).
+        var program = new byte[] { 0x1B, 0x2A };
+
+        // hu: Az AEntryRva=-1 jelzi, hogy header nélküli programként
+        //     futtassuk. Implementációként: ha negatív, a tracer az
+        //     Execute(byte[]) overload-ot hívja.
+        var (result, trace) = TRunner.RunBinaryWithTrace(program, AEntryRva: -1);
+
+        Assert.False(result.Trapped);
+        Assert.Equal(5, result.Result);
+        Assert.Equal(2, trace.Count);
+        Assert.Equal((byte)0x1B, trace[0].Opcode);
+        Assert.Equal((byte)0x2A, trace[1].Opcode);
+        Assert.Equal(0, trace[0].EvalDepth);
+        Assert.Equal(1, trace[1].EvalDepth);
+    }
+
+    /// <summary>
+    /// hu: Program.Main 'run' parancs '--trace path' flag-gel: a futtatás
+    /// után a path-on JSONL fájl jön létre, soronként parsálható, és
+    /// minden sor egy TCpuTraceEntry. Az exit kód 0.
+    /// <br />
+    /// en: Program.Main 'run' command with '--trace path' flag: after
+    /// execution a JSONL file appears at path, parseable line-by-line as
+    /// TCpuTraceEntry. Exit code 0.
+    /// </summary>
+    [Fact]
+    public void Main_RunWithTraceFlag_WritesJsonlFile()
+    {
+        var t0Bytes = BuildAddProgram();
+
+        using var t0File = new TTempFile();
+        File.WriteAllBytes(t0File.Path, t0Bytes);
+
+        var tracePath = Path.GetTempFileName();
+
+        try
+        {
+            var exitCode = Program.Main([
+                "run", t0File.Path,
+                "--args", "2,3",
+                "--trace", tracePath,
+            ]);
+
+            Assert.Equal(0, exitCode);
+            Assert.True(File.Exists(tracePath), $"Expected trace file at: {tracePath}");
+
+            // hu: A fájl JSONL — minden sor önálló JSON entry.
+            using var fs = File.OpenRead(tracePath);
+            var entries = TCpuTraceJsonl.ParseAll(fs);
+            Assert.NotEmpty(entries);
+
+            // hu: Az 1. lépés a body első utasítása (Add: LDARG.0 = 0x02).
+            //     A trace step 0 a TCpuNanoTracer Step-jét jelöli.
+            Assert.Equal(0, entries[0].Step);
+
+            // hu: Az utolsó lépés egy RET (0x2A).
+            Assert.Equal((byte)0x2A, entries[^1].Opcode);
+        }
+        finally
+        {
+            if (File.Exists(tracePath))
+                File.Delete(tracePath);
+        }
+    }
+
+    // ==========================================================================
     // 6. CLI edge case tesztek (Ördög Ügyvédje feedback)
     // ==========================================================================
 

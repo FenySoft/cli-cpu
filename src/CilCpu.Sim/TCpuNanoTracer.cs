@@ -91,10 +91,26 @@ public class TCpuNanoTracer : TCpuNano
         {
             var decoded = TDecoder.Decode(AProgram, FProgramCounter);
 
+            // hu: Sp = frame_end (RTL r_sp konvenció, nem az eval_top).
+            //     A C# TCpuNano FSp az eval_top-ra mutat (EvalPush növeli),
+            //     az RTL r_sp viszont a frame VÉGÉT jelöli, és nem mozdul a
+            //     stack műveletek hatására (a Stack Cache külön kezeli az
+            //     eval mélységet). A trace-be a frame_end-t írjuk, hogy a
+            //     cocotb golden harness közvetlenül összevethesse az r_sp-vel.
+            //     Az eval_top a fogyasztó oldalon kiszámolható: sp + ed*4.
+            // en: Sp = frame_end (matches RTL r_sp convention, not the C#
+            //     eval_top). C# TCpuNano's FSp tracks eval_top (grows with
+            //     EvalPush), but RTL r_sp denotes the frame END and is
+            //     immutable across stack ops (the Stack Cache tracks eval
+            //     depth separately). The trace records frame_end so the
+            //     cocotb golden harness can compare directly to r_sp. The
+            //     consumer can recompute eval_top via sp + ed*4.
+            var frameEnd = FSp - EvalDepth * 4;
+
             FEntries.Add(new TCpuTraceEntry(
                 Step: step,
                 Pc: FProgramCounter,
-                Sp: FSp,
+                Sp: frameEnd,
                 Fp: FFrameBase,
                 CallDepth: FCallDepth,
                 ArgCount: FArgCount,

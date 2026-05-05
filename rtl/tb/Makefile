@@ -44,4 +44,18 @@ $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_core.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core
+# hu: F2.5b golden vector harness — cocotb vs C# szim trace JSONL.
+#     A C# Runner DLL-nek le kell fordulva lennie:
+#     `dotnet build src/CilCpu.Sim.Runner/CilCpu.Sim.Runner.csproj`
+# en: F2.5b golden vector harness — cocotb vs C# tracer JSONL.
+#     The C# Runner DLL must be built first.
+test_core_golden:
+	$(SUBMAKE) MODULE=test_core_golden TOPLEVEL=cilcpu_core VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_core.v"
+
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden

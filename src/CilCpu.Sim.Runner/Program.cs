@@ -60,6 +60,7 @@ public static class Program
         var filePath = AArgs[1];
         var entryRva = 0;
         int[]? args = null;
+        string? tracePath = null;
 
         try
         {
@@ -75,17 +76,44 @@ public static class Program
                     args = ParseIntArray(AArgs[i + 1]);
                     i++;
                 }
+                else if (AArgs[i] == "--trace" && i + 1 < AArgs.Length)
+                {
+                    tracePath = AArgs[i + 1];
+                    i++;
+                }
             }
 
-            var result = TRunner.RunFile(filePath, entryRva, args);
-
-            if (result.Trapped)
+            // hu: Ha trace path meg van adva, a tracer-rel futtatunk és
+            //     a végrehajtás után JSONL fájlba írjuk a trace-t.
+            // en: When a trace path is given, run with the tracer and
+            //     write the trace as JSONL after execution.
+            if (tracePath is not null)
             {
-                Console.Error.WriteLine($"Trap: {result.TrapReason} — {result.TrapMessage}");
+                var programBytes = File.ReadAllBytes(filePath);
+                var (result, trace) = TRunner.RunBinaryWithTrace(programBytes, entryRva, args);
+
+                using (var fs = File.Create(tracePath))
+                    TCpuTraceJsonl.WriteAll(fs, trace);
+
+                if (result.Trapped)
+                {
+                    Console.Error.WriteLine($"Trap: {result.TrapReason} — {result.TrapMessage}");
+                    return 2;
+                }
+
+                Console.WriteLine(result.Result?.ToString() ?? "(no result)");
+                return 0;
+            }
+
+            var resultNoTrace = TRunner.RunFile(filePath, entryRva, args);
+
+            if (resultNoTrace.Trapped)
+            {
+                Console.Error.WriteLine($"Trap: {resultNoTrace.TrapReason} — {resultNoTrace.TrapMessage}");
                 return 2;
             }
 
-            Console.WriteLine(result.Result?.ToString() ?? "(no result)");
+            Console.WriteLine(resultNoTrace.Result?.ToString() ?? "(no result)");
             return 0;
         }
         catch (FileNotFoundException ex)
@@ -202,7 +230,7 @@ public static class Program
     private static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  run <file.t0> [--entry <rva>] [--args <a1,a2,...>]");
+        Console.WriteLine("  run <file.t0> [--entry <rva>] [--args <a1,a2,...>] [--trace <path>]");
         Console.WriteLine("  link <file.dll> --class <name> --method <name> -o <output.t0>");
     }
 }

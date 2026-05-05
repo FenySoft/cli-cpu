@@ -511,7 +511,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | — F2.3 | Stack cache (4×32-bit TOS + spill) | ~50 | | ✅ KÉSZ |
 | — F2.4 | QSPI vezérlő | ~70 | | ✅ KÉSZ |
 | — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | ✅ KÉSZ (Sub1..6 mind ✅, 48 cocotb zöld, 12/13 trap, 0 Verilator warning) |
-| — F2.5b | Golden vector harness | ~25 | | 🔧 Folyamatban (Phase 1 ✅: C# trace API + JSONL — 10 xUnit zöld; Phase 2 hátra: cocotb harness) |
+| — F2.5b | Golden vector harness | ~25 | | ✅ KÉSZ (Phase 1+2: C# trace API + JSONL + Runner --trace + cocotb harness — 172 xUnit + 51 cocotb zöld) |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
 | — F2.7 | FPGA validáció (A7-Lite) | ~45 | | ⬜ Tervezett |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Tervezett |
@@ -637,9 +637,13 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **F2.5a teljes (Sub1..Sub6 + spec/roadmap update):** 48 cocotb teszt zöld, 12/13 trap kód lefedett (TRAP_SRAM_OVERFLOW implementált, F5+ stack PSRAM spill-ben tesztelt), 0 Verilator warning.
 
-**F2.5b Phase 1 KÉSZ (C# trace API):** A `TCpuNanoTracer` osztály a `TCpuNano` alosztálya, override-olja a `RunLoop`-ot és minden CIL-T0 utasítás végrehajtása ELŐTT egy `TCpuTraceEntry` snapshot-ot rögzít (Step, Pc, Sp, Fp, CallDepth, ArgCount, LocalCount, EvalDepth, Opcode, Operand, LengthInBytes). A `TCpuTraceJsonl` static class JSONL formátumban serializál és parsál (1 entry / sor, kompakt mező-kulcsok). Lefedettség: smoke (LDC+RET), aritmetika (Add 2+3), branch (BR_S forward), CALL/RET (Add(2,3) hívás 8 lépéses trace, CallDepth 1→2→1 tranzíció), JSONL roundtrip, end-to-end. **170 xUnit zöld** (10 új tracer/JSONL teszt).
+**F2.5b KÉSZ — Golden vector harness teljes pipeline lezárva:**
+- **Phase 1 (C# trace API):** `TCpuNanoTracer` (a `TCpuNano` alosztálya, override `RunLoop`) minden utasítás VÉGREHAJTÁSA ELŐTT egy `TCpuTraceEntry` snapshot-ot rögzít. A `TCpuTraceJsonl` JSONL serializer/parser kompakt mező-kulcsokkal (1 entry/sor, BOM nélküli UTF-8). A `Sp` mezőt a tracer az RTL `r_sp` konvenciójára normalizálja (frame_end, NEM eval_top).
+- **Phase 2 (Runner CLI + cocotb harness):** A `CilCpu.Sim.Runner` `run --trace <path>` flag-gel JSONL fájlt generál a `TCpuTraceJsonl.WriteAll`-on át. A `rtl/tb/test_core_golden.py` cocotb harness beolvassa a trace-t, és az RTL minden `ST_DECODE` ciklusában 6 belső jelet (r_pc, r_sp, r_fp, r_call_depth, r_arg_count, r_local_count) lépésről-lépésre összevet a trace-szel. 3 golden teszt: smoke (LDC+RET, 2 lépés), Add(2,3) aritmetika (4 lépés), Add(2,3) **CALL/RET** (8 lépés CallDepth 1→2→1 tranzícióval, ArgCount 0→2→0).
 
-**Következő érdemi lépés:** **F2.5b Phase 2 — Cocotb golden harness**: `CilCpu.Sim.Runner --trace <path>` opció a JSONL fájl generálására, új `rtl/tb/test_core_golden.py` cocotb teszt ami beolvassa a trace-t, programot tölt az RTL-be, és lépésről-lépésre összevet (r_pc, r_sp, r_fp, r_call_depth, r_arg_count, r_local_count). Ez bezárja az F2.5 fázist és előkészíti az F2.6 Yosys szintézist.
+**Lefedettség:** **172 xUnit zöld** (10 tracer/JSONL + 2 Runner trace), **48 cocotb test_core zöld** (regresszió OK), **3 cocotb test_core_golden zöld**. Az RTL bitről-bitre megfelel az F1 aranypéldának 6 architekturális mezőn — ez F2.5 lezárását jelenti.
+
+**Következő érdemi lépés:** **F2.6 — Yosys szintézis** (Sky130 PDK, terület és timing becslés). Ez az utolsó F2 alszakasz, ami után az F2.7 FPGA validáció és az F3 Tiny Tapeout submission következik.
 
 ## Finanszírozási akcióterv
 

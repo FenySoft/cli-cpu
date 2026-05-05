@@ -31,6 +31,12 @@ public static class TCpuTraceJsonl
         WriteIndented = false,
     };
 
+    // hu: BOM nélküli UTF-8 — a JSONL streamelhetőségéhez kritikus, mert a
+    //     parser-ek (Python json.loads, jq, stb.) BOM-on hibáznak.
+    // en: BOM-less UTF-8 — critical for JSONL streaming since downstream
+    //     parsers (Python json.loads, jq, etc.) reject BOM-prefixed input.
+    private static readonly UTF8Encoding FUtf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
+
     /// <summary>
     /// hu: A megadott entry-listát JSONL formátumban kiírja a streambe.
     /// Minden entry egy sor, lezárva '\n'-nel. A stream nem záródik.
@@ -40,7 +46,7 @@ public static class TCpuTraceJsonl
     /// </summary>
     public static void WriteAll(Stream AStream, IEnumerable<TCpuTraceEntry> AEntries)
     {
-        using var writer = new StreamWriter(AStream, Encoding.UTF8, leaveOpen: true);
+        using var writer = new StreamWriter(AStream, FUtf8NoBom, leaveOpen: true);
         writer.NewLine = "\n";
 
         foreach (var entry in AEntries)
