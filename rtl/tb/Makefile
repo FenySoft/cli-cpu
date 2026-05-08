@@ -58,4 +58,25 @@ $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_core.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden
+# hu: F2.7 Sub1 — A7-Lite top-level wrapper cocotb tesztek.
+#     A wrapper a `cilcpu_core`-t veszi körül clock/reset szinkronizerrel,
+#     KEY2 start gombbal (debouncer-rel), boot szekvenszer FSM-mel és
+#     halt/trap LED kimenettel. Sim-ben DEBOUNCE_BITS=4-re csökkentve
+#     (FPGA default: 22 = ~84 ms).
+# en: F2.7 Sub1 — A7-Lite top-level wrapper cocotb tests.
+#     The wrapper wraps `cilcpu_core` with a clock/reset synchronizer, a
+#     KEY2 start button (with debouncer), a boot sequencer FSM, and
+#     halt/trap LED outputs. In sim DEBOUNCE_BITS=4 (FPGA default: 22 = ~84 ms).
+test_a7lite_top:
+	$(SUBMAKE) MODULE=test_a7lite_top TOPLEVEL=cilcpu_a7lite_top \
+		LOCAL_COMPILE_ARGS="-GDEBOUNCE_BITS=4" \
+		VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/../fpga/cilcpu_a7lite_top.v"
+
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden test_a7lite_top

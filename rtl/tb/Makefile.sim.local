@@ -11,6 +11,15 @@ SIM ?= verilator
 TOPLEVEL_LANG ?= verilog
 EXTRA_ARGS += --trace -I$(PWD)/../src
 
+# hu: Wrapper paraméterek átadása a Verilator-nak (-G<param>=<value>).
+#     A target Makefile-ban beállított LOCAL_COMPILE_ARGS itt csatolódik
+#     a cocotb által rakott COMPILE_ARGS-ra (a make command-line override
+#     elkerülése végett nem közvetlenül a COMPILE_ARGS-ba töltjük).
+# en: Forward wrapper parameters to Verilator (-G<param>=<value>).
+#     Target Makefile sets LOCAL_COMPILE_ARGS, appended here to cocotb's
+#     COMPILE_ARGS (avoids the make command-line override pitfall).
+COMPILE_ARGS += $(LOCAL_COMPILE_ARGS)
+
 VENV_PY     ?= /usr/local/bin/python3.13
 VENV_SITE   ?= $(PWD)/../.venv/lib/python3.13/site-packages
 COCOTB_MAKEFILES ?= $(shell PYTHONPATH="$(VENV_SITE)" $(VENV_PY) -c \
