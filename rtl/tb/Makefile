@@ -69,7 +69,7 @@ $(PWD)/../src/cilcpu_core.v"
 #     halt/trap LED outputs. In sim DEBOUNCE_BITS=4 (FPGA default: 22 = ~84 ms).
 test_a7lite_top:
 	$(SUBMAKE) MODULE=test_a7lite_top TOPLEVEL=cilcpu_a7lite_top \
-		LOCAL_COMPILE_ARGS="-GDEBOUNCE_BITS=4" \
+		LOCAL_COMPILE_ARGS="-GDEBOUNCE_BITS=4 -GCLOCKS_PER_BAUD=8" \
 		VERILOG_SOURCES="\
 $(PWD)/../src/cilcpu_alu.v \
 $(PWD)/../src/cilcpu_decoder.v \
@@ -77,6 +77,26 @@ $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_core.v \
+$(PWD)/../fpga/uart_tx.v \
+$(PWD)/../fpga/decimal_printer.v \
 $(PWD)/../fpga/cilcpu_a7lite_top.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden test_a7lite_top
+# hu: F2.7 Sub2 — UART transmitter standalone teszt.
+#     CLOCKS_PER_BAUD=8 a sim-ben (FPGA default: 434 = 50 MHz / 115200 baud).
+# en: F2.7 Sub2 — standalone UART transmitter test.
+#     CLOCKS_PER_BAUD=8 in sim (FPGA default: 434 = 50 MHz / 115200 baud).
+test_uart_tx:
+	$(SUBMAKE) MODULE=test_uart_tx TOPLEVEL=uart_tx \
+		LOCAL_COMPILE_ARGS="-GCLOCKS_PER_BAUD=8" \
+		VERILOG_SOURCES="$(PWD)/../fpga/uart_tx.v"
+
+# hu: F2.7 Sub2 — 32-bit decimal printer (uart_tx-et példányosít).
+# en: F2.7 Sub2 — 32-bit decimal printer (instantiates uart_tx).
+test_decimal_printer:
+	$(SUBMAKE) MODULE=test_decimal_printer TOPLEVEL=decimal_printer \
+		LOCAL_COMPILE_ARGS="-GCLOCKS_PER_BAUD=8" \
+		VERILOG_SOURCES="\
+$(PWD)/../fpga/uart_tx.v \
+$(PWD)/../fpga/decimal_printer.v"
+
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer

@@ -513,7 +513,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | ✅ KÉSZ (Sub1..6 mind ✅, 48 cocotb zöld, 12/13 trap, 0 Verilator warning) |
 | — F2.5b | Golden vector harness | ~25 | | ✅ KÉSZ (Phase 1+2: C# trace API + JSONL + Runner --trace + cocotb harness — 172 xUnit + 51 cocotb zöld) |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
-| — F2.7 | FPGA validáció (A7-Lite) | ~45 | | 🔧 Folyamatban (Sub1 ✅: top-level wrapper + 6 cocotb teszt zöld; Sub2..5 ⬜) |
+| — F2.7 | FPGA validáció (A7-Lite) | ~45 | | 🔧 Folyamatban (Sub1+Sub2 ✅: wrapper + UART/printer + 26 új cocotb teszt zöld; Sub3..5 ⬜) |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Tervezett |
 | **F4** | Multi-core Cognitive Fabric FPGA (4× Nano, router, sleep/wake) | ~360 | ~2.3 | ⬜ Tervezett |
 | **F5** | Rich core + heterogén rendszer (teljes CIL, GC, FPU, source gen.) | ~720 | ~4.5 | ⬜ Tervezett |
@@ -643,11 +643,13 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **Lefedettség:** **172 xUnit zöld** (10 tracer/JSONL + 2 Runner trace), **48 cocotb test_core zöld** (regresszió OK), **3 cocotb test_core_golden zöld**. Az RTL bitről-bitre megfelel az F1 aranypéldának 6 architekturális mezőn — ez F2.5 lezárását jelenti.
 
-**F2.7 Sub1 KÉSZ — A7-Lite top-level wrapper:** Az `rtl/fpga/cilcpu_a7lite_top.v` a `cilcpu_core` köré rakott integrációs réteg: 50 MHz clock (J19), KEY1 reset (AA1), KEY2 start gomb (W1) async/sync szinkronizerrel és paraméterezhető debouncerrel (FPGA: 22 bit ~84 ms, sim: 4 bit), 6-állapotú boot szekvenszer FSM (`o_boot_arg_ready` handshake-en át push-olja az argumentumokat), latch-elt halt/trap LED-ek (M18/N18, active low). Az XDC fájl (`cilcpu_a7lite.xdc`) a clock + KEY-ek + LED-ek pin assignment-jét rögzíti — a QSPI flash bekötése Sub4-ben véglegesül. **6 új cocotb teszt zöld** (`test_a7lite_top.py`): reset, idle, LDARG_0+RET, ALU smoke, invalid opcode trap, debouncer rejection. Új közös cocotb modulok: `tb_qspi.py` (flash slave) + `tb_isa.py` (opcode/trap konstansok + `make_method` header builder). Az `test_core` 48 regressziós teszt változatlanul zöld.
+**F2.7 Sub1 KÉSZ — A7-Lite top-level wrapper:** Az `rtl/fpga/cilcpu_a7lite_top.v` a `cilcpu_core` köré rakott integrációs réteg: 50 MHz clock (J19), KEY1 reset (AA1), KEY2 start gomb (W1) async/sync szinkronizerrel és paraméterezhető debouncerrel (FPGA: 22 bit ~84 ms, sim: 4 bit), 8-állapotú boot szekvenszer FSM (`o_boot_arg_ready` handshake-en át push-olja az argumentumokat), latch-elt halt/trap LED-ek (M18/N18, active low). Az XDC fájl (`cilcpu_a7lite.xdc`) a clock + KEY-ek + LED-ek pin assignment-jét rögzíti — a QSPI flash bekötése Sub4-ben véglegesül. **6 új cocotb teszt zöld** (`test_a7lite_top.py`): reset, idle, LDARG_0+RET, ALU smoke, invalid opcode trap, debouncer rejection. Új közös cocotb modulok: `tb_qspi.py` (flash slave) + `tb_isa.py` (opcode/trap konstansok + `make_method` header builder). Az `test_core` 48 regressziós teszt változatlanul zöld.
+
+**F2.7 Sub2 KÉSZ — UART TX + 32-bit decimális printer:** Két új RTL modul: `uart_tx.v` (8N1 transmitter, paraméterezhető `CLOCKS_PER_BAUD` — FPGA: 434 = 50 MHz / 115200, sim: 8) és `decimal_printer.v` (32-bit signed/unsigned int → ASCII decimal → UART, `\r\n` terminátorral). A wrapper FSM kibővítve két új állapottal (`S_PRINT_REQ` → `S_PRINT_WAIT`): halt esetén signed-ként, trap esetén unsigned-ként adja át az értéket a printer-nek. Új top-port: `o_uart_tx` (V2, CH340 USB-UART bridge), XDC frissítve. **20 új cocotb teszt zöld**: `test_uart_tx` 8/8 (idle, byte minták, busy, back-to-back), `test_decimal_printer` 10/10 (0, egy/több jegy, INT32_MIN/MAX, 6765 = Fibonacci(20), back-to-back), `test_a7lite_top` 2 új teszt: halt → UART "5\r\n", trap → UART "3\r\n" (TRAP_INVALID_OPCODE). Új közös cocotb modul: `tb_uart.py` (uart_rx_byte 8N1 dekódoló).
 
 **Sorrend-pivot 2026-05-08:** Az F2.7 (FPGA validáció) **megelőzi** az F2.6-ot (Yosys/Sky130 szintézis) — *„nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n"* elv. A korrekt sorrend: F2.7 (A7-Lite Sub1..Sub5) → F2.6 (Sky130 szintézis) → F3 (Tiny Tapeout submission).
 
-**Következő érdemi lépés:** **F2.7 Sub2 — UART TX + decimális printer** (50 MHz / 115200 baud TX modul, 32-bit `o_return_value` ASCII-decimális kiírás), majd Sub3 (Fibonacci(20) demó), Sub4 (QSPI flash bekötés), Sub5 (Vivado + OpenXC7 build, timing zárás 50 MHz-en).
+**Következő érdemi lépés:** **F2.7 Sub3 — Fibonacci(20) demó program + paraméterezhető boot** (több argumentum streaming, `samples/` alatti CIL-T0 fibonacci.t0, end-to-end "6765\r\n" UART output a wrapper-en), majd Sub4 (QSPI flash bekötés a board IS25L128F-re), Sub5 (Vivado + OpenXC7 build, timing zárás 50 MHz-en).
 
 ## Finanszírozási akcióterv
 

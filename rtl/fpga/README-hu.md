@@ -13,7 +13,7 @@ silicon) **előtt** validálni a magot valódi hardveren.
 | Sub | Hatókör | Státusz |
 |-----|---------|---------|
 | Sub1 | Top-level wrapper + cocotb integrációs teszt | ✅ KÉSZ |
-| Sub2 | UART TX + 32-bit decimális printer | ⬜ Tervezett |
+| Sub2 | UART TX + 32-bit decimális printer | ✅ KÉSZ |
 | Sub3 | Fibonacci(20) demó program + paraméterezhető boot | ⬜ Tervezett |
 | Sub4 | QSPI flash bekötés (IS25L128F) | ⬜ Tervezett |
 | Sub5 | Vivado + OpenXC7 build, timing zárás 50 MHz | ⬜ Tervezett |
@@ -97,6 +97,52 @@ top-level tesztek ne duplikáljanak:
 
 A meglévő `test_core.py` változatlan (self-contained marad, mert már stabil).
 
+## Sub2 — UART TX + decimális printer
+
+**Új fájlok:**
+
+| Fájl | Szerep |
+|------|--------|
+| [`uart_tx.v`](uart_tx.v) | 8N1 UART transmitter, paraméterezhető `CLOCKS_PER_BAUD` |
+| [`decimal_printer.v`](decimal_printer.v) | 32-bit signed/unsigned int → ASCII decimal → UART, `\r\n` terminátorral |
+
+**Wrapper bővítés:**
+
+- Új top-port: `o_uart_tx` (V2, CH340 USB-UART bridge)
+- Új paraméter: `CLOCKS_PER_BAUD` (FPGA: 434 = 50 MHz / 115200; sim: 8)
+- Boot FSM kibővítve: `S_PRINT_REQ` → `S_PRINT_WAIT` → `S_DONE`. Halt esetén
+  a wrapper signed-ként, trap esetén unsigned-ként adja át az értéket a
+  printer-nek.
+- Belső `decimal_printer` példányosítva, ami egy `uart_tx` példányt
+  vezérel.
+
+**XDC bővítés:** `o_uart_tx` → V2 (LVCMOS33, DRIVE 8).
+
+**cocotb tesztek:**
+
+| Teszt | Hatókör | Eredmény |
+|-------|---------|----------|
+| `test_uart_tx.py` (8 teszt) | UART TX standalone (idle, byte-minták, busy, back-to-back) | 8/8 PASS |
+| `test_decimal_printer.py` (10 teszt) | Printer standalone (0, single/multi digit, INT32 MIN/MAX, 6765 = Fibonacci(20), back-to-back) | 10/10 PASS |
+| `test_a7lite_top.py` Sub2 új tesztek | `test_07`: halt → UART "5\r\n", `test_08`: trap → UART "3\r\n" | 2/2 PASS |
+
+**Új közös cocotb modul:** [`tb_uart.py`](../tb/tb_uart.py) — `uart_rx_byte` és
+`uart_rx_string` 8N1 dekódolók a wrapper UART output verifikációjához.
+
+**Futtatás:**
+
+```bash
+cd rtl/tb
+make test_uart_tx          # 8/8 PASS
+make test_decimal_printer  # 10/10 PASS
+make test_a7lite_top       # 8/8 PASS (6 Sub1 + 2 Sub2)
+```
+
+**Szintézis-előzetes:** A printer-ben a `r_abs / 32'd10` (32-bit / 10) Yosys
+és Vivado is szintetizálja — a tényleges LUT/DSP területet a Sub5 build
+mutatja. Sim-ben combinational ágként elfogadott, ~3 ciklus/digit,
+8 jegyhez ~24 ciklus.
+
 ## Smoke-teszt (LED blink)
 
 Külön mappa: [`smoke_test/`](smoke_test/) — board bring-up LED blink, két
@@ -108,3 +154,4 @@ hardveren. Nem része az F2.7-nek, de igazolja, hogy a flow áll.
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
 | 0.1 | 2026-05-08 | Sub1 — top-level wrapper skeleton + 6 cocotb teszt zöld |
+| 0.2 | 2026-05-08 | Sub2 — UART TX + decimális printer (8+10+2 cocotb teszt zöld); halt/trap UART-on |

@@ -42,6 +42,18 @@ set_property -dict { PACKAGE_PIN N18  IOSTANDARD LVCMOS33  DRIVE 8 } [get_ports 
 set_output_delay -clock sys_clk 0 [get_ports {o_led1_n o_led2_n}]
 
 # =============================================================
+# hu: UART TX (Sub2) — CH340 USB-UART bridge a board-on, V2 az FPGA
+#     UART_TX (CH340 RX) pinje. A 115200 baud-en a host PC-ről egy
+#     terminál (`screen`, `minicom`, `picocom`) kiolvassa az eredményt.
+# en: UART TX (Sub2) — CH340 USB-UART bridge on the board, V2 is the
+#     FPGA UART_TX (CH340 RX) pin. At 115200 baud the host PC reads the
+#     result with a terminal (`screen`, `minicom`, `picocom`).
+# =============================================================
+
+set_property -dict { PACKAGE_PIN V2   IOSTANDARD LVCMOS33  DRIVE 8 } [get_ports o_uart_tx]
+set_output_delay -clock sys_clk 0 [get_ports o_uart_tx]
+
+# =============================================================
 # hu: QSPI flash pinek — Sub4-ben véglegesítve
 #     A config flash a Xilinx dedicated config bank-jában van
 #     (CCLK, D00, D01, D02, D03 — user módban a STARTUPE2 primitíven át

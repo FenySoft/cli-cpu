@@ -29,7 +29,13 @@ module cilcpu_a7lite_top #(
     //     cocotb sim-ben felülírva 4-re a gyors verifikációhoz.
     // en: Debounce counter bit-width. FPGA: 22 bits (~84 ms @ 50 MHz),
     //     cocotb sim overrides to 4 for fast verification.
-    parameter integer DEBOUNCE_BITS   = 22
+    parameter integer DEBOUNCE_BITS   = 22,
+
+    // hu: UART baud-osztó. FPGA: 50 MHz / 115200 = 434, sim-ben 8-ra
+    //     felülírjuk (Sub2).
+    // en: UART baud divider. FPGA: 50 MHz / 115200 = 434, overridden to 8
+    //     in sim (Sub2).
+    parameter integer CLOCKS_PER_BAUD = 434
 ) (
     // hu: Board-szintű I/O / en: Board-level I/O
     input  wire        i_clk_50m,        // J19 — 50 MHz aktív oszcillátor
@@ -38,6 +44,7 @@ module cilcpu_a7lite_top #(
 
     output wire        o_led1_n,         // D6 (M18) — halt indikátor (active low)
     output wire        o_led2_n,         // D5 (N18) — trap indikátor (active low)
+    output wire        o_uart_tx,        // V2 — UART TX (a CH340-en a host felé)
 
     // hu: QSPI flash pass-through — Sub4-ben kerül XDC-vel a board flash-re.
     // en: QSPI flash pass-through — Sub4 binds these to the board flash via XDC.
@@ -109,12 +116,14 @@ module cilcpu_a7lite_top #(
     //     and switches to RUN. On halt/trap, latches status and lights
     //     the appropriate LED.
     // ============================================================
-    localparam [2:0] S_IDLE     = 3'd0;
-    localparam [2:0] S_INIT     = 3'd1;
-    localparam [2:0] S_ARG_WAIT = 3'd2;
-    localparam [2:0] S_ARG_DRV  = 3'd3;
-    localparam [2:0] S_RUN      = 3'd4;
-    localparam [2:0] S_DONE     = 3'd5;
+    localparam [2:0] S_IDLE      = 3'd0;
+    localparam [2:0] S_INIT      = 3'd1;
+    localparam [2:0] S_ARG_WAIT  = 3'd2;
+    localparam [2:0] S_ARG_DRV   = 3'd3;
+    localparam [2:0] S_RUN       = 3'd4;
+    localparam [2:0] S_PRINT_REQ = 3'd5;   // Sub2: indítja a printer-t
+    localparam [2:0] S_PRINT_WAIT = 3'd6;  // Sub2: várja a printer leesését
+    localparam [2:0] S_DONE      = 3'd7;
 
     reg  [2:0]  r_boot_state;
     reg  [4:0]  r_boot_arg_idx;
@@ -129,6 +138,13 @@ module cilcpu_a7lite_top #(
     wire [31:0] core_return_value;
     wire        core_boot_arg_ready;
 
+    // hu: Printer interfész regiszterek (Sub2)
+    // en: Printer interface registers (Sub2)
+    reg  [31:0] r_print_value;
+    reg         r_print_signed;
+    reg         r_print_start;
+    wire        w_print_busy;
+
     always @(posedge i_clk_50m or negedge core_rst_n) begin
         if (!core_rst_n) begin
             r_boot_state       <= S_IDLE;
@@ -136,9 +152,13 @@ module cilcpu_a7lite_top #(
             r_boot_start_pulse <= 1'b0;
             r_boot_arg_data    <= 32'd0;
             r_boot_arg_valid   <= 1'b0;
+            r_print_value      <= 32'd0;
+            r_print_signed     <= 1'b0;
+            r_print_start      <= 1'b0;
         end else begin
             r_boot_start_pulse <= 1'b0;
             r_boot_arg_valid   <= 1'b0;
+            r_print_start      <= 1'b0;
 
             case (r_boot_state)
                 S_IDLE: begin
@@ -173,7 +193,28 @@ module cilcpu_a7lite_top #(
                         r_boot_state <= S_ARG_WAIT;
                 end
                 S_RUN: begin
-                    if (core_halt | core_trap)
+                    if (core_halt) begin
+                        // hu: halt → printer beállítása signed return_value-val
+                        r_print_value  <= core_return_value;
+                        r_print_signed <= 1'b1;
+                        r_boot_state   <= S_PRINT_REQ;
+                    end else if (core_trap) begin
+                        // hu: trap → printer beállítása unsigned trap_code-dal
+                        r_print_value  <= {24'd0, core_trap_code};
+                        r_print_signed <= 1'b0;
+                        r_boot_state   <= S_PRINT_REQ;
+                    end
+                end
+                S_PRINT_REQ: begin
+                    r_print_start <= 1'b1;
+                    r_boot_state  <= S_PRINT_WAIT;
+                end
+                S_PRINT_WAIT: begin
+                    // hu: Várjuk meg, amíg a printer befejezi (busy 0,
+                    //     start már alacsony).
+                    // en: Wait for the printer to finish (busy 0, start
+                    //     already low).
+                    if (!w_print_busy && !r_print_start)
                         r_boot_state <= S_DONE;
                 end
                 S_DONE: begin
@@ -229,6 +270,26 @@ module cilcpu_a7lite_top #(
         .qspi_dq_out        (qspi_dq_out),
         .qspi_dq_in         (qspi_dq_in),
         .qspi_dq_oe         (qspi_dq_oe)
+    );
+
+    // ============================================================
+    // hu: Decimális printer — halt/trap értéket ASCII-decimálisban küldi
+    //     ki UART-on (8N1 @ CLOCKS_PER_BAUD baud). Egy belső uart_tx-et
+    //     vezérel, és \r\n terminátorral zárja a sort.
+    // en: Decimal printer — sends halt/trap value as ASCII decimal over
+    //     UART (8N1 @ CLOCKS_PER_BAUD baud). Drives an internal uart_tx
+    //     and terminates the line with \r\n.
+    // ============================================================
+    decimal_printer #(
+        .CLOCKS_PER_BAUD (CLOCKS_PER_BAUD)
+    ) u_printer (
+        .clk     (i_clk_50m),
+        .rst_n   (core_rst_n),
+        .i_value (r_print_value),
+        .i_signed(r_print_signed),
+        .i_start (r_print_start),
+        .o_busy  (w_print_busy),
+        .o_tx    (o_uart_tx)
     );
 
     // ============================================================

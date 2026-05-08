@@ -24,17 +24,17 @@ from tb_isa import (
     TRAP_INVALID_OPCODE,
     make_method,
 )
+from tb_uart import uart_rx_byte
 
 
 # ============================================================
-# hu: Wrapper paraméterek (a Makefile -GDEBOUNCE_BITS=4 felülírja a
-#     wrapper default 22 bites debouncert sim-időre).
-# en: Wrapper parameters (Makefile passes -GDEBOUNCE_BITS=4 to override the
-#     wrapper's default 22-bit debouncer for sim).
+# hu: Wrapper paraméterek (a Makefile -G-vel felülírja a sim-hez)
+# en: Wrapper parameters (Makefile -G overrides for sim)
 # ============================================================
 DEBOUNCE_BITS    = 4
 DEBOUNCE_CYCLES  = (1 << DEBOUNCE_BITS) + 4   # ~max counter + ráhagyás
 BOOT_ARG_VALUE   = 5                          # cilcpu_a7lite_top default
+CLOCKS_PER_BAUD  = 8                          # Makefile felülírja
 
 CLK_PERIOD_NS    = 20  # 50 MHz
 
@@ -74,11 +74,13 @@ async def _press_start(dut):
         await RisingEdge(dut.i_clk_50m)
 
 
-async def _wait_for_done(dut, max_cycles=4000):
-    """hu: Vár, amíg a wrapper `S_DONE` állapotba ér (halt vagy trap latched).
-        Visszatér: (halted, trapped, return_value, trap_code, pc).
-    en: Wait until the wrapper enters `S_DONE` (halt or trap latched).
-        Returns: (halted, trapped, return_value, trap_code, pc)."""
+async def _wait_for_halt_or_trap(dut, max_cycles=4000):
+    """hu: Vár, amíg a wrapper-ben halt/trap latched. NEM várja meg a UART
+        printer-t, csak a core esemény-t. Visszatér: (halted, trapped,
+        return_value, trap_code, pc).
+    en: Wait until halt/trap is latched in the wrapper. Does NOT wait for
+        the UART printer, only the core event. Returns: (halted, trapped,
+        return_value, trap_code, pc)."""
     for _ in range(max_cycles):
         await RisingEdge(dut.i_clk_50m)
         try:
@@ -87,7 +89,6 @@ async def _wait_for_done(dut, max_cycles=4000):
         except ValueError:
             continue
         if halted or trapped:
-            # hu: Még néhány ciklus, hogy a S_DONE állapot stabilizálódjon
             for _ in range(2):
                 await RisingEdge(dut.i_clk_50m)
             return (
@@ -98,8 +99,20 @@ async def _wait_for_done(dut, max_cycles=4000):
                 int(dut.u_core.o_pc.value),
             )
     raise TimeoutError(
-        f"wrapper didn't reach S_DONE within {max_cycles} cycles"
+        f"wrapper didn't reach halt/trap within {max_cycles} cycles"
     )
+
+
+async def _read_uart_line(dut, max_bytes=16):
+    """hu: A wrapper UART kimenetét dekódolja byte-ról byte-ra LF-ig.
+    en: Decode the wrapper's UART output byte-by-byte until LF."""
+    out = bytearray()
+    for _ in range(max_bytes):
+        b = await uart_rx_byte(dut, dut.o_uart_tx, CLOCKS_PER_BAUD)
+        out.append(b)
+        if b == 0x0A:
+            break
+    return bytes(out)
 
 
 async def _setup(dut, code_bytes):
@@ -156,7 +169,7 @@ async def test_03_ldarg_ret_smoke(dut):
     ))
 
     await _press_start(dut)
-    halted, trapped, ret, trap_code, _pc = await _wait_for_done(dut)
+    halted, trapped, ret, trap_code, _pc = await _wait_for_halt_or_trap(dut)
 
     assert halted  == 1, f"expected halt, got halted={halted} trapped={trapped}"
     assert trapped == 0, f"unexpected trap, code=0x{trap_code:02X}"
@@ -176,7 +189,7 @@ async def test_04_ldarg_add_smoke(dut):
     ))
 
     await _press_start(dut)
-    halted, trapped, ret, trap_code, _pc = await _wait_for_done(dut)
+    halted, trapped, ret, trap_code, _pc = await _wait_for_halt_or_trap(dut)
 
     assert halted  == 1, f"expected halt, got halted={halted} trapped={trapped}"
     assert trapped == 0, f"unexpected trap, code=0x{trap_code:02X}"
@@ -194,7 +207,7 @@ async def test_05_invalid_opcode_trap(dut):
     ))
 
     await _press_start(dut)
-    halted, trapped, _ret, trap_code, _pc = await _wait_for_done(dut)
+    halted, trapped, _ret, trap_code, _pc = await _wait_for_halt_or_trap(dut)
 
     assert trapped == 1, f"expected trap, got halted={halted} trapped={trapped}"
     assert halted  == 0, "halt should not assert on trap"
@@ -202,6 +215,43 @@ async def test_05_invalid_opcode_trap(dut):
         f"expected trap_code=0x{TRAP_INVALID_OPCODE:02X}, got 0x{trap_code:02X}"
     assert int(dut.o_led1_n.value) == 1, "halt LED should be inactive"
     assert int(dut.o_led2_n.value) == 0, "trap LED should be active (low)"
+
+
+@cocotb.test()
+async def test_07_uart_halt_prints_return_value(dut):
+    """hu: Sub2 — halt után a wrapper a return_value-t signed-ként kiírja
+        UART-on, '\\r\\n' terminátorral. BOOT_ARG_VALUE=5, így "5\\r\\n".
+    en: Sub2 — after halt the wrapper prints the return_value as signed
+        over UART, terminated with '\\r\\n'. BOOT_ARG_VALUE=5, so "5\\r\\n"."""
+    await _setup(dut, code_bytes=make_method(
+        body=[OP_LDARG_0, OP_RET],
+        arg_count=1,
+    ))
+
+    await _press_start(dut)
+    line = await _read_uart_line(dut)
+    assert line == b"5\r\n", f"expected b'5\\r\\n', got {line!r}"
+    assert int(dut.r_halted.value) == 1
+    assert int(dut.o_led1_n.value) == 0
+
+
+@cocotb.test()
+async def test_08_uart_trap_prints_code(dut):
+    """hu: Sub2 — trap esetén a wrapper a trap_code-ot unsigned-ként írja ki.
+        TRAP_INVALID_OPCODE = 3, így "3\\r\\n".
+    en: Sub2 — on trap the wrapper prints trap_code as unsigned. With
+        TRAP_INVALID_OPCODE = 3, expected "3\\r\\n"."""
+    await _setup(dut, code_bytes=make_method(
+        body=[OP_LDARG_0, 0xFF, OP_RET],
+        arg_count=1,
+    ))
+
+    await _press_start(dut)
+    line = await _read_uart_line(dut)
+    expected = f"{TRAP_INVALID_OPCODE}\r\n".encode("ascii")
+    assert line == expected, f"expected {expected!r}, got {line!r}"
+    assert int(dut.r_trapped.value) == 1
+    assert int(dut.o_led2_n.value) == 0
 
 
 @cocotb.test()
