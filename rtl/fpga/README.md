@@ -14,7 +14,7 @@ core on real silicon **before** the F3 Tiny Tapeout submission.
 |-----|-------|--------|
 | Sub1 | Top-level wrapper + cocotb integration test | ✅ DONE |
 | Sub2 | UART TX + 32-bit decimal printer | ✅ DONE |
-| Sub3 | Fibonacci(20) demo program + parameterized boot | ⬜ Planned |
+| Sub3 | Fibonacci demo program + parameterized boot | ✅ DONE |
 | Sub4 | QSPI flash binding (IS25L128F) | ⬜ Planned |
 | Sub5 | Vivado + OpenXC7 build, 50 MHz timing closure | ⬜ Planned |
 
@@ -141,6 +141,70 @@ synthesized by both Yosys and Vivado — actual LUT/DSP area will be measured
 in the Sub5 build. In sim it is accepted as a combinational path,
 ~3 cycles/digit, ~24 cycles for an 8-digit number.
 
+## Sub3 — Fibonacci(20) end-to-end demo
+
+**Goal:** Verify the full toolchain (C# → Roslyn → CIL-T0 linker → core →
+wrapper → UART) on the wrapper with a real CIL-T0 binary.
+
+**New C# method** (`samples/PureMath/Math.cs`):
+```csharp
+public static int FibonacciIterative(int n)
+{
+    if (n < 2) return n;
+    int a = 0;
+    int b = 1;
+    for (int i = 2; i <= n; i++)
+    {
+        int c = a + b;
+        a = b;
+        b = c;
+    }
+    return b;
+}
+```
+
+The linker emits a 40-byte `.t0` binary (8 bytes header + 32 bytes body)
+using `LDLOC/STLOC`, `ADD/SUB`, `BLT_S/BR_S` opcodes — all 100% covered
+in the `cilcpu_core` Sub3/Sub4 implementation.
+
+**Wrapper parameter change:** `BOOT_PC`, `BOOT_ARG_COUNT`,
+`BOOT_LOCAL_COUNT`, `BOOT_ARG_VALUE` are now declared `parameter integer`
+(32-bit) so the Verilator `-G<name>=<value>` command-line override does not
+raise WIDTHTRUNC. The wrapper slices each parameter to the right width
+internally. This makes the sim build parameterizable:
+
+```bash
+make test_a7lite_fib  # -GBOOT_ARG_VALUE=20 -GBOOT_LOCAL_COUNT=4
+```
+
+**New cocotb test** (`test_a7lite_fib.py`):
+- Calls `dotnet $RUNNER_DLL link ... --method FibonacciIterative` at runtime
+- Loads the `.t0` bytes into the flash slave
+- KEY2 press → wrapper boots with N=20 → core runs → halt → UART
+- Expected: `"6765\r\n"` (= Fib(20))
+- **Result: 1/1 PASS** (~1.13ms sim time, ~1.35s wall time)
+
+**Known bug — recursive Math.Fibonacci:** The Roslyn-linked **recursive**
+`Math.Fibonacci` (CALL self) traps with `TRAP_STACK_UNDERFLOW` at depth ~5
+when run via the wrapper boot pattern (no caller frame, `boot_pc=8` directly
+into the Fib body). The hand-coded `test_52_call_recursive_fib_5` (with a
+caller frame) is green; the `TCpuNano` C# sim also returns Fib(10)=55
+correctly with the same binary. The bug lives in the `cilcpu_core.v` Sub5
+frame manager teardown logic when the "root frame" was not created by a
+CALL. **Sub3 workaround: iterative variant** (loop, same result, exercises
+fewer opcodes). Fix deferred to a separate debug sprint — see Vault entry
+`project_recursive_call_bug`.
+
+**Run:**
+
+```bash
+# Prereq:
+dotnet build CLI-CPU.sln -c Debug
+
+cd rtl/tb
+make test_a7lite_fib  # 1/1 PASS — UART "6765\r\n"
+```
+
 ## Smoke test (LED blink)
 
 Separate folder: [`smoke_test/`](smoke_test/) — board bring-up LED blink on
@@ -153,3 +217,4 @@ two toolchains (Vivado and OpenXC7). Verified on real hardware on
 |---------|------|---------|
 | 0.1 | 2026-05-08 | Sub1 — top-level wrapper skeleton + 6 cocotb tests green |
 | 0.2 | 2026-05-08 | Sub2 — UART TX + decimal printer (8+10+2 cocotb tests green); halt/trap on UART |
+| 0.3 | 2026-05-10 | Sub3 — FibonacciIterative(20) end-to-end UART "6765\r\n"; recursive bug deferred |

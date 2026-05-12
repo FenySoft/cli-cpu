@@ -20,10 +20,17 @@ module cilcpu_a7lite_top #(
     //     paraméterezhető a Fibonacci(N=20) demóhoz.
     // en: Boot configuration — wired fixed in Sub1, will be parameterized
     //     in Sub3 for the Fibonacci(N=20) demo.
-    parameter [23:0] BOOT_PC          = 24'h000008,
-    parameter [7:0]  BOOT_ARG_COUNT   = 8'd1,
-    parameter [7:0]  BOOT_LOCAL_COUNT = 8'd0,
-    parameter [31:0] BOOT_ARG_VALUE   = 32'd5,
+    // hu: A paramétereket méret-nélküli `integer`-rel deklaráljuk, hogy a
+    //     command-line `-Gname=value` override (Verilator) ne dobjon
+    //     WIDTHTRUNC hibát. A wrapper-en belül szükség szerint slice-eljük
+    //     a megfelelő méretű mezőkre.
+    // en: Parameters are declared as untyped `integer` so the command-line
+    //     `-Gname=value` override does not raise WIDTHTRUNC.
+    //     The wrapper slices each parameter to the right width as needed.
+    parameter integer BOOT_PC          = 32'h00000008,
+    parameter integer BOOT_ARG_COUNT   = 32'd1,
+    parameter integer BOOT_LOCAL_COUNT = 32'd0,
+    parameter integer BOOT_ARG_VALUE   = 32'd5,
 
     // hu: Debounce számláló bit-szélesség. FPGA-n 22 bit (~84 ms @ 50 MHz),
     //     cocotb sim-ben felülírva 4-re a gyors verifikációhoz.
@@ -169,7 +176,7 @@ module cilcpu_a7lite_top #(
                     end
                 end
                 S_INIT: begin
-                    if (BOOT_ARG_COUNT == 8'd0)
+                    if (BOOT_ARG_COUNT[7:0] == 8'd0)
                         r_boot_state <= S_RUN;
                     else
                         r_boot_state <= S_ARG_WAIT;
@@ -180,14 +187,14 @@ module cilcpu_a7lite_top #(
                         //     Sub3-ban argumentum-tömb paraméter lép be.
                         // en: In Sub1 all args use the same value.
                         //     Sub3 will introduce an argument array param.
-                        r_boot_arg_data  <= BOOT_ARG_VALUE;
+                        r_boot_arg_data  <= BOOT_ARG_VALUE[31:0];
                         r_boot_arg_valid <= 1'b1;
                         r_boot_state     <= S_ARG_DRV;
                     end
                 end
                 S_ARG_DRV: begin
                     r_boot_arg_idx <= r_boot_arg_idx + 5'd1;
-                    if ((r_boot_arg_idx + 5'd1) >= BOOT_ARG_COUNT[4:0])
+                    if ((r_boot_arg_idx + 5'd1) >= BOOT_ARG_COUNT[7:0][4:0])
                         r_boot_state <= S_RUN;
                     else
                         r_boot_state <= S_ARG_WAIT;
@@ -252,9 +259,9 @@ module cilcpu_a7lite_top #(
     cilcpu_core u_core (
         .clk                (i_clk_50m),
         .rst_n              (core_rst_n),
-        .i_boot_pc          (BOOT_PC),
-        .i_boot_arg_count   (BOOT_ARG_COUNT),
-        .i_boot_local_count (BOOT_LOCAL_COUNT),
+        .i_boot_pc          (BOOT_PC[23:0]),
+        .i_boot_arg_count   (BOOT_ARG_COUNT[7:0]),
+        .i_boot_local_count (BOOT_LOCAL_COUNT[7:0]),
         .i_boot_start       (r_boot_start_pulse),
         .i_boot_arg_data    (r_boot_arg_data),
         .i_boot_arg_valid   (r_boot_arg_valid),

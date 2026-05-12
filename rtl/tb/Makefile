@@ -81,6 +81,32 @@ $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
 $(PWD)/../fpga/cilcpu_a7lite_top.v"
 
+# hu: F2.7 Sub3 — FibonacciIterative(20) = 6765 end-to-end demó.
+#     A wrapper-be N=20 boot arg, a Math.FibonacciIterative CIL-T0 bináris a
+#     flash-en, UART-on "6765\r\n". A rekurzív Math.Fibonacci ismert
+#     mély-mélységi bug-ot trigger-el a Sub5 frame manager-ben — Sub3-hoz az
+#     iteratív verziót használjuk, ami csak loop-ot, LDLOC/STLOC, BLT/BR-t
+#     használ (a core-ban már 100% fedett opkódok).
+# en: F2.7 Sub3 — FibonacciIterative(20) = 6765 end-to-end demo.
+#     Wrapper booted with N=20, Math.FibonacciIterative CIL-T0 on flash,
+#     UART echoes "6765\r\n". The recursive Math.Fibonacci hits a known
+#     deep-recursion bug in the Sub5 frame manager — Sub3 uses the iterative
+#     variant which only relies on loop, LDLOC/STLOC, BLT/BR (all 100%
+#     covered in the core).
+test_a7lite_fib:
+	$(SUBMAKE) MODULE=test_a7lite_fib TOPLEVEL=cilcpu_a7lite_top \
+		LOCAL_COMPILE_ARGS="-GDEBOUNCE_BITS=4 -GCLOCKS_PER_BAUD=8 -GBOOT_ARG_VALUE=20 -GBOOT_LOCAL_COUNT=4" \
+		VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/../fpga/uart_tx.v \
+$(PWD)/../fpga/decimal_printer.v \
+$(PWD)/../fpga/cilcpu_a7lite_top.v"
+
 # hu: F2.7 Sub2 — UART transmitter standalone teszt.
 #     CLOCKS_PER_BAUD=8 a sim-ben (FPGA default: 434 = 50 MHz / 115200 baud).
 # en: F2.7 Sub2 — standalone UART transmitter test.
@@ -99,4 +125,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib

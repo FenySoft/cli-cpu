@@ -513,7 +513,8 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | ✅ KÉSZ (Sub1..6 mind ✅, 48 cocotb zöld, 12/13 trap, 0 Verilator warning) |
 | — F2.5b | Golden vector harness | ~25 | | ✅ KÉSZ (Phase 1+2: C# trace API + JSONL + Runner --trace + cocotb harness — 172 xUnit + 51 cocotb zöld) |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
-| — F2.7 | FPGA validáció (A7-Lite) | ~45 | | 🔧 Folyamatban (Sub1+Sub2 ✅: wrapper + UART/printer + 26 új cocotb teszt zöld; Sub3..5 ⬜) |
+| — F2.7 | FPGA validáció (A7-Lite) | ~45 | | 🔧 Folyamatban (Sub1+Sub2+Sub3 ✅: wrapper + UART + Fibonacci(20)→"6765\r\n" end-to-end; Sub4..5 ⬜) |
+| — F2.7.D | Debug — rekurzív CALL/RET root-frame teardown bug fix | ~10 | | ⬜ Tervezett (Sub5 frame manager; iteratív workaround a Sub3-ban) |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Tervezett |
 | **F4** | Multi-core Cognitive Fabric FPGA (4× Nano, router, sleep/wake) | ~360 | ~2.3 | ⬜ Tervezett |
 | **F5** | Rich core + heterogén rendszer (teljes CIL, GC, FPU, source gen.) | ~720 | ~4.5 | ⬜ Tervezett |
@@ -649,7 +650,13 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **Sorrend-pivot 2026-05-08:** Az F2.7 (FPGA validáció) **megelőzi** az F2.6-ot (Yosys/Sky130 szintézis) — *„nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n"* elv. A korrekt sorrend: F2.7 (A7-Lite Sub1..Sub5) → F2.6 (Sky130 szintézis) → F3 (Tiny Tapeout submission).
 
-**Következő érdemi lépés:** **F2.7 Sub3 — Fibonacci(20) demó program + paraméterezhető boot** (több argumentum streaming, `samples/` alatti CIL-T0 fibonacci.t0, end-to-end "6765\r\n" UART output a wrapper-en), majd Sub4 (QSPI flash bekötés a board IS25L128F-re), Sub5 (Vivado + OpenXC7 build, timing zárás 50 MHz-en).
+**F2.7 Sub3 KÉSZ — Fibonacci(20) end-to-end demó:** A `samples/PureMath/Math.cs`-be felvettünk egy `FibonacciIterative(int n)` metódust (loop-os Fibonacci LDLOC/STLOC/ADD/BLT_S/BR_S opkódokkal — mind 100% fedett a Sub3/Sub4 cocotb tesztekben). A Roslyn fordítás után a `CilCpu.Sim.Runner link --method FibonacciIterative` egy 40-byte CIL-T0 binárist gyárt, amit a `test_a7lite_fib.py` cocotb teszt build-time betölt a flash slave-be, KEY2-t lenyom, és UART-on várja a "6765\r\n"-t (= Fib(20)). **1/1 PASS** ~1.13 ms sim time @ 50 MHz, ~1.35 sec wall.
+
+A wrapper paraméterek (`BOOT_PC`, `BOOT_ARG_COUNT`, `BOOT_LOCAL_COUNT`, `BOOT_ARG_VALUE`) átírva `parameter integer` típusra (32-bit), hogy a Verilator `-G<name>=<value>` command-line override ne dobjon WIDTHTRUNC hibát; a wrapper-en belül slice-eljük a megfelelő szélességűre. Ez teszi paraméterezhetővé a sim build-et az iteratív Fib(20) lokál-számára (`-GBOOT_LOCAL_COUNT=4 -GBOOT_ARG_VALUE=20`).
+
+**Ismert bug — rekurzív Math.Fibonacci (külön taszk: F2.7.D):** A *rekurzív* `Math.Fibonacci` Roslyn-linkelt verziója a wrapper boot-mintával (caller frame nélkül, `boot_pc=8` közvetlenül a Fib body-tól) `TRAP_STACK_UNDERFLOW`-val trap-el ~5 mélységnél. A hand-coded `test_52_call_recursive_fib_5` (caller frame-mel) zöld; a `TCpuNano` C# szim is helyes Fib(10)=55-öt ad. A bug a `cilcpu_core.v` Sub5 frame manager teardown logikájában van, amikor a "root frame"-et nem CALL hozta létre. **Sub3-ban iteratív workaround**, gyökér-fix az **F2.7.D** taszkban (~10 órás debug sprint, lásd táblázat; Vault: `project_recursive_call_bug`).
+
+**Következő érdemi lépés:** **F2.7 Sub4 — QSPI flash bekötés** a board IS25L128F flash-re (STARTUPE2 primitív, `write_cfgmem` flow), majd **Sub5 — Vivado + OpenXC7 build, 50 MHz timing zárás** és ténylegesen futtatás A7-Lite hardveren.
 
 ## Finanszírozási akcióterv
 

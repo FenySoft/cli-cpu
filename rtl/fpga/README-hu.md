@@ -14,7 +14,7 @@ silicon) **előtt** validálni a magot valódi hardveren.
 |-----|---------|---------|
 | Sub1 | Top-level wrapper + cocotb integrációs teszt | ✅ KÉSZ |
 | Sub2 | UART TX + 32-bit decimális printer | ✅ KÉSZ |
-| Sub3 | Fibonacci(20) demó program + paraméterezhető boot | ⬜ Tervezett |
+| Sub3 | Fibonacci demó program + paraméterezhető boot | ✅ KÉSZ |
 | Sub4 | QSPI flash bekötés (IS25L128F) | ⬜ Tervezett |
 | Sub5 | Vivado + OpenXC7 build, timing zárás 50 MHz | ⬜ Tervezett |
 
@@ -143,6 +143,69 @@ make test_a7lite_top       # 8/8 PASS (6 Sub1 + 2 Sub2)
 mutatja. Sim-ben combinational ágként elfogadott, ~3 ciklus/digit,
 8 jegyhez ~24 ciklus.
 
+## Sub3 — Fibonacci(20) end-to-end demó
+
+**Cél:** A teljes toolchain (C# → Roslyn → CIL-T0 linker → core → wrapper →
+UART) verifikálása valós CIL-T0 binárissal a wrapper-en.
+
+**Új C# metódus** (`samples/PureMath/Math.cs`):
+```csharp
+public static int FibonacciIterative(int n)
+{
+    if (n < 2) return n;
+    int a = 0;
+    int b = 1;
+    for (int i = 2; i <= n; i++)
+    {
+        int c = a + b;
+        a = b;
+        b = c;
+    }
+    return b;
+}
+```
+
+A linker 40 byte-os `.t0` binárist generál (8 byte header + 32 byte body),
+ami `LDLOC/STLOC`, `ADD/SUB`, `BLT_S/BR_S` opkódokat használ — mind
+100%-ban fedett a `cilcpu_core` Sub3/Sub4 implementációjában.
+
+**Wrapper paraméter változás:** A `BOOT_PC`, `BOOT_ARG_COUNT`,
+`BOOT_LOCAL_COUNT`, `BOOT_ARG_VALUE` paraméterek immár `parameter integer`
+típusúak (32-bit), hogy a Verilator `-G<name>=<value>` command-line override
+ne dobjon WIDTHTRUNC hibát. A wrapper-en belül slice-eljük a megfelelő
+méretűre. Így a sim build paraméterezhető:
+
+```bash
+make test_a7lite_fib  # -GBOOT_ARG_VALUE=20 -GBOOT_LOCAL_COUNT=4
+```
+
+**Új cocotb teszt** (`test_a7lite_fib.py`):
+- Build-time hívja a `dotnet $RUNNER_DLL link ... --method FibonacciIterative`-et
+- A `.t0` byte-okat a flash slave-be tölti
+- KEY2 lenyomás → wrapper boot N=20-szal → core fut → halt → UART
+- Várakozott eredmény: `"6765\r\n"` (= Fib(20))
+- **Eredmény: 1/1 PASS** (~1.13ms sim time, ~1.35s wall time)
+
+**Ismert bug — rekurzív Math.Fibonacci:** A Roslyn-linkelt **rekurzív**
+`Math.Fibonacci` (CALL self) a wrapper boot-mintával (caller frame nélkül,
+`boot_pc=8` közvetlenül a Fib body-tól) `TRAP_STACK_UNDERFLOW`-val trap-el
+~5 mélységnél. A hand-coded `test_52_call_recursive_fib_5` (caller frame-mel)
+zöld; a `TCpuNano` C# szim is helyes Fib(10)=55-öt ad ugyanezzel a
+binárissal. A bug a `cilcpu_core.v` Sub5 frame manager teardown logikájában
+van, amikor a "root frame"-et nem CALL hozta létre. **Workaround Sub3-ban:
+iteratív verzió** (loop, ugyanaz az eredmény, kevesebb opkód-fedezetet
+gyakorol). A javítás külön debug sprintbe kerül — Vault `project_recursive_call_bug`.
+
+**Futtatás:**
+
+```bash
+# Előfeltétel:
+dotnet build CLI-CPU.sln -c Debug
+
+cd rtl/tb
+make test_a7lite_fib  # 1/1 PASS — UART "6765\r\n"
+```
+
 ## Smoke-teszt (LED blink)
 
 Külön mappa: [`smoke_test/`](smoke_test/) — board bring-up LED blink, két
@@ -155,3 +218,4 @@ hardveren. Nem része az F2.7-nek, de igazolja, hogy a flow áll.
 |--------|-------|-------------|
 | 0.1 | 2026-05-08 | Sub1 — top-level wrapper skeleton + 6 cocotb teszt zöld |
 | 0.2 | 2026-05-08 | Sub2 — UART TX + decimális printer (8+10+2 cocotb teszt zöld); halt/trap UART-on |
+| 0.3 | 2026-05-10 | Sub3 — FibonacciIterative(20) end-to-end UART "6765\r\n"; rekurzív bug külön taszk |
