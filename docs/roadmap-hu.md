@@ -113,6 +113,11 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - F2.6 Yosys szintézis — Sky130 PDK, terület becslés
 - F2.7 FPGA validáció — egymagos Nano core, valós hardveren (A7-Lite)
 
+> **⚠️ Végrehajtási sorrend ≠ számozás.** Az alszakasz-számok **stabil azonosítók**, nem lépés-sorrend (a git commit-history is ezekre hivatkozik). A 2026-05-08-i sorrend-pivot óta a tényleges végrehajtási sorrend:
+> **F2.5 → F2.7 (FPGA validáció, A7-Lite) → F2.6 (Yosys/Sky130 szintézis) → F3 (Tiny Tapeout).**
+> **Mérnöki indok:** *„nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n"* — előbb FPGA-n verifikálunk, csak utána szintetizálunk Sky130-ra; az FPGA-n talált hibák olcsók, a Tiny Tapeout chipen nem.
+> **Pályázati vonatkozás:** az **F2.6 Sky130 szintézis az NLnet M1 mérföldkő MoU-utáni horgonya**. A befejezett FPGA-validáció (F2.7) erős M1-előbizonyíték a 2026-06-01 beadáshoz, de a finanszírozott, a MoU-időszakra eső, igazolható deliverable a Sky130 area/timing report — ezért az F2.6-ot tudatosan a MoU utánra időzítjük.
+
 **Kész kritérium:**
 - Verilator szimuláció minden F1 teszten zöld
 - Yosys szintézis Sky130 PDK-ra sikeres
@@ -513,7 +518,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | — F2.5a | Top-level Nano core integráció (`cilcpu_core.v`) | ~30 | | ✅ KÉSZ (Sub1..6 mind ✅, 48 cocotb zöld, 12/13 trap, 0 Verilator warning) |
 | — F2.5b | Golden vector harness | ~25 | | ✅ KÉSZ (Phase 1+2: C# trace API + JSONL + Runner --trace + cocotb harness — 172 xUnit + 51 cocotb zöld) |
 | — F2.6 | Yosys szintézis (Sky130) | ~30 | | ⬜ Tervezett |
-| — F2.7 | FPGA validáció (A7-Lite) | ~45 | | 🔧 Folyamatban (Sub1+Sub2+Sub3 ✅: wrapper + UART + Fibonacci(20)→"6765\r\n" end-to-end; Sub4..5 ⬜) |
+| — F2.7 | FPGA validáció (A7-Lite) | ~45 | | 🔧 Folyamatban (Sub1+Sub2+Sub3+Sub4 ✅: wrapper + UART + Fibonacci(20)→"6765\r\n" end-to-end + STARTUPE2/IOBUF board.v; Sub5 ⬜) |
 | — F2.7.D | Debug — rekurzív CALL/RET root-frame teardown bug fix | ~10 | | ⬜ Tervezett (Sub5 frame manager; iteratív workaround a Sub3-ban) |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Tervezett |
 | **F4** | Multi-core Cognitive Fabric FPGA (4× Nano, router, sleep/wake) | ~360 | ~2.3 | ⬜ Tervezett |
@@ -648,7 +653,7 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **F2.7 Sub2 KÉSZ — UART TX + 32-bit decimális printer:** Két új RTL modul: `uart_tx.v` (8N1 transmitter, paraméterezhető `CLOCKS_PER_BAUD` — FPGA: 434 = 50 MHz / 115200, sim: 8) és `decimal_printer.v` (32-bit signed/unsigned int → ASCII decimal → UART, `\r\n` terminátorral). A wrapper FSM kibővítve két új állapottal (`S_PRINT_REQ` → `S_PRINT_WAIT`): halt esetén signed-ként, trap esetén unsigned-ként adja át az értéket a printer-nek. Új top-port: `o_uart_tx` (V2, CH340 USB-UART bridge), XDC frissítve. **20 új cocotb teszt zöld**: `test_uart_tx` 8/8 (idle, byte minták, busy, back-to-back), `test_decimal_printer` 10/10 (0, egy/több jegy, INT32_MIN/MAX, 6765 = Fibonacci(20), back-to-back), `test_a7lite_top` 2 új teszt: halt → UART "5\r\n", trap → UART "3\r\n" (TRAP_INVALID_OPCODE). Új közös cocotb modul: `tb_uart.py` (uart_rx_byte 8N1 dekódoló).
 
-**Sorrend-pivot 2026-05-08:** Az F2.7 (FPGA validáció) **megelőzi** az F2.6-ot (Yosys/Sky130 szintézis) — *„nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n"* elv. A korrekt sorrend: F2.7 (A7-Lite Sub1..Sub5) → F2.6 (Sky130 szintézis) → F3 (Tiny Tapeout submission).
+**Sorrend-pivot 2026-05-08:** Az F2.7 (FPGA validáció) **megelőzi** az F2.6-ot (Yosys/Sky130 szintézis). A teljes indoklás és a pályázati vonatkozás a kanonikus helyen, az **F2 fázis-fejléc „Végrehajtási sorrend ≠ számozás" kiemelt blokkjában** van — ez a mondat csak a döntés dátumát rögzíti a változás-naplóhoz.
 
 **F2.7 Sub3 KÉSZ — Fibonacci(20) end-to-end demó:** A `samples/PureMath/Math.cs`-be felvettünk egy `FibonacciIterative(int n)` metódust (loop-os Fibonacci LDLOC/STLOC/ADD/BLT_S/BR_S opkódokkal — mind 100% fedett a Sub3/Sub4 cocotb tesztekben). A Roslyn fordítás után a `CilCpu.Sim.Runner link --method FibonacciIterative` egy 40-byte CIL-T0 binárist gyárt, amit a `test_a7lite_fib.py` cocotb teszt build-time betölt a flash slave-be, KEY2-t lenyom, és UART-on várja a "6765\r\n"-t (= Fib(20)). **1/1 PASS** ~1.13 ms sim time @ 50 MHz, ~1.35 sec wall.
 
@@ -656,7 +661,9 @@ A wrapper paraméterek (`BOOT_PC`, `BOOT_ARG_COUNT`, `BOOT_LOCAL_COUNT`, `BOOT_A
 
 **Ismert bug — rekurzív Math.Fibonacci (külön taszk: F2.7.D):** A *rekurzív* `Math.Fibonacci` Roslyn-linkelt verziója a wrapper boot-mintával (caller frame nélkül, `boot_pc=8` közvetlenül a Fib body-tól) `TRAP_STACK_UNDERFLOW`-val trap-el ~5 mélységnél. A hand-coded `test_52_call_recursive_fib_5` (caller frame-mel) zöld; a `TCpuNano` C# szim is helyes Fib(10)=55-öt ad. A bug a `cilcpu_core.v` Sub5 frame manager teardown logikájában van, amikor a "root frame"-et nem CALL hozta létre. **Sub3-ban iteratív workaround**, gyökér-fix az **F2.7.D** taszkban (~10 órás debug sprint, lásd táblázat; Vault: `project_recursive_call_bug`).
 
-**Következő érdemi lépés:** **F2.7 Sub4 — QSPI flash bekötés** a board IS25L128F flash-re (STARTUPE2 primitív, `write_cfgmem` flow), majd **Sub5 — Vivado + OpenXC7 build, 50 MHz timing zárás** és ténylegesen futtatás A7-Lite hardveren.
+**F2.7 Sub4 KÉSZ — QSPI flash bekötés (IS25L128F + STARTUPE2 + IOBUF):** Új board-szintű top wrapper, `rtl/fpga/cilcpu_a7lite_board.v`: a sim-friendly `cilcpu_a7lite_top` köré rakja a Xilinx 7-series **STARTUPE2** primitívet (CCLK pin user-mode hajtása a dedikált config bankban) és négy **IOBUF** primitívet (DQ[3:0] inout busz a master-hajtott CMD/ADDR és flash-hajtott DATA fázisok közt). A board.v `+define+CILCPU_SIM_BOARD` makróval Verilator-kompatibilis split debug portokra vált, hogy ne legyen multi-driver konfliktus az IOBUF `assign IO = T ? 'bz : I` mintáján. Új sim stub fájl: `rtl/fpga/sim_stubs/xilinx_primitives_sim.v` (behavioral STARTUPE2 + IOBUF a Xilinx 'unisims' helyett Verilator-ban). Az XDC frissítve: top module → `cilcpu_a7lite_board`, pinek `o_qspi_cs_n` (T19) + `io_qspi_dq[0..3]` (P22, R22, P21, R21) — a CCLK fizikai pinje (E8) NEM XDC-ben, mert STARTUPE2 hajtja. `create_generated_clock` a `qspi_sck` névre (sys_clk / 2 = 25 MHz) + datasheet-alapú `set_input_delay` / `set_output_delay` (Sub5-ben finomítjuk). **5 új cocotb teszt zöld**: `test_a7lite_board.py` 4/4 (reset, LDARG+RET UART "5\r\n", LDARG+ADD halt, INVALID_OPCODE trap UART "3\r\n") + `test_a7lite_board_fib.py` 1/1 (FibonacciIterative(20) = 6765 end-to-end a board.v-n keresztül). A meglévő test_a7lite_top (8/8) és test_a7lite_fib (1/1) regresszió változatlanul zöld — a board.v új réteg nem törte el a Sub1..Sub3-at.
+
+**Következő érdemi lépés:** **F2.7 Sub5 — Vivado + OpenXC7 build a board.v-vel**, IS25L128F-re `write_cfgmem` flow (alkalmazás-bináris a config flash-en), 50 MHz timing zárás (a Sub4-ben felvett constraint-ek pontosítása), és tényleges A7-Lite hardver bring-up UART terminallel a CH340 felett.
 
 ## Finanszírozási akcióterv
 
@@ -711,6 +718,8 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.5 | 2026-05-14 | F2.7 Sub4 KÉSZ — board-szintű top wrapper (`cilcpu_a7lite_board.v`) STARTUPE2 + 4× IOBUF körül a `cilcpu_a7lite_top` köré; sim stub fájl Xilinx primitivekhez; XDC frissítve a QSPI flash pinekkel (T19, P22, R22, P21, R21) + `qspi_sck` generated clock. **5 új cocotb zöld** (4 smoke + 1 Fibonacci e2e a board.v-n át). Mai státusz, becsült munkaóra-tábla frissítve. |
+| 1.5.1 | 2026-05-15 | Doku-konzisztencia: az F2 fázis-fejlécbe kiemelt „Végrehajtási sorrend ≠ számozás" blokk (kanonikus hely a F2.7→F2.6→F3 sorrendre + NLnet M1 horgony-magyarázat). A Mai státusz „Sorrend-pivot" mondata hivatkozássá rövidítve (nincs átszámozás — a git commit-history immutable). |
 | 1.4 | 2026-05-04 | F2.5a Devil's Advocate végaudit hiánypótlás: Sub4 INVALID_BRANCH (negatív target) + Sub2 OVERFLOW teszt + Sub5 halasztás explicit dokumentáció. 43 cocotb teszt zöld (41 + 2 új), 9/13 trap kód lefedett, 0 Verilator warning. CORE_SPEC v1.3-ra emelve. Mai státusz, becsült munkaóra-tábla frissítve. |
 | 1.3 | 2026-05-04 | F2.5a Sub1..Sub4 + Sub6 KÉSZ — 41 cocotb teszt zöld (LDC, ALU, fetch fix, LDARG/STARG/LDLOC/STLOC, branch, stack/break/invalid trap-ek). Sub5 (CALL/RET nem-root) NYITOTT, a következő ülésre marad. Mai státusz frissítve. |
 | 1.2 | 2026-05-04 | F2.5 alszakasz F2.5a (top-level Nano core) + F2.5b (golden vector harness) bontásra. F2.4 KÉSZ státuszra váltva. F2 össz. ~370 óra. Mai státusz frissítve F2.5a spec lezártra. |

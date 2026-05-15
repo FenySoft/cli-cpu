@@ -15,7 +15,7 @@ silicon) **előtt** validálni a magot valódi hardveren.
 | Sub1 | Top-level wrapper + cocotb integrációs teszt | ✅ KÉSZ |
 | Sub2 | UART TX + 32-bit decimális printer | ✅ KÉSZ |
 | Sub3 | Fibonacci demó program + paraméterezhető boot | ✅ KÉSZ |
-| Sub4 | QSPI flash bekötés (IS25L128F) | ⬜ Tervezett |
+| Sub4 | QSPI flash bekötés (IS25L128F + STARTUPE2 + IOBUF) | ✅ KÉSZ |
 | Sub5 | Vivado + OpenXC7 build, timing zárás 50 MHz | ⬜ Tervezett |
 
 ## Sub1 — Top-level wrapper
@@ -206,6 +206,78 @@ cd rtl/tb
 make test_a7lite_fib  # 1/1 PASS — UART "6765\r\n"
 ```
 
+## Sub4 — QSPI flash bekötés (IS25L128F)
+
+**Cél:** A `cilcpu_a7lite_top` köré rakott board-szintű wrapper, amely a
+Xilinx 7-széria **STARTUPE2** primitívvel hajtja a CCLK pinjét (a CCLK
+fizikai pin a dedikált config bankban van, user módban közvetlenül nem
+köthető GPIO-ra), és négy **IOBUF** primitív kezeli a DQ[3:0] inout buszt.
+Az IS25L128F (128 Mbit) QSPI flash a board konfigurációs flash-e — a
+bitstream után user módban innen olvassa a CIL-T0 programot is a core.
+
+**Új fájlok:**
+
+| Fájl | Szerep |
+|------|--------|
+| [`cilcpu_a7lite_board.v`](cilcpu_a7lite_board.v) | Board-szintű (FPGA) top wrapper. `cilcpu_a7lite_top` + STARTUPE2 + 4 IOBUF |
+| [`sim_stubs/xilinx_primitives_sim.v`](sim_stubs/xilinx_primitives_sim.v) | Behavioral STARTUPE2 + IOBUF stub Verilator-hoz (Xilinx 'unisims' helyett sim-ben) |
+
+**Architektúra döntés:**
+
+A board.v két módban viselkedik a `+define+CILCPU_SIM_BOARD` makró
+alapján:
+
+- **FPGA build** (Vivado/OpenXC7, makró undef): port-interfész
+  `output o_qspi_cs_n` + `inout wire [3:0] io_qspi_dq`, a négy IOBUF
+  szétválasztja a master-hajtott / flash-hajtott fázisokat.
+- **Sim build** (Verilator + cocotb, `+define+CILCPU_SIM_BOARD`):
+  IOBUF-ok kihagyva (Verilator multi-driver konfliktust dobna az
+  `assign IO = T ? 'bz : I`-re egy külső driver-rel egyszerre), helyettük
+  split debug portok (`o_qspi_dq_out_dbg`, `i_qspi_dq_in_dbg`,
+  `o_qspi_dq_oe_dbg`, `o_qspi_clk_dbg`) közvetlenül a belső net-ekre.
+
+A STARTUPE2 mindkét módban példányosítva: FPGA-n a Xilinx 'unisims'
+valódi primitív, sim-ben a `sim_stubs/xilinx_primitives_sim.v` behavioral
+modellje (USRCCLKO transzparens — a board.v belső `w_qspi_clk_user`
+net-jén át megfigyelhető a flash slave-hez).
+
+**XDC frissítés** (`cilcpu_a7lite.xdc`):
+
+- Top module váltás: `cilcpu_a7lite_top` → `cilcpu_a7lite_board`
+- `o_qspi_cs_n` (T19), `io_qspi_dq[0..3]` (P22, R22, P21, R21) pin assignment
+- CCLK NEM kerül `set_property PACKAGE_PIN`-be — a STARTUPE2 hajtja
+- `create_generated_clock` a STARTUPE2 USRCCLKO útvonalra: `qspi_sck` =
+  sys_clk / 2 = 25 MHz
+- `set_input_delay` / `set_output_delay` az IS25L128F datasheet alapján
+  (tV max 7 ns, tIS / tIH 2 ns; finomítás Sub5-ben)
+
+**cocotb tesztek:**
+
+| Teszt | Hatókör | Eredmény |
+|-------|---------|----------|
+| [`test_a7lite_board.py`](../tb/test_a7lite_board.py) | Reset + LDARG/RET + LDARG+ADD + INVALID_OPCODE trap, UART "5\r\n" / "3\r\n" | 4/4 PASS |
+| [`test_a7lite_board_fib.py`](../tb/test_a7lite_board_fib.py) | FibonacciIterative(20) = 6765 a board.v-n keresztül | 1/1 PASS |
+
+Mindkét teszt a STARTUPE2 + (sim módban null) IOBUF útvonalon viszi
+keresztül a flash slave-flash master kommunikációt — bizonyítja, hogy a
+board.v új réteg nem regresszió a Sub3 demóhoz képest.
+
+**Futtatás:**
+
+```bash
+cd rtl/tb
+make test_a7lite_board       # 4/4 PASS
+make test_a7lite_board_fib   # 1/1 PASS — UART "6765\r\n" a board.v-n át
+```
+
+**Sub5-be halasztott munka:**
+
+- Vivado / OpenXC7 build a board.v-vel + IS25L128F-ra ténylegesen
+- Bitstream `write_cfgmem` flow (alkalmazás bináris a config flash-en
+  beágyazva, vagy külön JEDEC/MCS sectorban)
+- 50 MHz timing zárás (a `qspi_sck` constraint pontosítása mérés alapján)
+- Tényleges A7-Lite hardver bring-up — UART terminal a CH340 felett
+
 ## Smoke-teszt (LED blink)
 
 Külön mappa: [`smoke_test/`](smoke_test/) — board bring-up LED blink, két
@@ -219,3 +291,4 @@ hardveren. Nem része az F2.7-nek, de igazolja, hogy a flow áll.
 | 0.1 | 2026-05-08 | Sub1 — top-level wrapper skeleton + 6 cocotb teszt zöld |
 | 0.2 | 2026-05-08 | Sub2 — UART TX + decimális printer (8+10+2 cocotb teszt zöld); halt/trap UART-on |
 | 0.3 | 2026-05-10 | Sub3 — FibonacciIterative(20) end-to-end UART "6765\r\n"; rekurzív bug külön taszk |
+| 0.4 | 2026-05-14 | Sub4 — board.v wrapper STARTUPE2 + IOBUF; XDC QSPI pinekkel; 4+1 új cocotb teszt zöld |

@@ -15,7 +15,7 @@ core on real silicon **before** the F3 Tiny Tapeout submission.
 | Sub1 | Top-level wrapper + cocotb integration test | ✅ DONE |
 | Sub2 | UART TX + 32-bit decimal printer | ✅ DONE |
 | Sub3 | Fibonacci demo program + parameterized boot | ✅ DONE |
-| Sub4 | QSPI flash binding (IS25L128F) | ⬜ Planned |
+| Sub4 | QSPI flash binding (IS25L128F + STARTUPE2 + IOBUF) | ✅ DONE |
 | Sub5 | Vivado + OpenXC7 build, 50 MHz timing closure | ⬜ Planned |
 
 ## Sub1 — Top-level wrapper
@@ -205,6 +205,78 @@ cd rtl/tb
 make test_a7lite_fib  # 1/1 PASS — UART "6765\r\n"
 ```
 
+## Sub4 — QSPI flash binding (IS25L128F)
+
+**Goal:** A board-level wrapper around `cilcpu_a7lite_top` that drives the
+flash CCLK via the Xilinx 7-series **STARTUPE2** primitive (CCLK lives in
+the dedicated config bank and cannot be reached as a regular GPIO in user
+mode), and uses four **IOBUF** primitives for the DQ[3:0] inout bus. The
+IS25L128F (128 Mbit) QSPI flash is the board's configuration flash —
+after bitstream load, the core also reads its CIL-T0 program from there
+in user mode.
+
+**New files:**
+
+| File | Role |
+|------|------|
+| [`cilcpu_a7lite_board.v`](cilcpu_a7lite_board.v) | Board-level (FPGA) top wrapper. `cilcpu_a7lite_top` + STARTUPE2 + 4 IOBUFs |
+| [`sim_stubs/xilinx_primitives_sim.v`](sim_stubs/xilinx_primitives_sim.v) | Behavioral STARTUPE2 + IOBUF stub for Verilator (instead of Xilinx 'unisims' in sim) |
+
+**Architecture decision:**
+
+board.v has two modes via the `+define+CILCPU_SIM_BOARD` macro:
+
+- **FPGA build** (Vivado/OpenXC7, macro undefined): port interface is
+  `output o_qspi_cs_n` + `inout wire [3:0] io_qspi_dq`, the four IOBUFs
+  separate master-driven (CMD/ADDR) and flash-driven (DATA) phases.
+- **Sim build** (Verilator + cocotb, `+define+CILCPU_SIM_BOARD`): IOBUFs
+  omitted (Verilator would emit a multi-driver conflict on `assign IO =
+  T ? 'bz : I` racing against an external driver), replaced by split
+  debug ports (`o_qspi_dq_out_dbg`, `i_qspi_dq_in_dbg`, `o_qspi_dq_oe_dbg`,
+  `o_qspi_clk_dbg`) wired straight to the internal nets.
+
+STARTUPE2 is instantiated in both modes: real Xilinx 'unisims' primitive
+in FPGA, behavioral stub in sim (USRCCLKO is transparent — observable on
+the board.v internal `w_qspi_clk_user` net for the flash slave).
+
+**XDC update** (`cilcpu_a7lite.xdc`):
+
+- Top module switch: `cilcpu_a7lite_top` → `cilcpu_a7lite_board`
+- `o_qspi_cs_n` (T19), `io_qspi_dq[0..3]` (P22, R22, P21, R21) pin assignment
+- CCLK NOT in `set_property PACKAGE_PIN` — STARTUPE2 drives it
+- `create_generated_clock` on the STARTUPE2 USRCCLKO path: `qspi_sck` =
+  sys_clk / 2 = 25 MHz
+- `set_input_delay` / `set_output_delay` from the IS25L128F datasheet
+  (tV max 7 ns, tIS / tIH 2 ns; tightened in Sub5)
+
+**cocotb tests:**
+
+| Test | Scope | Result |
+|------|-------|--------|
+| [`test_a7lite_board.py`](../tb/test_a7lite_board.py) | Reset + LDARG/RET + LDARG+ADD + INVALID_OPCODE trap, UART "5\r\n" / "3\r\n" | 4/4 PASS |
+| [`test_a7lite_board_fib.py`](../tb/test_a7lite_board_fib.py) | FibonacciIterative(20) = 6765 through board.v | 1/1 PASS |
+
+Both tests route the flash slave ↔ master traffic through STARTUPE2 +
+(in sim, no-op) IOBUFs — proves the new board.v layer is not a
+regression vs. the Sub3 demo.
+
+**Run:**
+
+```bash
+cd rtl/tb
+make test_a7lite_board       # 4/4 PASS
+make test_a7lite_board_fib   # 1/1 PASS — UART "6765\r\n" via board.v
+```
+
+**Deferred to Sub5:**
+
+- Vivado / OpenXC7 build with board.v actually targeting IS25L128F
+- Bitstream `write_cfgmem` flow (app binary embedded in the config flash
+  or as a separate JEDEC/MCS sector)
+- 50 MHz timing closure (refining the `qspi_sck` constraint from real
+  measurement)
+- Real A7-Lite bring-up — UART terminal over CH340
+
 ## Smoke test (LED blink)
 
 Separate folder: [`smoke_test/`](smoke_test/) — board bring-up LED blink on
@@ -218,3 +290,4 @@ two toolchains (Vivado and OpenXC7). Verified on real hardware on
 | 0.1 | 2026-05-08 | Sub1 — top-level wrapper skeleton + 6 cocotb tests green |
 | 0.2 | 2026-05-08 | Sub2 — UART TX + decimal printer (8+10+2 cocotb tests green); halt/trap on UART |
 | 0.3 | 2026-05-10 | Sub3 — FibonacciIterative(20) end-to-end UART "6765\r\n"; recursive bug deferred |
+| 0.4 | 2026-05-14 | Sub4 — board.v wrapper STARTUPE2 + IOBUF; XDC with QSPI pins; 4+1 new cocotb tests green |

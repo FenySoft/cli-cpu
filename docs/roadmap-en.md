@@ -113,6 +113,11 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - F2.6 Yosys synthesis — Sky130 PDK, area estimate
 - F2.7 FPGA validation — single Nano core on real hardware (A7-Lite)
 
+> **⚠️ Execution order ≠ numbering.** The subsection numbers are **stable identifiers**, not a step sequence (the git commit history also references them). Since the 2026-05-08 order pivot, the actual execution order is:
+> **F2.5 → F2.7 (FPGA validation, A7-Lite) → F2.6 (Yosys/Sky130 synthesis) → F3 (Tiny Tapeout).**
+> **Engineering rationale:** *"No silicon tape-out with a design that hasn't run on FPGA."* — verify on FPGA first, synthesize to Sky130 only afterwards; bugs found on FPGA are cheap, bugs on the Tiny Tapeout chip are not.
+> **Grant implication:** the **F2.6 Sky130 synthesis is the post-MoU anchor of the NLnet M1 milestone**. The completed FPGA validation (F2.7) is strong M1 pre-evidence for the 2026-06-01 submission, but the funded, in-MoU-period, verifiable deliverable is the Sky130 area/timing report — hence F2.6 is deliberately timed after the MoU.
+
 **Done criteria:**
 - Verilator simulation passes on all F1 tests
 - Yosys synthesis to Sky130 PDK succeeds
@@ -513,7 +518,8 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | — F2.5a | Top-level Nano core integration (`cilcpu_core.v`) | ~30 | | ✅ DONE (Sub1..6 all ✅, 48 cocotb green, 12/13 traps, 0 Verilator warning) |
 | — F2.5b | Golden vector harness | ~25 | | ✅ DONE (Phase 1+2: C# trace API + JSONL + Runner --trace + cocotb harness — 172 xUnit + 51 cocotb green) |
 | — F2.6 | Yosys synthesis (Sky130) | ~30 | | ⬜ Planned |
-| — F2.7 | FPGA validation (A7-Lite) | ~45 | | ⬜ Planned |
+| — F2.7 | FPGA validation (A7-Lite) | ~45 | | 🔧 In progress (Sub1+Sub2+Sub3+Sub4 ✅: wrapper + UART + Fibonacci(20)→"6765\r\n" end-to-end + STARTUPE2/IOBUF board.v; Sub5 ⬜) |
+| — F2.7.D | Debug — recursive CALL/RET root-frame teardown bug fix | ~10 | | ⬜ Planned (Sub5 frame manager; iterative workaround in Sub3) |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Planned |
 | **F4** | Multi-core Cognitive Fabric on FPGA (4× Nano, router, sleep/wake) | ~360 | ~2.3 | ⬜ Planned |
 | **F5** | Rich core + heterogeneous system (full CIL, GC, FPU, source gen.) | ~720 | ~4.5 | ⬜ Planned |
@@ -641,7 +647,15 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 
 **Coverage:** **172 xUnit green** (10 tracer/JSONL + 2 Runner trace), **48 cocotb test_core green** (regression OK), **3 cocotb test_core_golden green**. The RTL matches the F1 golden reference bit-for-bit on 6 architectural fields — this closes F2.5.
 
-**Next substantive step:** **F2.6 — Yosys synthesis** (Sky130 PDK, area and timing estimation). Last F2 sub-stage, followed by F2.7 FPGA validation and F3 Tiny Tapeout submission.
+**F2.7 Sub1..Sub4 DONE — A7-Lite top wrapper, UART, Fibonacci demo, QSPI flash bring-up:**
+- **Sub1:** `rtl/fpga/cilcpu_a7lite_top.v` board-friendly wrapper around `cilcpu_core` (50 MHz clock, KEY1 reset, KEY2 start with debouncer, 8-state boot FSM, halt/trap LED latches). 6 cocotb tests green.
+- **Sub2:** `uart_tx.v` + `decimal_printer.v` — UART TX (8N1, 115200 baud) and 32-bit signed/unsigned decimal printer with `\r\n` terminator. 20 cocotb tests green (8 UART + 10 printer + 2 wrapper UART halt/trap).
+- **Sub3:** `Math.FibonacciIterative(int)` added to `samples/PureMath/Math.cs`; the C# Runner links it to a 40-byte CIL-T0 binary; `test_a7lite_fib.py` loads it into the cocotb flash slave, presses KEY2, and asserts UART output `"6765\r\n"`. 1/1 PASS at ~1.13 ms sim time. Wrapper parameters changed to `parameter integer` (32-bit) so the Verilator `-G` override doesn't throw WIDTHTRUNC.
+- **Sub4:** new board-level top wrapper `rtl/fpga/cilcpu_a7lite_board.v` with **STARTUPE2** primitive (drives the CCLK pin in user mode — the physical CCLK lives in the dedicated config bank and is unreachable from regular GPIO) and four **IOBUF** primitives (DQ[3:0] inout bus). A `+define+CILCPU_SIM_BOARD` macro switches to split debug ports for Verilator (sidesteps the IOBUF tri-state multi-driver conflict on `assign IO = T ? 'bz : I`). New sim stub file `rtl/fpga/sim_stubs/xilinx_primitives_sim.v` (behavioral STARTUPE2 + IOBUF for Verilator instead of Xilinx 'unisims'). XDC updated: top module → `cilcpu_a7lite_board`, pins `o_qspi_cs_n` (T19) + `io_qspi_dq[0..3]` (P22, R22, P21, R21); CCLK NOT in XDC (STARTUPE2 drives it). `create_generated_clock` for `qspi_sck` (sys_clk / 2 = 25 MHz) + datasheet-derived `set_input_delay` / `set_output_delay` (refined in Sub5). **5 new cocotb tests green**: `test_a7lite_board.py` 4/4 (reset, LDARG+RET UART, LDARG+ADD halt, INVALID_OPCODE trap UART) + `test_a7lite_board_fib.py` 1/1 (FibonacciIterative(20) = 6765 end-to-end through board.v).
+
+**Ismert bug — rekurzív Math.Fibonacci (separate task: F2.7.D):** The *recursive* Roslyn-linked `Math.Fibonacci` traps with `TRAP_STACK_UNDERFLOW` at ~5 depth using the wrapper boot pattern (no caller frame, `boot_pc=8` directly at the Fib body). The hand-coded `test_52_call_recursive_fib_5` (with caller frame) is green; `TCpuNano` C# sim also returns the correct Fib(10)=55. The bug is in the `cilcpu_core.v` Sub5 frame manager teardown logic when the "root frame" was not created by CALL. **Sub3 uses the iterative workaround**; root-cause fix lives in **F2.7.D** (~10 h debug sprint; Vault: `project_recursive_call_bug`).
+
+**Next substantive step:** **F2.7 Sub5** — Vivado / OpenXC7 build with board.v, `write_cfgmem` flow for the IS25L128F, 50 MHz timing closure (tightening Sub4 constraints), and real A7-Lite bring-up with a UART terminal over CH340.
 
 ## Funding Action Plan
 
@@ -696,6 +710,8 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5 | 2026-05-14 | F2.7 Sub1..Sub4 DONE — board-level top wrapper (`cilcpu_a7lite_board.v`) STARTUPE2 + 4× IOBUF wrapped around `cilcpu_a7lite_top`; sim stub file for Xilinx primitives; XDC updated with QSPI flash pins (T19, P22, R22, P21, R21) + `qspi_sck` generated clock. **5 new cocotb tests green** (4 smoke + 1 Fibonacci e2e through board.v). Current Status, Estimated Work Hours table updated. |
+| 1.5.1 | 2026-05-15 | Doc consistency: highlighted "Execution order ≠ numbering" block added to the F2 phase header (canonical place for the F2.7→F2.6→F3 order + NLnet M1 anchor rationale). No renumbering — the git commit history is immutable. |
 | 1.4 | 2026-05-04 | F2.5a Devil's Advocate final-audit gap fixes: Sub4 INVALID_BRANCH (negative target) + Sub2 OVERFLOW test + Sub5 deferral explicit doc. 43 cocotb tests green (41 + 2 new), 9/13 trap codes covered, 0 Verilator warning. CORE_SPEC bumped to v1.3. Current Status, Estimated Work Hours table updated. |
 | 1.3 | 2026-05-04 | F2.5a Sub1..Sub4 + Sub6 DONE — 41 cocotb tests green (LDC, ALU, fetch fix, LDARG/STARG/LDLOC/STLOC, branch, stack/break/invalid traps). Sub5 (CALL/RET non-root) OPEN, deferred to next session. Current Status updated. |
 | 1.2 | 2026-05-04 | F2.5 subsection split into F2.5a (top-level Nano core) + F2.5b (golden vector harness). F2.4 marked DONE. F2 total ~370 hours. Current Status updated to F2.5a spec closed. |

@@ -107,6 +107,57 @@ $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
 $(PWD)/../fpga/cilcpu_a7lite_top.v"
 
+# hu: F2.7 Sub4 — board-szintű wrapper smoke tesztek (`cilcpu_a7lite_board`).
+#     A board.v a `cilcpu_a7lite_top` köré rakja a STARTUPE2-t és IOBUF-okat.
+#     Verilator-hoz mellékelt sim stub fájlt is fordítjuk
+#     (`fpga/sim_stubs/xilinx_primitives_sim.v`), és a `+define+CILCPU_SIM_BOARD`
+#     makróval a board.v split debug portokat expose-ol az inout helyett
+#     (multi-driver konfliktust elkerülve).
+# en: F2.7 Sub4 — board-level wrapper smoke tests (`cilcpu_a7lite_board`).
+#     board.v wraps STARTUPE2 + IOBUFs around `cilcpu_a7lite_top`. A
+#     Verilator sim stub file is compiled in
+#     (`fpga/sim_stubs/xilinx_primitives_sim.v`), and `+define+CILCPU_SIM_BOARD`
+#     makes board.v expose split debug ports instead of an inout bus
+#     (sidesteps multi-driver conflicts).
+test_a7lite_board:
+	$(SUBMAKE) MODULE=test_a7lite_board TOPLEVEL=cilcpu_a7lite_board \
+		LOCAL_COMPILE_ARGS="-GDEBOUNCE_BITS=4 -GCLOCKS_PER_BAUD=8 -GBOOT_ARG_VALUE=5 -DCILCPU_SIM_BOARD" \
+		VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/../fpga/uart_tx.v \
+$(PWD)/../fpga/decimal_printer.v \
+$(PWD)/../fpga/cilcpu_a7lite_top.v \
+$(PWD)/../fpga/cilcpu_a7lite_board.v \
+$(PWD)/../fpga/sim_stubs/xilinx_primitives_sim.v"
+
+# hu: F2.7 Sub4 — board-szintű Fibonacci(20) end-to-end teszt. Ugyanaz a
+#     toolchain mint a `test_a7lite_fib`, de a board wrapper-en át (STARTUPE2
+#     CCLK + IOBUF DQ stubokkal). Bizonyítja, hogy a board.v szintű hozzáadás
+#     nem regresszió.
+# en: F2.7 Sub4 — board-level Fibonacci(20) end-to-end test. Same toolchain
+#     as `test_a7lite_fib` but routed through the board wrapper (STARTUPE2
+#     CCLK + IOBUF DQ stubs). Proves the board.v layer is not a regression.
+test_a7lite_board_fib:
+	$(SUBMAKE) MODULE=test_a7lite_board_fib TOPLEVEL=cilcpu_a7lite_board \
+		LOCAL_COMPILE_ARGS="-GDEBOUNCE_BITS=4 -GCLOCKS_PER_BAUD=8 -GBOOT_ARG_VALUE=20 -GBOOT_LOCAL_COUNT=4 -DCILCPU_SIM_BOARD" \
+		VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/../fpga/uart_tx.v \
+$(PWD)/../fpga/decimal_printer.v \
+$(PWD)/../fpga/cilcpu_a7lite_top.v \
+$(PWD)/../fpga/cilcpu_a7lite_board.v \
+$(PWD)/../fpga/sim_stubs/xilinx_primitives_sim.v"
+
 # hu: F2.7 Sub2 — UART transmitter standalone teszt.
 #     CLOCKS_PER_BAUD=8 a sim-ben (FPGA default: 434 = 50 MHz / 115200 baud).
 # en: F2.7 Sub2 — standalone UART transmitter test.
@@ -125,4 +176,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
