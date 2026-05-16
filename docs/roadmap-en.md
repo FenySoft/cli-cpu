@@ -6,7 +6,7 @@ status: living
 
 > Magyar verzió: [roadmap-hu.md](roadmap-hu.md)
 
-> Version: 1.4
+> Version: 1.6
 
 The CLI-CPU project is built in **seven phases**, from the specification document to the first working, hand-held silicon and beyond, to a full ECMA-335 CIL implementation.
 
@@ -519,7 +519,7 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | — F2.5b | Golden vector harness | ~25 | | ✅ DONE (Phase 1+2: C# trace API + JSONL + Runner --trace + cocotb harness — 172 xUnit + 51 cocotb green) |
 | — F2.6 | Yosys synthesis (Sky130) | ~30 | | ⬜ Planned |
 | — F2.7 | FPGA validation (A7-Lite) | ~45 | | 🔧 In progress (Sub1+Sub2+Sub3+Sub4 ✅: wrapper + UART + Fibonacci(20)→"6765\r\n" end-to-end + STARTUPE2/IOBUF board.v; Sub5 ⬜) |
-| — F2.7.D | Debug — recursive CALL/RET root-frame teardown bug fix | ~10 | | ⬜ Planned (Sub5 frame manager; iterative workaround in Sub3) |
+| — F2.7.D | Debug — recursive CALL/RET caller eval depth preservation (root fix) | ~10 | ~10 | ✅ DONE (flush to SRAM + eval depth in header reserved field + RET SPFILL cache refill; test_core 49/49 + 3 new stack_cache unit tests; regression: `test_52c` Fib(10)=55 recursive Roslyn) |
 | **F3** | Tiny Tapeout submission (1 Nano + Mailbox, bring-up board) | ~220 | ~1.4 | ⬜ Planned |
 | **F4** | Multi-core Cognitive Fabric on FPGA (4× Nano, router, sleep/wake) | ~360 | ~2.3 | ⬜ Planned |
 | **F5** | Rich core + heterogeneous system (full CIL, GC, FPU, source gen.) | ~720 | ~4.5 | ⬜ Planned |
@@ -653,7 +653,7 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 - **Sub3:** `Math.FibonacciIterative(int)` added to `samples/PureMath/Math.cs`; the C# Runner links it to a 40-byte CIL-T0 binary; `test_a7lite_fib.py` loads it into the cocotb flash slave, presses KEY2, and asserts UART output `"6765\r\n"`. 1/1 PASS at ~1.13 ms sim time. Wrapper parameters changed to `parameter integer` (32-bit) so the Verilator `-G` override doesn't throw WIDTHTRUNC.
 - **Sub4:** new board-level top wrapper `rtl/fpga/cilcpu_a7lite_board.v` with **STARTUPE2** primitive (drives the CCLK pin in user mode — the physical CCLK lives in the dedicated config bank and is unreachable from regular GPIO) and four **IOBUF** primitives (DQ[3:0] inout bus). A `+define+CILCPU_SIM_BOARD` macro switches to split debug ports for Verilator (sidesteps the IOBUF tri-state multi-driver conflict on `assign IO = T ? 'bz : I`). New sim stub file `rtl/fpga/sim_stubs/xilinx_primitives_sim.v` (behavioral STARTUPE2 + IOBUF for Verilator instead of Xilinx 'unisims'). XDC updated: top module → `cilcpu_a7lite_board`, pins `o_qspi_cs_n` (T19) + `io_qspi_dq[0..3]` (P22, R22, P21, R21); CCLK NOT in XDC (STARTUPE2 drives it). `create_generated_clock` for `qspi_sck` (sys_clk / 2 = 25 MHz) + datasheet-derived `set_input_delay` / `set_output_delay` (refined in Sub5). **5 new cocotb tests green**: `test_a7lite_board.py` 4/4 (reset, LDARG+RET UART, LDARG+ADD halt, INVALID_OPCODE trap UART) + `test_a7lite_board_fib.py` 1/1 (FibonacciIterative(20) = 6765 end-to-end through board.v).
 
-**Ismert bug — rekurzív Math.Fibonacci (separate task: F2.7.D):** The *recursive* Roslyn-linked `Math.Fibonacci` traps with `TRAP_STACK_UNDERFLOW` at ~5 depth using the wrapper boot pattern (no caller frame, `boot_pc=8` directly at the Fib body). The hand-coded `test_52_call_recursive_fib_5` (with caller frame) is green; `TCpuNano` C# sim also returns the correct Fib(10)=55. The bug is in the `cilcpu_core.v` Sub5 frame manager teardown logic when the "root frame" was not created by CALL. **Sub3 uses the iterative workaround**; root-cause fix lives in **F2.7.D** (~10 h debug sprint; Vault: `project_recursive_call_bug`).
+**F2.7.D DONE — recursive Math.Fibonacci root fix (2026-05-16):** The *recursive* Roslyn-linked `Math.Fibonacci` with the wrapper boot pattern (no caller frame, `boot_pc=8`) previously trapped with `TRAP_STACK_UNDERFLOW` because the Sub5 frame manager did not preserve the caller eval depth across CALL/RET (the CORE_SPEC "F2.5a simplification"). **Root cause:** `RET_FINALIZE` reset the caller Stack Cache to the eval *base*, discarding eval elements that must survive a call (e.g. `Fib(n-1)` while computing `Fib(n-2)`); the 4-deep TOS cache hid it for a few levels (Fib(5) green, Fib(10) failed at d≥5). **Fix (3 modules):** Stack Cache `flush_en`+`ST_FLUSH` (caller eval to SRAM), `sp_depth`+`ST_SPFILL` (reload top min(D,4) held elements into the cache, maintaining the `cache_count=min(depth,4)` invariant the ALU `tos`/`tos1` require); core `ST_CALL` places FP_new above the held elements + saves `D` into the header reserved field, `ST_RET` restores with `D`. **Regression:** test_core 49/49, test_stack_cache 28/28, wrapper/board all green; new permanent test `test_52c_recursive_fib10_roslyn_boot_no_caller` (Fib(10)=55). The Sub3 iterative demo (`FibonacciIterative`) remains green and is kept as the Sub3 acceptance. CORE_SPEC v1.5. Vault: `Bug-Debug-Log/2026-05-15-recursive-call-eval-depth-loss`.
 
 **Next substantive step:** **F2.7 Sub5** — Vivado / OpenXC7 build with board.v, `write_cfgmem` flow for the IS25L128F, 50 MHz timing closure (tightening Sub4 constraints), and real A7-Lite bring-up with a UART terminal over CH340.
 
@@ -710,6 +710,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.6 | 2026-05-16 | **F2.7.D DONE** — recursive CALL/RET caller eval depth preservation root fix (flush to SRAM + eval depth in header reserved field + RET SPFILL cache refill, 3 modules: `cilcpu_stack_cache.v` + `cilcpu_core.v`). The former "F2.5a simplification" (project_recursive_call_bug, `TRAP_STACK_UNDERFLOW` on recursive Fibonacci) is resolved. test_core 49/49, test_stack_cache 28/28 (3 new unit tests), wrapper/board all green, new regression `test_52c` (Fib(10)=55). CORE_SPEC v1.5. Work-hours table + Current Status updated. |
 | 1.5 | 2026-05-14 | F2.7 Sub1..Sub4 DONE — board-level top wrapper (`cilcpu_a7lite_board.v`) STARTUPE2 + 4× IOBUF wrapped around `cilcpu_a7lite_top`; sim stub file for Xilinx primitives; XDC updated with QSPI flash pins (T19, P22, R22, P21, R21) + `qspi_sck` generated clock. **5 new cocotb tests green** (4 smoke + 1 Fibonacci e2e through board.v). Current Status, Estimated Work Hours table updated. |
 | 1.5.1 | 2026-05-15 | Doc consistency: highlighted "Execution order ≠ numbering" block added to the F2 phase header (canonical place for the F2.7→F2.6→F3 order + NLnet M1 anchor rationale). No renumbering — the git commit history is immutable. |
 | 1.4 | 2026-05-04 | F2.5a Devil's Advocate final-audit gap fixes: Sub4 INVALID_BRANCH (negative target) + Sub2 OVERFLOW test + Sub5 deferral explicit doc. 43 cocotb tests green (41 + 2 new), 9/13 trap codes covered, 0 Verilator warning. CORE_SPEC bumped to v1.3. Current Status, Estimated Work Hours table updated. |

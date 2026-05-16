@@ -5,6 +5,10 @@
 #     reset, boot, LDC + RET smoke. Golden reference: TCpuNano (src/CilCpu.Sim).
 #     Spec: rtl/src/CORE_SPEC-{hu,en}.md.
 
+import os
+import subprocess
+import tempfile
+
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge, Timer
@@ -1093,6 +1097,103 @@ async def test_52_call_recursive_fib_5(dut):
     assert halt == 1, \
         f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
     assert rv == 5, f"return_value = {rv}, expected 5 (fib(5))"
+
+
+# ============================================================
+# hu: F2.7.D regressziós teszt — Roslyn-linkelt REKURZÍV
+#     Math.Fibonacci a wrapper boot-mintájával (caller frame nélkül,
+#     boot_pc = method body). Korábban (project_recursive_call_bug)
+#     TRAP_STACK_UNDERFLOW-val bukott, mert a Sub5 frame manager nem
+#     őrizte meg a caller eval depth-jét CALL/RET között. A gyökér-fix
+#     (flush SRAM-ba + eval depth a header reserved mezőjében + RET
+#     SPFILL cache-újratöltés) után helyesen Fib(10) = 55.
+# en: F2.7.D regression test — Roslyn-linked RECURSIVE Math.Fibonacci
+#     with the wrapper boot pattern. Previously trapped (caller eval
+#     depth not preserved across CALL/RET); after the root fix it
+#     correctly returns Fib(10) = 55.
+# ============================================================
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.abspath(os.path.join(_THIS_DIR, "..", ".."))
+_RUNNER_DLL = os.path.join(
+    _REPO_ROOT, "src", "CilCpu.Sim.Runner", "bin", "Debug", "net10.0",
+    "CilCpu.Sim.Runner.dll",
+)
+_PUREMATH_DLL = os.path.join(
+    _REPO_ROOT, "samples", "PureMath", "bin", "Debug", "net10.0",
+    "PureMath.dll",
+)
+
+
+def _link_math_method(method_name):
+    """hu: A `Math.<method_name>` C# metódust CIL-T0 binárissá linkeli
+        a Runner-rel, és visszaadja (code_bytes, arg_count, local_count)-ot
+        a 8-byte fejlécből kiolvasva.
+    en: Links `Math.<method_name>` to a CIL-T0 binary via the Runner,
+        returns (code_bytes, arg_count, local_count) parsed from the
+        8-byte header."""
+    if not os.path.exists(_RUNNER_DLL):
+        raise FileNotFoundError(
+            f"Runner DLL not found: {_RUNNER_DLL}\nRun 'dotnet build' first."
+        )
+    if not os.path.exists(_PUREMATH_DLL):
+        raise FileNotFoundError(
+            f"PureMath DLL not found: {_PUREMATH_DLL}\n"
+            "Run 'dotnet build samples/PureMath/PureMath.csproj' first."
+        )
+
+    out_fd, out_path = tempfile.mkstemp(suffix=".t0")
+    os.close(out_fd)
+    cmd = [
+        "dotnet", _RUNNER_DLL, "link", _PUREMATH_DLL,
+        "--class", "Math", "--method", method_name, "-o", out_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        os.unlink(out_path)
+        raise RuntimeError(
+            f"Runner link failed (exit={result.returncode}):\n"
+            f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+    with open(out_path, "rb") as f:
+        code_bytes = f.read()
+    os.unlink(out_path)
+
+    assert code_bytes[0] == 0xFE, \
+        f"bad method header magic: 0x{code_bytes[0]:02X} (expected 0xFE)"
+    arg_count = code_bytes[1]
+    local_count = code_bytes[2]
+    return code_bytes, arg_count, local_count
+
+
+@cocotb.test()
+async def test_52c_recursive_fib10_roslyn_boot_no_caller(dut):
+    """hu: F2.7.D regresszió — a Roslyn-fordított REKURZÍV
+        `Math.Fibonacci(10)` a wrapper boot-mintájával futtatva
+        (boot_pc=8, a Fib body közvetlenül; NINCS caller frame).
+        Fib(10) = 55, halt. A caller eval depth megőrzése CALL/RET
+        között (flush + header reserved + SPFILL) biztosítja a
+        helyes rekurzív kombinációt.
+    en: F2.7.D regression — Roslyn-compiled RECURSIVE
+        `Math.Fibonacci(10)` with the wrapper boot pattern
+        (boot_pc=8, Fib body directly; NO caller frame).
+        Fib(10) = 55, halt — caller eval depth preserved across
+        CALL/RET (flush + header reserved + SPFILL)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    code_bytes, arg_count, local_count = _link_math_method("Fibonacci")
+    assert arg_count == 1, f"expected arg_count=1, got {arg_count}"
+
+    rv, tc, halt, trap, pc = await boot_and_run(
+        dut, code_bytes, boot_pc=8, args=[10],
+        locals_count=local_count, max_cycles=2_000_000,
+    )
+    assert halt == 1, (
+        f"core didn't halt — trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X} "
+        f"(project_recursive_call_bug: Sub5 teardown a boot-kontextusú "
+        f"root frame-en)"
+    )
+    assert rv == 55, f"return_value = {rv}, expected 55 (Fibonacci(10))"
 
 
 @cocotb.test()

@@ -68,6 +68,13 @@ module cilcpu_core (
     localparam [3:0] CALL_HDR_WR_AL    = 4'd8;
     localparam [3:0] CALL_LOCAL_ZERO   = 4'd9;
     localparam [3:0] CALL_FINALIZE     = 4'd10;
+    // hu: F2.7.D — új sub-state-ek. A CALL_ARG_POP_* (3/4/5) szemantikája
+    //     megváltozott: NEM cache-pop, hanem SRAM→SRAM arg-másolás a flush
+    //     UTÁN (a caller eval ekkor már teljesen SRAM-ban van).
+    // en: F2.7.D — new sub-states. CALL_ARG_POP_* (3/4/5) repurposed:
+    //     SRAM→SRAM arg copy AFTER flush (caller eval fully in SRAM).
+    localparam [3:0] CALL_FLUSH        = 4'd11;
+    localparam [3:0] CALL_SAVE_D       = 4'd12;
 
     // hu: Sub5 — ST_RET sub-states (frame pop szekvencia)
     // en: Sub5 — ST_RET sub-states (frame pop sequence)
@@ -80,6 +87,11 @@ module cilcpu_core (
     localparam [3:0] RET_LATCH_AL   = 4'd6;
     localparam [3:0] RET_FINALIZE   = 4'd7;
     localparam [3:0] RET_PUSH_RV    = 4'd8;
+    // hu: F2.7.D — 1-ciklus bridge a sp_load → ST_SPFILL beindulásáig,
+    //     hogy a RET_PUSH_RV !w_sc_busy őre érvényes legyen.
+    // en: F2.7.D — 1-cycle bridge so the SC enters ST_SPFILL before the
+    //     RET_PUSH_RV !w_sc_busy guard is evaluated.
+    localparam [3:0] RET_WAIT_SPFILL = 4'd9;
 
     // hu: Boot szekvencia alállapotok
     // en: Boot sequence sub-states
@@ -126,6 +138,16 @@ module cilcpu_core (
     reg  [13:0] r_callee_old_fp;       // RET: a callee r_fp-je (felszabadításhoz)
     reg  [23:0] r_ret_return_pc;       // RET: visszatérési PC (header [FP+0]-ból)
     reg  [13:0] r_ret_prev_fp;         // RET: caller FP (header [FP+4]-ből)
+    // hu: F2.7.D — caller eval depth megőrzés CALL/RET között.
+    //     r_call_total_depth: caller eval mélység a CALL pillanatában
+    //       (args-szal együtt), w_sc_depth-ből latch-elve.
+    //     r_caller_eval_d: a megőrzendő held eval depth = total - new_arg.
+    //       CALL-kor a caller header [FP+8] bits[22:16]-ba mentve.
+    //     r_ret_caller_d: RET-kor a [prev_fp+8][22:16]-ból visszaolvasva.
+    // en: F2.7.D — caller eval depth preservation across CALL/RET.
+    reg  [6:0]  r_call_total_depth;
+    reg  [6:0]  r_caller_eval_d;
+    reg  [6:0]  r_ret_caller_d;
 
     // hu: Fetch buffer (8 byte, packed FIFO). A packed register a Verilator
     //     non-blocking assignment-jén megbízhatóbb mint a reg array
@@ -272,6 +294,8 @@ module cilcpu_core (
     // ============================================================
     reg         r_sc_sp_load;
     reg  [13:0] r_sc_sp_init;
+    reg  [6:0]  r_sc_sp_depth;        // F2.7.D — sp_load eval depth (RET restore)
+    reg         r_sc_flush;           // F2.7.D — cache flush SRAM-ba (CALL előtt)
     reg         r_sc_push_en;
     reg  [31:0] r_sc_push_data;
     reg         r_sc_pop_en;
@@ -301,12 +325,15 @@ module cilcpu_core (
     wire        w_sc_sram_re;
     wire [31:0] w_sc_sram_rdata;
     wire        w_sc_sram_ready;
+    wire [2:0]  w_sc_cc;              // F2.7.D — cache_count (flush done detektálás)
 
     cilcpu_stack_cache u_stack_cache (
         .clk              (clk),
         .rst_n            (rst_n),
         .sp_load          (r_sc_sp_load),
         .sp_init          (r_sc_sp_init),
+        .sp_depth         (r_sc_sp_depth),
+        .flush_en         (r_sc_flush),
         .push_en          (r_sc_push_en),
         .push_data        (r_sc_push_data),
         .pop_en           (r_sc_pop_en),
@@ -320,7 +347,7 @@ module cilcpu_core (
         .tos1             (w_sc_tos1),
         .pop_data         (w_sc_pop_data),
         .depth            (w_sc_depth),
-        .cache_count      (),
+        .cache_count      (w_sc_cc),
         .busy             (w_sc_busy),
         .ready            (w_sc_ready),
         .trap             (w_sc_trap),
@@ -556,6 +583,8 @@ module cilcpu_core (
             r_sram_rdata_latched <= 32'd0;
             r_sc_sp_load     <= 1'b0;
             r_sc_sp_init     <= 14'd0;
+            r_sc_sp_depth    <= 7'd0;
+            r_sc_flush       <= 1'b0;
             r_sc_push_en     <= 1'b0;
             r_sc_push_data   <= 32'd0;
             r_sc_pop_en      <= 1'b0;
@@ -580,6 +609,9 @@ module cilcpu_core (
             r_callee_old_fp       <= 14'd0;
             r_ret_return_pc       <= 24'd0;
             r_ret_prev_fp         <= 14'd0;
+            r_call_total_depth    <= 7'd0;
+            r_caller_eval_d       <= 7'd0;
+            r_ret_caller_d        <= 7'd0;
             o_halt           <= 1'b0;
             o_trap           <= 1'b0;
             o_trap_code      <= 8'd0;
@@ -595,6 +627,7 @@ module cilcpu_core (
             r_sram_we        <= 1'b0;
             r_sram_re        <= 1'b0;
             r_sc_sp_load        <= 1'b0;
+            r_sc_flush          <= 1'b0;
             r_sc_push_en        <= 1'b0;
             r_sc_pop_en         <= 1'b0;
             r_sc_replace_top_en <= 1'b0;
@@ -727,11 +760,13 @@ module cilcpu_core (
                         r_sp <= 14'd12
                                 + {7'd0, r_arg_count, 2'd0}
                                 + {7'd0, r_local_count, 2'd0};
-                        // hu: Stack Cache reset az új SP-re
+                        // hu: Stack Cache reset az új SP-re (boot: üres eval)
+                        // en: Stack Cache reset to new SP (boot: empty eval)
                         r_sc_sp_load <= 1'b1;
                         r_sc_sp_init <= 14'd12
                                         + {7'd0, r_arg_count, 2'd0}
                                         + {7'd0, r_local_count, 2'd0};
+                        r_sc_sp_depth <= 7'd0;
                         r_state    <= ST_FETCH;
                         r_fetch_count <= 4'd0;
                         r_fetch_pc <= r_pc;
@@ -1144,7 +1179,15 @@ module cilcpu_core (
                         //     start).
                         r_call_target_rva <= r_operand[23:0];
                         r_return_pc       <= r_pc + {21'd0, r_length};
-                        r_new_fp          <= r_sp;
+                        // hu: F2.7.D — FP_new a CALL_VALIDATE-ben dől el
+                        //     (kell hozzá a callee arg_count). A caller
+                        //     eval mélységét (args-szal) ITT latch-eljük,
+                        //     mielőtt bármi pop/flush történne.
+                        // en: F2.7.D — FP_new decided in CALL_VALIDATE
+                        //     (needs callee arg_count). Latch the caller
+                        //     eval depth (incl. args) HERE, before any
+                        //     pop/flush.
+                        r_call_total_depth <= w_sc_depth;
                         r_arg_pop_idx     <= 5'd0;
                         r_local_zero_idx  <= 5'd0;
                         r_call_sub        <= CALL_HDR_REQ;
@@ -1341,11 +1384,27 @@ module cilcpu_core (
                     end
 
                     CALL_VALIDATE: begin
-                        // hu: SRAM overflow check: r_sp + frame_size > 16384
-                        //     A 15-bit unsigned compare 14-bit r_sp + max
-                        //     frame_size (140 byte) eseteit kezeli.
-                        // en: SRAM overflow check: r_sp + frame_size > 16384.
+                        // hu: F2.7.D — D = total (args-szal) - callee arg.
+                        //     FP_new a caller eval TETEJE fölé (a held D
+                        //     elem fölé), NEM a caller eval bázisra, hogy a
+                        //     callee frame ne írja felül a megőrzött
+                        //     értékeket. caller_eval_base = r_sp.
+                        // en: F2.7.D — D = total (incl. args) - callee arg.
+                        //     FP_new ABOVE the caller's held eval, not at
+                        //     the eval base.
+                        r_caller_eval_d <= r_call_total_depth -
+                                           {2'd0, r_new_arg_count};
+                        r_new_fp        <= r_sp +
+                            {5'd0,
+                             (r_call_total_depth - {2'd0, r_new_arg_count}),
+                             2'd0};
+                        // hu: SRAM overflow: FP_new + frame_size > 16384.
+                        // en: SRAM overflow: FP_new + frame_size > 16384.
                         if ({1'b0, r_sp} +
+                            {1'b0,
+                             {5'd0,
+                              (r_call_total_depth - {2'd0, r_new_arg_count}),
+                              2'd0}} +
                             {1'b0, 14'd12} +
                             {8'd0, r_new_arg_count, 2'd0} +
                             {8'd0, r_new_local_count, 2'd0} > 15'h4000) begin
@@ -1353,44 +1412,65 @@ module cilcpu_core (
                             o_trap_code <= `TRAP_SRAM_OVERFLOW;
                             r_state     <= ST_TRAP;
                         end else begin
+                            r_call_sub <= CALL_FLUSH;
+                        end
+                    end
+
+                    CALL_FLUSH: begin
+                        // hu: F2.7.D — a caller TELJES eval stack-jét (cache
+                        //     + spilled) SRAM-ba ürítjük: a held elemek így
+                        //     biztonságosan SRAM-ban (FP_new alatt), a callee
+                        //     tiszta cache-sel indul. flush_en SZINTVEZÉRELT
+                        //     — tartjuk, míg cache_count==0 és !busy. Üres
+                        //     cache → azonnali no-op.
+                        // en: F2.7.D — flush caller's ENTIRE eval stack
+                        //     (cache + spilled) to SRAM; preserved items end
+                        //     up in SRAM below FP_new, callee starts clean.
+                        //     flush_en level-held until cache_count==0 &&
+                        //     !busy. Empty cache → immediate no-op.
+                        if (w_sc_cc == 3'd0 && !w_sc_busy) begin
                             r_call_sub <= CALL_ARG_POP_REQ;
+                        end else begin
+                            r_sc_flush <= 1'b1;
                         end
                     end
 
                     CALL_ARG_POP_REQ: begin
-                        // hu: Args reverse-pop: első pop = TOS = arg[N-1],
-                        //     második = arg[N-2], stb. Ha minden arg pop-olva,
-                        //     a header write fázisra megyünk.
-                        // en: Args reverse-pop: first pop = TOS = arg[N-1],
-                        //     second = arg[N-2], etc.
+                        // hu: F2.7.D — args SRAM→SRAM másolás a flush UTÁN.
+                        //     SRAM[FP_new + j*4] = arg j (j=0..N-1). Cél:
+                        //     callee slot [FP_new+12 + j*4]. j = N-1-idx
+                        //     (csökkenő) — a dst=src+12 felülírás és a
+                        //     header-írás így nem ütközik.
+                        // en: F2.7.D — SRAM→SRAM arg copy AFTER flush.
+                        //     SRAM[FP_new + j*4] → callee slot
+                        //     [FP_new+12 + j*4]. j descending avoids clobber.
                         if (r_arg_pop_idx >= r_new_arg_count) begin
                             r_call_sub <= CALL_HDR_WR_RPC;
-                        end else if (!w_sc_busy) begin
-                            r_sc_pop_en <= 1'b1;
+                        end else begin
+                            r_sram_addr <= r_new_fp +
+                                {7'd0,
+                                 (r_new_arg_count - 5'd1 - r_arg_pop_idx),
+                                 2'd0};
+                            r_sram_re   <= 1'b1;
                             r_call_sub  <= CALL_ARG_POP_WAIT;
                         end
                     end
 
                     CALL_ARG_POP_WAIT: begin
-                        // hu: Stack Cache pop_data 1-cycle regisztrált.
-                        //     A spill miatt busy lehet — várjuk a !busy-t,
-                        //     aztán biztonságosan írhatunk az SRAM-ba.
-                        // en: Stack Cache registered pop_data; wait for
-                        //     !busy (potential spill) before SRAM write.
-                        if (!w_sc_busy) begin
-                            r_call_sub <= CALL_ARG_POP_WR;
-                        end
+                        // hu: SRAM read 2-ciklus latencia (bridge).
+                        // en: SRAM read 2-cycle latency (bridge).
+                        r_call_sub <= CALL_ARG_POP_WR;
                     end
 
                     CALL_ARG_POP_WR: begin
-                        // hu: SRAM write a frame megfelelő arg slot-jára.
-                        //     Cím = FP_new + 12 + (N-1-pop_idx)*4
-                        // en: SRAM write to the frame's arg slot.
+                        // hu: r_sram_rdata_latched = arg j → callee slot.
+                        //     Cím = FP_new + 12 + (N-1-idx)*4.
+                        // en: r_sram_rdata_latched = arg j → callee slot.
                         r_sram_addr  <= r_new_fp + 14'd12 +
                                         {7'd0,
                                          (r_new_arg_count - 5'd1 - r_arg_pop_idx),
                                          2'd0};
-                        r_sram_wdata <= w_sc_pop_data;
+                        r_sram_wdata <= r_sram_rdata_latched;
                         r_sram_we    <= 1'b1;
                         r_arg_pop_idx <= r_arg_pop_idx + 5'd1;
                         r_call_sub    <= CALL_ARG_POP_REQ;
@@ -1415,6 +1495,24 @@ module cilcpu_core (
                         r_sram_wdata <= {16'd0,
                                          3'd0, r_new_local_count,
                                          3'd0, r_new_arg_count};
+                        r_sram_we    <= 1'b1;
+                        r_call_sub   <= CALL_SAVE_D;
+                    end
+
+                    CALL_SAVE_D: begin
+                        // hu: F2.7.D — a CALLER header [r_fp+8] reserved
+                        //     bitjeibe ([22:16]) mentjük a megőrzött eval
+                        //     depth-et (D). RET-kor innen olvassuk vissza.
+                        //     A caller arg/local count alsó bitjei
+                        //     változatlanok (r_fp még a caller-é).
+                        // en: F2.7.D — save preserved eval depth D into the
+                        //     CALLER header [r_fp+8] reserved bits [22:16].
+                        //     RET reads it back. Caller arg/local low bits
+                        //     unchanged (r_fp still the caller's).
+                        r_sram_addr  <= r_fp + 14'd8;
+                        r_sram_wdata <= {9'd0, r_caller_eval_d,
+                                         3'd0, r_local_count,
+                                         3'd0, r_arg_count};
                         r_sram_we    <= 1'b1;
                         if (r_new_local_count > 5'd0) begin
                             r_local_zero_idx <= 5'd0;
@@ -1459,6 +1557,9 @@ module cilcpu_core (
                         r_sc_sp_init <= r_new_fp + 14'd12 +
                                         {7'd0, r_new_arg_count, 2'd0} +
                                         {7'd0, r_new_local_count, 2'd0};
+                        // hu: F2.7.D — a callee üres eval-lal indul.
+                        // en: F2.7.D — callee starts with empty eval.
+                        r_sc_sp_depth <= 7'd0;
                         r_state <= ST_FETCH;
                     end
 
@@ -1534,11 +1635,16 @@ module cilcpu_core (
 
                     RET_LATCH_AL: begin
                         // hu: byte 0 = arg_count, byte 1 = local_count
-                        //     ([FP+8] formátum: {0, local_count, arg_count}).
+                        //     ([FP+8]: {reserved, local_count, arg_count}).
+                        //     F2.7.D — bits[22:16] = a CALL-kor mentett
+                        //     caller eval depth (D), visszaolvasva.
                         // en: byte 0 = arg_count, byte 1 = local_count.
-                        r_arg_count   <= r_sram_rdata_latched[4:0];
-                        r_local_count <= r_sram_rdata_latched[12:8];
-                        r_ret_sub     <= RET_FINALIZE;
+                        //     F2.7.D — bits[22:16] = caller eval depth (D)
+                        //     saved at CALL, read back here.
+                        r_arg_count    <= r_sram_rdata_latched[4:0];
+                        r_local_count  <= r_sram_rdata_latched[12:8];
+                        r_ret_caller_d <= r_sram_rdata_latched[22:16];
+                        r_ret_sub      <= RET_FINALIZE;
                     end
 
                     RET_FINALIZE: begin
@@ -1552,33 +1658,61 @@ module cilcpu_core (
                         //     Callee SRAM region freed.
                         r_pc          <= r_ret_return_pc;
                         r_fp          <= r_ret_prev_fp;
-                        r_sp          <= r_callee_old_fp;
+                        // hu: F2.7.D — r_sp a caller eval BÁZISA (a frame
+                        //     eval-pointer regiszter), NEM a callee old fp.
+                        // en: F2.7.D — r_sp = caller eval BASE (frame eval
+                        //     pointer), not the callee old fp.
+                        r_sp          <= r_ret_prev_fp + 14'd12 +
+                                         {7'd0, r_arg_count, 2'd0} +
+                                         {7'd0, r_local_count, 2'd0};
                         r_call_depth  <= r_call_depth - 10'd1;
                         r_fetch_count <= 4'd0;
                         r_fetch_pc    <= r_ret_return_pc;
                         r_next_fetch_addr <= r_ret_return_pc;
                         r_qspi_inflight <= 1'b0;
-                        // hu: Stack Cache reset a caller eval bázisra. A
-                        //     return value push-ja külön ciklusban (RET_PUSH_RV),
-                        //     mert a sp_load és push_en egyszerre nem.
-                        // en: Stack Cache reset to caller eval base. Return
-                        //     value push runs in a separate cycle because
-                        //     sp_load and push_en don't combine.
+                        // hu: F2.7.D — Stack Cache a caller eval bázisra,
+                        //     a megőrzött eval depth-tel (D). A held elemek
+                        //     az SRAM-ban [base .. base+D*4) — a Stack Cache
+                        //     onnan tölti vissza pop-kor. A return value
+                        //     push külön ciklusban (RET_PUSH_RV).
+                        // en: F2.7.D — Stack Cache to caller eval base WITH
+                        //     the preserved eval depth (D). Held items live
+                        //     in SRAM [base .. base+D*4); the cache fills
+                        //     them back on pop. RV push in a separate cycle.
                         r_sc_sp_load <= 1'b1;
                         r_sc_sp_init <= r_ret_prev_fp + 14'd12 +
                                         {7'd0, r_arg_count, 2'd0} +
                                         {7'd0, r_local_count, 2'd0};
+                        r_sc_sp_depth <= r_ret_caller_d;
+                        r_ret_sub <= RET_WAIT_SPFILL;
+                    end
+
+                    RET_WAIT_SPFILL: begin
+                        // hu: 1-ciklus bridge: a sp_load-ot a Stack Cache
+                        //     ebben a ciklusban dolgozza fel; ST_SPFILL a
+                        //     KÖVETKEZŐ ciklusban indul (busy=1). A
+                        //     RET_PUSH_RV !w_sc_busy őre így érvényes.
+                        // en: 1-cycle bridge: SC processes sp_load this
+                        //     cycle; ST_SPFILL starts NEXT cycle (busy=1),
+                        //     so the RET_PUSH_RV !w_sc_busy guard is valid.
                         r_ret_sub <= RET_PUSH_RV;
                     end
 
                     RET_PUSH_RV: begin
-                        // hu: A return value push a Stack Cache-be a
-                        //     caller eval stack-jére, és ST_FETCH-re megyünk.
-                        // en: Push return value to Stack Cache (caller eval
-                        //     stack), transition to ST_FETCH.
-                        r_sc_push_en   <= 1'b1;
-                        r_sc_push_data <= r_ret_value;
-                        r_state        <= ST_FETCH;
+                        // hu: F2.7.D — várjuk az ST_SPFILL befejezését
+                        //     (a caller held eval cache-újratöltése a
+                        //     sp_load(depth) hatására), MIELŐTT push-olunk.
+                        //     A return value push a caller eval tetejére,
+                        //     majd ST_FETCH.
+                        // en: F2.7.D — wait for ST_SPFILL to finish (the
+                        //     caller held-eval cache refill from
+                        //     sp_load(depth)) BEFORE pushing the return
+                        //     value, then ST_FETCH.
+                        if (!w_sc_busy) begin
+                            r_sc_push_en   <= 1'b1;
+                            r_sc_push_data <= r_ret_value;
+                            r_state        <= ST_FETCH;
+                        end
                     end
 
                     default: begin

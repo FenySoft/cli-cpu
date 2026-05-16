@@ -38,10 +38,26 @@ module cilcpu_stack_cache (
     input  wire        clk,
     input  wire        rst_n,
 
-    // hu: SP betöltés (frame setup)
-    // en: SP load (frame setup)
+    // hu: SP betöltés (frame setup). sp_depth = a betöltendő frame eval
+    //     mélysége szóban (RET-kor a caller megőrzött eval depth-je; CALL /
+    //     boot esetén 0 = üres eval). sp_load ÜRÍTI a cache-t (cache_count
+    //     <= 0) — a megőrzendő elemek az SRAM-ban élnek (lásd flush_en).
+    // en: SP load (frame setup). sp_depth = the loaded frame's eval depth
+    //     in words (the caller's preserved eval depth on RET; 0 = empty
+    //     eval for CALL / boot). sp_load CLEARS the cache (cache_count <=
+    //     0) — preserved items live in SRAM (see flush_en).
     input  wire        sp_load,
     input  wire [13:0] sp_init,
+    input  wire [6:0]  sp_depth,
+
+    // hu: Cache flush SRAM-ba (CALL előtt): minden cache-elt elemet
+    //     kiír az SRAM-ba (a legmélyebb a legalacsonyabb címre),
+    //     r_sp-t feljebb lépteti, cache_count <= 0. A `depth` invariáns
+    //     a flush alatt (cache→SRAM transzfer).
+    // en: Flush cache to SRAM (before CALL): writes every cached entry
+    //     to SRAM (deepest at the lowest address), advances r_sp, sets
+    //     cache_count <= 0. `depth` is invariant across the flush.
+    input  wire        flush_en,
 
     // hu: Stack műveletek
     // en: Stack operations
@@ -103,6 +119,18 @@ module cilcpu_stack_cache (
     reg [31:0] r_pop_data;                    // hu: Pop eredmény (FILL esetén belső SRAM-ból)
     reg [31:0] r_spill_push_data;             // hu: SPILL elején regisztrált push_data/dup_data
     reg [31:0] r_fill_replace_data;           // hu: FILL_REPLACE elején regisztrált adat
+    // hu: F2.7.D — sp_load(depth>0) cache-újratöltés (RET restore).
+    //     A design invariánsa: cache_count = min(depth,4) — az ALU
+    //     2-operandus opjai a tos/tos1 cache-only kimeneteket olvassák,
+    //     ezért a top min(D,4) held elemet SRAM-ból a cache-be kell
+    //     tölteni. r_spfill_k = hányadik elem; r_spfill_d = D.
+    // en: F2.7.D — sp_load(depth>0) cache refill (RET restore).
+    //     Invariant: cache_count = min(depth,4) — ALU 2-operand ops read
+    //     the cache-only tos/tos1, so the top min(D,4) held elements must
+    //     be loaded from SRAM into the cache.
+    reg [2:0]  r_spfill_k;
+    reg [6:0]  r_spfill_d;
+    reg        r_spfill_ph;                   // 0 = read bridge, 1 = latch
 
     reg        r_trap;                        // hu: Trap flag (regisztrált, self-clearing)
     reg [7:0]  r_trap_code;                   // hu: Trap kód (regisztrált)
@@ -122,6 +150,32 @@ module cilcpu_stack_cache (
     localparam [2:0] ST_FILL_DUP     = 3'd3;
     localparam [2:0] ST_FILL_SWAP    = 3'd4;
     localparam [2:0] ST_FILL_REPLACE = 3'd5;
+    localparam [2:0] ST_FLUSH        = 3'd6;
+    localparam [2:0] ST_SPFILL       = 3'd7;
+
+    // hu: A betöltendő cache-elemszám: min(sp_depth, 4).
+    // en: Cache fill count: min(sp_depth, 4).
+    wire [2:0] w_spfill_cnt =
+        (r_spfill_d >= 7'd4) ? 3'd4 : r_spfill_d[2:0];
+
+    // hu: Flush alatt a legmélyebb ÉRVÉNYES cache-elem kiválasztása.
+    //     cc=4→t3, cc=3→t2, cc=2→t1, cc=1→t0 (a legrégebbi cache-elt
+    //     elem megy a legalacsonyabb szabad SRAM címre = r_sp).
+    // en: Deepest VALID cache entry select during flush.
+    wire [31:0] w_flush_sel =
+        (r_cache_count == 3'd4) ? r_t3 :
+        (r_cache_count == 3'd3) ? r_t2 :
+        (r_cache_count == 3'd2) ? r_t1 :
+                                  r_t0;
+
+    // hu: A KÖVETKEZŐ flush-elem (a cache_count-1 melletti legmélyebb).
+    //     A cache NEM tolódik flush közben — indexelt kiválasztás.
+    // en: The NEXT flush entry (deepest for cache_count-1). The cache
+    //     does NOT shift during flush — indexed select.
+    wire [31:0] w_flush_next =
+        (r_cache_count == 3'd4) ? r_t2 :
+        (r_cache_count == 3'd3) ? r_t1 :
+                                  r_t0;
 
     // ============================================================
     // hu: Prioritás-kódolt műveletek dekódolása (IDLE-ban)
@@ -286,6 +340,9 @@ module cilcpu_stack_cache (
             r_pop_data          <= 32'h0;
             r_spill_push_data   <= 32'h0;
             r_fill_replace_data <= 32'h0;
+            r_spfill_k          <= 3'd0;
+            r_spfill_d          <= 7'd0;
+            r_spfill_ph         <= 1'b0;
             r_trap              <= 1'b0;
             r_trap_code         <= 8'h00;
             r_prev_busy         <= 1'b0;
@@ -315,11 +372,54 @@ module cilcpu_stack_cache (
                     r_sram_we <= 1'b0;
                     r_sram_re <= 1'b0;
 
-                    // hu: SP betöltés (frame setup)
-                    // en: SP load (frame setup)
+                    // hu: SP betöltés (frame setup). sp_init = új eval bázis,
+                    //     r_sp = bázis + sp_depth*4 (a megőrzött elemek az
+                    //     SRAM-ban élnek). A cache MINDIG ürül (cache_count
+                    //     <= 0) — CORE_SPEC: a callee tiszta cache-sel indul,
+                    //     a caller maradéka flush-olva van SRAM-ba.
+                    // en: SP load (frame setup). sp_init = new eval base,
+                    //     r_sp = base + sp_depth*4 (preserved items live in
+                    //     SRAM). Cache is ALWAYS cleared.
                     if (sp_load) begin
-                        r_sp      <= sp_init;
-                        r_sp_base <= sp_init;
+                        r_sp_base     <= sp_init;
+                        r_t0          <= 32'h0;
+                        r_t1          <= 32'h0;
+                        r_t2          <= 32'h0;
+                        r_t3          <= 32'h0;
+                        if (sp_depth == 7'd0) begin
+                            // hu: Üres eval (CALL / boot).
+                            // en: Empty eval (CALL / boot).
+                            r_sp          <= sp_init;
+                            r_cache_count <= 3'd0;
+                        end else begin
+                            // hu: RET restore — a top min(D,4) held elemet
+                            //     SRAM-ból a cache-be töltjük (ST_SPFILL).
+                            //     1. read: SRAM[base + (D-1)*4] → r_t0 (TOS).
+                            // en: RET restore — load top min(D,4) held
+                            //     items from SRAM into the cache.
+                            r_cache_count <= 3'd0;
+                            r_spfill_d    <= sp_depth;
+                            r_spfill_k    <= 3'd0;
+                            r_spfill_ph   <= 1'b0;
+                            r_state       <= ST_SPFILL;
+                            r_sram_re     <= 1'b1;
+                            r_sram_addr   <= sp_init +
+                                {5'd0, (sp_depth - 7'd1), 2'b00};
+                        end
+                    end
+
+                    // hu: Cache flush SRAM-ba (CALL előtt). Csak ha van
+                    //     cache-elt elem; egyébként no-op (már minden SRAM).
+                    //     A flush kizárja a normál op-ot ebben a ciklusban.
+                    // en: Flush cache to SRAM (before CALL). Only if cache
+                    //     has entries; otherwise no-op. Flush excludes a
+                    //     normal op this cycle.
+                    if (flush_en && ~r_prev_busy && ~sp_load &&
+                        (r_cache_count > 3'd0)) begin
+                        r_state      <= ST_FLUSH;
+                        r_sram_we    <= 1'b1;
+                        r_sram_addr  <= r_sp;
+                        r_sram_wdata <= w_flush_sel;
                     end
 
                     // hu: Spurious op blokkolás: ha az előző ciklus busy volt,
@@ -328,7 +428,7 @@ module cilcpu_stack_cache (
                     // en: Spurious op blocking: if previous cycle was busy,
                     //     skip this cycle (op arrived due to signals during busy,
                     //     must be ignored)
-                    if (~r_prev_busy) begin
+                    if (~r_prev_busy && ~flush_en && ~sp_load) begin
 
                         if (op_pop) begin
                             // ── POP ──
@@ -551,6 +651,89 @@ module cilcpu_stack_cache (
                         r_state       <= ST_IDLE;
                     end
                 end // ST_FILL_REPLACE
+
+                // --------------------------------------------------------
+                // hu: FLUSH — minden cache-elt elem SRAM-ba (CALL előtt).
+                //     Ciklusonként a legmélyebb érvényes elemet írjuk a
+                //     soron következő (növekvő) SRAM címre, sram_ready
+                //     handshake-kel. cache_count==0 → ST_IDLE. A `depth`
+                //     invariáns: cc-- és w_sram_cnt++ kiegyenlíti egymást.
+                // en: FLUSH — every cached entry to SRAM (before CALL).
+                //     Per cycle write the deepest valid entry to the next
+                //     ascending SRAM address with sram_ready handshake.
+                //     cache_count==0 → ST_IDLE. `depth` is invariant.
+                // --------------------------------------------------------
+                ST_FLUSH: begin
+                    r_sram_we <= 1'b1;
+
+                    if (sram_ready) begin
+                        // hu: Az aktuális elem (r_sram_addr/wdata) kiírva.
+                        //     Léptetés a következőre.
+                        // en: Current entry (r_sram_addr/wdata) written.
+                        //     Advance to the next.
+                        r_sp          <= r_sp + 14'd4;
+                        r_cache_count <= r_cache_count - 3'd1;
+                        if (r_cache_count <= 3'd1) begin
+                            // hu: Ez volt az utolsó elem → IDLE.
+                            // en: This was the last entry → IDLE.
+                            r_sram_we <= 1'b0;
+                            r_state   <= ST_IDLE;
+                        end else begin
+                            r_sram_addr  <= r_sp + 14'd4;
+                            r_sram_wdata <= w_flush_next;
+                        end
+                    end
+                end // ST_FLUSH
+
+                // --------------------------------------------------------
+                // hu: SPFILL — sp_load(depth>0): a top min(D,4) held elemet
+                //     SRAM-ból a cache-be tölti (RET restore). Elemenként
+                //     2 fázis (ph0 = read bridge, ph1 = latch+advance), a
+                //     core RET-olvasásával egyező robosztus időzítés.
+                //     r_t0 = TOS = SRAM[base+(D-1)*4], r_t1 = +(D-2)*4, ...
+                // en: SPFILL — sp_load(depth>0): load top min(D,4) held
+                //     items from SRAM into the cache (RET restore). Per
+                //     element 2 phases (ph0 read bridge, ph1 latch+advance).
+                // --------------------------------------------------------
+                ST_SPFILL: begin
+                    if (r_spfill_ph == 1'b0) begin
+                        // hu: A read folyamatban (addr a sp_load/előző
+                        //     elem óta tartva) — 1 ciklus bridge.
+                        // en: Read in flight (addr held) — 1-cycle bridge.
+                        r_sram_re   <= 1'b1;
+                        r_spfill_ph <= 1'b1;
+                    end else begin
+                        // hu: sram_rdata érvényes → r_t[k] latch.
+                        // en: sram_rdata valid → latch r_t[k].
+                        case (r_spfill_k)
+                            3'd0: r_t0 <= sram_rdata;
+                            3'd1: r_t1 <= sram_rdata;
+                            3'd2: r_t2 <= sram_rdata;
+                            default: r_t3 <= sram_rdata;
+                        endcase
+                        if (r_spfill_k + 3'd1 >= w_spfill_cnt) begin
+                            // hu: Kész — cache_count + SRAM-maradék SP.
+                            // en: Done — set cache_count + SRAM-rest SP.
+                            r_cache_count <= w_spfill_cnt;
+                            r_sp <= r_sp_base +
+                                {5'd0,
+                                 (r_spfill_d - {4'd0, w_spfill_cnt}),
+                                 2'b00};
+                            r_sram_re <= 1'b0;
+                            r_state   <= ST_IDLE;
+                        end else begin
+                            // hu: Következő elem: addr = base+(D-2-k)*4.
+                            // en: Next element.
+                            r_spfill_k  <= r_spfill_k + 3'd1;
+                            r_spfill_ph <= 1'b0;
+                            r_sram_re   <= 1'b1;
+                            r_sram_addr <= r_sp_base +
+                                {5'd0,
+                                 (r_spfill_d - 7'd2 - {4'd0, r_spfill_k}),
+                                 2'b00};
+                        end
+                    end
+                end // ST_SPFILL
 
                 default: begin
                     r_state   <= ST_IDLE;

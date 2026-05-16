@@ -119,6 +119,8 @@ async def reset_dut(dut, sram_ready_override=None):
     dut.rst_n.value = 0
     dut.sp_load.value = 0
     dut.sp_init.value = SP_INIT_DEFAULT
+    dut.sp_depth.value = 0
+    dut.flush_en.value = 0
     dut.push_en.value = 0
     dut.push_data.value = 0
     dut.pop_en.value = 0
@@ -1751,3 +1753,130 @@ async def test_25_peek_out_of_range(dut):
             assert int(dut.sram_re.value) == 0, \
                 f"cache_count=0/depth=1, peek[{idx}] must NOT trigger FILL (sram_re==0)"
 
+
+
+# ============================================================
+# hu: F2.7.D — flush_en + sp_depth (caller eval megőrzés CALL/RET)
+# en: F2.7.D — flush_en + sp_depth (caller eval preservation)
+# ============================================================
+
+async def do_flush(dut):
+    """hu: flush_en SZINTVEZÉRELT — addig tartjuk, míg a flush el nem
+        indul (busy=1) vagy a cache üres (cc=0 → no-op), majd vár
+        !busy-ra. A core valós flush-kérés protokollja.
+    en: flush_en is LEVEL-held — keep it until the flush starts
+        (busy=1) or the cache is empty, then wait for !busy."""
+    await FallingEdge(dut.clk)
+    dut.flush_en.value = 1
+    started = False
+    for _ in range(40):
+        await RisingEdge(dut.clk)
+        if int(dut.busy.value) == 1:
+            started = True
+            break
+        if int(dut.cache_count.value) == 0:
+            break
+    dut.flush_en.value = 0
+    if started:
+        for _ in range(60):
+            if int(dut.busy.value) == 0 and int(dut.ready.value) == 1:
+                break
+            await RisingEdge(dut.clk)
+
+
+@cocotb.test()
+async def test_26_flush_empties_cache_depth_invariant(dut):
+    """hu: 6 push (4 cache + 2 spill), flush → cache_count=0, depth
+        VÁLTOZATLAN (6), majd 6 pop LIFO sorrendben az eredeti értékeket
+        adja (most mind SRAM-ból).
+    en: 6 pushes (4 cache + 2 spill), flush → cache_count=0, depth
+        UNCHANGED (6), then 6 LIFO pops return the original values."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await reset_dut(dut)
+
+    vals = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66]
+    for v in vals:
+        await do_push(dut, v)
+
+    assert int(dut.depth.value) == 6, f"depth={int(dut.depth.value)} expected 6"
+
+    await do_flush(dut)
+
+    assert int(dut.cache_count.value) == 0, \
+        f"cache_count={int(dut.cache_count.value)} expected 0 after flush"
+    assert int(dut.depth.value) == 6, \
+        f"depth={int(dut.depth.value)} expected 6 (invariant) after flush"
+
+    got = [await do_pop(dut) for _ in range(6)]
+    assert got == vals[::-1], f"LIFO pop {got} expected {vals[::-1]}"
+    assert int(dut.depth.value) == 0, "depth must be 0 after draining"
+
+
+@cocotb.test()
+async def test_27_sp_load_clears_cache(dut):
+    """hu: 3 push (cache), sp_load(sp_init=0, sp_depth=0) → cache_count=0,
+        depth=0 (a callee tiszta eval-lal indul, CORE_SPEC).
+    en: 3 pushes, sp_load(sp_init=0, sp_depth=0) → cache_count=0,
+        depth=0 (callee starts with clean eval)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await reset_dut(dut)
+
+    for v in (0xAA, 0xBB, 0xCC):
+        await do_push(dut, v)
+    assert int(dut.cache_count.value) == 3
+
+    await FallingEdge(dut.clk)
+    dut.sp_load.value = 1
+    dut.sp_init.value = 0
+    dut.sp_depth.value = 0
+    await RisingEdge(dut.clk)
+    dut.sp_load.value = 0
+    await RisingEdge(dut.clk)
+
+    assert int(dut.cache_count.value) == 0, \
+        f"cache_count={int(dut.cache_count.value)} expected 0 after sp_load"
+    assert int(dut.depth.value) == 0, \
+        f"depth={int(dut.depth.value)} expected 0 after sp_load(depth=0)"
+
+
+@cocotb.test()
+async def test_28_sp_load_depth_restore(dut):
+    """hu: RET-visszaállítás szimuláció — 5 érték SRAM-ba (push+flush),
+        majd sp_load(sp_init=0, sp_depth=3) → depth=3, és a 3 pop az
+        SRAM[8],[4],[0] (azaz a 3., 2., 1. push) értékeket adja.
+        Ez a caller megőrzött eval depth helyreállítása.
+    en: RET-restore simulation — 5 values to SRAM (push+flush), then
+        sp_load(sp_init=0, sp_depth=3) → depth=3, 3 pops return the
+        SRAM-resident values (caller preserved eval restore)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    await reset_dut(dut)
+
+    vals = [0x100, 0x200, 0x300, 0x400, 0x500]
+    for v in vals:
+        await do_push(dut, v)
+    await do_flush(dut)
+    assert int(dut.depth.value) == 5 and int(dut.cache_count.value) == 0
+
+    # hu: caller eval base = 0, megőrzött depth = 3. Az sp_load(depth>0)
+    #     ST_SPFILL-t indít (top min(3,4)=3 elem SRAM→cache) — várni kell
+    #     a !busy-ra, mint a core RET_WAIT_SPFILL-ben.
+    # en: sp_load(depth>0) triggers ST_SPFILL — wait for !busy.
+    await FallingEdge(dut.clk)
+    dut.sp_load.value = 1
+    dut.sp_init.value = 0
+    dut.sp_depth.value = 3
+    await RisingEdge(dut.clk)
+    dut.sp_load.value = 0
+    for _ in range(40):
+        await RisingEdge(dut.clk)
+        if int(dut.busy.value) == 0 and int(dut.ready.value) == 1:
+            break
+
+    assert int(dut.cache_count.value) == 3, \
+        f"cache_count={int(dut.cache_count.value)} expected 3 (min(D,4) refill)"
+    assert int(dut.depth.value) == 3, \
+        f"depth={int(dut.depth.value)} expected 3 (sp_depth restore)"
+
+    got = [await do_pop(dut) for _ in range(3)]
+    assert got == [0x300, 0x200, 0x100], \
+        f"restored LIFO pop {got} expected [0x300, 0x200, 0x100]"
