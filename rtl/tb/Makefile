@@ -33,6 +33,35 @@ test_stack_cache:
 test_qspi_controller:
 	$(SUBMAKE) MODULE=test_qspi_controller TOPLEVEL=cilcpu_qspi_controller VERILOG_SOURCES="$(PWD)/../src/cilcpu_qspi_controller.v"
 
+# hu: Sub5.A — CODE_BASE_OFFSET paraméterezett QSPI controller teszt.
+#     EGYETLEN forrás: a 256 (= 0x000100) érték a Verilator generic-be
+#     (-GCODE_BASE_OFFSET=) ÉS a cocotb env-be (QSPI_CODE_BASE_OFFSET)
+#     egyszerre kerül — a kettő MINDIG egyezzen. (Decimális érték: a
+#     Verilog `'h` literál a shellben aposztróf-hibát dob.) A default
+#     `test_qspi_controller` (offszet 0) változatlanul fut, ott a
+#     test_30/test_31 skip-el (sim-paritás).
+# en: Sub5.A — CODE_BASE_OFFSET parameterized QSPI controller test.
+#     SINGLE source: the value 256 (= 0x000100) goes to BOTH the
+#     Verilator generic (-GCODE_BASE_OFFSET=) AND the cocotb env
+#     (QSPI_CODE_BASE_OFFSET) — the two must ALWAYS match. (Decimal
+#     value: a Verilog `'h` literal breaks the shell on the apostrophe.)
+#     The default `test_qspi_controller` (offset 0) runs unchanged;
+#     test_30/test_31 skip there (sim parity).
+# hu: TESTCASE-szel CSAK a két offszet-tesztet futtatjuk: a többi 29
+#     teszt CODE-fixture-je szándékosan offszet-0-ra van rakva (a
+#     default konfig verifikációja), nem-0 offszettel értelemszerűen
+#     nem stimmelne — azok a `test_qspi_controller`-ben zöldek.
+# en: TESTCASE runs ONLY the two offset tests: the other 29 tests'
+#     CODE fixtures are intentionally placed at offset 0 (default-config
+#     verification) and would not match under a non-zero offset — they
+#     stay green under `test_qspi_controller`.
+test_qspi_controller_offset:
+	QSPI_CODE_BASE_OFFSET=256 \
+	$(SUBMAKE) MODULE=test_qspi_controller TOPLEVEL=cilcpu_qspi_controller \
+		TESTCASE=test_30_code_base_offset_applied,test_31_code_base_offset_addr_zero \
+		LOCAL_COMPILE_ARGS="-GCODE_BASE_OFFSET=256" \
+		VERILOG_SOURCES="$(PWD)/../src/cilcpu_qspi_controller.v"
+
 # hu: F2.5a top-level core — 5 részegység + cilcpu_core
 # en: F2.5a top-level core — 5 submodules + cilcpu_core
 test_core:
@@ -176,4 +205,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib

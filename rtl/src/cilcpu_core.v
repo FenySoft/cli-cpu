@@ -11,7 +11,17 @@
 
 `default_nettype none
 
-module cilcpu_core (
+module cilcpu_core #(
+    // hu: Sub5.A — CODE szegmens flash-bázis offszet, áthajtva a belső
+    //     `cilcpu_qspi_controller`-be. Default 0 → sim-paritás. FPGA-n a
+    //     top-level generic (lásd cilcpu_a7lite_top/board) a bitstream
+    //     fölé (0xC00000) állítja.
+    // en: Sub5.A — CODE segment flash base offset, forwarded to the inner
+    //     `cilcpu_qspi_controller`. Default 0 → sim parity. On FPGA the
+    //     top-level generic (see cilcpu_a7lite_top/board) sets it above
+    //     the bitstream (0xC00000).
+    parameter integer CODE_BASE_OFFSET = 0
+) (
     input  wire        clk,
     input  wire        rst_n,
 
@@ -208,7 +218,9 @@ module cilcpu_core (
     reg         r_qspi_inflight;
     reg  [23:0] r_next_fetch_addr;
 
-    cilcpu_qspi_controller u_qspi (
+    cilcpu_qspi_controller #(
+        .CODE_BASE_OFFSET (CODE_BASE_OFFSET)
+    ) u_qspi (
         .clk             (clk),
         .rst_n           (rst_n),
         .cpu_addr        (r_qspi_addr),

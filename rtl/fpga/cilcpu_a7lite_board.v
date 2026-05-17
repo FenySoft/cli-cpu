@@ -48,7 +48,15 @@ module cilcpu_a7lite_board #(
     parameter integer BOOT_LOCAL_COUNT = 32'd4,
     parameter integer BOOT_ARG_VALUE   = 32'd20,
     parameter integer DEBOUNCE_BITS    = 22,
-    parameter integer CLOCKS_PER_BAUD  = 434
+    parameter integer CLOCKS_PER_BAUD  = 434,
+
+    // hu: Sub5.A — CODE szegmens flash-bázis offszet, áthajtva a belső
+    //     `cilcpu_a7lite_top`-ra. Sim default 0; FPGA-n a Vivado/OpenXC7
+    //     0xC00000-ra állítja (config-flash bitstream fölé).
+    // en: Sub5.A — CODE segment flash base offset, forwarded to the inner
+    //     `cilcpu_a7lite_top`. Sim default 0; on FPGA Vivado/OpenXC7 sets
+    //     it to 0xC00000 (above the config-flash bitstream).
+    parameter integer CODE_BASE_OFFSET = 0
 ) (
     // hu: Board-szintű I/O / en: Board-level I/O
     input  wire        i_clk_50m,        // J19 — 50 MHz aktív oszcillátor
@@ -103,7 +111,8 @@ module cilcpu_a7lite_board #(
         .BOOT_LOCAL_COUNT (BOOT_LOCAL_COUNT),
         .BOOT_ARG_VALUE   (BOOT_ARG_VALUE),
         .DEBOUNCE_BITS    (DEBOUNCE_BITS),
-        .CLOCKS_PER_BAUD  (CLOCKS_PER_BAUD)
+        .CLOCKS_PER_BAUD  (CLOCKS_PER_BAUD),
+        .CODE_BASE_OFFSET (CODE_BASE_OFFSET)
     ) u_top (
         .i_clk_50m       (i_clk_50m),
         .i_rst_btn_n     (i_rst_btn_n),

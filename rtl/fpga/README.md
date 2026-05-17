@@ -2,7 +2,7 @@
 
 > Magyar verzió: [README-hu.md](README-hu.md)
 
-> Version: 0.1 (Sub1)
+> Version: 0.5.1 (Sub5.A)
 
 This directory holds the CLI-CPU Nano core FPGA integration for the
 **MicroPhase A7-Lite XC7A200T** reference board. The goal is to validate the
@@ -16,7 +16,7 @@ core on real silicon **before** the F3 Tiny Tapeout submission.
 | Sub2 | UART TX + 32-bit decimal printer | ✅ DONE |
 | Sub3 | Fibonacci demo program + parameterized boot | ✅ DONE |
 | Sub4 | QSPI flash binding (IS25L128F + STARTUPE2 + IOBUF) | ✅ DONE |
-| Sub5 | Vivado + OpenXC7 build, 50 MHz timing closure | ⬜ Planned |
+| Sub5 | Vivado + OpenXC7 build + write_cfgmem + XDC timing + bring-up runbook | 🔧 Build-infra done (HW bring-up pending on the user) |
 
 ## Sub1 — Top-level wrapper
 
@@ -184,16 +184,21 @@ make test_a7lite_fib  # -GBOOT_ARG_VALUE=20 -GBOOT_LOCAL_COUNT=4
 - Expected: `"6765\r\n"` (= Fib(20))
 - **Result: 1/1 PASS** (~1.13ms sim time, ~1.35s wall time)
 
-**Known bug — recursive Math.Fibonacci:** The Roslyn-linked **recursive**
-`Math.Fibonacci` (CALL self) traps with `TRAP_STACK_UNDERFLOW` at depth ~5
-when run via the wrapper boot pattern (no caller frame, `boot_pc=8` directly
-into the Fib body). The hand-coded `test_52_call_recursive_fib_5` (with a
-caller frame) is green; the `TCpuNano` C# sim also returns Fib(10)=55
-correctly with the same binary. The bug lives in the `cilcpu_core.v` Sub5
-frame manager teardown logic when the "root frame" was not created by a
-CALL. **Sub3 workaround: iterative variant** (loop, same result, exercises
-fewer opcodes). Fix deferred to a separate debug sprint — see Vault entry
-`project_recursive_call_bug`.
+**Note:** The `iterative FibonacciIterative` is the accepted Sub3 demo —
+it exercises the loop opcode coverage (`LDLOC/STLOC`, `ADD/SUB`,
+`BLT_S/BR_S`) across the end-to-end toolchain.
+
+**Recursive Math.Fibonacci — RESOLVED (F2.7.D, commit `762536b`):** The
+Roslyn-linked **recursive** `Math.Fibonacci` (CALL self) used to trap
+with `TRAP_STACK_UNDERFLOW` at depth ~5 when run via the wrapper boot
+pattern (no caller frame, `boot_pc=8` directly into the Fib body). Root
+cause: `RET_FINALIZE` reset the caller Stack Cache to the eval base,
+discarding eval elements that must be preserved across the call.
+3-module root-cause fix (`cilcpu_stack_cache.v` flush + sp_depth;
+`cilcpu_core.v` ST_CALL/ST_RET frame-eval preservation). The recursive
+Roslyn Fibonacci is now green with the wrapper boot pattern too:
+`test_52c_recursive_fib10_roslyn_boot_no_caller` (Fib(10)=55). Vault:
+`project_recursive_call_bug` (RESOLVED).
 
 **Run:**
 
@@ -277,6 +282,148 @@ make test_a7lite_board_fib   # 1/1 PASS — UART "6765\r\n" via board.v
   measurement)
 - Real A7-Lite bring-up — UART terminal over CH340
 
+## Sub5 — Vivado + OpenXC7 build + bring-up
+
+> **Important — scope boundary:** Synthesis, PnR, `write_bitstream`,
+> `write_cfgmem`, 50 MHz timing closure and physical bring-up run **on
+> the user's WSL machine and A7-Lite hardware** — they are NOT runnable
+> in this session (no `vivado`/`yosys`/`nextpnr-xilinx`, no HW). Sub5
+> acceptance is therefore: **build infrastructure + bring-up runbook
+> done**; the actual HW verification (timing WNS ≥ 0, UART "6765\r\n")
+> is pending on the user.
+
+**Goal:** Compile the Sub4 board.v into a real bitstream on both
+toolchains, embed the CIL-T0 application binary into the config flash,
+and reproduce on hardware the "6765\r\n" pattern proven in the Sub3/Sub4
+sim.
+
+**New files:**
+
+| File | Role |
+|------|------|
+| [`Vivado/create_project.tcl`](Vivado/create_project.tcl) | Full `cilcpu_a7lite_board` project: synth → impl → write_bitstream + timing report. Part `xc7a200tfbg484-2` |
+| [`Vivado/write_cfgmem.tcl`](Vivado/write_cfgmem.tcl) | `.bit` + CIL-T0 `.t0` → one `.mcs` (SPIx4, 16 MB IS25L128F) |
+| [`OpenXC7/Makefile`](OpenXC7/Makefile) | Yosys → nextpnr-xilinx → fasm2frames → xc7frames2bit, full source tree |
+| [`OpenXC7/build.sh`](OpenXC7/build.sh) | WSL launcher (PATH, S: mount, `make`) |
+| [`OpenXC7/cilcpu_a7lite.xdc`](OpenXC7/cilcpu_a7lite.xdc) | OpenXC7-format constraint (no `-dict`) |
+| [`scripts/build_app_bin.sh`](scripts/build_app_bin.sh) | `dotnet build` → linker → `.t0` (parameterizable method/N) |
+
+**Source-tree parity:** Both builds synthesize the **same** RTL source
+tree as the `rtl/tb/Makefile` `test_a7lite_board_fib` `VERILOG_SOURCES`
+list, **without** `sim_stubs/` — on FPGA, STARTUPE2 + IOBUF are the
+Vivado 'unisims' / Yosys `synth_xilinx` built-in cells. `cilcpu_defines.vh`
+is added as an include path.
+
+**Flash-offset parity (sim ↔ cfgmem) — RESOLVED in Sub5.A:**
+
+The `cilcpu_qspi_controller` maps the CODE segment
+(`cpu_addr[23:20]=0x0`) to flash address
+`CODE_BASE_OFFSET + {4'h0, cpu_addr[19:0]}`. `CODE_BASE_OFFSET` is a
+parameterizable generic (Sub5.A), threaded through the full
+instantiation chain (`cilcpu_qspi_controller` ← `cilcpu_core` ←
+`cilcpu_a7lite_top` ← `cilcpu_a7lite_board`):
+
+- **SIM:** default `0` → the cocotb `TQSPIFlashModel` stores `.t0[i]`
+  at flash address `i` → **bit-identical sim parity**, every existing
+  test stays green (`BOOT_PC=0x08`).
+- **FPGA:** Vivado `create_project.tcl`
+  `set_property generic CODE_BASE_OFFSET=32'hC00000` (12 MB), OpenXC7
+  `Makefile` `chparam -set CODE_BASE_OFFSET 12582912`, and
+  `write_cfgmem.tcl` embeds the `.t0` at EXACTLY `0x00C00000`. The
+  config-flash loads `.bit` from 0x0 (SPIx4 master config); the app
+  sits **ABOVE the ~9.9 MB XC7A200T bitstream** → **no collision** on
+  the IS25L128F (16 MB; app window 1 MB: `0xC00000..0xCFFFFF`).
+
+> **SINGLE SOURCE:** the `CODE_BASE_OFFSET` generic, the
+> `write_cfgmem.tcl` `CODE_BASE_OFFSET_HEX` and the OpenXC7
+> `CODE_BASE_OFFSET` must ALWAYS match (all three = 12 MB). The 2nd
+> `write_cfgmem.tcl` arg only overrides it if you set the generic to
+> the same value. Source: `rtl/src/cilcpu_qspi_controller.v` ST_IDLE
+> `SEG_CODE` branch (`CODE_BASE_OFFSET`) +
+> `rtl/tb/test_qspi_controller.py` test_30/31.
+>
+> Note: `SEG_DATA` (flash `{4'h1, cpu_addr[19:0]}` = 0x100000) was
+> **intentionally NOT offset** — current int-only CIL-T0 programs
+> (PureMath) use no static DATA flash region, sim parity (test_08)
+> relies on this offset-less mapping, and offsetting it with no
+> test/use-case would be over-engineering. If DATA becomes flash-backed,
+> a separate task + test is required (see `todo.md`).
+
+**XDC timing tightening (`cilcpu_a7lite.xdc`):**
+
+- `create_clock -period 20.000` on `i_clk_50m` (J19) — explicit 50 MHz
+  primary constraint (unchanged, present since Sub1).
+- `qspi_sck` `create_generated_clock` = sys_clk / 2 = 25 MHz (unchanged).
+- `set_input_delay` / `set_output_delay` tightened with IS25L128F
+  (ISSI) datasheet 0x6B Quad Output Read values: tCLQV max 7.0 ns,
+  tCLQX min 1.5 ns, tDVCH/tCHDX min 2.0 ns, CS# tSLCH/tCHSH min 5.0 ns,
+  estimated FBG484+PCB trace skew ~0.5 ns. Input window widened by the
+  skew (−min 1.0 / −max 7.5), output by flash s/h (−2.5 / +2.5).
+
+**OpenXC7 STARTUPE2 support (openly stated limitation):**
+
+`IOBUF` **is supported** in the nextpnr-xilinx/prjxray flow (DQ[3:0]
+bus fine). **STARTUPE2** (config-bank startup block, user CCLK via
+`USRCCLKO`) is **NOT reliably supported** in the nextpnr-xilinx +
+prjxray-db artix7 flow — incomplete STARTUP site fuzzing in prjxray-db.
+So the **OpenXC7 path is best-effort in Sub5; the primary Sub5 path is
+Vivado.** Per the single-layer-trust / no-compromise principle this is
+**stated, not worked around**: if nextpnr-xilinx fails on STARTUPE2 it
+is the documented OpenXC7 limitation, not an RTL/XDC bug. (Note: the
+smoke-test LED-blink passed on OpenXC7 on 2026-04-24 without STARTUPE2
+— STARTUPE2 is a new requirement introduced by board.v.)
+
+App binary on the OpenXC7 path: after `xc7frames2bit`, separate
+flash-image concatenation or `openFPGALoader` (`--external-flash`,
+`-o <offset>`) — the exact step is in the bring-up runbook.
+
+**Run (on the user's WSL machine):**
+
+```bash
+# 1. App binary (CIL-T0 .t0) — same linker command as the sim
+rtl/fpga/scripts/build_app_bin.sh           # FibonacciIterative, N=20
+
+# 2a. Vivado (primary path)
+cd rtl/fpga/Vivado
+vivado -mode batch -source create_project.tcl
+vivado -mode batch -source write_cfgmem.tcl -tclargs build/app.t0
+
+# 2b. OpenXC7 (best-effort, may hit STARTUPE2 failure)
+cd rtl/fpga/OpenXC7
+bash build.sh check-env
+bash build.sh chipdb        # one-time, ~5-10 min
+bash build.sh all
+```
+
+**Bring-up runbook (on the user's A7-Lite hardware):**
+
+1. **JTAG bitstream upload (quick smoke):** Vivado Hardware Manager →
+   Open target → Auto Connect → Program Device →
+   `cilcpu_a7lite_board.bit`. (RAM-only, no flash — quick function check.)
+2. **Config flash programming:** Hardware Manager → Add Configuration
+   Memory Device → `is25lp128f` (IS25L128F-compatible, 128 Mbit) →
+   Program Configuration Memory Device → `build/cilcpu_a7lite.mcs`.
+   (Loads bitstream + the `.t0` app binary.) On OpenXC7:
+   `openFPGALoader -b <board> --write-flash cilcpu_a7lite.bit`, the app
+   image at a separate offset.
+3. **UART terminal:** CH340 USB-serial, **115200 baud, 8N1**, no flow
+   control. (Linux: `screen /dev/ttyUSB0 115200`; Windows: PuTTY /
+   TeraTerm.)
+4. **Power-cycle / KEY1 reset:** the FPGA configures from flash, then in
+   user mode the core reads the CIL-T0 from the QSPI flash.
+5. **Press KEY2 (W1):** the boot FSM starts the core with N =
+   `BOOT_ARG_VALUE` (=20).
+6. **Expected output:** on the UART terminal **`6765\r\n`** (= Fib(20)),
+   the **D6 LED (M18) lit** (halt latch), D5 (trap) **dark**. On a trap,
+   D5 lights and the UART prints the trap code in decimal.
+
+**What is left to the user (explicit):** the actual synthesis/PnR run,
+producing the `write_bitstream`/`write_cfgmem`, **verifying 50 MHz
+timing closure** (sys_clk WNS ≥ 0 from `timing_summary.rpt`), observing
+the actual OpenXC7 STARTUPE2 failure, and the hardware bring-up (UART
+"6765\r\n"). Sub5 acceptance is the build infra + runbook; HW
+verification on these deliverables remains open.
+
 ## Smoke test (LED blink)
 
 Separate folder: [`smoke_test/`](smoke_test/) — board bring-up LED blink on
@@ -291,3 +438,6 @@ two toolchains (Vivado and OpenXC7). Verified on real hardware on
 | 0.2 | 2026-05-08 | Sub2 — UART TX + decimal printer (8+10+2 cocotb tests green); halt/trap on UART |
 | 0.3 | 2026-05-10 | Sub3 — FibonacciIterative(20) end-to-end UART "6765\r\n"; recursive bug deferred |
 | 0.4 | 2026-05-14 | Sub4 — board.v wrapper STARTUPE2 + IOBUF; XDC with QSPI pins; 4+1 new cocotb tests green |
+| 0.4.1 | 2026-05-17 | F2.7.D recursive CALL/RET root-cause fix propagated (commit 762536b); Sub3 "Known bug" resolved, test_52c green |
+| 0.5 | 2026-05-17 | Sub5 build infra — Vivado `create_project.tcl` + `write_cfgmem.tcl`, OpenXC7 `Makefile`/`build.sh`/XDC, `scripts/build_app_bin.sh`, XDC timing tightening (IS25L128F datasheet). Flash-offset parity 0x000000 (sim ↔ cfgmem); OpenXC7 STARTUPE2 limitation openly documented; bring-up runbook. Synthesis/timing/bring-up pending on the user (not HW-verified) |
+| 0.5.1 | 2026-05-17 | Sub5.A — parameterizable `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). Flash-collision "open question" → RESOLVED: sim default 0 (bit-identical parity), FPGA 0xC00000 (12 MB, above the ~9.9 MB bitstream). Single source: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 new cocotb tests (test_30/31) + 7 regression targets green; SEG_DATA intentionally not offset (rationale in the Sub5 section) |

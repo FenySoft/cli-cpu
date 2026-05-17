@@ -14,7 +14,27 @@
 
 `include "cilcpu_defines.vh"
 
-module cilcpu_qspi_controller (
+module cilcpu_qspi_controller #(
+    // hu: Sub5.A — CODE szegmens flash-bázis offszet. A config-flash
+    //     a 0x0-tól a bitstream-et tárolja; a CIL-T0 app a bitstream
+    //     FÖLÉ kerül (FPGA: 0xC00000). Default 0 → sim-paritás (a
+    //     cocotb flash modell és minden meglévő teszt változatlan).
+    //     A CODE szegmens flash-címe = CODE_BASE_OFFSET[23:0] + cpu_addr[19:0].
+    //     Méret-nélküli `integer`-ként deklarálva, hogy a parancssori
+    //     `-GCODE_BASE_OFFSET=<value>` (Verilator) / `set_property generic`
+    //     (Vivado) override ne dobjon WIDTHTRUNC-ot; a használat helyén
+    //     [23:0]-ra slice-eljük (a wrapper-paraméter konvencióval egyezően).
+    // en: Sub5.A — CODE segment flash base offset. The config-flash
+    //     stores the bitstream from 0x0; the CIL-T0 app is placed
+    //     ABOVE the bitstream (FPGA: 0xC00000). Default 0 → sim parity
+    //     (cocotb flash model and all existing tests unchanged).
+    //     CODE segment flash address = CODE_BASE_OFFSET[23:0] + cpu_addr[19:0].
+    //     Declared as untyped `integer` so the command-line
+    //     `-GCODE_BASE_OFFSET=<value>` (Verilator) / `set_property generic`
+    //     (Vivado) override does not raise WIDTHTRUNC; sliced to [23:0] at
+    //     the use site (matching the wrapper-parameter convention).
+    parameter integer CODE_BASE_OFFSET = 0
+) (
     // hu: Órajel és reset
     // en: Clock and reset
     input  wire        clk,
@@ -133,10 +153,21 @@ always @(posedge clk or negedge rst_n) begin
                 case (cpu_addr[23:20])
                     `SEG_CODE: begin
                         if (cpu_re) begin
-                            // hu: Flash olvasás — CODE
-                            // en: Flash read — CODE
+                            // hu: Flash olvasás — CODE. A flash-cím a
+                            //     CODE_BASE_OFFSET fölé tolva, hogy a config-
+                            //     flash bitstream-je (0x0-tól) és a CIL-T0 app
+                            //     ne ütközzön. Default 0 → sim-paritás (a régi
+                            //     {4'h0, cpu_addr[19:0]} viselkedés). Mindkét
+                            //     operandus 24-bit, r_addr 24-bit → nincs trunc.
+                            // en: Flash read — CODE. Flash address shifted
+                            //     above CODE_BASE_OFFSET so the config-flash
+                            //     bitstream (from 0x0) and the CIL-T0 app do
+                            //     not collide. Default 0 → sim parity (the old
+                            //     {4'h0, cpu_addr[19:0]} behaviour). Both
+                            //     operands 24-bit, r_addr 24-bit → no trunc.
                             r_cmd            <= `QSPI_CMD_FLASH_READ;
-                            r_addr           <= {4'h0, cpu_addr[19:0]};
+                            r_addr           <= CODE_BASE_OFFSET[23:0]
+                                                + {4'h0, cpu_addr[19:0]};
                             r_is_write       <= 1'b0;
                             r_device         <= 1'b0;
                             qspi_cs_flash_n  <= 1'b0;

@@ -1,5 +1,6 @@
 # hu: CLI-CPU F2.7 — XDC constraint fájl MicroPhase A7-Lite XC7A200T-hez.
-#     Top module: cilcpu_a7lite_board (Sub4-től). A board-szintű wrapper
+#     Top module: cilcpu_a7lite_board (Sub4-től; Sub5: QSPI input/output
+#     delay datasheet-pontosítás). A board-szintű wrapper
 #     a `cilcpu_a7lite_top`-ot kötögeti az IS25L128F QSPI config flash-re
 #     egy STARTUPE2 primitív (CCLK) és négy IOBUF (DQ[3:0]) segítségével.
 # en: CLI-CPU F2.7 — XDC constraint file for MicroPhase A7-Lite XC7A200T.
@@ -84,27 +85,39 @@ create_generated_clock -name qspi_sck \
     -divide_by 2 \
     [get_pins -hier -filter {NAME =~ */u_startupe2/USRCCLKO}]
 
-# hu: IS25L128F datasheet — Fast Read Quad I/O (0x6B):
-#     tV (CLK low → output valid)   max ~7 ns
-#     tCLQH (output hold from CLK)  min ~1.5 ns
-#     tIS (input setup before CLK)  min 2 ns
-#     tIH (input hold after CLK)    min 2 ns
-#     Becsült PCB trace delay: ~0.5 ns. A Sub5-ben mérjük és pontosítjuk.
-# en: IS25L128F datasheet — Fast Read Quad I/O (0x6B):
-#     tV (CLK low → output valid)   max ~7 ns
-#     tCLQH (output hold from CLK)  min ~1.5 ns
-#     tIS (input setup before CLK)  min 2 ns
-#     tIH (input hold after CLK)    min 2 ns
-#     Estimated PCB trace delay: ~0.5 ns. Measured and tightened in Sub5.
+# hu: Sub5 timing finomítás — IS25L128F (ISSI) datasheet, Quad Output
+#     Read (0x6B), 25 MHz QSPI CLK (40 ns periódus, bőven a 80 MHz alatt):
+#       tCLQV (CLK él → DQ output valid)  max  7.0 ns   (a "tV")
+#       tCLQX (DQ output hold CLK-tól)    min  1.5 ns   (a "tCLQH")
+#       tDVCH (DQ input setup CLK előtt)  min  2.0 ns   (a "tIS")
+#       tCHDX (DQ input hold CLK után)    min  2.0 ns   (a "tIH")
+#       tSLCH / tCHSH (CS# setup/hold)    min  5.0 ns
+#     Becsült FBG484 + A7-Lite PCB trace round-trip skew: ~0.5 ns
+#     (rövid, dedikált config-bank vonalak). A bemeneti ablakot a
+#     trace skew-val tágítjuk (min = tCLQX - skew, max = tCLQV + skew),
+#     a kimenetit a flash setup/hold-jával szűkítjük.
+# en: Sub5 timing tightening — IS25L128F (ISSI) datasheet, Quad Output
+#     Read (0x6B), 25 MHz QSPI CLK (40 ns period, well under 80 MHz):
+#       tCLQV (CLK edge → DQ valid)  max  7.0 ns
+#       tCLQX (DQ output hold)       min  1.5 ns
+#       tDVCH (DQ input setup)       min  2.0 ns
+#       tCHDX (DQ input hold)        min  2.0 ns
+#       tSLCH / tCHSH (CS# s/h)      min  5.0 ns
+#     Estimated FBG484 + A7-Lite PCB trace round-trip skew: ~0.5 ns
+#     (short dedicated config-bank lines). Input window widened by the
+#     trace skew; output window constrained by the flash setup/hold.
 
-# hu: A DQ vonalak bemenetként a flash által hajtottak — clock-to-output
-# en: DQ lines as inputs are driven by the flash — clock-to-output
-set_input_delay  -clock qspi_sck -min 1.5 [get_ports {io_qspi_dq[*]}]
+# hu: DQ bemenetként a flash hajtja — clock-to-output (tCLQX..tCLQV ± skew)
+# en: DQ as inputs are driven by the flash — clock-to-output
+set_input_delay  -clock qspi_sck -min 1.0 [get_ports {io_qspi_dq[*]}]
 set_input_delay  -clock qspi_sck -max 7.5 [get_ports {io_qspi_dq[*]}]
 
-# hu: A DQ vonalak kimenetként mi hajtjuk őket — setup/hold a flash felé
-# en: DQ lines as outputs are driven by us — setup/hold to the flash
-set_output_delay -clock qspi_sck -min -2.0 [get_ports {io_qspi_dq[*] o_qspi_cs_n}]
+# hu: DQ/CS# kimenetként mi hajtjuk — flash setup (+tDVCH) / hold (-tCHDX)
+#     + trace skew. CS# ugyanezen az ablakon (tSLCH/tCHSH konzervatívan
+#     belefér a tDVCH/tCHDX + skew közé).
+# en: DQ/CS# as outputs driven by us — flash setup (+tDVCH) / hold
+#     (-tCHDX) + trace skew. CS# fits the same window conservatively.
+set_output_delay -clock qspi_sck -min -2.5 [get_ports {io_qspi_dq[*] o_qspi_cs_n}]
 set_output_delay -clock qspi_sck -max  2.5 [get_ports {io_qspi_dq[*] o_qspi_cs_n}]
 
 # =============================================================

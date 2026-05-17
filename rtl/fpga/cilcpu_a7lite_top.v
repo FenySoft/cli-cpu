@@ -42,7 +42,19 @@ module cilcpu_a7lite_top #(
     //     felülírjuk (Sub2).
     // en: UART baud divider. FPGA: 50 MHz / 115200 = 434, overridden to 8
     //     in sim (Sub2).
-    parameter integer CLOCKS_PER_BAUD = 434
+    parameter integer CLOCKS_PER_BAUD = 434,
+
+    // hu: Sub5.A — CODE szegmens flash-bázis offszet. Sim default 0
+    //     (cocotb flash-paritás); FPGA-n a Vivado `set_property generic`
+    //     / OpenXC7 `-G` a config-flash bitstream FÖLÉ (0xC00000 = 12 MB)
+    //     állítja, hogy a ~9,9 MB XC7A200T bitstream és a CIL-T0 app ne
+    //     ütközzön az IS25L128F-en. Áthajtva a `cilcpu_core`-ba.
+    // en: Sub5.A — CODE segment flash base offset. Sim default 0 (cocotb
+    //     flash parity); on FPGA Vivado `set_property generic` / OpenXC7
+    //     `-G` sets it ABOVE the config-flash bitstream (0xC00000 = 12 MB)
+    //     so the ~9.9 MB XC7A200T bitstream and the CIL-T0 app do not
+    //     collide on the IS25L128F. Forwarded to `cilcpu_core`.
+    parameter integer CODE_BASE_OFFSET = 0
 ) (
     // hu: Board-szintű I/O / en: Board-level I/O
     input  wire        i_clk_50m,        // J19 — 50 MHz aktív oszcillátor
@@ -256,7 +268,9 @@ module cilcpu_a7lite_top #(
     // hu: Nano core példányosítás
     // en: Nano core instantiation
     // ============================================================
-    cilcpu_core u_core (
+    cilcpu_core #(
+        .CODE_BASE_OFFSET (CODE_BASE_OFFSET)
+    ) u_core (
         .clk                (i_clk_50m),
         .rst_n              (core_rst_n),
         .i_boot_pc          (BOOT_PC[23:0]),

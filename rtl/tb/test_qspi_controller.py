@@ -8,6 +8,7 @@
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge, Timer
+import os
 import random
 
 # ============================================================
@@ -1133,3 +1134,110 @@ async def test_29_busy_ignores_new_request(dut):
     assert busy == 0, f"cpu_busy={busy} (várt: 0) a tranzakció befejezése után"
     assert cs_f == 1, f"qspi_cs_flash_n={cs_f} (várt: 1) a tranzakció befejezése után"
     assert cs_p == 1, f"qspi_cs_psram_n={cs_p} (várt: 1) a tranzakció befejezése után"
+
+
+# ============================================================
+# hu: Sub5.A — paraméterezhető CODE-bázis-offszet (CODE_BASE_OFFSET)
+#     A config-flash bitstream a 0x0-tól foglal; a CIL-T0 app a
+#     bitstream FÖLÉ kerül. A `cilcpu_qspi_controller` CODE szegmens
+#     ágának BASE + cpu_addr[19:0] flash-címről kell fetch-elnie.
+#     A `CODE_BASE_OFFSET` érték a `-GCODE_BASE_OFFSET=` Verilator
+#     generic-kel ÉS a `QSPI_CODE_BASE_OFFSET` env-vel egyezően
+#     állítódik (egyetlen forrás — a `test_qspi_controller_offset`
+#     Makefile target). Default 0 esetén a teszt skip-el (a többi 29
+#     teszt változatlanul fut a default `test_qspi_controller`-rel).
+# en: Sub5.A — parameterizable CODE base offset (CODE_BASE_OFFSET).
+#     The config-flash bitstream occupies from 0x0; the CIL-T0 app is
+#     placed ABOVE the bitstream. The `cilcpu_qspi_controller` CODE
+#     segment branch must fetch from BASE + cpu_addr[19:0]. The
+#     `CODE_BASE_OFFSET` value is set consistently via the
+#     `-GCODE_BASE_OFFSET=` Verilator generic AND the
+#     `QSPI_CODE_BASE_OFFSET` env (single source — the
+#     `test_qspi_controller_offset` Makefile target). With default 0
+#     the test skips (the other 29 tests run unchanged under the
+#     default `test_qspi_controller`).
+# ============================================================
+
+CODE_BASE_OFFSET = int(os.environ.get("QSPI_CODE_BASE_OFFSET", "0"), 0)
+
+
+@cocotb.test()
+async def test_30_code_base_offset_applied(dut):
+    """hu: A CODE szegmens fetch a CODE_BASE_OFFSET + cpu_addr[19:0]
+           flash-címről jön. A flash modell KIZÁRÓLAG a BASE+addr
+           címen tárolja az adatot (a BASE alatti rész — pl. a
+           "bitstream" — default 0xFF). Ha az RTL kőbe vésve 0x0-ról
+           olvas (offszet nélkül), 0xFFFFFFFF jön vissza → RED.
+    en: The CODE segment fetch must come from CODE_BASE_OFFSET +
+           cpu_addr[19:0]. The flash model stores data ONLY at
+           BASE+addr (the region below BASE — i.e. the "bitstream" —
+           defaults to 0xFF). If the RTL is hardcoded to read from 0x0
+           (no offset), it returns 0xFFFFFFFF → RED."""
+    if CODE_BASE_OFFSET == 0:
+        # hu: Default sim-paritás — nincs offszet, a teszt nem értelmes.
+        # en: Default sim parity — no offset, test not meaningful.
+        return
+
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    cpu_off = 0x000100
+    val = 0xCAFEBABE
+    flash_addr = CODE_BASE_OFFSET + cpu_off
+
+    # hu: Adat KIZÁRÓLAG a BASE+offset flash-címen — a BASE alatti
+    #     címek (a "bitstream"-tartomány) üresek (modell default 0xFF).
+    # en: Data ONLY at BASE+offset flash address — addresses below BASE
+    #     (the "bitstream" range) are empty (model default 0xFF).
+    flash_mem = {
+        flash_addr:     (val >> 24) & 0xFF,
+        flash_addr + 1: (val >> 16) & 0xFF,
+        flash_addr + 2: (val >> 8) & 0xFF,
+        flash_addr + 3: val & 0xFF,
+    }
+
+    await reset_dut(dut, flash_mem=flash_mem)
+
+    result = await do_read(dut, make_addr(SEG_CODE, cpu_off))
+    assert result == val, (
+        f"CODE_BASE_OFFSET=0x{CODE_BASE_OFFSET:06X}: a controller-nek a "
+        f"flash 0x{flash_addr:06X} címről kellene fetch-elnie "
+        f"(várt 0x{val:08X}), de 0x{result:08X} jött — "
+        f"valószínűleg kőbe vésve 0x0-ról olvas (nincs offszet)"
+    )
+
+
+@cocotb.test()
+async def test_31_code_base_offset_addr_zero(dut):
+    """hu: cpu_addr offset 0 esetén is a BASE flash-címről olvas
+           (BASE+0). A flash 0x0-án "bitstream" placeholder (0xDEADC0DE),
+           a BASE-en a valódi első app-szó. RED, ha 0x0-ról olvas.
+    en: With cpu offset 0 it must still read from the BASE flash
+           address (BASE+0). Flash 0x0 holds a "bitstream" placeholder
+           (0xDEADC0DE); BASE holds the real first app word. RED if it
+           reads from 0x0."""
+    if CODE_BASE_OFFSET == 0:
+        return
+
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    bit_ph = 0xDEADC0DE   # hu: "bitstream" placeholder a flash 0x0-án
+    val = 0x01020304      # hu: valódi app első szó a BASE-en
+
+    flash_mem = {
+        0: (bit_ph >> 24) & 0xFF, 1: (bit_ph >> 16) & 0xFF,
+        2: (bit_ph >> 8) & 0xFF,  3: bit_ph & 0xFF,
+        CODE_BASE_OFFSET:     (val >> 24) & 0xFF,
+        CODE_BASE_OFFSET + 1: (val >> 16) & 0xFF,
+        CODE_BASE_OFFSET + 2: (val >> 8) & 0xFF,
+        CODE_BASE_OFFSET + 3: val & 0xFF,
+    }
+
+    await reset_dut(dut, flash_mem=flash_mem)
+
+    result = await do_read(dut, make_addr(SEG_CODE, 0))
+    assert result == val, (
+        f"CODE_BASE_OFFSET=0x{CODE_BASE_OFFSET:06X}: cpu offset 0 → "
+        f"flash 0x{CODE_BASE_OFFSET:06X}-ról kellene olvasni "
+        f"(várt 0x{val:08X}), de 0x{result:08X} jött "
+        f"(0x{bit_ph:08X} = a bitstream placeholder a 0x0-án)"
+    )
