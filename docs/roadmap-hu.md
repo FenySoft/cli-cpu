@@ -272,7 +272,8 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 **Új munka az F4+F5-höz képest:**
 - **Adaptív top-level instanciálás** — paraméterezhető (`#NUM_RICH`, `#NUM_NANO`) az ugyanazon RTL-re
 - **Mesh router** skálázhatóság — 4 core-nál nagyobb rendszerhez 2D grid topológia (~1 mérnökhónap)
-- **Inter-chip Ethernet bridge** — a board-ok közötti mailbox üzenetek Gigabit Ethernet-en, a Symphact location transparency valódi tesztje (~1 mérnökhónap)
+- **Inter-chip Ethernet bridge** — a board-ok közötti mailbox üzenetek Gigabit Ethernet-en, a Symphact location transparency valódi tesztje (~1 mérnökhónap). A bridge **hardver** (RTL): a core csak az MMIO outbox FIFO-ba ír, a csomagolás/kicsomagolás az `eth_bridge` RTL-é. Becsült ~4–6K LUT/board (RGMII MAC + mailbox bridge), +1–2 BRAM RX/TX FIFO.
+  - **NYITOTT F6 DÖNTÉS — mailbox-batchelés:** összevonjon-e a HW több mailbox üzenetet egy Ethernet keretbe (küszöb/timeout-alapú aggregálás), vagy egy-üzenet-egy-keret? **Trade-off:** a batchelés amortizálja a ~1,5 µs szerializációs keret-overhead-et (jobb throughput), de a timeout-küszöb latency-t ad. **Költség:** ha igen, az is HW, +~0,5–1K LUT (aggregáló FSM + timeout-timer + per-üzenet hossz-fejléc + RX-szétbontás) + 1 BRAM aggregáló buffer — a 134K budget-hez képest elhanyagolható. **Eldöntendő az F6-FPGA latency/throughput mérés alapján** (`bring-up/f6_fpga_results.md`); a policy nincs rögzítve.
 - **Heterogén verification** és többkonfigurációs test harness (~1 mérnökhónap)
 - **Configuration sweep script** — automatikus szintézis és P&R több (Rich, Nano) párra, LUT/timing/throughput riport
 - **Összesen: ~3-4 mérnökhónap**

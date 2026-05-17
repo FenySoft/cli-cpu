@@ -41,10 +41,12 @@ A MicroPhase A7-Lite három FPGA variánssal gyártott, közös PCB-vel. A pin-a
 | CMTs (1 MMCM + 1 PLL) | 10 |
 | Single-ended I/O | max 500 |
 | Differenciális I/O pár | 240 |
-| GTP transceiver | 16 (max 6.6 Gb/s) |
-| PCIe Gen2 | 1 |
+| GTP transceiver | 1 Quad = 4 sáv (Bank 216, max 6.6 Gb/s) — **board-on NEM kivezetve** |
+| PCIe Gen2 | chip-képesség, **board-on nincs PCIe csatlakozó** |
 | XADC (analóg) | 1 |
 | AES/HMAC blokk | 1 |
+
+> **GTP/PCIe figyelmeztetés (schematic-verifikált, R11, 2026-05-18):** A `-FBG484` tok **1 GTP Quad-ot (4 sáv, Bank 216: `MGTPRXP/N0..3`, `MGTPTXP/N0..3`, `MGTREFCLK0/1`)** vezet ki az FPGA-labokra — **nem 16-ot** (a 16 a chip-család maximuma nagy tokban). A schematic 14 oldalából a `MGTP*` netek **kizárólag a 6. oldalon** (FPGA pin-oldal) szerepelnek: az A7-Lite **semmilyen nagysebességű csatlakozóra (PCIe finger, SFP, SATA, SMA) nem vezeti ki** a serdes-t. A Gigabit Ethernet **RGMII**-n megy (10. oldal), nem GTP-n. **Következmény:** board-to-board GTP link ezen a HW-en nem járható út — az F6 multi-board interconnect véglegesen a **Gigabit Ethernet (RGMII) bridge**, ~3–6 µs egyirányú latency-vel.
 
 ## Memória
 

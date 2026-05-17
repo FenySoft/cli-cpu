@@ -272,7 +272,8 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 **New work beyond F4+F5:**
 - **Adaptive top-level instantiation** — parameterizable (`#NUM_RICH`, `#NUM_NANO`) on the same RTL
 - **Mesh router** scalability — 2D grid topology for systems larger than 4 cores (~1 engineer-month)
-- **Inter-chip Ethernet bridge** — cross-board mailbox messages over Gigabit Ethernet, the real test of Symphact location transparency (~1 engineer-month)
+- **Inter-chip Ethernet bridge** — cross-board mailbox messages over Gigabit Ethernet, the real test of Symphact location transparency (~1 engineer-month). The bridge is **hardware** (RTL): the core only writes the MMIO outbox FIFO; encapsulation/decapsulation is the `eth_bridge` RTL's job. Estimated ~4–6K LUT/board (RGMII MAC + mailbox bridge), +1–2 BRAM RX/TX FIFO.
+  - **OPEN F6 DECISION — mailbox batching:** should the HW aggregate multiple mailbox messages into one Ethernet frame (threshold/timeout-based aggregation), or one-message-per-frame? **Trade-off:** batching amortizes the ~1.5 µs serialization frame overhead (better throughput) but the timeout threshold adds latency. **Cost:** if yes, also HW, +~0.5–1K LUT (aggregation FSM + timeout timer + per-message length header + RX split) + 1 BRAM aggregation buffer — negligible vs the 134K budget. **To be decided based on the F6-FPGA latency/throughput measurement** (`bring-up/f6_fpga_results.md`); the policy is not yet fixed.
 - **Heterogeneous verification** and multi-configuration test harness (~1 engineer-month)
 - **Configuration sweep script** — automated synthesis and P&R for multiple (Rich, Nano) pairs, LUT/timing/throughput report
 - **Total: ~3-4 engineer-months**

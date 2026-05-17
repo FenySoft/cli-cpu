@@ -41,10 +41,12 @@ The MicroPhase A7-Lite is manufactured in three FPGA variants sharing the same P
 | CMTs (1 MMCM + 1 PLL) | 10 |
 | Single-ended I/O | up to 500 |
 | Differential I/O pair | 240 |
-| GTP transceivers | 16 (up to 6.6 Gb/s) |
-| PCIe Gen2 | 1 |
+| GTP transceivers | 1 Quad = 4 lanes (Bank 216, up to 6.6 Gb/s) — **NOT routed on the board** |
+| PCIe Gen2 | chip capability, **no PCIe connector on the board** |
 | XADC (analog) | 1 |
 | AES/HMAC block | 1 |
+
+> **GTP/PCIe warning (schematic-verified, R11, 2026-05-18):** The `-FBG484` package exposes **1 GTP Quad (4 lanes, Bank 216: `MGTPRXP/N0..3`, `MGTPTXP/N0..3`, `MGTREFCLK0/1`)** at the FPGA balls — **not 16** (16 is the device-family max in large packages). Across the schematic's 14 pages the `MGTP*` nets appear **only on page 6** (FPGA pin page): the A7-Lite does **not route the serdes to any high-speed connector (PCIe finger, SFP, SATA, SMA)**. Gigabit Ethernet uses **RGMII** (page 10), not GTP. **Consequence:** a board-to-board GTP link is not feasible on this HW — the F6 multi-board interconnect is definitively the **Gigabit Ethernet (RGMII) bridge**, ~3–6 µs one-way latency.
 
 ## Memory
 
