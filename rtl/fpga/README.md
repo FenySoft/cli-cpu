@@ -2,7 +2,7 @@
 
 > Magyar verzió: [README-hu.md](README-hu.md)
 
-> Version: 0.5.1 (Sub5.A)
+> Version: 0.5.2 (Sub5.A + doc-sync)
 
 This directory holds the CLI-CPU Nano core FPGA integration for the
 **MicroPhase A7-Lite XC7A200T** reference board. The goal is to validate the
@@ -360,16 +360,21 @@ instantiation chain (`cilcpu_qspi_controller` ← `cilcpu_core` ←
   estimated FBG484+PCB trace skew ~0.5 ns. Input window widened by the
   skew (−min 1.0 / −max 7.5), output by flash s/h (−2.5 / +2.5).
 
-**OpenXC7 STARTUPE2 support (openly stated limitation):**
+**OpenXC7 STARTUPE2 — supported upstream, to be verified here:**
 
 `IOBUF` **is supported** in the nextpnr-xilinx/prjxray flow (DQ[3:0]
 bus fine). **STARTUPE2** (config-bank startup block, user CCLK via
-`USRCCLKO`) is **NOT reliably supported** in the nextpnr-xilinx +
-prjxray-db artix7 flow — incomplete STARTUP site fuzzing in prjxray-db.
-So the **OpenXC7 path is best-effort in Sub5; the primary Sub5 path is
-Vivado.** Per the single-layer-trust / no-compromise principle this is
-**stated, not worked around**: if nextpnr-xilinx fails on STARTUPE2 it
-is the documented OpenXC7 limitation, not an RTL/XDC bug. (Note: the
+`USRCCLKO`): the `openXC7/nextpnr-xilinx` issue **#13** ("Prioritize
+BSCANE2 + STARTUPE2") was **closed, completed 2024-02** → it **became
+supported** in the upstream toolchain. The project-specific artix7
+`USRCCLKO` path is **not yet empirically verified in this project** —
+the first WSL build will decide. So **OpenXC7 is a first-class Sub5
+target for the grant "fully open" deliverable; the empirically
+verified path is so far Vivado.** Per the single-layer-trust /
+no-compromise principle we **state the actual status** (supported
+upstream, unverified here) — neither working around it with a fake
+stub nor over-claiming: if nextpnr-xilinx still fails on STARTUPE2 it
+is a documented, to-be-verified risk, not an RTL/XDC bug. (Note: the
 smoke-test LED-blink passed on OpenXC7 on 2026-04-24 without STARTUPE2
 — STARTUPE2 is a new requirement introduced by board.v.)
 
@@ -388,7 +393,7 @@ cd rtl/fpga/Vivado
 vivado -mode batch -source create_project.tcl
 vivado -mode batch -source write_cfgmem.tcl -tclargs build/app.t0
 
-# 2b. OpenXC7 (best-effort, may hit STARTUPE2 failure)
+# 2b. OpenXC7 (first-class target; artix7 STARTUPE2/USRCCLKO to verify here)
 cd rtl/fpga/OpenXC7
 bash build.sh check-env
 bash build.sh chipdb        # one-time, ~5-10 min
@@ -441,3 +446,4 @@ two toolchains (Vivado and OpenXC7). Verified on real hardware on
 | 0.4.1 | 2026-05-17 | F2.7.D recursive CALL/RET root-cause fix propagated (commit 762536b); Sub3 "Known bug" resolved, test_52c green |
 | 0.5 | 2026-05-17 | Sub5 build infra — Vivado `create_project.tcl` + `write_cfgmem.tcl`, OpenXC7 `Makefile`/`build.sh`/XDC, `scripts/build_app_bin.sh`, XDC timing tightening (IS25L128F datasheet). Flash-offset parity 0x000000 (sim ↔ cfgmem); OpenXC7 STARTUPE2 limitation openly documented; bring-up runbook. Synthesis/timing/bring-up pending on the user (not HW-verified) |
 | 0.5.1 | 2026-05-17 | Sub5.A — parameterizable `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). Flash-collision "open question" → RESOLVED: sim default 0 (bit-identical parity), FPGA 0xC00000 (12 MB, above the ~9.9 MB bitstream). Single source: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 new cocotb tests (test_30/31) + 7 regression targets green; SEG_DATA intentionally not offset (rationale in the Sub5 section) |
+| 0.5.2 | 2026-05-17 | Doc-sync (`cascade-changes`): OpenXC7 README flash-offset "open question" → brought to Sub5.A RESOLVED; STARTUPE2 status corrected across all READMEs (`openXC7/nextpnr-xilinx #13` closed 2024-02 → supported upstream, project-specific artix7 USRCCLKO to be empirically verified here), "best-effort" → first-class Sub5 target for the grant ("fully open" NLnet) |

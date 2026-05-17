@@ -2,7 +2,7 @@
 
 > Magyar verzió: [README-hu.md](README-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 OpenXC7 build (Yosys + nextpnr-xilinx + Project X-Ray) of the full
 `cilcpu_a7lite_board` for the A7-Lite XC7A200T. Mirrors
@@ -11,23 +11,28 @@ OpenXC7 build (Yosys + nextpnr-xilinx + Project X-Ray) of the full
 > **Scope:** The build runs on the user's WSL machine — not runnable
 > here (no yosys/nextpnr-xilinx).
 
-## ⚠️ STARTUPE2 limitation (stated openly)
+## ⚠️ STARTUPE2 — supported upstream, not yet verified here
 
 The Sub4 board.v instantiates a **STARTUPE2** + 4× **IOBUF**.
 
 - **IOBUF** — **supported** in the nextpnr-xilinx/prjxray flow (the
   QSPI DQ[3:0] bus is fine).
 - **STARTUPE2** — the config-bank startup block, user CCLK via
-  `USRCCLKO`. STARTUP site fuzzing is **incomplete** in the
-  nextpnr-xilinx + prjxray-db **artix7** flow, so the STARTUPE2 binding
-  is **NOT reliably supported**.
+  `USRCCLKO`. The `openXC7/nextpnr-xilinx` issue **#13** ("Prioritize
+  BSCANE2 + STARTUPE2 primitives") was **closed, completed 2024-02** →
+  STARTUPE2 **became supported** in the upstream toolchain. The
+  project-specific **artix7 `USRCCLKO`** path (config-flash CCLK in
+  user mode) is **not yet empirically verified in this project** — the
+  first WSL build will decide.
 
-Therefore: the **OpenXC7 path is best-effort in Sub5; the primary Sub5
-path is Vivado.** If `make all` fails at the `nextpnr-xilinx` step on
-STARTUPE2, that is the **documented OpenXC7 limitation**, not an
-RTL/XDC bug — per the single-layer-trust principle the limitation is
-stated, not papered over with a fake stub. (The smoke-test LED-blink
-passed on OpenXC7 on 2026-04-24 without STARTUPE2; STARTUPE2 is a new
+Therefore: the **OpenXC7 path is a first-class Sub5 target for the
+grant "fully open" deliverable; the empirically verified path is so
+far Vivado.** If `make all` still fails at the `nextpnr-xilinx` step
+on STARTUPE2, that is a **documented, to-be-verified risk**, not an
+RTL/XDC bug — per the single-layer-trust principle we state the actual
+status (supported upstream, unverified here), neither papering it over
+with a fake stub nor over-claiming. (The smoke-test LED-blink passed
+on OpenXC7 on 2026-04-24 without STARTUPE2; STARTUPE2 is a new
 requirement introduced by board.v.)
 
 ## Files
@@ -62,15 +67,19 @@ load the bitstream and the `.t0` separately into the config flash with
 ```bash
 # Bitstream to flash 0x0 (FPGA config)
 openFPGALoader -b <board> --write-flash cilcpu_a7lite.bit
-# App binary at a separate offset (see the flash-offset open question)
-openFPGALoader -b <board> --external-flash -o <APP_OFFSET> \
+# App binary at CODE_BASE_OFFSET (0xC00000) — Sub5.A
+openFPGALoader -b <board> --external-flash -o 0xC00000 \
     ../Vivado/build/app.t0
 ```
 
-**Flash offset (sim parity):** the cocotb model and the QSPI controller
-read CODE from flash QSPI 0x000000. **Open HW question:** the bitstream
-is also at 0x0 — details and resolution options in `../README.md` Sub5
-section.
+**Flash offset — RESOLVED in Sub5.A (not an open question):** the
+bitstream lives from config-flash 0x0 (~9.9 MB), the app is placed at
+`CODE_BASE_OFFSET = 0xC00000` (12 MB, above the bitstream) → **no
+collision**. **Single source:** this offset = the `Makefile`
+`CODE_BASE_OFFSET` chparam = the Vivado `write_cfgmem.tcl`
+`CODE_BASE_OFFSET_HEX` = the `cilcpu_qspi_controller` generic. SIM
+default `0` (bit-identical cocotb flash parity). Details:
+`../README.md` Sub5.A section + Vault `project_flash_base_offset`.
 
 ## Bring-up
 
@@ -81,3 +90,4 @@ See the full runbook: `../README.md` "Sub5" section.
 | Version | Date | Summary |
 |---------|------|---------|
 | 1.0 | 2026-05-17 | Initial release — full board.v OpenXC7 build; STARTUPE2 limitation documented |
+| 1.1 | 2026-05-17 | Doc-sync: flash-offset "open question" → Sub5.A RESOLVED (app @0xC00000, single source); STARTUPE2 status corrected (`#13` closed 2024-02 → supported upstream, artix7 USRCCLKO to verify here), best-effort → first-class grant target |

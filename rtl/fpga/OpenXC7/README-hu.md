@@ -2,7 +2,7 @@
 
 > English version: [README.md](README.md)
 
-> Verzió: 1.0
+> Verzió: 1.1
 
 A teljes `cilcpu_a7lite_board` OpenXC7-build-je (Yosys + nextpnr-xilinx
 + Project X-Ray) az A7-Lite XC7A200T-re. A `smoke_test/OpenXC7/`
@@ -11,23 +11,29 @@ mintáját követi, a teljes Nano core forrásfával.
 > **Hatókör:** A build a felhasználó WSL-gépén fut — itt nem futtatható
 > (nincs yosys/nextpnr-xilinx).
 
-## ⚠️ STARTUPE2-korlát (nyíltan kimondva)
+## ⚠️ STARTUPE2 — upstream támogatott, itt még nem igazolt
 
 A Sub4 board.v **STARTUPE2** + 4× **IOBUF** primitívet példányosít.
 
 - **IOBUF** — az nextpnr-xilinx/prjxray flow-ban **támogatott** (a
   QSPI DQ[3:0] busz rendben).
 - **STARTUPE2** — a config-bank startup blokk, a user CCLK a
-  `USRCCLKO`-n keresztül. Az nextpnr-xilinx + prjxray-db **artix7**
-  flow-ban a STARTUP site fuzzing **hiányos**, ezért a STARTUPE2
-  binding **NEM megbízhatóan támogatott**.
+  `USRCCLKO`-n keresztül. Az `openXC7/nextpnr-xilinx` **#13** issue
+  („Prioritize BSCANE2 + STARTUPE2 primitives") **lezárva, completed
+  2024-02** → a STARTUPE2 a felső toolchainben **támogatott lett**. A
+  projekt-specifikus **artix7 `USRCCLKO`** út (config-flash CCLK user
+  módban) **ebben a projektben empirikusan még nincs igazolva** — az
+  első WSL-build dönti el.
 
-Ezért: az **OpenXC7 path Sub5-ben best-effort; az elsődleges Sub5 path
-a Vivado.** Ha a `make all` a `nextpnr-xilinx` lépésnél a STARTUPE2-n
-elbukik, az a **dokumentált OpenXC7-korlát**, nem RTL/XDC-hiba — a
-single-layer-trust elv szerint a korlátot kimondjuk, nem kerüljük meg
-egy hamis stub-bal. (A smoke-teszt LED-blink STARTUPE2 nélkül ment át
-OpenXC7-en 2026-04-24-én; a STARTUPE2 a board.v új igénye.)
+Ezért: az **OpenXC7 path Sub5-ben egyenrangú cél a pályázati „fully
+open" deliverable miatt; az empirikusan igazolt path egyelőre a
+Vivado.** Ha a `make all` a `nextpnr-xilinx` lépésnél a STARTUPE2-n
+mégis elbukik, az **dokumentált, igazolandó kockázat**, nem RTL/XDC-hiba
+— a single-layer-trust elv szerint a tényleges státuszt kimondjuk
+(upstream támogatott, itt igazolatlan), se nem kerüljük meg hamis
+stub-bal, se nem állítjuk túl. (A smoke-teszt LED-blink STARTUPE2
+nélkül ment át OpenXC7-en 2026-04-24-én; a STARTUPE2 a board.v új
+igénye.)
 
 ## Fájlok
 
@@ -61,15 +67,19 @@ bitstream-et és a `.t0`-t külön töltjük a config flash-be
 ```bash
 # Bitstream a flash 0x0-ra (FPGA config)
 openFPGALoader -b <board> --write-flash cilcpu_a7lite.bit
-# App-bináris külön offszetre (lásd a flash-offszet nyitott kérdést)
-openFPGALoader -b <board> --external-flash -o <APP_OFFSET> \
-    ../scripts/../Vivado/build/app.t0
+# App-bináris a CODE_BASE_OFFSET-re (0xC00000) — Sub5.A
+openFPGALoader -b <board> --external-flash -o 0xC00000 \
+    ../Vivado/build/app.t0
 ```
 
-**Flash-offszet (sim-paritás):** a cocotb modell és a QSPI controller
-a CODE-ot a flash QSPI 0x000000-ról olvassa. **Nyitott HW-kérdés:** a
-bitstream is 0x0-tól van — részletek és a feloldási opciók a
-`../README-hu.md` Sub5 szakaszában.
+**Flash-offszet — Sub5.A-ban MEGOLDVA (nem nyitott kérdés):** a
+bitstream a config-flash 0x0-tól él (~9,9 MB), az app a
+`CODE_BASE_OFFSET = 0xC00000`-ra kerül (12 MB, a bitstream fölé) →
+**nincs ütközés**. **Egyetlen forrás:** ez az offszet = a `Makefile`
+`CODE_BASE_OFFSET` chparam = a Vivado `write_cfgmem.tcl`
+`CODE_BASE_OFFSET_HEX` = a `cilcpu_qspi_controller` generic. SIM
+default `0` (bit-azonos cocotb flash-paritás). Részletek:
+`../README-hu.md` Sub5.A szakasz + Vault `project_flash_base_offset`.
 
 ## Bring-up
 
@@ -80,3 +90,4 @@ Lásd a teljes runbookot: `../README-hu.md` „Sub5" szakasz.
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
 | 1.0 | 2026-05-17 | Kezdeti kiadás — teljes board.v OpenXC7 build; STARTUPE2-korlát dokumentálva |
+| 1.1 | 2026-05-17 | Doksi-szinkron: flash-offszet „nyitott kérdés" → Sub5.A MEGOLDVA (app @0xC00000, egyetlen forrás); STARTUPE2 státusz pontosítva (`#13` lezárva 2024-02 → upstream támogatott, artix7 USRCCLKO itt igazolandó), best-effort → pályázati egyenrangú cél |

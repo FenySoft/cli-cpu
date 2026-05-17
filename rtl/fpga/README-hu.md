@@ -2,7 +2,7 @@
 
 > English version: [README.md](README.md)
 
-> Verzió: 0.5.1 (Sub5.A)
+> Verzió: 0.5.2 (Sub5.A + doksi-szinkron)
 
 Ez a könyvtár tartalmazza a CLI-CPU Nano core FPGA integrációját a
 **MicroPhase A7-Lite XC7A200T** referencia board-ra. A cél az F3 (Tiny Tapeout
@@ -359,18 +359,23 @@ teljes példányosítási láncon (`cilcpu_qspi_controller` ←
   becsült FBG484+PCB trace skew ~0.5 ns. Az input-ablak a skew-val
   tágítva (−min 1.0 / −max 7.5), az output a flash s/h-val (−2.5 / +2.5).
 
-**OpenXC7 STARTUPE2-támogatás (nyíltan kimondott korlát):**
+**OpenXC7 STARTUPE2 — upstream támogatott, itt még igazolandó:**
 
 Az `IOBUF` az nextpnr-xilinx/prjxray flow-ban **támogatott** (a DQ[3:0]
 busz rendben). A **STARTUPE2** (config-bank startup blokk, a user CCLK a
-`USRCCLKO`-n keresztül) az nextpnr-xilinx + prjxray-db artix7 flow-ban
-**NEM megbízhatóan támogatott** — a STARTUP site fuzzing hiányos a
-prjxray-db-ben. Ezért az **OpenXC7 path Sub5-ben best-effort; az
-elsődleges Sub5 path a Vivado.** Ezt a single-layer-trust /
-no-compromise elv szerint **kimondjuk, nem kerüljük meg**: ha a
-nextpnr-xilinx a STARTUPE2-n elbukik, az a dokumentált OpenXC7-korlát,
-nem RTL/XDC-hiba. (Megjegyzés: a smoke-teszt LED-blink STARTUPE2 nélkül
-ment át OpenXC7-en 2026-04-24-én — a STARTUPE2 a board.v új igénye.)
+`USRCCLKO`-n keresztül): az `openXC7/nextpnr-xilinx` **#13** issue
+(„Prioritize BSCANE2 + STARTUPE2") **lezárva, completed 2024-02** → a
+felső toolchainben **támogatott lett**. A projekt-specifikus artix7
+`USRCCLKO` út **ebben a projektben empirikusan még nincs igazolva** —
+az első WSL-build dönti el. Ezért az **OpenXC7 a pályázati „fully open"
+deliverable miatt egyenrangú Sub5 cél; az empirikusan igazolt path
+egyelőre a Vivado.** A single-layer-trust / no-compromise elv szerint a
+**tényleges státuszt kimondjuk** (upstream támogatott, itt igazolatlan)
+— se nem kerüljük meg hamis stub-bal, se nem állítjuk túl: ha a
+nextpnr-xilinx mégis elbukik a STARTUPE2-n, az dokumentált, igazolandó
+kockázat, nem RTL/XDC-hiba. (Megjegyzés: a smoke-teszt LED-blink
+STARTUPE2 nélkül ment át OpenXC7-en 2026-04-24-én — a STARTUPE2 a
+board.v új igénye.)
 
 Az app-bináris OpenXC7-path-on: a `xc7frames2bit` után külön flash-image
 összefűzés vagy `openFPGALoader` (`--external-flash`, `-o <offszet>`) —
@@ -387,7 +392,7 @@ cd rtl/fpga/Vivado
 vivado -mode batch -source create_project.tcl
 vivado -mode batch -source write_cfgmem.tcl -tclargs build/app.t0
 
-# 2b. OpenXC7 (best-effort, lehet STARTUPE2-bukás)
+# 2b. OpenXC7 (egyenrangú cél; artix7 STARTUPE2/USRCCLKO itt igazolandó)
 cd rtl/fpga/OpenXC7
 bash build.sh check-env
 bash build.sh chipdb        # egyszeri, ~5-10 perc
@@ -440,3 +445,4 @@ hardveren. Nem része az F2.7-nek, de igazolja, hogy a flow áll.
 | 0.4.1 | 2026-05-17 | F2.7.D rekurzív CALL/RET gyökér-fix átvezetve (commit 762536b); a Sub3 „Ismert bug" feloldva, test_52c zöld |
 | 0.5 | 2026-05-17 | Sub5 build-infra — Vivado `create_project.tcl` + `write_cfgmem.tcl`, OpenXC7 `Makefile`/`build.sh`/XDC, `scripts/build_app_bin.sh`, XDC timing finomítás (IS25L128F datasheet). Flash-offszet paritás 0x000000 (sim ↔ cfgmem); OpenXC7 STARTUPE2-korlát nyíltan dokumentálva; bring-up runbook. Szintézis/timing/bring-up a felhasználóra vár (nem HW-verifikált) |
 | 0.5.1 | 2026-05-17 | Sub5.A — paraméterezhető `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). Flash-ütközés „nyitott kérdés" → MEGOLDVA: sim default 0 (bit-azonos paritás), FPGA 0xC00000 (12 MB, ~9,9 MB bitstream fölé). Egyetlen forrás: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 új cocotb teszt (test_30/31) + 7 regressziós target zöld; SEG_DATA szándékosan offszetlen (indoklás a Sub5 szakaszban) |
+| 0.5.2 | 2026-05-17 | Doksi-szinkron (`cascade-changes`): OpenXC7 README flash-offszet „nyitott kérdés" → Sub5.A MEGOLDVA-ra hozva; STARTUPE2 státusz pontosítva minden README-ben (`openXC7/nextpnr-xilinx #13` lezárva 2024-02 → upstream támogatott, projekt-specifikus artix7 USRCCLKO empirikusan itt igazolandó), „best-effort" → pályázati („fully open" NLnet) egyenrangú Sub5 cél |
