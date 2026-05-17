@@ -6,7 +6,7 @@ status: living
 
 > English version: [roadmap-en.md](roadmap-en.md)
 
-> Version: 1.6
+> Version: 1.8
 
 A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első működő, kezedben tartható szilíciumig és tovább, a teljes ECMA-335 CIL implementációig.
 
@@ -462,6 +462,42 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 ---
 
+### F6.7 — „Cognitive Fabric Dense" node-shrink (GF 22FDX, Dresden) — opcionális de-risk lépcső
+
+**Cél:** Az F6-Silicon One-ban (6R+16N+1S, 130nm) verifikált design **node-shrink validációja** egy gyártásérett, sűrű, alacsony fogyasztású processen — **európai földön** (GlobalFoundries Fab 1, Dresden). Ez áthidalja a roadmap **legnagyobb technológiai szakadékát**: minden eddigi szilícium-bizonyíték 130nm-en van (F3 Sky130, F6-Si Zero IHP SG13G2, F6-Si One Sky130), a termék-vízió viszont 5nm-ről indul (`chiplet-packaging-hu.md`) — köztük ~10× logikai sűrűség-különbség, ma de-risking lépcső nélkül.
+
+**Miért önálló, opcionális mérföldkő:**
+- Nem kötelező út — ugyanúgy, ahogy az F6-Silicon Zero is opcionális de-risk a Tiny Tapeout és a Cognitive Fabric One között. A 22FDX a **130nm → 5nm** szakadékot hidalja.
+- Az **F6-Si One** (130nm) bizonyítja, hogy a heterogén multi-core működik szilíciumon. A **Cognitive Fabric Dense** azt bizonyítja, hogy ugyanaz a design **node-skálázódik** — egy 5nm MPW (~$300K+ maszk-szett) kockázata nélkül.
+
+**Miért 22FDX (decision-trail):** mérlegelt alternatívák — *marad 130nm→ugrás 5nm* (elvetve: nulla de-risking a szakadékon belül), *STMicro Crolles 28nm FD-SOI* (elvetve: csak ~2× sűrűség, nincs nyílt MPW kisszereplőnek), *TSMC Dresden 12nm* (elvetve: nem EU-cég, 2027 előtt nincs, MPW bizonytalan). **Megtartva a GF 22FDX**, mert: (1) valódi köztes sűrűség (22nm FD-SOI ≈ 28nm és 16nm FinFET között); (2) a CFPU-profilra szabva — kiváló SRAM-sűrűség + ultra-low-power + back-gate body biasing, ami pont az idle core-ok agresszív power-gatingjét segíti (explicit F6-One cél); (3) Europractice MPW shuttle-n hozzáférhető kisszereplőnek; (4) európai földön marad (Dresden), konzisztens az IHP-vonallal. Teljes döntési napló: Vault `Decisions/2026-05-17-f67-22fdx-intermediate-node.md`.
+
+**Mit bizonyít, amit a 130nm nem tud:**
+- **Node-portabilitás** — ugyanaz az RTL std-cell remap + SRAM compiler csere + clock tree után sűrű processen is záródik
+- **Reális órajel** — 130nm-en ~50–100 MHz a plafon; 22FDX-en a **>500 MHz** cél (az F6-One „kritikus mérés" kritériuma) ténylegesen elérhető és mérhető
+- **Reális energia/op** — a termék-vízió power-számai 5nm-ről extrapoláltak; a 22FDX az **első valós, nem irodalmi** energiapont
+- **Sűrűség-kalibráció** — a `chiplet-packaging-hu.md` 5nm→3nm→2nm skálázási táblája egy valós mérési ponttal kalibrálható
+
+**Kész kritérium:**
+- A Cognitive Fabric Dense lapka legyártva és a kezedben (GF 22FDX, Dresden)
+- Az F6-Si One-on verifikált összes demó megismételve a sűrű node-on
+- **>500 MHz órajel** ténylegesen mérve, valós energia/op az event-driven workloadokon
+- Összehasonlítás az F6-Si One 130nm chipjével — a node-skálázódás kvantitatívan kimutatva
+- A `chiplet-packaging` skálázási tábla frissítve a mért 22FDX ponttal
+
+**Függőség:** **F6-Silicon One kész** (130nm referencia legyártva, demók verifikálva). Indulási feltétel — opcionális, ezért csak ha **legalább egy** igaz: a projekt finanszírozást/ipari partnert kapott a tape-out fedezésére **vagy** a >500 MHz / valós energia mérés kritikus a következő mérföldkőhöz (F7 demó HW, F6.5 Secure Edition).
+
+**Költség-nagyságrend:** GF 22FDX **Europractice MPW** shuttle-n — **nem ingyenes** (ellentétben az IHP FMD-QNC programmal), MPW-áron a néhány mm²-es die nagyságrendileg **tízezres €** tartomány (a teljes maszk-szett milliós nagyságrendje helyett). **A pontos ár az Europractice aktuális árlistájából igazolandó a fázis indulása előtt — itt nem becsüljük.** Plusz tervezési munka az F6-Si One-on felül: std-cell remap + SRAM compiler csere + CTS + sign-off ≈ **~2-3 mérnökhónap** (hasonló az F6-Si One floorplan/sign-off munkájához).
+
+**Kimenet:**
+- `mpw/22fdx/` — Europractice/GF submission könyvtár
+- `hw/cfdense-board/` — Cognitive Fabric Dense bring-up board
+- Frissített `chiplet-packaging` skálázási tábla (mért 22FDX pont)
+
+**Megjegyzés:** A Cognitive Fabric Dense **nem helyettesíti** sem az F6-Si One-t, sem az F7-et — egy opcionális node-shrink de-risk lépcső, amely a 130nm validált design és az 5nm termék-tape-out közötti kockázatot csökkenti. A moat továbbra is a **tervezés + ISA + .NET-stack + Symphact co-design**, nem a gyártás — a 22FDX a *bizonyíték*, hogy a design sűrű node-on is áll, nem maga a termék.
+
+---
+
 ### F7 — Demonstrációs platform + Symphact fejlesztői SDK
 
 **Cél:** A Cognitive Fabric + Symphact kombináció mint **demonstrálható, fejleszthető platform** több valós use-case-re. A `Symphact` itt lép ki kutatási státuszból valós fejlesztői platform szintre.
@@ -529,6 +565,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 | **F6-Si Zero** | IHP 3 mm² (1R+8N, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Tervezett |
 | **F6-Si One** | ChipIgnite 15 mm² (6R+16N+1S, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Tervezett |
 | **F6.5** | Secure Edition (Crypto Actor, TRNG, PUF, tamper, DPA) | ~5 600 | ~35 | ⬜ Opcionális |
+| **F6.7** | Cognitive Fabric Dense — 22FDX node-shrink (GF Dresden) | ~360 | ~2.3 | ⬜ Opcionális |
 | **F7** | Symphact SDK + demó platform (PCB-k, SDK, alkalmazások) | ~520 | ~3.3 | ⬜ Tervezett |
 | | **Összesen (F6.5 nélkül)** | **~3 630** | **~23** | |
 | | **Összesen (F6.5-tel)** | **~9 230** | **~58** | |
@@ -540,6 +577,7 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 - Az F4 becslés alacsonyabb, mint ami core-szám alapján várható, mert a Nano core RTL **újrafelhasználható** az F2/F3-ból — az érdemi új munka a router, sleep/wake és demók
 - Az F6-Silicon Zero és One **párhuzamosan** is futhat az F6-FPGA után, de egymás után is — a táblázat az érdemi mérnöki munkát mutatja, a gyártási várakozási időt nem
 - Az F6.5 (Secure Edition) egy **külön csapatot** igényel, és a Common Criteria tanúsítás további ~2–3 év
+- Az F6.7 (Cognitive Fabric Dense, 22FDX) **opcionális de-risk lépcső** — az F6.5-höz hasonlóan **nem szerepel** a „F6.5 nélkül" összesenben; csak akkor indul, ha finanszírozás van vagy a sűrű-node mérés kritikus a következő mérföldkőhöz
 - A becslések **tiszta mérnöki munkaidőt** tartalmaznak — a gyártási átfutás (TT ~5 hó, ChipIgnite ~5 hó, IHP ~4 hó), szállítás és bring-up várakozás nincs benne
 
 ### NLnet NGI Zero Commons Fund összehangolás
@@ -722,6 +760,7 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.8 | 2026-05-17 | **F6.7 opcionális de-risk lépcső hozzáadva** — „Cognitive Fabric Dense" 22FDX node-shrink (GlobalFoundries Fab 1, Dresden) az F6-Silicon One és F7 közé. Áthidalja a roadmap legnagyobb technológiai szakadékát (130nm minden szilícium-bizonyíték ↔ 5nm termék-vízió, ~10× sűrűség). Decision-trail: 22FDX megtartva (köztes sűrűség + CFPU-profil illeszkedés + EU-föld + Europractice MPW), 28nm Crolles / TSMC 12nm / 130→5nm-ugrás elvetve. Munkaóra-tábla (~360 h, opcionális, totálba nem számít), Megjegyzések, ADR `Decisions/2026-05-17-f67-22fdx-intermediate-node.md`. Kaszkád: `chiplet-packaging`, `perf-vs-riscv`. |
 | 1.7 | 2026-05-17 | **F2.7 Sub5.A KÉSZ** — config-flash app-bázis-offszet gyökér-fix: paraméterezhető `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). A Sub5 build-infra „nyitott HW-kérdése" (bitstream@0x0 ↔ app@0x0 ütközés) megoldva: sim default 0 (bit-azonos paritás), FPGA 0xC00000 (12 MB, ~9,9 MB bitstream fölé). Egyetlen forrás: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 új cocotb teszt (test_30/31) RED→GREEN + 7 regressziós target zöld. SEG_DATA szándékosan offszetlen (indoklás dokumentálva). `todo.md` F2.7.E, README-k 0.5.1, Vault: project_flash_base_offset. |
 | 1.6 | 2026-05-16 | **F2.7.D KÉSZ** — rekurzív CALL/RET caller eval depth megőrzés gyökér-fix (flush SRAM-ba + eval depth a header reserved mezőjében + RET SPFILL cache-újratöltés, 3 modul: `cilcpu_stack_cache.v` + `cilcpu_core.v`). A korábbi „F2.5a egyszerűsítés" (project_recursive_call_bug, `TRAP_STACK_UNDERFLOW` rekurzív Fibonacci-nál) megoldva. test_core 49/49, test_stack_cache 28/28 (3 új unit teszt), wrapper/board mind zöld, új regresszió `test_52c` (Fib(10)=55). CORE_SPEC v1.5. Munkaóra-tábla + Mai státusz frissítve. |
 | 1.5 | 2026-05-14 | F2.7 Sub4 KÉSZ — board-szintű top wrapper (`cilcpu_a7lite_board.v`) STARTUPE2 + 4× IOBUF körül a `cilcpu_a7lite_top` köré; sim stub fájl Xilinx primitivekhez; XDC frissítve a QSPI flash pinekkel (T19, P22, R22, P21, R21) + `qspi_sck` generated clock. **5 új cocotb zöld** (4 smoke + 1 Fibonacci e2e a board.v-n át). Mai státusz, becsült munkaóra-tábla frissítve. |

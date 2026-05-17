@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [chiplet-packaging-hu.md](chiplet-packaging-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 This document specifies the Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architecture**: chiplet types, multi-chiplet configurations, technology scaling, and the impact on Symphact.
 
@@ -190,6 +190,18 @@ SRAM does not scale at the same rate as logic because the 6-transistor SRAM cell
 | 1.4nm | 3.5× | **1.3×** |
 | 1nm | 5× | **1.5×** (with 3D SRAM) |
 
+### 22FDX Calibration Point (F6.7 — measured)
+
+The scaling table above is a forward-extrapolated working hypothesis **relative to 5nm** — from literature, not measured silicon. The roadmap [F6.7 "Cognitive Fabric Dense"](roadmap-en.md#f67--cognitive-fabric-dense-node-shrink-gf-22fdx-dresden--optional-de-risk-step) optional de-risk step exists to calibrate this table against a **real measured point**:
+
+| Node | Role | Logic Density | SRAM Density |
+|------|------|---------------|--------------|
+| 130nm (Sky130 / IHP SG13G2) | F3 / F6-Si Zero / F6-Si One silicon proof | silicon-proof, not perf baseline | — |
+| **22nm FD-SOI (GF, F6.7)** | **intermediate measured calibration point** | ≈ between 28nm and 16nm FinFET (to be measured) | FD-SOI: excellent (to be measured) |
+| 5nm | product-vision baseline (1×) | 1× (extrapolation origin) | 1× |
+
+22FDX bridges the **~10× density gap** between the 130nm silicon proof and the 5nm product vision: in F6.7 the actually measured logic/SRAM density and energy/op replace the literature extrapolation over one segment of the table. The exact ratios can be filled in **only after the F6.7 measurement** — until then the cells above are intentionally "to be measured".
+
 ### Chiplet Size Growth
 
 Defect density decreases with each generation, enabling larger chiplets at 90%+ yield:
@@ -291,4 +303,5 @@ If cooling technology permits, chiplets can be stacked in two layers via SoIC:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-05-17 | **22FDX Calibration Point (F6.7)** section added to Technology Scaling — the roadmap F6.7 optional de-risk step ties the ~10× density gap between the 130nm silicon proof and the 5nm product vision to a real measured point; exact ratios are "to be measured" until F6.7. Cascade: `roadmap` v1.8, `perf-vs-riscv`. |
 | 1.0 | 2026-04-23 | Initial version — C/R chiplet types, 1+1..8 product variants, combined mesh+star topology, 256-bit 500 MHz link, DDR5 in C chiplet, technology scaling (SRAM wall, 3D SRAM, chiplet size growth), Symphact scheduler impact |

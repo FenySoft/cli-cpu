@@ -6,7 +6,7 @@ status: vision
 
 > English version: [perf-vs-riscv-en.md](perf-vs-riscv-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vízió-szintű dokumentum.** A számszerű becslések irodalmi precedensek (picoJava-2 perf paper, Jazelle DBX measurement, Krall & Probst 1998, Azul Vega) extrapolációi. **Nem RTL-szintű mérés, nem szilikon-mérés.** A pontos arányok csak F1.5 dynamic instruction count baseline + F2.7 FPGA cycle-accurate prototípus + F4 multi-core RTL + F6 szilícium után validálhatók. A dokumentum célja a **methodológia rögzítése** és a felmért becslések reprodukálható alapra hozása, nem a végleges számok deklarálása.
 
@@ -76,6 +76,20 @@ Eredmény: **valódi mért wall-clock**, ugyanazon clock-on, ugyanazon FPGA-n.
 
 A Cognitive Fabric One MPW (15 mm², 6R+16N+1S) a végső igazság. Egy referencia RV chip ugyanazon node-on (pl. SiFive U74 PMP).
 
+> **Fontos korlát:** a Cognitive Fabric One MPW **130nm** (Sky130). Ez „működik szilíciumon" bizonyíték — **nem** reális perf- vagy energia-baseline a termék-vízió (5nm) számára: a 130nm órajel-plafonja ~50–100 MHz, az energia/op nagyságrendekkel rosszabb. A 130nm-en mért RV-arány **funkcionálisan** érvényes, de a *sűrű-node* perf/energia kérdést nem dönti el.
+
+### Módszer 3.5: 22FDX szilícium mérés (F6.7-ben elérhető, opcionális)
+
+A roadmap [F6.7 „Cognitive Fabric Dense"](roadmap-hu.md#f67--cognitive-fabric-dense-node-shrink-gf-22fdx-dresden--opcionális-de-risk-lépcső) opcionális de-risk lépcső a GlobalFoundries **22FDX** (22nm FD-SOI, Dresden) processzen tape-out-olja az F6-Si One-ban verifikált designt. Ez az **első valós, nem irodalmi** perf/energia mérési pont egy *sűrű* node-on — a 130nm (Módszer 3) és az 5nm termék-vízió közötti ~10× sűrűség-szakadékban.
+
+| | Módszer 3 (130nm) | **Módszer 3.5 (22FDX)** | Termék-vízió (5nm) |
+|---|---|---|---|
+| Órajel | ~50–100 MHz | **>500 MHz (mért)** | extrapoláció |
+| Energia/op | gyenge (130nm) | **első valós mért pont** | extrapoláció |
+| RV-arány | funkcionálisan érvényes | **sűrű-node-on érvényes** | extrapoláció |
+
+A 22FDX-en a referencia összehasonlítás egy ugyanazon node-ra szintetizált RV core-ral (VexRiscv/SERV ASIC flow), nem FPGA-emulációval. Ez a pont kalibrálja a `chiplet-packaging` skálázási táblát is (lásd ott a „22FDX kalibrációs pont" szekciót). **Opcionális** — csak ha az F6.7 elindul (finanszírozás vagy kritikus sűrű-node mérés).
+
 ## Reprodukálható baseline — mit csináljunk most (F1.5)
 
 Ezt **a következő lépésként javasoljuk implementálni** a `CilCpu.Sim` projektben:
@@ -136,4 +150,5 @@ Ezt a perspektívát **minden összehasonlító kommunikációban explicit fennt
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.1 | 2026-05-17 | **Módszer 3.5: 22FDX szilícium mérés** hozzáadva — a roadmap F6.7 opcionális de-risk lépcső adja az első valós (nem irodalmi) sűrű-node perf/energia pontot a 130nm (Módszer 3) és 5nm termék-vízió közötti ~10× szakadékban. Módszer 3-hoz a 130nm-korlát figyelmeztetés. Kaszkád: `roadmap` v1.8, `chiplet-packaging` v1.1. |
 | 1.0 | 2026-04-25 | Kezdeti verzió — methodológia (dynamic instruction count, FPGA, szilikon), in-order vs in-order összehasonlítás, OoO-feltételezés visszavonva, F1.5 baseline-mérés terv |

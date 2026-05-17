@@ -6,7 +6,7 @@ status: vision
 
 > English version: [chiplet-packaging-en.md](chiplet-packaging-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architektúráját** specifikálja: a chiplet típusokat, a multi-chiplet elrendezéseket, a technológiai skálázást és a Symphact-re gyakorolt hatást.
 
@@ -190,6 +190,18 @@ Az SRAM nem skálázódik a logikával azonos ütemben, mert a 6 tranzisztoros S
 | 1,4nm | 3,5× | **1,3×** |
 | 1nm | 5× | **1,5×** (3D SRAM-mal) |
 
+### 22FDX kalibrációs pont (F6.7 — mért)
+
+A fenti skálázási tábla az 5nm-hez **viszonyított, előre extrapolált** munkahipotézis — irodalmi adatokból, nem mért szilíciumból. A roadmap [F6.7 „Cognitive Fabric Dense"](roadmap-hu.md#f67--cognitive-fabric-dense-node-shrink-gf-22fdx-dresden--opcionális-de-risk-lépcső) opcionális de-risk lépcső célja, hogy ezt a táblát egy **valós mért ponttal** kalibrálja:
+
+| Node | Szerep | Logika sűrűség | SRAM sűrűség |
+|------|--------|----------------|--------------|
+| 130nm (Sky130 / IHP SG13G2) | F3 / F6-Si Zero / F6-Si One szilícium-bizonyíték | szilícium-proof, nem perf-baseline | — |
+| **22nm FD-SOI (GF, F6.7)** | **köztes mért kalibrációs pont** | ≈ 28nm és 16nm FinFET között (mérendő) | FD-SOI: kiváló (mérendő) |
+| 5nm | termék-vízió baseline (1×) | 1× (extrapoláció kezdőpontja) | 1× |
+
+A 22FDX a 130nm szilícium-proof és az 5nm termék-vízió közötti **~10× sűrűség-szakadékot** hidalja: az F6.7-ben ténylegesen mért logika-/SRAM-sűrűség és energia/op váltja fel a tábla egy szakaszán az irodalmi extrapolációt. A pontos arányok **csak az F6.7 mérés után** írhatók be — addig a fenti cellák szándékosan „mérendő".
+
 ### Chiplet méret növekedés
 
 A defect density csökken generációnként, ami nagyobb chiplet-eket tesz lehetővé 90%+ yield mellett:
@@ -291,4 +303,5 @@ Ha a hűtés technológia megengedi, a chiplet-ek két rétegben stackelhetők S
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.1 | 2026-05-17 | **22FDX kalibrációs pont (F6.7)** szekció hozzáadva a Technológiai skálázáshoz — a roadmap F6.7 opcionális de-risk lépcső köti a 130nm szilícium-proof és az 5nm termék-vízió közötti ~10× sűrűség-szakadékot egy valós mért ponthoz; a pontos arányok F6.7 mérésig „mérendő". Kaszkád: `roadmap` v1.8, `perf-vs-riscv`. |
 | 1.0 | 2026-04-23 | Kezdeti verzió — C/R chiplet típusok, 1+1..8 termékváltozatok, kombinált mesh+csillag topológia, 256-bit 500 MHz link, DDR5 a C chipletben, technológiai skálázás (SRAM fal, 3D SRAM, chiplet méret növekedés), Symphact scheduler hatás |

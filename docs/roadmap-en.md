@@ -6,7 +6,7 @@ status: living
 
 > Magyar verzió: [roadmap-hu.md](roadmap-hu.md)
 
-> Version: 1.6
+> Version: 1.8
 
 The CLI-CPU project is built in **seven phases**, from the specification document to the first working, hand-held silicon and beyond, to a full ECMA-335 CIL implementation.
 
@@ -462,6 +462,42 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 ---
 
+### F6.7 — "Cognitive Fabric Dense" node-shrink (GF 22FDX, Dresden) — optional de-risk step
+
+**Goal:** **Node-shrink validation** of the design verified in F6-Silicon One (6R+16N+1S, 130nm) on a mature, dense, low-power process — on **European soil** (GlobalFoundries Fab 1, Dresden). This bridges the roadmap's **largest technology gap**: every silicon proof so far is at 130nm (F3 Sky130, F6-Si Zero IHP SG13G2, F6-Si One Sky130), while the product vision starts at 5nm (`chiplet-packaging-en.md`) — a ~10× logic-density difference with no de-risking step today.
+
+**Why a standalone, optional milestone:**
+- Not a mandatory path — just as F6-Silicon Zero is an optional de-risk between Tiny Tapeout and Cognitive Fabric One. The 22FDX bridges the **130nm → 5nm** gap.
+- **F6-Si One** (130nm) proves the heterogeneous multi-core works in silicon. **Cognitive Fabric Dense** proves the same design **node-scales** — without the risk of a 5nm MPW (~$300K+ mask set).
+
+**Why 22FDX (decision-trail):** alternatives considered — *stay 130nm→jump to 5nm* (rejected: zero de-risking within the gap), *STMicro Crolles 28nm FD-SOI* (rejected: only ~2× density, no open MPW for small players), *TSMC Dresden 12nm* (rejected: not an EU company, not before 2027, MPW access uncertain). **GF 22FDX retained** because: (1) genuine intermediate density (22nm FD-SOI ≈ between 28nm and 16nm FinFET); (2) tailored to the CFPU profile — excellent SRAM density + ultra-low-power + back-gate body biasing, which directly aids aggressive power-gating of idle cores (an explicit F6-One goal); (3) accessible to small players via Europractice MPW shuttle; (4) stays on European soil (Dresden), consistent with the IHP line. Full decision log: Vault `Decisions/2026-05-17-f67-22fdx-intermediate-node.md`.
+
+**What it proves that 130nm cannot:**
+- **Node portability** — the same RTL closes on a dense process after std-cell remap + SRAM compiler swap + clock tree
+- **Realistic clock** — 130nm tops out at ~50–100 MHz; on 22FDX the **>500 MHz** target (the F6-One "critical measurement" criterion) is actually reachable and measurable
+- **Realistic energy/op** — the product-vision power numbers are extrapolated from 5nm; 22FDX is the **first real, non-literature** energy data point
+- **Density calibration** — the `chiplet-packaging-en.md` 5nm→3nm→2nm scaling table can be calibrated against a real measured point
+
+**Completion criteria:**
+- The Cognitive Fabric Dense chip manufactured and in hand (GF 22FDX, Dresden)
+- All demos verified on F6-Si One reproduced on the dense node
+- **>500 MHz clock** actually measured, real energy/op on event-driven workloads
+- Comparison against the F6-Si One 130nm chip — node-scaling quantitatively demonstrated
+- The `chiplet-packaging` scaling table updated with the measured 22FDX point
+
+**Dependency:** **F6-Silicon One done** (130nm reference manufactured, demos verified). Start condition — optional, therefore only if **at least one** is true: the project has obtained funding/an industrial partner to cover the tape-out **or** the >500 MHz / real energy measurement is critical for the next milestone (F7 demo HW, F6.5 Secure Edition).
+
+**Cost estimate:** GF 22FDX via **Europractice MPW** shuttle — **not free** (unlike the IHP FMD-QNC program); at MPW pricing a few-mm² die is in the **tens-of-thousands EUR** range (versus the millions for a full mask set). **The exact price must be confirmed from the current Europractice price list before the phase starts — not estimated here.** Additional design work on top of F6-Si One: std-cell remap + SRAM compiler swap + CTS + sign-off ≈ **~2-3 engineer-months** (similar to the F6-Si One floorplan/sign-off effort).
+
+**Output:**
+- `mpw/22fdx/` — Europractice/GF submission directory
+- `hw/cfdense-board/` — Cognitive Fabric Dense bring-up board
+- Updated `chiplet-packaging` scaling table (measured 22FDX point)
+
+**Note:** Cognitive Fabric Dense **does not replace** either F6-Si One or F7 — it is an optional node-shrink de-risk step that reduces the risk between the 130nm validated design and the 5nm product tape-out. The moat remains **design + ISA + .NET stack + Symphact co-design**, not manufacturing — the 22FDX is the *proof* that the design holds on a dense node, not the product itself.
+
+---
+
 ### F7 — Demonstration Platform + Symphact Developer SDK
 
 **Goal:** The Cognitive Fabric + Symphact combination as a **demonstrable, developable platform** for multiple real use cases. The `Symphact` graduates from research status to a real developer platform here.
@@ -529,6 +565,7 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 | **F6-Si Zero** | IHP 3 mm² (1R+8N, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Planned |
 | **F6-Si One** | ChipIgnite 15 mm² (6R+16N+1S, tape-out + bring-up) | ~360 | ~2.3 | ⬜ Planned |
 | **F6.5** | Secure Edition (Crypto Actor, TRNG, PUF, tamper, DPA) | ~5,600 | ~35 | ⬜ Optional |
+| **F6.7** | Cognitive Fabric Dense — 22FDX node-shrink (GF Dresden) | ~360 | ~2.3 | ⬜ Optional |
 | **F7** | Symphact SDK + demo platform (PCBs, SDK, applications) | ~520 | ~3.3 | ⬜ Planned |
 | | **Total (without F6.5)** | **~3,630** | **~23** | |
 | | **Total (with F6.5)** | **~9,230** | **~58** | |
@@ -540,6 +577,7 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 - The F4 estimate is lower than core count might suggest because Nano core RTL is **reused** from F2/F3 — the substantive new work is the router, sleep/wake, and demos
 - F6-Silicon Zero and One **can run in parallel** after F6-FPGA, or sequentially — the table shows pure engineering effort, not manufacturing wait times
 - F6.5 (Secure Edition) requires a **separate team**, and Common Criteria certification adds ~2–3 years
+- F6.7 (Cognitive Fabric Dense, 22FDX) is an **optional de-risk step** — like F6.5 it is **not included** in the "without F6.5" total; it only starts if funding is available or the dense-node measurement is critical for the next milestone
 - Estimates cover **pure engineering time** only — manufacturing lead times (TT ~5 months, ChipIgnite ~5 months, IHP ~4 months), shipping, and bring-up waiting are not included
 
 ### NLnet NGI Zero Commons Fund Alignment
@@ -714,6 +752,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.8 | 2026-05-17 | **F6.7 optional de-risk step added** — "Cognitive Fabric Dense" 22FDX node-shrink (GlobalFoundries Fab 1, Dresden) between F6-Silicon One and F7. Bridges the roadmap's largest technology gap (130nm — all silicon proofs ↔ 5nm product vision, ~10× density). Decision-trail: 22FDX retained (intermediate density + CFPU-profile fit + EU soil + Europractice MPW), 28nm Crolles / TSMC 12nm / 130→5nm jump rejected. Work-hours table (~360 h, optional, not counted in total), Notes, ADR `Decisions/2026-05-17-f67-22fdx-intermediate-node.md`. Cascade: `chiplet-packaging`, `perf-vs-riscv`. |
 | 1.7 | 2026-05-17 | **F2.7 Sub5.A DONE** — config-flash app base offset root fix: parameterizable `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). The Sub5 build-infra "open HW question" (bitstream@0x0 ↔ app@0x0 collision) resolved: sim default 0 (bit-identical parity), FPGA 0xC00000 (12 MB, above the ~9.9 MB bitstream). Single source: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 new cocotb tests (test_30/31) RED→GREEN + 7 regression targets green. SEG_DATA intentionally not offset (rationale documented). `todo.md` F2.7.E, READMEs 0.5.1, Vault: project_flash_base_offset. |
 | 1.6 | 2026-05-16 | **F2.7.D DONE** — recursive CALL/RET caller eval depth preservation root fix (flush to SRAM + eval depth in header reserved field + RET SPFILL cache refill, 3 modules: `cilcpu_stack_cache.v` + `cilcpu_core.v`). The former "F2.5a simplification" (project_recursive_call_bug, `TRAP_STACK_UNDERFLOW` on recursive Fibonacci) is resolved. test_core 49/49, test_stack_cache 28/28 (3 new unit tests), wrapper/board all green, new regression `test_52c` (Fib(10)=55). CORE_SPEC v1.5. Work-hours table + Current Status updated. |
 | 1.5 | 2026-05-14 | F2.7 Sub1..Sub4 DONE — board-level top wrapper (`cilcpu_a7lite_board.v`) STARTUPE2 + 4× IOBUF wrapped around `cilcpu_a7lite_top`; sim stub file for Xilinx primitives; XDC updated with QSPI flash pins (T19, P22, R22, P21, R21) + `qspi_sck` generated clock. **5 new cocotb tests green** (4 smoke + 1 Fibonacci e2e through board.v). Current Status, Estimated Work Hours table updated. |

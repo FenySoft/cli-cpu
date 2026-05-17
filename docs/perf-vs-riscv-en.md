@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [perf-vs-riscv-hu.md](perf-vs-riscv-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vision-level document.** Numerical estimates are extrapolations from documented sources (picoJava-2 perf paper, Jazelle DBX measurements, Krall & Probst 1998, Azul Vega). **Not an RTL-level measurement, not a silicon measurement.** Precise ratios can only be validated after F1.5 dynamic instruction count baseline + F2.7 FPGA cycle-accurate prototype + F4 multi-core RTL + F6 silicon. The document records **methodology** and brings prior estimates onto a reproducible foundation, not declared final numbers.
 
@@ -76,6 +76,20 @@ Result: **actual measured wall-clock**, same clock, same FPGA.
 
 The Cognitive Fabric One MPW (15 mm², 6R+16N+1S) is the final ground truth. A reference RV chip on the same node (e.g. SiFive U74 PMP).
 
+> **Important caveat:** the Cognitive Fabric One MPW is **130nm** (Sky130). This is a "works in silicon" proof — **not** a realistic perf or energy baseline for the product vision (5nm): the 130nm clock ceiling is ~50–100 MHz and energy/op is orders of magnitude worse. The RV ratio measured at 130nm is **functionally** valid but does not settle the *dense-node* perf/energy question.
+
+### Method 3.5: 22FDX silicon measurement (available in F6.7, optional)
+
+The roadmap [F6.7 "Cognitive Fabric Dense"](roadmap-en.md#f67--cognitive-fabric-dense-node-shrink-gf-22fdx-dresden--optional-de-risk-step) optional de-risk step tapes out the design verified in F6-Si One on the GlobalFoundries **22FDX** (22nm FD-SOI, Dresden) process. This is the **first real, non-literature** perf/energy data point on a *dense* node — within the ~10× density gap between 130nm (Method 3) and the 5nm product vision.
+
+| | Method 3 (130nm) | **Method 3.5 (22FDX)** | Product vision (5nm) |
+|---|---|---|---|
+| Clock | ~50–100 MHz | **>500 MHz (measured)** | extrapolation |
+| Energy/op | poor (130nm) | **first real measured point** | extrapolation |
+| RV ratio | functionally valid | **valid on a dense node** | extrapolation |
+
+On 22FDX the reference comparison uses an RV core synthesized to the same node (VexRiscv/SERV ASIC flow), not FPGA emulation. This point also calibrates the `chiplet-packaging` scaling table (see the "22FDX Calibration Point" section there). **Optional** — only if F6.7 starts (funding or critical dense-node measurement).
+
 ## Reproducible baseline — what to do now (F1.5)
 
 We propose this as **the next implementation step** in the `CilCpu.Sim` project:
@@ -136,4 +150,5 @@ This perspective must be **explicitly maintained in every comparative communicat
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-05-17 | **Method 3.5: 22FDX silicon measurement** added — the roadmap F6.7 optional de-risk step provides the first real (non-literature) dense-node perf/energy point in the ~10× gap between 130nm (Method 3) and the 5nm product vision. 130nm-caveat warning added to Method 3. Cascade: `roadmap` v1.8, `chiplet-packaging` v1.1. |
 | 1.0 | 2026-04-25 | Initial version — methodology (dynamic instruction count, FPGA, silicon), in-order vs in-order comparison, OoO assumption withdrawn, F1.5 baseline measurement plan |
