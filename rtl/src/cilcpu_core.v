@@ -189,6 +189,21 @@ module cilcpu_core #(
     reg         r_sram_re;
     reg  [31:0] r_sram_rdata_latched;
 
+    // hu: SRAM bus arbiter — a két forrás (Stack Cache spill/fill `w_sc_*`
+    //     PRIORITÁSSAL, ill. a microcode/boot `r_sram_*`) egyetlen single-port
+    //     cím-/adat-/enable-jelkészletre muxolva. A muxolás a memória-blokkon
+    //     KÍVÜL történik, hogy a Vivado tiszta single-port BRAM-ot inferáljon
+    //     (a blokkon belüli elágaztatást több portos memóriának látná).
+    // en: SRAM bus arbiter — the two sources (Stack Cache spill/fill `w_sc_*`
+    //     with PRIORITY, and the microcode/boot `r_sram_*`) muxed into one
+    //     single-port address/data/enable set. The mux lives OUTSIDE the
+    //     memory block so Vivado infers a clean single-port BRAM (branching
+    //     inside the block would look like a multi-port memory).
+    wire [11:0] w_sram_idx   = w_sc_busy ? w_sc_sram_addr[13:2] : r_sram_addr[13:2];
+    wire [31:0] w_sram_wdata = w_sc_busy ? w_sc_sram_wdata      : r_sram_wdata;
+    wire        w_sram_we    = w_sc_busy ? w_sc_sram_we         : r_sram_we;
+    wire        w_sram_re    = w_sc_busy ? w_sc_sram_re         : r_sram_re;
+
     // ============================================================
     // hu: QSPI controller bekötése
     // en: QSPI controller wiring
@@ -445,8 +460,17 @@ module cilcpu_core #(
         case (uc_pc_src)
             `PC_SRC_NEXT:   pc_next = r_pc + {21'd0, r_length};
             `PC_SRC_BRANCH: pc_next = r_pc + {21'd0, r_length} + branch_offset_ext;
-            `PC_SRC_RET:    pc_next = r_sram[r_fp[13:2]][23:0];
-            default:        pc_next = r_pc;  // PC_SRC_CALL: Sub5
+            // hu: PC_SRC_RET / PC_SRC_CALL: a RET-/CALL-állapotgép hajtja a
+            //     PC-t a regisztrált úton (RET_FINALIZE: r_pc <= r_ret_return_pc),
+            //     a pc_next mux ezekre nem fogyasztódik. A RET-PC kombinációs
+            //     r_sram-olvasása megakadályozná a BRAM-inferenciát, ezért
+            //     nincs külön ág — mindkettő a default biztonságos r_pc-jére esik.
+            // en: PC_SRC_RET / PC_SRC_CALL: the RET/CALL FSM drives the PC via
+            //     the registered path (RET_FINALIZE: r_pc <= r_ret_return_pc);
+            //     pc_next is not consumed for these. A combinational r_sram
+            //     read for the RET PC would block BRAM inference, so there is
+            //     no dedicated arm — both fall through to the safe default r_pc.
+            default:        pc_next = r_pc;
         endcase
     end
 
@@ -557,6 +581,33 @@ module cilcpu_core #(
     endfunction
 
     // ============================================================
+    // hu: SRAM memória — KÜLÖN always @(posedge clk) blokk, async reset
+    //     NÉLKÜL. A BRAM-inferencia tiltja az async-reset érzékenységet,
+    //     a fő FSM blokk viszont async resetes — ezért a memória nem
+    //     lehet ott. A tömb maga nem resetelhető (BRAM-tartalom); az
+    //     r_sram_rdata_latched kimeneti regiszter szinkron resettel
+    //     nullázódik. A muxolt w_sram_* arbiter-jelek a deklarációnál.
+    // en: SRAM memory — SEPARATE always @(posedge clk) block, NO async
+    //     reset. BRAM inference forbids async-reset sensitivity, but the
+    //     main FSM block is async-reset — so the memory cannot live
+    //     there. The array itself is not reset (BRAM contents); the
+    //     r_sram_rdata_latched output register clears via synchronous
+    //     reset. Muxed w_sram_* arbiter signals are at the declaration.
+    // ============================================================
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            r_sram_rdata_latched <= 32'd0;
+        end else begin
+            if (w_sram_we) begin
+                r_sram[w_sram_idx] <= w_sram_wdata;
+            end
+            if (w_sram_re) begin
+                r_sram_rdata_latched <= r_sram[w_sram_idx];
+            end
+        end
+    end
+
+    // ============================================================
     // hu: Fő FSM
     // en: Main FSM
     // ============================================================
@@ -592,7 +643,6 @@ module cilcpu_core #(
             r_sram_wdata     <= 32'd0;
             r_sram_we        <= 1'b0;
             r_sram_re        <= 1'b0;
-            r_sram_rdata_latched <= 32'd0;
             r_sc_sp_load     <= 1'b0;
             r_sc_sp_init     <= 14'd0;
             r_sc_sp_depth    <= 7'd0;
@@ -656,35 +706,6 @@ module cilcpu_core #(
                 o_trap      <= 1'b1;
                 o_trap_code <= w_sc_trap_code;
                 r_state     <= ST_TRAP;
-            end
-
-            // hu: SRAM bus arbiter — a Stack Cache spill/fill PRIORITÁS-T
-            //     kap. A microcode kontrakt biztosítja, hogy uc_sram_rd/wr
-            //     csak akkor fut le, amikor w_sc_busy=0 (a Stack Cache
-            //     egyszerre csak egyfajta műveletet csinál). Tehát a busy-
-            //     priority race-mentes és determinisztikus.
-            //     SRAM olvasás 1-ciklus latency: r_sram_rdata_latched a
-            //     következő ciklus elején érvényes.
-            // en: SRAM bus arbiter — Stack Cache spill/fill takes PRIORITY.
-            //     Per microcode contract, uc_sram_rd/wr fires only when
-            //     w_sc_busy=0 (Stack Cache runs one op at a time), so
-            //     busy-priority is race-free and deterministic.
-            //     SRAM read 1-cycle latency: r_sram_rdata_latched valid at
-            //     the next cycle's start.
-            if (w_sc_busy) begin
-                if (w_sc_sram_re) begin
-                    r_sram_rdata_latched <= r_sram[w_sc_sram_addr[13:2]];
-                end
-                if (w_sc_sram_we) begin
-                    r_sram[w_sc_sram_addr[13:2]] <= w_sc_sram_wdata;
-                end
-            end else begin
-                if (r_sram_re) begin
-                    r_sram_rdata_latched <= r_sram[r_sram_addr[13:2]];
-                end
-                if (r_sram_we) begin
-                    r_sram[r_sram_addr[13:2]] <= r_sram_wdata;
-                end
             end
 
             case (r_state)

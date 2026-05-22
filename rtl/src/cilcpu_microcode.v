@@ -79,6 +79,7 @@ module cilcpu_microcode (
     // hu: Egyszerű 1-lépéses ALU vezérlőszó: pop(N), ALU, push(ALU), PC+=len, done.
     // en: Simple 1-step ALU control word: pop(N), ALU, push(ALU), PC=next, done.
     function [31:0] alu_binary(input [4:0] alu_op);
+        begin
         alu_binary = 0;
         alu_binary[`UC_DONE]                          = 1;
         alu_binary[`UC_STACK_POP_HI:`UC_STACK_POP_LO] = 2'd2;  // pop2
@@ -88,9 +89,11 @@ module cilcpu_microcode (
         alu_binary[`UC_ALU_OP_HI:`UC_ALU_OP_LO]       = alu_op;
         alu_binary[`UC_PC_WR]                          = 1;
         alu_binary[`UC_PC_SRC_HI:`UC_PC_SRC_LO]       = `PC_SRC_NEXT;
+        end
     endfunction
 
     function [31:0] alu_unary(input [4:0] alu_op);
+        begin
         alu_unary = 0;
         alu_unary[`UC_DONE]                          = 1;
         alu_unary[`UC_STACK_POP_HI:`UC_STACK_POP_LO] = 2'd1;  // pop1
@@ -100,23 +103,27 @@ module cilcpu_microcode (
         alu_unary[`UC_ALU_OP_HI:`UC_ALU_OP_LO]       = alu_op;
         alu_unary[`UC_PC_WR]                          = 1;
         alu_unary[`UC_PC_SRC_HI:`UC_PC_SRC_LO]       = `PC_SRC_NEXT;
+        end
     endfunction
 
     // hu: Konstans push: push(IMM), PC+=len, done.
     // en: Constant push: push(IMM), PC=next, done.
     function [31:0] const_push;
         input dummy;  // hu: Verilog function igényel paramétert / en: Verilog function needs parameter
+        begin
         const_push = 0;
         const_push[`UC_DONE]                          = 1;
         const_push[`UC_STACK_PUSH]                     = 1;
         const_push[`UC_PUSH_SRC_HI:`UC_PUSH_SRC_LO]   = `PUSH_SRC_IMM;
         const_push[`UC_PC_WR]                          = 1;
         const_push[`UC_PC_SRC_HI:`UC_PC_SRC_LO]       = `PC_SRC_NEXT;
+        end
     endfunction
 
     // hu: SRAM olvasás → push: sram_rd, push(SRAM), addr_src, PC+=len, done.
     // en: SRAM read → push: sram_rd, push(SRAM), addr_src, PC=next, done.
     function [31:0] sram_read_push(input [1:0] addr_src);
+        begin
         sram_read_push = 0;
         sram_read_push[`UC_DONE]                          = 1;
         sram_read_push[`UC_STACK_PUSH]                     = 1;
@@ -125,11 +132,13 @@ module cilcpu_microcode (
         sram_read_push[`UC_ADDR_SRC_HI:`UC_ADDR_SRC_LO]   = addr_src;
         sram_read_push[`UC_PC_WR]                          = 1;
         sram_read_push[`UC_PC_SRC_HI:`UC_PC_SRC_LO]       = `PC_SRC_NEXT;
+        end
     endfunction
 
     // hu: Pop → SRAM írás: pop1, sram_wr, addr_src, PC+=len, done.
     // en: Pop → SRAM write: pop1, sram_wr, addr_src, PC=next, done.
     function [31:0] pop_sram_write(input [1:0] addr_src);
+        begin
         pop_sram_write = 0;
         pop_sram_write[`UC_DONE]                          = 1;
         pop_sram_write[`UC_STACK_POP_HI:`UC_STACK_POP_LO] = 2'd1;
@@ -137,11 +146,13 @@ module cilcpu_microcode (
         pop_sram_write[`UC_ADDR_SRC_HI:`UC_ADDR_SRC_LO]   = addr_src;
         pop_sram_write[`UC_PC_WR]                          = 1;
         pop_sram_write[`UC_PC_SRC_HI:`UC_PC_SRC_LO]       = `PC_SRC_NEXT;
+        end
     endfunction
 
     // hu: Összehasonlító branch: pop2, ALU, cond_en, PC, done.
     // en: Comparison branch: pop2, ALU, cond_en, PC, done.
     function [31:0] cmp_branch(input [4:0] alu_op, input [1:0] cond_type, input cond_signed);
+        begin
         cmp_branch = 0;
         cmp_branch[`UC_DONE]                          = 1;
         cmp_branch[`UC_STACK_POP_HI:`UC_STACK_POP_LO] = 2'd2;
@@ -152,6 +163,7 @@ module cilcpu_microcode (
         cmp_branch[`UC_COND_EN]                        = 1;
         cmp_branch[`UC_COND_TYPE_HI:`UC_COND_TYPE_LO] = cond_type;
         cmp_branch[`UC_COND_SIGNED]                    = cond_signed;
+        end
     endfunction
 
     always @(*) begin

@@ -206,7 +206,7 @@ module cilcpu_a7lite_top #(
                 end
                 S_ARG_DRV: begin
                     r_boot_arg_idx <= r_boot_arg_idx + 5'd1;
-                    if ((r_boot_arg_idx + 5'd1) >= BOOT_ARG_COUNT[7:0][4:0])
+                    if ((r_boot_arg_idx + 5'd1) >= BOOT_ARG_COUNT[4:0])
                         r_boot_state <= S_RUN;
                     else
                         r_boot_state <= S_ARG_WAIT;
