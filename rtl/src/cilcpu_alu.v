@@ -11,9 +11,7 @@ module cilcpu_alu (
     input  wire [31:0] i_op_a,       // TOS-1 (vagy egyetlen operandus neg/not-hoz)
     input  wire [31:0] i_op_b,       // TOS
     input  wire [4:0]  i_alu_op,     // ALU művelet kód (ALU_ADD, ALU_SUB, stb.)
-    output reg  [31:0] o_result,     // Eredmény
-    output reg         o_trap_div_zero,  // DIV/REM: osztó == 0
-    output reg         o_trap_overflow   // DIV: INT_MIN / -1
+    output reg  [31:0] o_result      // Eredmény
 );
 
     // hu: Signed interpretáció a signed összehasonlításokhoz és osztáshoz.
@@ -22,9 +20,7 @@ module cilcpu_alu (
     wire signed [31:0] s_b = $signed(i_op_b);
 
     always @(*) begin
-        o_result         = 32'd0;
-        o_trap_div_zero  = 1'b0;
-        o_trap_overflow  = 1'b0;
+        o_result = 32'd0;
 
         case (i_alu_op)
 
@@ -36,27 +32,23 @@ module cilcpu_alu (
 
             `ALU_MUL: o_result = i_op_a * i_op_b;  // alsó 32 bit (wrapping)
 
-            `ALU_DIV: begin
-                if (i_op_b == 32'd0) begin
-                    o_trap_div_zero = 1'b1;
-                end else if (i_op_a == 32'h8000_0000 && i_op_b == 32'hFFFF_FFFF) begin
-                    // hu: INT_MIN / -1 = overflow (az eredmény nem fér el int32-ben)
-                    // en: INT_MIN / -1 = overflow (result doesn't fit in int32)
-                    o_trap_overflow = 1'b1;
-                end else begin
-                    o_result = $signed(s_a / s_b);
-                end
-            end
-
-            `ALU_REM: begin
-                if (i_op_b == 32'd0) begin
-                    o_trap_div_zero = 1'b1;
-                end else begin
-                    // hu: INT_MIN % -1 = 0 (NEM overflow, a spec szerint)
-                    // en: INT_MIN % -1 = 0 (NOT overflow, per spec)
-                    o_result = $signed(s_a % s_b);
-                end
-            end
+            // hu: ALU_DIV / ALU_REM: a szekvenciális `cilcpu_divider.v`
+            //     kezeli (F2.7 Sub5 timing-fix — a kombinációs osztó 86 ns
+            //     kritikus utat adott, 50 MHz-en nem zárt). A core a DIV/REM
+            //     opkódot ST_DIV_WAIT-en át routolja a divider-re; az ALU
+            //     ezekre nem aktív, o_result a default 0 marad (a core a
+            //     divider o_quotient / o_remainder kimenetét használja).
+            //     A trap-detektálás (div_zero, INT_MIN/-1 overflow) is a
+            //     divider-ben van.
+            // en: ALU_DIV / ALU_REM: handled by the sequential
+            //     `cilcpu_divider.v` (F2.7 Sub5 timing fix — the
+            //     combinational divider produced an 86 ns critical path and
+            //     could not close at 50 MHz). The core routes DIV/REM
+            //     opcodes via ST_DIV_WAIT to the divider; the ALU does not
+            //     process them, and o_result stays at the default 0 (the
+            //     core uses the divider's o_quotient / o_remainder outputs).
+            //     Trap detection (div_zero, INT_MIN/-1 overflow) is also
+            //     in the divider.
 
             // ── Bitwise logika ──
 

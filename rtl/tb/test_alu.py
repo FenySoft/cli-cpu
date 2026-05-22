@@ -51,8 +51,6 @@ async def alu_op(dut, a, b, op):
     await Timer(1, units="ns")
     return {
         "result": int(dut.o_result.value),
-        "div_zero": int(dut.o_trap_div_zero.value),
-        "overflow": int(dut.o_trap_overflow.value),
     }
 
 async def check(dut, a, b, op, expected, msg=""):
@@ -61,14 +59,6 @@ async def check(dut, a, b, op, expected, msg=""):
     actual = r["result"]
     exp_u32 = to_u32(expected)
     assert actual == exp_u32, f"{msg}: expected {exp_u32:#010x}, got {actual:#010x} (a={to_u32(a):#010x}, b={to_u32(b):#010x}, op={op})"
-
-async def check_trap(dut, a, b, op, trap_name, msg=""):
-    """Assert ALU raises the specified trap flag."""
-    r = await alu_op(dut, a, b, op)
-    if trap_name == "div_zero":
-        assert r["div_zero"] == 1, f"{msg}: expected div_zero trap"
-    elif trap_name == "overflow":
-        assert r["overflow"] == 1, f"{msg}: expected overflow trap"
 
 # ============================================================
 # ADD tesztek
@@ -128,49 +118,16 @@ async def test_mul_wrap(dut):
     await check(dut, 0x10000, 0x10000, ALU_MUL, 0, "overflow wraps")
 
 # ============================================================
-# DIV tesztek
+# hu: DIV / REM tesztek áthelyezve a `cilcpu_divider.v` szekvenciális
+#     osztó modulra (test_divider.py). Az ALU innentől nem kezeli a
+#     DIV/REM-et — a kombinációs osztó megakadályozta az 50 MHz-es
+#     timing-zárást (F2.7 Sub5, lásd `cilcpu_alu.v` és `cilcpu_core.v`
+#     ST_DIV_WAIT állapot).
+# en: DIV / REM tests moved to the `cilcpu_divider.v` sequential divider
+#     module (test_divider.py). The ALU no longer handles DIV/REM — the
+#     combinational divider blocked 50 MHz timing closure (F2.7 Sub5,
+#     see `cilcpu_alu.v` and the ST_DIV_WAIT state in `cilcpu_core.v`).
 # ============================================================
-
-@cocotb.test()
-async def test_div_basic(dut):
-    await check(dut, 10, 3, ALU_DIV, 3, "10/3")
-
-@cocotb.test()
-async def test_div_negative(dut):
-    await check(dut, -10, 3, ALU_DIV, -3, "-10/3")
-
-@cocotb.test()
-async def test_div_by_zero(dut):
-    await check_trap(dut, 10, 0, ALU_DIV, "div_zero", "div by zero")
-
-@cocotb.test()
-async def test_div_int_min_by_minus_one(dut):
-    await check_trap(dut, INT_MIN, -1, ALU_DIV, "overflow", "INT_MIN/-1")
-
-@cocotb.test()
-async def test_div_exact(dut):
-    await check(dut, 42, 6, ALU_DIV, 7, "42/6")
-
-# ============================================================
-# REM tesztek
-# ============================================================
-
-@cocotb.test()
-async def test_rem_basic(dut):
-    await check(dut, 10, 3, ALU_REM, 1, "10%3")
-
-@cocotb.test()
-async def test_rem_negative(dut):
-    await check(dut, -10, 3, ALU_REM, -1, "-10%3")
-
-@cocotb.test()
-async def test_rem_by_zero(dut):
-    await check_trap(dut, 10, 0, ALU_REM, "div_zero", "rem by zero")
-
-@cocotb.test()
-async def test_rem_int_min_by_minus_one(dut):
-    # INT_MIN % -1 = 0 (NOT overflow, per ECMA-335)
-    await check(dut, INT_MIN, -1, ALU_REM, 0, "INT_MIN%-1=0")
 
 # ============================================================
 # Bitwise logika tesztek

@@ -64,6 +64,18 @@ module cilcpu_core #(
     localparam [3:0] ST_RET      = 4'd7;   // Sub5: RET frame manager
     localparam [3:0] ST_HALT     = 4'd8;
     localparam [3:0] ST_TRAP     = 4'd9;
+    // hu: F2.7 Sub5 — szekvenciális osztó (cilcpu_divider) wait-állapota.
+    //     A DIV/REM opkódok ST_EXECUTE phase 0-ról ide ugranak, megvárják
+    //     a divider o_done-ját (~34 ciklus), majd a normál phase 0 záró
+    //     műveletek (latch + pop + phase 1) az ST_DIV_WAIT done ágában
+    //     futnak — innen vissza ST_EXECUTE phase 1-be a replace_top-ra.
+    // en: F2.7 Sub5 — wait state for the sequential divider
+    //     (cilcpu_divider). DIV/REM opcodes jump here from ST_EXECUTE
+    //     phase 0, wait for the divider's o_done (~34 cycles); the normal
+    //     phase-0 closing actions (latch + pop + phase 1) run in the
+    //     ST_DIV_WAIT done branch — back to ST_EXECUTE phase 1 for the
+    //     replace_top.
+    localparam [3:0] ST_DIV_WAIT = 4'd10;
 
     // hu: Sub5 — ST_CALL sub-states (frame push szekvencia)
     // en: Sub5 — ST_CALL sub-states (frame push sequence)
@@ -396,8 +408,27 @@ module cilcpu_core #(
     //     combinational, result valid immediately.
     // ============================================================
     wire [31:0] w_alu_result;
-    wire        w_alu_trap_div_zero;
-    wire        w_alu_trap_overflow;
+
+    // hu: F2.7 Sub5 — szekvenciális osztó (cilcpu_divider) bekötése.
+    //     A DIV/REM-et r_div_start 1-ciklusos pulzus indítja; a divider
+    //     ~34 ciklus alatt párhuzamosan ad hányadost és maradékot,
+    //     r_div_is_rem dönti el, melyiket írja a result-latch-be. A
+    //     trap-flag-eket (div_zero / INT_MIN/-1 overflow) az ST_DIV_WAIT
+    //     vizsgálja az o_done ciklusban.
+    // en: F2.7 Sub5 — sequential divider (cilcpu_divider) wiring. DIV/REM
+    //     is launched by a 1-cycle r_div_start pulse; the divider yields
+    //     quotient and remainder in parallel over ~34 cycles, and
+    //     r_div_is_rem selects which goes into the result latch. Trap
+    //     flags (div_zero / INT_MIN/-1 overflow) are inspected in
+    //     ST_DIV_WAIT on the o_done cycle.
+    wire [31:0] w_div_quotient;
+    wire [31:0] w_div_remainder;
+    wire        w_div_busy;
+    wire        w_div_done;
+    wire        w_div_trap_div_zero;
+    wire        w_div_trap_overflow;
+    reg         r_div_start;
+    reg         r_div_is_rem;
 
     // hu: ALU operandus mux — binary (pop=2): i_op_a=TOS1, i_op_b=TOS;
     //     unary (pop=1): i_op_a=TOS (a stack tetején lévő érték), i_op_b
@@ -413,9 +444,35 @@ module cilcpu_core #(
         .i_op_a          (w_alu_op_a),
         .i_op_b          (w_sc_tos),
         .i_alu_op        (uc_alu_op),
-        .o_result        (w_alu_result),
-        .o_trap_div_zero (w_alu_trap_div_zero),
-        .o_trap_overflow (w_alu_trap_overflow)
+        .o_result        (w_alu_result)
+    );
+
+    // hu: Szekvenciális osztó példányosítás (DIV/REM, F2.7 Sub5).
+    //     Operandusok: i_dividend = w_sc_tos1 (TOS-1, osztandó),
+    //     i_divisor = w_sc_tos (TOS, osztó). Az operandusok az
+    //     r_div_start pulzus ciklusában érvényesek; a divider belül
+    //     latch-eli őket, így a stack a divider futása alatt szabadon
+    //     mozogna — a jelenlegi flow viszont az o_done-ig stallol és
+    //     csak az ST_DIV_WAIT záró ágában popol (egyszerűbb az FSM).
+    // en: Sequential divider instantiation (DIV/REM, F2.7 Sub5).
+    //     Operands: i_dividend = w_sc_tos1 (TOS-1, dividend),
+    //     i_divisor = w_sc_tos (TOS, divisor). Operands are valid in
+    //     the r_div_start pulse cycle; the divider latches them
+    //     internally, so the stack could move during the divider's
+    //     run — but the current flow stalls until o_done and only pops
+    //     in the ST_DIV_WAIT closing branch (simpler FSM).
+    cilcpu_divider u_divider (
+        .i_clk           (clk),
+        .i_rst_n         (rst_n),
+        .i_start         (r_div_start),
+        .i_dividend      (w_sc_tos1),
+        .i_divisor       (w_sc_tos),
+        .o_busy          (w_div_busy),
+        .o_done          (w_div_done),
+        .o_quotient      (w_div_quotient),
+        .o_remainder     (w_div_remainder),
+        .o_trap_div_zero (w_div_trap_div_zero),
+        .o_trap_overflow (w_div_trap_overflow)
     );
 
     // ============================================================
@@ -643,6 +700,8 @@ module cilcpu_core #(
             r_sram_wdata     <= 32'd0;
             r_sram_we        <= 1'b0;
             r_sram_re        <= 1'b0;
+            r_div_start      <= 1'b0;
+            r_div_is_rem     <= 1'b0;
             r_sc_sp_load     <= 1'b0;
             r_sc_sp_init     <= 14'd0;
             r_sc_sp_depth    <= 7'd0;
@@ -688,6 +747,7 @@ module cilcpu_core #(
             r_qspi_re        <= 1'b0;
             r_sram_we        <= 1'b0;
             r_sram_re        <= 1'b0;
+            r_div_start      <= 1'b0;
             r_sc_sp_load        <= 1'b0;
             r_sc_flush          <= 1'b0;
             r_sc_push_en        <= 1'b0;
@@ -956,17 +1016,20 @@ module cilcpu_core #(
                     r_state     <= ST_TRAP;
                 end else if (uc_alu_en && r_alu_phase == 2'd0) begin
                     // hu: ALU phase 0 — kombinációs ALU eredmény latch-elése
-                    //     (TOS1, TOS még érvényes), trap-ek ellenőrzése.
-                    // en: ALU phase 0 — latch combinational ALU result
-                    //     (TOS1, TOS still valid), check traps.
-                    if (w_alu_trap_div_zero) begin
-                        o_trap      <= 1'b1;
-                        o_trap_code <= `TRAP_DIV_BY_ZERO;
-                        r_state     <= ST_TRAP;
-                    end else if (w_alu_trap_overflow) begin
-                        o_trap      <= 1'b1;
-                        o_trap_code <= `TRAP_OVERFLOW;
-                        r_state     <= ST_TRAP;
+                    //     (TOS1, TOS még érvényes). F2.7 Sub5: DIV/REM-et
+                    //     szekvenciális osztó kezeli — r_div_start pulzus +
+                    //     ST_DIV_WAIT; a phase 0 záró műveletei (latch +
+                    //     pop + phase 1) és a trap-ellenőrzés is ott fut.
+                    // en: ALU phase 0 — latch the combinational ALU result
+                    //     (TOS1, TOS still valid). F2.7 Sub5: DIV/REM are
+                    //     handled by the sequential divider — r_div_start
+                    //     pulse + ST_DIV_WAIT; the phase-0 closing actions
+                    //     (latch + pop + phase 1) and trap detection both
+                    //     run there.
+                    if (uc_alu_op == `ALU_DIV || uc_alu_op == `ALU_REM) begin
+                        r_div_start  <= 1'b1;
+                        r_div_is_rem <= (uc_alu_op == `ALU_REM);
+                        r_state      <= ST_DIV_WAIT;
                     end else begin
                         r_alu_result_latched <= w_alu_result;
                         if (uc_stack_pop == 2'd2) begin
@@ -1754,6 +1817,61 @@ module cilcpu_core #(
                         o_trap_code <= `TRAP_INVALID_OPCODE;
                     end
                 endcase
+            end
+
+            // ====================================================
+            // hu: ST_DIV_WAIT — a szekvenciális osztó (cilcpu_divider)
+            //     o_done-jára vár. Az r_div_start 1-ciklusos pulzus
+            //     elindította a divider-t az ST_EXECUTE phase 0 átmenetben;
+            //     amint w_div_done magas, a phase 0 záró műveletei (trap-
+            //     ellenőrzés, eredmény-latch, pop1, phase 1) lefutnak, és
+            //     visszatérünk ST_EXECUTE-ba a phase 1-re (replace_top).
+            // en: ST_DIV_WAIT — waits for the sequential divider's
+            //     (cilcpu_divider) o_done. The r_div_start 1-cycle pulse
+            //     launched the divider at the ST_EXECUTE phase-0 entry;
+            //     once w_div_done goes high, the phase-0 closing actions
+            //     (trap check, result latch, pop1, phase 1) run, and we
+            //     return to ST_EXECUTE for phase 1 (replace_top).
+            // ====================================================
+            ST_DIV_WAIT: begin
+                if (w_div_done) begin
+                    if (w_div_trap_div_zero) begin
+                        // hu: Osztó nulla → div-by-zero trap (DIV és REM is).
+                        // en: Divisor zero → div-by-zero trap (both DIV and REM).
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_DIV_BY_ZERO;
+                        r_state     <= ST_TRAP;
+                    end else if (w_div_trap_overflow && !r_div_is_rem) begin
+                        // hu: INT_MIN / -1 → DIV-overflow trap. REM-re NEM
+                        //     trap (a divider o_remainder=0-t ad, ami a
+                        //     spec szerint a helyes INT_MIN % -1 eredmény).
+                        // en: INT_MIN / -1 → DIV overflow trap. NOT a trap
+                        //     for REM (the divider returns o_remainder=0,
+                        //     which per spec is the correct INT_MIN % -1
+                        //     result).
+                        o_trap      <= 1'b1;
+                        o_trap_code <= `TRAP_OVERFLOW;
+                        r_state     <= ST_TRAP;
+                    end else begin
+                        // hu: Normál befejezés — phase 0 záró műveletei:
+                        //     eredmény-latch (hányados DIV-re, maradék
+                        //     REM-re), pop1, phase 1 jelzés, vissza
+                        //     ST_EXECUTE-ba a replace_top-ra.
+                        // en: Normal completion — phase-0 closing actions:
+                        //     result latch (quotient for DIV, remainder
+                        //     for REM), pop1, signal phase 1, back to
+                        //     ST_EXECUTE for the replace_top.
+                        r_alu_result_latched <= r_div_is_rem ? w_div_remainder : w_div_quotient;
+                        r_sc_pop_en <= 1'b1;
+                        r_alu_phase <= 2'd1;
+                        r_state     <= ST_EXECUTE;
+                    end
+                end
+                // hu: Egyébként várunk; r_div_start a default-each-cycle
+                //     blokkban már 0-ra állt, így a divider nyugodtan fut.
+                // en: Otherwise we wait; r_div_start was already cleared
+                //     by the default-each-cycle block, so the divider
+                //     runs undisturbed.
             end
 
             // ====================================================

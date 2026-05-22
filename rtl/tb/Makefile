@@ -14,9 +14,19 @@
 
 VENV_PY ?= /usr/local/bin/python3.13
 
-# hu: Közös sub-make hívás template
-# en: Common sub-make invocation template
-SUBMAKE = PATH="$(PWD)/../.venv/bin:$$PATH" $(MAKE) -f Makefile.sim.local
+# hu: Közös sub-make hívás template. A SIM_BUILD targetenként külön
+#     könyvtár (sim_build/<target>) — különben a cocotb a megosztott
+#     sim_build/-ben a korábbi target lefordított binárisát húzná újra:
+#     a bináris frissebb, mint a .v források, így a make target-váltáskor
+#     nem fordít újra, és rossz toplevel-lel futna. A sim_build/ a
+#     .gitignore-ban van, így a per-target alkönyvtárak nem szennyezik a fát.
+# en: Common sub-make invocation template. SIM_BUILD is per-target
+#     (sim_build/<target>) — otherwise cocotb would reuse the previous
+#     target's compiled binary from the shared sim_build/: the binary is
+#     newer than the .v sources, so make skips the rebuild on a target
+#     switch and would run with the wrong toplevel. sim_build/ is in
+#     .gitignore, so the per-target subdirs do not pollute the tree.
+SUBMAKE = PATH="$(PWD)/../.venv/bin:$$PATH" $(MAKE) -f Makefile.sim.local SIM_BUILD=$(PWD)/sim_build/$@
 
 test_alu:
 	$(SUBMAKE) MODULE=test_alu TOPLEVEL=cilcpu_alu VERILOG_SOURCES="$(PWD)/../src/cilcpu_alu.v"
@@ -32,6 +42,11 @@ test_stack_cache:
 
 test_qspi_controller:
 	$(SUBMAKE) MODULE=test_qspi_controller TOPLEVEL=cilcpu_qspi_controller VERILOG_SOURCES="$(PWD)/../src/cilcpu_qspi_controller.v"
+
+# hu: F2.7 — szekvenciális előjeles osztó (cilcpu_divider) standalone teszt.
+# en: F2.7 — standalone sequential signed divider (cilcpu_divider) test.
+test_divider:
+	$(SUBMAKE) MODULE=test_divider TOPLEVEL=cilcpu_divider VERILOG_SOURCES="$(PWD)/../src/cilcpu_divider.v"
 
 # hu: Sub5.A — CODE_BASE_OFFSET paraméterezett QSPI controller teszt.
 #     EGYETLEN forrás: a 256 (= 0x000100) érték a Verilator generic-be
@@ -205,4 +220,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
