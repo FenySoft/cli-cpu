@@ -237,7 +237,7 @@
     </p>
 
     <p>
-      This is not a thought experiment. I have been building exactly this for the past months, and the reference implementation is already done: 48 opcodes, 259+ passing tests, a working linker, a CLI runner, and an ALU in Verilog with 41 cocotb tests green. The project is called <strong>CLI-CPU</strong>, and it is fully open source under CERN-OHL-S v2.
+      This is not a thought experiment. I have been building exactly this for the past months, and the reference implementation is already done: 48 opcodes, 160 green xUnit tests, 249 green cocotb tests, a working linker, a CLI runner, a single-core Nano RTL in Verilog (ALU + decoder + microcode + stack cache + QSPI controller + frame manager), a board-level top wrapper for the MicroPhase A7-Lite XC7A200T (STARTUPE2 + IOBUF), and a Fibonacci(20) = 6765 end-to-end demo over UART in cocotb simulation. The project is called <strong>CLI-CPU</strong>, and it is fully open source under CERN-OHL-S v2.
     </p>
 
     <p>
@@ -295,7 +295,7 @@
     </p>
 
     <p>
-      Cores communicate exclusively through <strong>hardware mailbox FIFOs</strong>. A core writes a 32-bit message to its outgoing mailbox; the hardware delivers it to the destination core's incoming mailbox. The sending core does not block. The receiving core wakes from sleep when a message arrives, processes it, and goes back to sleep. This is the <strong>actor model in silicon</strong>.
+      Cores communicate exclusively through <strong>hardware mailbox FIFOs</strong>. A core writes a message to its outgoing mailbox — the Cognitive Fabric NoC cell format is 16-byte header + 1–128-byte payload, with the router using fixed 144-byte slots — and the hardware delivers it to the destination core's incoming mailbox. The sending core does not block. The receiving core wakes from sleep when a message arrives, processes it, and goes back to sleep. This is the <strong>actor model in silicon</strong>.
     </p>
     <p>
       The consequences of this design are profound:
@@ -338,15 +338,18 @@
     </p>
 
     <p>
-      <strong>Phase F1.5 is complete.</strong> This includes:
+      <strong>Phase F1.5 is complete; phase F2 (RTL) is at the F2.7 Sub5 boundary.</strong> This includes:
     </p>
 
     <ul>
       <li>A <strong>reference simulator</strong> (<code>TCpu</code>) implementing all 48 CIL-T0 opcodes — the integer subset of ECMA-335 CIL, plus mailbox MMIO extensions. The simulator models the full memory map: CODE, DATA, STACK, and MMIO regions.</li>
       <li>A <strong>CIL-T0 linker</strong> (<code>TCliCpuLinker</code>) that takes a standard .NET assembly (.dll compiled by Roslyn) and repackages it into a flat binary (.t0) that the hardware can boot from. No translation — the CIL opcodes in the .dll are the same ones the CPU executes.</li>
       <li>A <strong>CLI runner</strong> with <code>run</code> and <code>link</code> commands.</li>
-      <li><strong>259+ xUnit tests</strong> covering every opcode, every trap condition, every edge case. Strict TDD — every test was written before its implementation.</li>
-      <li>An <strong>ALU module in Verilog</strong> with a full cocotb testbench (41/41 tests passing). This is the beginning of the RTL phase (F2).</li>
+      <li>A <strong>single-core Nano RTL in Verilog</strong>: ALU (F2.1, 41 cocotb), decoder (42 cocotb), microcode (25 cocotb), stack cache (28 cocotb), QSPI controller (F2.4, 29 cocotb), top-level integration with frame manager and trap aggregator (F2.5a Sub1..6, 49 cocotb).</li>
+      <li>A <strong>golden-vector harness</strong> (F2.5b) that compares cocotb execution step-by-step against the C# reference simulator's JSONL trace.</li>
+      <li>A <strong>board-level top wrapper for the MicroPhase A7-Lite XC7A200T</strong> (F2.7 Sub1..Sub4): clock + KEY debouncer + boot sequencer FSM, UART TX + decimal printer, IS25L128F QSPI flash wiring with the Xilinx STARTUPE2 + 4× IOBUF primitives in <code>cilcpu_a7lite_board.v</code>.</li>
+      <li>A <strong>Fibonacci(20) = 6765 end-to-end demo over UART</strong>, in cocotb simulation through the board.v — from the Roslyn compiler through the CIL-T0 binary to the board-level UART output.</li>
+      <li><strong>249 green cocotb tests</strong> + <strong>160 green xUnit tests</strong> covering every opcode, every trap condition, every edge case. Strict TDD — every test was written before its implementation.</li>
     </ul>
 
     <p>
@@ -452,7 +455,7 @@
 
     <ul>
       <li><strong>F2 — RTL:</strong> Complete the Verilog/Amaranth HDL implementation of a single Nano core. Verify every opcode against the C# simulator using cocotb golden-vector testing. Synthesize for Sky130 with Yosys.</li>
-      <li><strong>F2.7 — FPGA Validation:</strong> Run the single Nano core on a real FPGA (MicroPhase A7-Lite XC7A200T) before committing to silicon. Fibonacci(20) over UART on real hardware. Principle: no tape-out without FPGA validation.</li>
+      <li><strong>F2.7 Sub5 — A7-Lite hardware bring-up:</strong> F2.7 Sub1..Sub4 are done (board-level top wrapper, STARTUPE2 + 4× IOBUF, Fibonacci(20) = 6765 through the board.v in cocotb simulation). What remains: Vivado + OpenXC7 synthesis, IS25L128F config flash programming (<code>write_cfgmem</code>), 50 MHz timing closure, and Fibonacci(20) output over UART from the actual A7-Lite XC7A200T board through the CH340 — the last validation step before silicon tape-out (F3). Principle: no tape-out without FPGA validation.</li>
       <li><strong>F3 — First Silicon:</strong> Tape out the FPGA-validated Nano core + hardware mailbox on Tiny Tapeout. Run Fibonacci(20) and an "echo neuron" demo on real silicon. The first physical CIL-native processor.</li>
       <li><strong>F4 — Cognitive Fabric Pivot:</strong> Demonstrate 4 Nano cores on FPGA, communicating via hardware mailboxes in a shared-nothing event-driven fabric. Prove that the architecture scales.</li>
       <li><strong>F5 — Rich Core:</strong> Add the full CIL instruction set — objects, GC assist, exception handling, FPU. Demonstrate heterogeneous Nano + Rich operation.</li>

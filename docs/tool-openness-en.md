@@ -28,7 +28,7 @@ This strategy matches industry practice: **SpinalHDL, NaxRiscv, LibreCores**, an
 | CLI-CPU ISA specification | CC-BY-SA 4.0 | `docs/ISA-CIL-T0-en.md` |
 | C# reference simulator | MIT | `src/CilCpu.Sim/` |
 | C# linker and runner | MIT | `src/CilCpu.Linker/`, `src/CilCpu.Sim.Runner/` |
-| xUnit tests (259+) | MIT | `src/CilCpu.Sim.Tests/` |
+| xUnit tests (160) | MIT | `src/CilCpu.Sim.Tests/` |
 | Verilog RTL (ALU, decoder, microcode) | Apache 2.0 | `rtl/src/` |
 | cocotb testbench | Apache 2.0 | `rtl/tb/` |
 | FPGA bring-up smoke test | Apache 2.0 | `rtl/fpga/smoke_test/` |

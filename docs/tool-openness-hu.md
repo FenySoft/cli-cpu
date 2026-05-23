@@ -28,7 +28,7 @@ Ez a stratégia megfelel az iparági gyakorlatnak: a **SpinalHDL, NaxRiscv, Libr
 | CLI-CPU ISA specifikáció | CC-BY-SA 4.0 | `docs/ISA-CIL-T0-hu.md` |
 | C# referencia szimulátor | MIT | `src/CilCpu.Sim/` |
 | C# linker és runner | MIT | `src/CilCpu.Linker/`, `src/CilCpu.Sim.Runner/` |
-| xUnit tesztek (259+) | MIT | `src/CilCpu.Sim.Tests/` |
+| xUnit tesztek (160) | MIT | `src/CilCpu.Sim.Tests/` |
 | Verilog RTL (ALU, decoder, microcode) | Apache 2.0 | `rtl/src/` |
 | cocotb tesztbench | Apache 2.0 | `rtl/tb/` |
 | FPGA bring-up smoke teszt | Apache 2.0 | `rtl/fpga/smoke_test/` |

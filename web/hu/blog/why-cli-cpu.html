@@ -237,7 +237,7 @@
     </p>
 
     <p>
-      Ez nem gondolatkísérlet. Pontosan ezt építem az elmúlt hónapokban, és a referencia-implementáció már kész: 48 opkód, 259+ sikeres teszt, működő linker, CLI futtatóeszköz, és egy Verilog ALU modul 41 zöld cocotb teszttel. A projekt neve <strong>CLI-CPU</strong>, és teljes egészében nyílt forráskódú, CERN-OHL-S v2 licenc alatt.
+      Ez nem gondolatkísérlet. Pontosan ezt építem az elmúlt hónapokban, és a referencia-implementáció már kész: 48 opkód, 160 zöld xUnit teszt, 249 zöld cocotb teszt, működő linker, CLI futtatóeszköz, egymagos Nano core RTL Verilogban (ALU + decoder + microcode + stack cache + QSPI controller + frame manager), MicroPhase A7-Lite XC7A200T board-szintű top wrapper (STARTUPE2 + IOBUF), és cocotb szimulációban Fibonacci(20) = 6765 end-to-end demó UART-on. A projekt neve <strong>CLI-CPU</strong>, és teljes egészében nyílt forráskódú, CERN-OHL-S v2 licenc alatt.
     </p>
 
     <p>
@@ -295,7 +295,7 @@
     </p>
 
     <p>
-      A magok kizárólag <strong>hardveres mailbox FIFO-kon</strong> keresztül kommunikálnak. Egy mag egy 32 bites üzenetet ír a kimenő mailbox-ába; a hardver kézbesíti a célmag bejövő mailbox-ába. A küldő mag nem blokkolódik. A fogadó mag felébredl alvásból, amikor üzenet érkezik, feldolgozza, és visszaalszik. Ez az <strong>actor modell szilíciumban</strong>.
+      A magok kizárólag <strong>hardveres mailbox FIFO-kon</strong> keresztül kommunikálnak. Egy mag egy üzenetet ír a kimenő mailbox-ába — a Cognitive Fabric NoC cell-formátuma 16 byte header + 1–128 byte payload, a router fix 144 byte slot-okkal kezeli — és a hardver kézbesíti a célmag bejövő mailbox-ába. A küldő mag nem blokkolódik. A fogadó mag felébred alvásból, amikor üzenet érkezik, feldolgozza, és visszaalszik. Ez az <strong>actor modell szilíciumban</strong>.
     </p>
     <p>
       Ennek a tervezési döntésnek mélyreható következményei vannak:
@@ -338,15 +338,18 @@
     </p>
 
     <p>
-      <strong>Az F1.5 fázis kész.</strong> Ez magában foglalja:
+      <strong>Az F1.5 fázis kész, az F2 (RTL) az F2.7 Sub5 előtti állapotban van.</strong> Ez magában foglalja:
     </p>
 
     <ul>
       <li>Egy <strong>referencia szimulátort</strong> (<code>TCpu</code>), ami mind a 48 CIL-T0 opkódot implementálja — az ECMA-335 CIL egész szám részhalmazát, plusz mailbox MMIO kiterjesztéseket. A szimulátor a teljes memóriatérképet modellezi: CODE, DATA, STACK és MMIO régiókat.</li>
       <li>Egy <strong>CIL-T0 linkert</strong> (<code>TCliCpuLinker</code>), ami egy szabványos .NET assembly-t (.dll, Roslyn fordítás) átalakít lapos bináris formátumba (.t0), amiből a hardver bootolhat. Nincs transzláció — a .dll-ben lévő CIL opkódok ugyanazok, amiket a CPU végrehajt.</li>
       <li>Egy <strong>CLI futtatóeszközt</strong> <code>run</code> és <code>link</code> parancsokkal.</li>
-      <li><strong>259+ xUnit tesztet</strong>, ami lefedi az összes opkódot, minden trap-feltételt, minden szélsőséges esetet. Szigorú TDD — minden teszt az implementáció előtt készült.</li>
-      <li>Egy <strong>Verilog ALU modult</strong> teljes cocotb tesztpaddal (41/41 teszt zöld). Ez az RTL fázis (F2) kezdete.</li>
+      <li><strong>Egymagos Nano core RTL Verilogban</strong>: ALU (F2.1, 41 cocotb), decoder (42 cocotb), microcode (25 cocotb), stack cache (28 cocotb), QSPI controller (F2.4, 29 cocotb), top-level integráció frame manager + trap aggregátorral (F2.5a Sub1..6, 49 cocotb).</li>
+      <li>Egy <strong>golden vector harness</strong> (F2.5b), ami a cocotb futást lépésről lépésre összehasonlítja a C# referencia szimulátor JSONL trace-ével.</li>
+      <li>A <strong>MicroPhase A7-Lite XC7A200T board-szintű top wrapper</strong> (F2.7 Sub1..Sub4): clock + KEY debouncer + boot szekvenszer FSM, UART TX + decimális printer, IS25L128F QSPI flash bekötés a Xilinx STARTUPE2 + 4× IOBUF primitívvel a <code>cilcpu_a7lite_board.v</code>-ben.</li>
+      <li>Egy <strong>Fibonacci(20) = 6765 end-to-end demó UART-on</strong>, cocotb szimulációban a board.v-n keresztül — a Roslyn fordítótól a CIL-T0 binárison át a board-szintű UART kimenetig.</li>
+      <li><strong>249 zöld cocotb teszt</strong> + <strong>160 zöld xUnit teszt</strong>, ami lefedi az összes opkódot, minden trap-feltételt, minden szélsőséges esetet. Szigorú TDD — minden teszt az implementáció előtt készült.</li>
     </ul>
 
     <p>
@@ -452,7 +455,7 @@
 
     <ul>
       <li><strong>F2 — RTL:</strong> Egyetlen Nano core teljes Verilog/Amaranth HDL implementációja. Minden opkód verifikálása a C# szimulátorral, cocotb golden-vector teszteléssel. Szintézis Sky130-ra Yosys-szal.</li>
-      <li><strong>F2.7 — FPGA validáció:</strong> Az egyetlen Nano core futtatása valós FPGA-n (MicroPhase A7-Lite XC7A200T) a szilícium tape-out előtt. Fibonacci(20) UART-on, valós hardveren. Elv: nincs tape-out FPGA validáció nélkül.</li>
+      <li><strong>F2.7 Sub5 — A7-Lite hardver bring-up:</strong> Az F2.7 Sub1..Sub4 KÉSZ (board-szintű top wrapper, STARTUPE2 + 4× IOBUF, cocotb szimulációban Fibonacci(20) = 6765 a board.v-n át). Hátra: Vivado + OpenXC7 szintézis, IS25L128F config flash programozás (<code>write_cfgmem</code>), 50 MHz timing zárás, és a tényleges A7-Lite XC7A200T board UART-on Fibonacci(20) kimenete a CH340 felett — a szilícium tape-out (F3) előtti utolsó validáció. Elv: nincs tape-out FPGA validáció nélkül.</li>
       <li><strong>F3 — Első szilícium:</strong> Az FPGA-n validált Nano core + hardveres mailbox tape-out a Tiny Tapeout-on. Fibonacci(20) és egy „echo neuron" demó valódi szilíciumon. A történelem első fizikai CIL-natív processzora.</li>
       <li><strong>F4 — Cognitive Fabric fordulópont:</strong> 4 Nano core demonstrálása FPGA-n, hardveres mailbox-okon keresztüli kommunikációval, shared-nothing eseményvezérelt fabric-ban. Az architektúra skálázhatóságának bizonyítása.</li>
       <li><strong>F5 — Rich Core:</strong> A teljes CIL utasításkészlet hozzáadása — objektumok, GC-támogatás, kivételkezelés, FPU. Heterogén Nano + Rich működés demonstrálása.</li>
