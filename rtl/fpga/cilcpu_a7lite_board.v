@@ -56,7 +56,19 @@ module cilcpu_a7lite_board #(
     // en: Sub5.A — CODE segment flash base offset, forwarded to the inner
     //     `cilcpu_a7lite_top`. Sim default 0; on FPGA Vivado/OpenXC7 sets
     //     it to 0xC00000 (above the config-flash bitstream).
-    parameter integer CODE_BASE_OFFSET = 0
+    parameter integer CODE_BASE_OFFSET = 0,
+
+    // hu: F2.7 Sub5 — flash QE-bit init engedélyezése a `cilcpu_a7lite_top`-on
+    //     át a QSPI controllerig. Default 0 → sim-paritás (a meglévő tesztek
+    //     változatlanok); FPGA-n a Vivado generic 1-re állítja (a board MODE
+    //     pinjei SPIx4-re nem konfiguráltak, ezért a flash QE-jét RTL-szinten
+    //     kell beállítani a reset utáni boot-sequence során).
+    // en: F2.7 Sub5 — flash QE-bit init enable, forwarded through
+    //     `cilcpu_a7lite_top` to the QSPI controller. Default 0 → sim parity
+    //     (existing tests unchanged); on FPGA Vivado generic sets it to 1
+    //     (the board's MODE pins are not configured for SPIx4, so the flash
+    //     QE must be set at RTL level during the post-reset boot sequence).
+    parameter integer QE_INIT_ENABLE = 0
 ) (
     // hu: Board-szintű I/O / en: Board-level I/O
     input  wire        i_clk_50m,        // J19 — 50 MHz aktív oszcillátor
@@ -112,7 +124,8 @@ module cilcpu_a7lite_board #(
         .BOOT_ARG_VALUE   (BOOT_ARG_VALUE),
         .DEBOUNCE_BITS    (DEBOUNCE_BITS),
         .CLOCKS_PER_BAUD  (CLOCKS_PER_BAUD),
-        .CODE_BASE_OFFSET (CODE_BASE_OFFSET)
+        .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
+        .QE_INIT_ENABLE   (QE_INIT_ENABLE)
     ) u_top (
         .i_clk_50m       (i_clk_50m),
         .i_rst_btn_n     (i_rst_btn_n),

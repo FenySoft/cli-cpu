@@ -54,7 +54,15 @@ module cilcpu_a7lite_top #(
     //     `-G` sets it ABOVE the config-flash bitstream (0xC00000 = 12 MB)
     //     so the ~9.9 MB XC7A200T bitstream and the CIL-T0 app do not
     //     collide on the IS25L128F. Forwarded to `cilcpu_core`.
-    parameter integer CODE_BASE_OFFSET = 0
+    parameter integer CODE_BASE_OFFSET = 0,
+
+    // hu: F2.7 Sub5 — flash QE-bit init engedélyezése a QSPI controllerben
+    //     (a `cilcpu_core`-on át a `cilcpu_qspi_controller`-be hajtva).
+    //     Default 0 → sim-paritás; FPGA-n a Vivado generic 1-re állítja.
+    // en: F2.7 Sub5 — flash QE-bit init enable for the QSPI controller
+    //     (forwarded through `cilcpu_core` to `cilcpu_qspi_controller`).
+    //     Default 0 → sim parity; on FPGA Vivado generic sets it to 1.
+    parameter integer QE_INIT_ENABLE = 0
 ) (
     // hu: Board-szintű I/O / en: Board-level I/O
     input  wire        i_clk_50m,        // J19 — 50 MHz aktív oszcillátor
@@ -269,7 +277,8 @@ module cilcpu_a7lite_top #(
     // en: Nano core instantiation
     // ============================================================
     cilcpu_core #(
-        .CODE_BASE_OFFSET (CODE_BASE_OFFSET)
+        .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
+        .QE_INIT_ENABLE   (QE_INIT_ENABLE)
     ) u_core (
         .clk                (i_clk_50m),
         .rst_n              (core_rst_n),

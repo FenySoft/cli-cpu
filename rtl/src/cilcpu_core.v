@@ -20,7 +20,17 @@ module cilcpu_core #(
     //     `cilcpu_qspi_controller`. Default 0 → sim parity. On FPGA the
     //     top-level generic (see cilcpu_a7lite_top/board) sets it above
     //     the bitstream (0xC00000).
-    parameter integer CODE_BASE_OFFSET = 0
+    parameter integer CODE_BASE_OFFSET = 0,
+
+    // hu: F2.7 Sub5 — flash QE-bit init engedélyezése a `cilcpu_qspi_controller`-ben.
+    //     Default 0 → sim-paritás (a meglévő tesztek változatlanok). FPGA-n a
+    //     top-level generic (lásd cilcpu_a7lite_top/board → create_project.tcl)
+    //     1-re állítja, hogy reset után WREN+WRSR sequence-szel beállítsa a flash QE-t.
+    // en: F2.7 Sub5 — flash QE-bit init enable for `cilcpu_qspi_controller`.
+    //     Default 0 → sim parity (existing tests unchanged). On FPGA the
+    //     top-level generic (see cilcpu_a7lite_top/board → create_project.tcl)
+    //     sets it to 1 so that WREN+WRSR runs after reset to set flash QE.
+    parameter integer QE_INIT_ENABLE = 0
 ) (
     input  wire        clk,
     input  wire        rst_n,
@@ -246,7 +256,8 @@ module cilcpu_core #(
     reg  [23:0] r_next_fetch_addr;
 
     cilcpu_qspi_controller #(
-        .CODE_BASE_OFFSET (CODE_BASE_OFFSET)
+        .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
+        .QE_INIT_ENABLE   (QE_INIT_ENABLE)
     ) u_qspi (
         .clk             (clk),
         .rst_n           (rst_n),

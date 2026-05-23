@@ -48,6 +48,15 @@ test_qspi_controller:
 test_divider:
 	$(SUBMAKE) MODULE=test_divider TOPLEVEL=cilcpu_divider VERILOG_SOURCES="$(PWD)/../src/cilcpu_divider.v"
 
+# hu: F2.7 Sub5 — QSPI Controller QE-init sequence verifikáció.
+#     QE_INIT_ENABLE=1 mellett a controller reset után WREN+WRSR-t küld.
+# en: F2.7 Sub5 — QSPI Controller QE-init sequence verification.
+#     With QE_INIT_ENABLE=1, the controller emits WREN+WRSR after reset.
+test_qspi_qe_init:
+	$(SUBMAKE) MODULE=test_qspi_qe_init TOPLEVEL=cilcpu_qspi_controller \
+		LOCAL_COMPILE_ARGS="-GQE_INIT_ENABLE=1" \
+		VERILOG_SOURCES="$(PWD)/../src/cilcpu_qspi_controller.v"
+
 # hu: Sub5.A — CODE_BASE_OFFSET paraméterezett QSPI controller teszt.
 #     EGYETLEN forrás: a 256 (= 0x000100) érték a Verilator generic-be
 #     (-GCODE_BASE_OFFSET=) ÉS a cocotb env-be (QSPI_CODE_BASE_OFFSET)
@@ -86,6 +95,7 @@ $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
 $(PWD)/../src/cilcpu_core.v"
 
 # hu: F2.5b golden vector harness — cocotb vs C# szim trace JSONL.
@@ -100,6 +110,7 @@ $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
 $(PWD)/../src/cilcpu_core.v"
 
 # hu: F2.7 Sub1 — A7-Lite top-level wrapper cocotb tesztek.
@@ -120,6 +131,7 @@ $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
@@ -146,6 +158,7 @@ $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
@@ -172,6 +185,7 @@ $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
@@ -195,6 +209,7 @@ $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
@@ -220,4 +235,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib

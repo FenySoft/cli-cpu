@@ -33,7 +33,25 @@ module cilcpu_qspi_controller #(
     //     `-GCODE_BASE_OFFSET=<value>` (Verilator) / `set_property generic`
     //     (Vivado) override does not raise WIDTHTRUNC; sliced to [23:0] at
     //     the use site (matching the wrapper-parameter convention).
-    parameter integer CODE_BASE_OFFSET = 0
+    parameter integer CODE_BASE_OFFSET = 0,
+
+    // hu: F2.7 Sub5 — flash QE-bit init engedélyezése reset után. HW-en
+    //     KÖTELEZŐ (a board MODE pinjei SPI x1 boot-ra konfiguráltak, így
+    //     az FPGA startup ROM nem állítja be a flash QE-jét → a core 0x6B
+    //     Quad Output Read parancsa garbage-t kapna). Sim-ben default 0,
+    //     hogy a meglévő unit-tesztek (test_qspi_controller, test_core,
+    //     test_a7lite_*) változatlan reset-utáni viselkedést kapjanak; a
+    //     dedikált test_qspi_qe_init expliciten 1-re állítja.
+    //     Vivado FPGA build: set_property generic QE_INIT_ENABLE=1.
+    // en: F2.7 Sub5 — enable flash QE-bit init after reset. REQUIRED on
+    //     real HW (the board's MODE pins are configured for SPI x1 boot,
+    //     so the FPGA startup ROM does not set the flash QE → the core's
+    //     0x6B Quad Output Read would return garbage). Default 0 in sim
+    //     so existing unit tests (test_qspi_controller, test_core,
+    //     test_a7lite_*) see unchanged post-reset behaviour; the
+    //     dedicated test_qspi_qe_init sets it to 1 explicitly.
+    //     Vivado FPGA build: set_property generic QE_INIT_ENABLE=1.
+    parameter integer QE_INIT_ENABLE = 0
 ) (
     // hu: Órajel és reset
     // en: Clock and reset
@@ -72,6 +90,27 @@ localparam [3:0] ST_DUMMY   = 4'd3;
 localparam [3:0] ST_DATA_RD = 4'd4;
 localparam [3:0] ST_DATA_WR = 4'd5;
 localparam [3:0] ST_DONE    = 4'd6;
+// hu: F2.7 Sub5 — flash QE-init állapotok. Reset után a controller először
+//     egy WREN (0x06) + WRSR (0x01) 0x40 sekvenciát küld a flash-nek, hogy
+//     a Status Register QE bitje (bit 6) = 1 legyen. Enélkül HW-en a
+//     0x6B Quad Output Read garbage-t adna (a board MODE-pinjei nem SPIx4
+//     boot-ra vannak konfigurálva → FPGA startup ROM nem állítja be a QE-t).
+//     Sim: a TQSPIFlashModel transzparensen átengedi az ismeretlen CMD-ket
+//     (CS# magasig vár), így a meglévő tesztek változatlanul futnak.
+// en: F2.7 Sub5 — flash QE-init states. After reset the controller first
+//     issues WREN (0x06) + WRSR (0x01) 0x40 to set the flash Status
+//     Register QE bit (bit 6). Without this, on real HW the 0x6B Quad
+//     Output Read returns garbage (the board's MODE pins are not set for
+//     SPIx4 boot → the FPGA startup ROM does not configure QE).
+//     Sim: TQSPIFlashModel transparently absorbs unknown CMDs (waits for
+//     CS# high), so existing tests run unchanged.
+localparam [3:0] ST_INIT_CS_HI    = 4'd7;
+localparam [3:0] ST_INIT_DATA_SPI = 4'd8;
+
+localparam [1:0] INIT_WREN     = 2'd0;
+localparam [1:0] INIT_WRSR_CMD = 2'd1;
+localparam [1:0] INIT_WRSR_DAT = 2'd2;
+localparam [1:0] INIT_DONE     = 2'd3;
 
 // ============================================================
 // hu: Belső regiszterek
@@ -88,6 +127,11 @@ reg         r_clk_phase;   // hu: QSPI CLK toggle (0→1→0→1...), /2 osztó
 reg         r_is_write;    // hu: 1=írás, 0=olvasás
 reg         r_device;      // hu: 0=Flash, 1=PSRAM
 reg         r_clk_en;      // hu: CLK gating: 1 ha aktív tranzakció
+
+// hu: F2.7 Sub5 — flash QE-init állapot
+// en: F2.7 Sub5 — flash QE-init state
+reg  [1:0]  r_init_phase;  // aktuális init fázis (WREN/WRSR_CMD/WRSR_DAT/DONE)
+reg         r_init_done;   // 1 = QE-init lefutott, normál üzem engedélyezve
 
 // ============================================================
 // hu: QSPI CLK kimenet — kombinációs, gated
@@ -110,24 +154,47 @@ assign cpu_busy = (r_state != ST_IDLE) & (r_state != ST_DONE);
 
 always @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-        // hu: Reset — minden regiszter törlése
-        // en: Reset — clear all registers
-        r_state          <= ST_IDLE;
-        r_bit_cnt        <= 6'd0;
-        r_cmd            <= 8'd0;
+        // hu: Reset — minden regiszter törlése. Ha QE_INIT_ENABLE=1, a
+        //     reset után közvetlenül indul a WREN 0x06 CMD (a flash QE-bit
+        //     beállításához). Ha 0 (sim default), klasszikus IDLE-állapot.
+        // en: Reset — clear all registers. If QE_INIT_ENABLE=1, the WREN
+        //     0x06 CMD starts immediately after reset (to set the flash
+        //     QE bit). If 0 (sim default), classic IDLE state.
         r_addr           <= 24'd0;
         r_shift_out      <= 32'd0;
         r_shift_in       <= 32'd0;
         r_clk_phase      <= 1'b0;
         r_is_write       <= 1'b0;
         r_device         <= 1'b0;
-        r_clk_en         <= 1'b0;
         cpu_ready        <= 1'b0;
         cpu_rdata        <= 32'd0;
-        qspi_cs_flash_n  <= 1'b1;
         qspi_cs_psram_n  <= 1'b1;
-        qspi_dq_out      <= 4'hF;
-        qspi_dq_oe       <= 1'b0;
+
+        if (QE_INIT_ENABLE != 0) begin
+            // hu: QE-init aktív — WREN tranzakció indítása
+            // en: QE-init active — start WREN transaction
+            r_bit_cnt        <= 6'd7;     // 8 CMD bit, 7→0
+            r_cmd            <= 8'h06;    // WREN
+            r_clk_en         <= 1'b1;     // CLK aktív az init alatt
+            qspi_cs_flash_n  <= 1'b0;     // CS# low — WREN tranzakció kezdődik
+            qspi_dq_out      <= 4'b1110;  // 0x06 MSB=0 → DQ[0]=0
+            qspi_dq_oe       <= 1'b1;
+            r_init_done      <= 1'b0;
+            r_init_phase     <= INIT_WREN;
+            r_state          <= ST_CMD;   // egyből CMD küldés
+        end else begin
+            // hu: QE-init disabled — klasszikus IDLE-állapot reset után
+            // en: QE-init disabled — classic IDLE state after reset
+            r_bit_cnt        <= 6'd0;
+            r_cmd            <= 8'd0;
+            r_clk_en         <= 1'b0;
+            qspi_cs_flash_n  <= 1'b1;
+            qspi_dq_out      <= 4'hF;
+            qspi_dq_oe       <= 1'b0;
+            r_init_done      <= 1'b1;     // azonnal "kész" — IDLE-ben fogadja a CPU-kéréseket
+            r_init_phase     <= INIT_DONE;
+            r_state          <= ST_IDLE;
+        end
     end else begin
         // hu: cpu_ready alapértelmezetten 0 (1-ciklusos pulzus)
         // en: cpu_ready defaults to 0 (1-cycle pulse)
@@ -281,29 +348,55 @@ always @(posedge clk or negedge rst_n) begin
                 //     Setup: r_cmd[r_bit_cnt] bit → DQ[0]
                 //     DQ[3:2]=1,1 (WP#/HOLD# inactive), DQ[1]=1 (MISO idle)
                 if (r_bit_cnt == 6'd0) begin
-                    // hu: Utolsó bit — átmenet ST_ADDR-ba
-                    // en: Last bit — transition to ST_ADDR
-                    // hu: A következő fázis beállítása: ADDR, 24 SPI bit (Flash) vagy 6 Quad CLK (PSRAM)
-                    // en: Setup next phase: ADDR, 24 SPI bits (Flash) or 6 Quad CLKs (PSRAM)
-                    if (r_device == 1'b0) begin
-                        // hu: Flash — SPI ADDR (24 bit, 1 bit/CLK)
-                        // en: Flash — SPI ADDR (24 bits, 1 bit/CLK)
-                        r_bit_cnt <= 6'd23;
-                    end else begin
-                        // hu: PSRAM — Quad ADDR (24 bit, 4 bit/CLK = 6 CLK)
-                        // en: PSRAM — Quad ADDR (24 bits, 4 bits/CLK = 6 CLKs)
-                        r_bit_cnt <= 6'd5;
-                    end
-                    r_state <= ST_ADDR;
-                    // hu: Setup az ADDR első nibble/bit
-                    // en: Setup the first ADDR nibble/bit
-                    if (r_device == 1'b0) begin
-                        // hu: Flash SPI ADDR: bit[23] → DQ[0]
-                        qspi_dq_out <= {3'b111, r_addr[23]};
-                    end else begin
-                        // hu: PSRAM Quad ADDR: addr[23:20] → DQ[3:0]
-                        qspi_dq_out <= r_addr[23:20];
-                    end
+                    // hu: Utolsó CMD bit — elágazás az init fázis alapján.
+                    //     INIT_WREN/INIT_WRSR_CMD: F2.7 Sub5 QE-init lépések
+                    //     (CS# spacing vagy 8-bit data SPI). INIT_DONE: normál
+                    //     fetch flow (ADDR/PSRAM Quad ADDR átmenet).
+                    // en: Last CMD bit — branch on init phase. INIT_WREN /
+                    //     INIT_WRSR_CMD: F2.7 Sub5 QE-init steps (CS# spacing
+                    //     or 8-bit SPI data). INIT_DONE: normal fetch flow
+                    //     (transition to ADDR / PSRAM Quad ADDR).
+                    case (r_init_phase)
+                        INIT_WREN: begin
+                            // hu: WREN CMD küldve → CS# spacing (4 ciklus
+                            //     > tSHSL_min 30 ns ISSI IS25LP128-on)
+                            // en: WREN CMD sent → CS# spacing (4 cycles
+                            //     > tSHSL_min 30 ns on ISSI IS25LP128)
+                            r_bit_cnt <= 6'd3;
+                            r_state   <= ST_INIT_CS_HI;
+                        end
+                        INIT_WRSR_CMD: begin
+                            // hu: WRSR CMD küldve → 8-bit data byte küldés
+                            //     SPI módban (0x40 = QE bit, SR bit 6).
+                            // en: WRSR CMD sent → send 8-bit data byte in SPI
+                            //     mode (0x40 = QE bit, SR bit 6).
+                            r_shift_out <= 32'h0000_0040;
+                            r_bit_cnt   <= 6'd7;
+                            qspi_dq_out <= 4'b1110;  // 0x40 MSB=0 → DQ[0]=0
+                            r_state     <= ST_INIT_DATA_SPI;
+                        end
+                        default: begin
+                            // hu: INIT_DONE — normál fetch flow.
+                            //     A következő fázis: ADDR, 24 SPI bit (Flash)
+                            //     vagy 6 Quad CLK (PSRAM)
+                            // en: INIT_DONE — normal fetch flow.
+                            //     Next phase: ADDR, 24 SPI bits (Flash) or 6
+                            //     Quad CLKs (PSRAM)
+                            if (r_device == 1'b0) begin
+                                r_bit_cnt <= 6'd23;
+                            end else begin
+                                r_bit_cnt <= 6'd5;
+                            end
+                            r_state <= ST_ADDR;
+                            // hu: Setup az ADDR első nibble/bit
+                            // en: Setup the first ADDR nibble/bit
+                            if (r_device == 1'b0) begin
+                                qspi_dq_out <= {3'b111, r_addr[23]};
+                            end else begin
+                                qspi_dq_out <= r_addr[23:20];
+                            end
+                        end
+                    endcase
                 end else begin
                     // hu: Következő CMD bit setup
                     // en: Setup next CMD bit
@@ -483,6 +576,86 @@ always @(posedge clk or negedge rst_n) begin
                 cpu_rdata <= r_shift_in;
             end
             r_state <= ST_IDLE;
+        end
+
+        // --------------------------------------------------------
+        // hu: ST_INIT_CS_HI — F2.7 Sub5 QE-init: CS# high spacing két
+        //     SPI tranzakció között (WREN után, WRSR data után). 4 ciklus
+        //     (~80 ns @ 50 MHz) > tSHSL_min (30 ns ISSI IS25LP128). A
+        //     spacing végén r_init_phase alapján: WREN befejezve →
+        //     WRSR CMD indítás; WRSR_DAT befejezve → init kész, ST_IDLE.
+        // en: ST_INIT_CS_HI — F2.7 Sub5 QE-init: CS# high spacing between
+        //     two SPI transactions (after WREN, after WRSR data). 4 cycles
+        //     (~80 ns @ 50 MHz) > tSHSL_min (30 ns ISSI IS25LP128). At end:
+        //     INIT_WREN done → start WRSR CMD; INIT_WRSR_DAT done → init
+        //     complete, ST_IDLE.
+        // --------------------------------------------------------
+        ST_INIT_CS_HI: begin
+            qspi_cs_flash_n <= 1'b1;
+            r_clk_en        <= 1'b0;
+            r_clk_phase     <= 1'b0;
+            qspi_dq_oe      <= 1'b0;
+            qspi_dq_out     <= 4'hF;
+
+            if (r_bit_cnt == 6'd0) begin
+                case (r_init_phase)
+                    INIT_WREN: begin
+                        // hu: WREN befejezve → WRSR CMD indítás
+                        // en: WREN done → start WRSR CMD
+                        r_init_phase    <= INIT_WRSR_CMD;
+                        r_cmd           <= 8'h01;     // WRSR
+                        r_bit_cnt       <= 6'd7;
+                        qspi_cs_flash_n <= 1'b0;
+                        r_clk_en        <= 1'b1;
+                        qspi_dq_oe      <= 1'b1;
+                        qspi_dq_out     <= 4'b1110;   // 0x01 MSB=0 → DQ[0]=0
+                        r_state         <= ST_CMD;
+                    end
+                    INIT_WRSR_DAT: begin
+                        // hu: WRSR DATA befejezve → QE-init lefutott
+                        // en: WRSR DATA done → QE-init complete
+                        r_init_phase <= INIT_DONE;
+                        r_init_done  <= 1'b1;
+                        r_state      <= ST_IDLE;
+                    end
+                    default: r_state <= ST_IDLE;
+                endcase
+            end else begin
+                r_bit_cnt <= r_bit_cnt - 6'd1;
+            end
+        end
+
+        // --------------------------------------------------------
+        // hu: ST_INIT_DATA_SPI — F2.7 Sub5 QE-init: 8 bites data byte
+        //     küldés SPI módban (DQ[0]) a WRSR-hez. 8 SPI clock,
+        //     r_shift_out alsó 8 bitjéből bit 7→0 sorrendben.
+        //     Setup falling edge, sample (slave) rising edge — azonos
+        //     mintával mint ST_CMD.
+        // en: ST_INIT_DATA_SPI — F2.7 Sub5 QE-init: 8-bit data byte send
+        //     in SPI mode (DQ[0]) for the WRSR transaction. 8 SPI clocks,
+        //     bits 7→0 from the low byte of r_shift_out. Setup on falling
+        //     edge, slave samples on rising — same pattern as ST_CMD.
+        // --------------------------------------------------------
+        ST_INIT_DATA_SPI: begin
+            r_clk_phase <= ~r_clk_phase;
+
+            if (!r_clk_phase) begin
+                // hu: Rising edge — slave mintavételez
+                // en: Rising edge — slave samples
+            end else begin
+                // hu: Falling edge — következő bit setup vagy átmenet
+                // en: Falling edge — setup next bit or transition
+                if (r_bit_cnt == 6'd0) begin
+                    // hu: Utolsó data bit kiküldve → CS# spacing, majd init kész
+                    // en: Last data bit sent → CS# spacing, then init complete
+                    r_init_phase <= INIT_WRSR_DAT;
+                    r_bit_cnt    <= 6'd3;
+                    r_state      <= ST_INIT_CS_HI;
+                end else begin
+                    r_bit_cnt   <= r_bit_cnt - 6'd1;
+                    qspi_dq_out <= {3'b111, r_shift_out[r_bit_cnt - 1]};
+                end
+            end
         end
 
         default: begin

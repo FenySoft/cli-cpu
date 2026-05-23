@@ -56,6 +56,7 @@ set rtl_files [list \
     "$src_dir/cilcpu_microcode.v" \
     "$src_dir/cilcpu_stack_cache.v" \
     "$src_dir/cilcpu_qspi_controller.v" \
+    "$src_dir/cilcpu_divider.v" \
     "$src_dir/cilcpu_core.v" \
     "$fpga_dir/uart_tx.v" \
     "$fpga_dir/decimal_printer.v" \
@@ -128,6 +129,7 @@ set_property generic { \
     DEBOUNCE_BITS=22 \
     CLOCKS_PER_BAUD=434 \
     CODE_BASE_OFFSET=32'hC00000 \
+    QE_INIT_ENABLE=32'd1 \
 } [current_fileset]
 
 # =============================================================
