@@ -50,9 +50,10 @@ status: policy
 - A Fibonacci(20) = 6765 végponttól végpontig teszt
 - F2.7: FPGA validáció a szilícium ELŐTT — a "nincs tape-out FPGA nélkül" elv
 
-## 3.5. cikk — Vázlat (opcionális, az F2.7 befejezése után)
+## 3.5. cikk — Publikált (2026-05-23)
 
-**Cím:** Szimulációtól a valódi hardverig: az első FPGA futásunk
+**Cím:** Szimulációtól a valódi hardverig — az első FPGA futásunk
+**URL:** `web/{hu,en}/blog/first-fpga.html`
 
 - A szakadék a szimuláció és a valódi hardver között
 - F2.7: egyetlen Nano core futása az A7-Lite XC7A200T-n

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Szimulációtól a valódi hardverig — Az első FPGA futásunk — CLI-CPU Blog</title>
+  <meta name="description" content="A CLI-CPU első CIL-T0 programja valódi FPGA-n futott: C# → Roslyn → CIL-T0 → flash → XC7A200T → UART. Fibonacci(20) = 6765 az A7-Lite hardveren. A három bug, ami a szimuláció és a szilícium közé állt.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.8; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 24px; width: 100%; }
+    header { padding: 48px 0 32px; border-bottom: 1px solid var(--border); }
+    header .nav { font-family: var(--mono); font-size: 0.85rem; margin-bottom: 24px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: #f0f6fc; line-height: 1.25; }
+    header .subtitle { font-family: var(--mono); font-size: 1rem; color: var(--green); margin-top: 12px; }
+    header .meta { font-size: 0.85rem; color: var(--text-dim); margin-top: 16px; font-family: var(--mono); }
+    article { flex: 1; padding: 48px 0; }
+    article h2 { font-family: var(--mono); font-size: 1.3rem; color: #f0f6fc; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    article h2:first-child { margin-top: 0; }
+    article h3 { font-size: 1.1rem; color: #f0f6fc; margin-top: 32px; margin-bottom: 12px; }
+    article p { margin-bottom: 16px; font-size: 1.02rem; }
+    article blockquote { border-left: 3px solid var(--green); padding: 12px 20px; margin: 24px 0; background: var(--bg-card); border-radius: 0 6px 6px 0; font-style: italic; }
+    article ul, article ol { margin: 16px 0; padding-left: 24px; }
+    article li { margin-bottom: 8px; font-size: 1.02rem; }
+    article strong { color: #f0f6fc; }
+    article code { font-family: var(--mono); background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 24px 0; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.6; }
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.9rem; }
+    .comparison-table th, .comparison-table td { padding: 10px 14px; border: 1px solid var(--border); text-align: left; }
+    .comparison-table th { background: var(--bg-card); font-family: var(--mono); font-size: 0.85rem; color: #f0f6fc; }
+    .comparison-table td { color: var(--text-dim); }
+    .highlight-box { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 16px 20px; margin: 24px 0; border-radius: 0 6px 6px 0; }
+    .highlight-box strong { color: var(--accent); }
+    .video-wrap { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; margin: 32px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: var(--bg-card); }
+    .video-wrap iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+    .cta { background: var(--bg-card); border: 1px solid var(--green); border-radius: 8px; padding: 28px; margin-top: 48px; text-align: center; }
+    .cta h3 { font-family: var(--mono); color: var(--green); margin-bottom: 12px; }
+    .cta p { margin-bottom: 16px; font-size: 0.95rem; }
+    .cta-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-family: var(--mono); font-size: 0.9rem; }
+    footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; font-size: 0.85rem; color: var(--text-dim); }
+    footer a { color: var(--text-dim); } footer a:hover { color: var(--accent); }
+    .footer-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+    @media (max-width: 600px) { header h1 { font-size: 1.5rem; } header { padding: 32px 0 24px; } article h2 { font-size: 1.1rem; } .comparison-table { font-size: 0.8rem; } .comparison-table th, .comparison-table td { padding: 6px 8px; } }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">Magyar</span>
+  <a href="../../en/blog/first-fpga.html" style="color:var(--text-dim);padding:4px 12px;margin-left:4px;">English</a>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>Szimulációtól a valódi hardverig</h1>
+    <div class="subtitle">Az első FPGA futásunk — Fibonacci(20) = 6765 valódi szilíciumon</div>
+    <div class="meta">2026. május 23. · Hocza József Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <!-- A YouTube feltöltés után írd be a videó 11 karakteres azonosítóját a VIDEO_ID helyére (ez az egyetlen csere ezen az oldalon). A magyar oldalon a YouTube ID megegyezik az angoléval. -->
+    <div class="video-wrap">
+      <iframe src="https://www.youtube-nocookie.com/embed/VIDEO_ID" title="CLI-CPU — első FPGA futás" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+
+    <p>
+      Egy szimulátor mindig hazudik egy kicsit. Nem rosszindulatból — egyszerűen elnéz dolgokat, amiket a valódi szilícium nem. A CLI-CPU mögött <strong>250+ C# teszt</strong> és egy teljes cocotb regressziós csomag áll: a referencia-szimulátor zölden futott, a Verilator RTL-szimuláció zölden futott, a Fibonacci(20) végponttól végpontig <strong>6765</strong>-öt adott. Papíron kész volt.
+    </p>
+
+    <p>
+      Aztán fogtam egy <strong>Alinx A7-Lite</strong> kártyát egy Xilinx XC7A200T FPGA-val, és kiderült, mit jelent valójában a „kész".
+    </p>
+
+    <blockquote>
+      A szimuláció megmondja, hogy a logikád helyes. A hardver megmondja, hogy a logikád <em>valódi</em>.
+    </blockquote>
+
+    <h2>Mit akartam látni</h2>
+
+    <p>
+      A cél egyetlen, szándékosan unalmas dolog volt: egy C#-ban írt függvény fusson le <strong>natívan, valódi hardveren</strong>, JIT, interpreter és operációs rendszer nélkül — és írja ki az eredményt egy soros porton. Ez a CLI-CPU „hello world"-je.
+    </p>
+
+    <pre>C# (samples/PureMath, Math.FibonacciIterative)
+    ↓ dotnet build (Roslyn)
+.dll (CIL bytecode)
+    ↓ TCliCpuLinker
+app.t0  (40 byte: 8 header + 32 kód)
+    ↓ openFPGALoader (config-flash @ 0xC00000)
+IS25LP128 flash
+    ↓ (FPGA üzem közben olvassa)
+cilcpu_core  (Fetch → Decode → Microcode → StackCache → ALU)
+    ↓ core_halt, return_value = 6765
+decimal_printer → uart_tx (115200 8N1)
+    ↓
+"6765\r\n"  a soros porton</pre>
+
+    <p>
+      A teljes láncban <strong>egyetlen sornyi C kód vagy firmware sincs</strong>. A C# függvény CIL bytecode-ja közvetlenül a szilíciumon fut. Ez a vízió lényege — és pontosan ez tette a bring-upot izgalmassá.
+    </p>
+
+    <h2>Három bug állt a szilícium és köztem</h2>
+
+    <p>
+      A „papíron kész" és a „villog a LED, jön a 6765" között három hiba húzódott meg. Mindhárom olyan, amit a szimuláció elnéz, a valódi eszköz viszont nem.
+    </p>
+
+    <h3>1. A szimulátor megengedőbb, mint a szintézis</h3>
+
+    <p>
+      Az első igazi Vivado-szintézis három Verilog-szabálysértést dobott ki, amit a Verilator évek óta elnézett:
+    </p>
+
+    <ul>
+      <li><strong>Kettős part-select</strong> — <code>BOOT_ARG_COUNT[7:0][4:0]</code>, amit a Verilator értelmezett, a szintézer viszont visszautasít.</li>
+      <li><strong>Hiányzó <code>begin/end</code></strong> hat többutasításos function-ben — a Verilog-2001 megköveteli, a sim-fordító nem panaszkodott.</li>
+      <li><strong>BRAM-inferencia</strong>: az SRAM-blokkot úgy kellett átírni, hogy a Vivado tisztán 4× RAMB36E1-et ismerjen fel — egy halott kombinációs olvasási ágat, egy rosszul elhelyezett busz-multiplexert és egy async-reset-et kellett kiszedni belőle.</li>
+    </ul>
+
+    <p>
+      Tanulság: a sim-szintű zöld teszt szükséges, de nem elégséges. A szintézer egy második, szigorúbb lektor — és érdemes minél hamarabb futtatni.
+    </p>
+
+    <h3>2. Az osztó, ami nem fért bele az órajelbe</h3>
+
+    <p>
+      A szintézis lefutott, de a <strong>timing nem zárt</strong>: WNS = −66 ns 50 MHz-en. A kritikus út 329 logikai szint volt, <strong>287 darab CARRY4</strong> egyetlen láncon. A bűnös: a tisztán kombinációs ALU 32-bites előjeles osztása (<code>DIV</code> / <code>REM</code>), amit a szintézer egy 32 szintű kivonó-láncként göngyölített ki.
+    </p>
+
+    <p>
+      Itt nem volt felületi javítás — a gyökeret kellett orvosolni. Az egyciklusos kombinációs osztó helyébe egy <strong>szekvenciális, 1 bit/ciklus restoring osztó</strong> került (~34 ciklus, külön <code>ST_DIV_WAIT</code> állapottal a core-ban, megőrizve a C# osztás-szemantikát: 0 felé csonkítás, a maradék előjele az osztandóé). Az eredmény nem csak timing-zárás, hanem jelentősen kisebb chip is lett:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Erőforrás</th><th>Kombinációs</th><th>Iteratív</th><th>Változás</th></tr>
+      <tr><td>Slice LUT</td><td>5 722</td><td>3 559</td><td><strong>−37,8%</strong></td></tr>
+      <tr><td>CARRY4</td><td>869</td><td>302</td><td><strong>−65,2%</strong></td></tr>
+      <tr><td>Slice FF</td><td>1 354</td><td>1 564</td><td>+15,5%</td></tr>
+    </table>
+
+    <p>
+      A végső build <strong>WNS = +2,797 ns</strong> margóval zárt 50 MHz-en, nulla bukó endpoint-tal. Klasszikus hardver-trade-off: néhány extra flip-flop és néhány ciklus latencia cserébe a kombinációs robbanásért.
+    </p>
+
+    <h3>3. A flash, ami nem akart négysávosan beszélni</h3>
+
+    <p>
+      A legalattomosabb bug a legvégére maradt. A bitstream betöltve, a flash felprogramozva, KEY2 megnyomva — és a soros porton <code>3\r\n</code> jelent meg. Ez a <strong>TRAP_INVALID_OPCODE</strong> trap kódja: a core szemetet olvasott a kódmemóriából.
+    </p>
+
+    <p>
+      A nyom a flash-hez vezetett. A core a <code>0x6B Quad Output Read</code> paranccsal olvassa a programot az ISSI IS25LP128 flashből — ehhez a flash <strong>QE (Quad Enable) bitjének</strong> 1-nek kell lennie. Csakhogy ennek a flash-nek a QE bitje gyárilag 0, az A7-Lite MODE-lábai nincsenek SPIx4-re kötve, így az FPGA startup ROM-ja sem állítja be, és az openFPGALoader <code>--enable-quad</code> sem ismeri ezt a variánst. Négysávos parancs, egysávos flash → tiszta szemét.
+    </p>
+
+    <p>
+      A megoldás megint a gyökérnél: a <code>cilcpu_qspi_controller</code> reset után egy <strong>WREN (0x06) + WRSR (0x01, 0x40)</strong> szekvenciával maga állítja perzisztensen 1-re a flash Status Register QE bitjét. Egy <code>QE_INIT_ENABLE</code> paraméter mögé tettem: a szimulációban 0 (a meglévő tesztek viselkedése változatlan marad), a valódi hardveren 1.
+    </p>
+
+    <div class="highlight-box">
+      <strong>Egyik bug sem jött elő szimulációban.</strong> A part-select és a <code>begin/end</code> a szintézernek számított, a timing a valódi órajelnek, a flash QE-bit pedig egy fizikai chip gyári alapállapotának. A szimuláció a logikát ellenőrzi — a hardver a feltételezéseket.
+    </div>
+
+    <h2>A pillanat</h2>
+
+    <p>
+      Reset (KEY1), majd start (KEY2). A soros terminál (COM3, 115200 8N1) hat bájtot mutatott:
+    </p>
+
+    <pre>36 37 36 35 0D 0A
+=  "6765\r\n"
+=  FibonacciIterative(20) = 6765  ✓</pre>
+
+    <p>
+      Egy C#-ban írt függvény lefordult CIL bytecode-dá, áthaladt a saját linkeremen, leszállt egy flash chipre, és egy általam tervezett processzor — valódi szilíciumon, ~1,1 ms alatt — kiszámolta a helyes választ. Ez a CLI-CPU első igazi életjele a szimuláción túl.
+    </p>
+
+    <h2>Miért éri meg az FPGA</h2>
+
+    <p>
+      Ezt a három bugot meg lehetett volna találni a chip legyártása <em>után</em> is. Az viszont drasztikusan másképp néz ki:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Hol bukik el a hiba</th><th>Költség</th><th>Iterációs idő</th></tr>
+      <tr><td>Szimuláció</td><td>~0 €</td><td>másodpercek</td></tr>
+      <tr><td>FPGA</td><td>~0 € (a kártya megvan)</td><td>percek (újraflashelés)</td></tr>
+      <tr><td>ASIC tape-out</td><td>$1300+ (MPW shuttle)</td><td>hónapok</td></tr>
+    </table>
+
+    <p>
+      Ez az F2.7 fázis tétje: <strong>nincs tape-out FPGA-validáció nélkül</strong>. A flash QE-bug egy néhány soros RTL-javítás volt FPGA-n. Ugyanez egy legyártott chipen egy halott die és egy elveszett shuttle-kör. Az FPGA az a hely, ahol a feltételezések ingyen omlanak össze.
+    </p>
+
+    <h2>Egy core — és a nagyobb kép</h2>
+
+    <p>
+      Ez egyetlen Nano core volt, egyetlen kártyán. A CLI-CPU víziója ennél nagyságrendekkel nagyobb: sok kicsi, független core egyetlen chipben, hardveres mailbox-okkal összekötve — a „Cognitive Fabric". A mostani futás ennek a víziónak az első, kézzelfogható alapköve: nem egy diagram, nem egy szimuláció, hanem működő szilícium.
+    </p>
+
+    <p>
+      A teljes toolchain működik: C# → CIL-T0 → bitstream → flash → core → UART. Ez a lánc az, ami eddig csak a fejemben és a tesztekben létezett — most egy fizikai eszközön zár be.
+    </p>
+
+    <div class="cta">
+      <h3>Nyílt forráskód</h3>
+      <p>Az RTL, a szimulátor, a linker és a teljes tesztcsomag publikusan elérhető. A bring-up runbook is benne van a repóban.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub → CLI-CPU</a>
+        <a href="why-cli-cpu.html">Blog → Miért építek ilyen CPU-t</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      A szimuláció megmondja, hogy igazad <em>lehet</em>. A hardver megmondja, hogy igazad <em>van</em>. 2026. május 23-án a CLI-CPU átlépte ezt a határt.
+    </p>
+
+  </div>
+</article>
+
+<nav style="max-width:720px;width:100%;margin:0 auto;padding:0 24px 48px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;font-family:var(--mono);font-size:0.9rem;border-top:1px solid var(--border);padding-top:24px;">
+  <a href="cfpu-ml-max.html">← CFPU-ML-Max</a>
+  <a href="why-cli-cpu.html">Miért építek CPU-t →</a>
+</nav>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 · FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

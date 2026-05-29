@@ -50,9 +50,10 @@ status: policy
 - The Fibonacci(20) = 6,765 end-to-end test
 - F2.7: FPGA validation BEFORE silicon — the principle of "no tape-out without FPGA"
 
-## Article #3.5 — Outline (optional, after F2.7 is done)
+## Article #3.5 — Published (2026-05-23)
 
-**Title:** From Simulation to Real Hardware: Our First FPGA Run
+**Title:** From Simulation to Real Hardware — Our First FPGA Run
+**URL:** `web/{hu,en}/blog/first-fpga.html`
 
 - The gap between simulation and real hardware
 - F2.7: single Nano core running on A7-Lite XC7A200T

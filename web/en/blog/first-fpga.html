@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>From Simulation to Real Hardware — Our First FPGA Run — CLI-CPU Blog</title>
+  <meta name="description" content="The CLI-CPU's first CIL-T0 program ran on real silicon: C# → Roslyn → CIL-T0 → flash → XC7A200T → UART. Fibonacci(20) = 6765 on the A7-Lite FPGA. The three bugs that stood between simulation and silicon.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.8; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 24px; width: 100%; }
+    header { padding: 48px 0 32px; border-bottom: 1px solid var(--border); }
+    header .nav { font-family: var(--mono); font-size: 0.85rem; margin-bottom: 24px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: #f0f6fc; line-height: 1.25; }
+    header .subtitle { font-family: var(--mono); font-size: 1rem; color: var(--green); margin-top: 12px; }
+    header .meta { font-size: 0.85rem; color: var(--text-dim); margin-top: 16px; font-family: var(--mono); }
+    article { flex: 1; padding: 48px 0; }
+    article h2 { font-family: var(--mono); font-size: 1.3rem; color: #f0f6fc; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    article h2:first-child { margin-top: 0; }
+    article h3 { font-size: 1.1rem; color: #f0f6fc; margin-top: 32px; margin-bottom: 12px; }
+    article p { margin-bottom: 16px; font-size: 1.02rem; }
+    article blockquote { border-left: 3px solid var(--green); padding: 12px 20px; margin: 24px 0; background: var(--bg-card); border-radius: 0 6px 6px 0; font-style: italic; }
+    article ul, article ol { margin: 16px 0; padding-left: 24px; }
+    article li { margin-bottom: 8px; font-size: 1.02rem; }
+    article strong { color: #f0f6fc; }
+    article code { font-family: var(--mono); background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 24px 0; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.6; }
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.9rem; }
+    .comparison-table th, .comparison-table td { padding: 10px 14px; border: 1px solid var(--border); text-align: left; }
+    .comparison-table th { background: var(--bg-card); font-family: var(--mono); font-size: 0.85rem; color: #f0f6fc; }
+    .comparison-table td { color: var(--text-dim); }
+    .highlight-box { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 16px 20px; margin: 24px 0; border-radius: 0 6px 6px 0; }
+    .highlight-box strong { color: var(--accent); }
+    .video-wrap { position: relative; width: 100%; padding-bottom: 56.25%; height: 0; margin: 32px 0; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); background: var(--bg-card); }
+    .video-wrap iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+    .cta { background: var(--bg-card); border: 1px solid var(--green); border-radius: 8px; padding: 28px; margin-top: 48px; text-align: center; }
+    .cta h3 { font-family: var(--mono); color: var(--green); margin-bottom: 12px; }
+    .cta p { margin-bottom: 16px; font-size: 0.95rem; }
+    .cta-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-family: var(--mono); font-size: 0.9rem; }
+    footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; font-size: 0.85rem; color: var(--text-dim); }
+    footer a { color: var(--text-dim); } footer a:hover { color: var(--accent); }
+    .footer-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+    @media (max-width: 600px) { header h1 { font-size: 1.5rem; } header { padding: 32px 0 24px; } article h2 { font-size: 1.1rem; } .comparison-table { font-size: 0.8rem; } .comparison-table th, .comparison-table td { padding: 6px 8px; } }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <a href="../../hu/blog/first-fpga.html" style="color:var(--text-dim);padding:4px 12px;">Magyar</a>
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;margin-left:4px;">English</span>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>From Simulation to Real Hardware</h1>
+    <div class="subtitle">Our first FPGA run — Fibonacci(20) = 6765 on real silicon</div>
+    <div class="meta">May 23, 2026 · Hocza József Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <!-- After uploading to YouTube, put the video's 11-character ID in place of VIDEO_ID (this is the only edit on this page). The English page uses the same YouTube ID as the Hungarian one. -->
+    <div class="video-wrap">
+      <iframe src="https://www.youtube-nocookie.com/embed/VIDEO_ID" title="CLI-CPU — first FPGA run" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+
+    <p>
+      A simulator always lies a little. Not out of malice — it simply overlooks things that real silicon won't. The CLI-CPU is backed by <strong>250+ C# tests</strong> and a full cocotb regression suite: the reference simulator ran green, the Verilator RTL simulation ran green, and Fibonacci(20) returned <strong>6765</strong> end to end. On paper, it was done.
+    </p>
+
+    <p>
+      Then I picked up an <strong>Alinx A7-Lite</strong> board with a Xilinx XC7A200T FPGA, and found out what "done" actually means.
+    </p>
+
+    <blockquote>
+      Simulation tells you your logic is correct. Hardware tells you your logic is <em>real</em>.
+    </blockquote>
+
+    <h2>What I wanted to see</h2>
+
+    <p>
+      The goal was a single, deliberately boring thing: a function written in C# running <strong>natively, on real hardware</strong>, with no JIT, no interpreter, no operating system — and printing its result over a serial port. This is the CLI-CPU's "hello world."
+    </p>
+
+    <pre>C# (samples/PureMath, Math.FibonacciIterative)
+    ↓ dotnet build (Roslyn)
+.dll (CIL bytecode)
+    ↓ TCliCpuLinker
+app.t0  (40 bytes: 8 header + 32 code)
+    ↓ openFPGALoader (config flash @ 0xC00000)
+IS25LP128 flash
+    ↓ (read by the FPGA at runtime)
+cilcpu_core  (Fetch → Decode → Microcode → StackCache → ALU)
+    ↓ core_halt, return_value = 6765
+decimal_printer → uart_tx (115200 8N1)
+    ↓
+"6765\r\n"  on the serial port</pre>
+
+    <p>
+      There is <strong>not a single line of C or firmware</strong> anywhere in this chain. The C# function's CIL bytecode runs directly on silicon. That's the whole point of the vision — and it's exactly what made bring-up interesting.
+    </p>
+
+    <h2>Three bugs stood between me and silicon</h2>
+
+    <p>
+      Between "done on paper" and "the LED is on, 6765 is coming through" sat three bugs. Each one is the kind simulation overlooks but a real device does not.
+    </p>
+
+    <h3>1. The simulator is more forgiving than synthesis</h3>
+
+    <p>
+      The first real Vivado synthesis spat out three Verilog violations that Verilator had tolerated for years:
+    </p>
+
+    <ul>
+      <li><strong>Double part-select</strong> — <code>BOOT_ARG_COUNT[7:0][4:0]</code>, which Verilator interpreted but synthesis rejects.</li>
+      <li><strong>Missing <code>begin/end</code></strong> in six multi-statement functions — Verilog-2001 requires it; the sim compiler never complained.</li>
+      <li><strong>BRAM inference</strong>: the SRAM block had to be rewritten so Vivado cleanly infers 4× RAMB36E1 — a dead combinational read path, a misplaced bus multiplexer, and an async reset all had to come out.</li>
+    </ul>
+
+    <p>
+      Lesson: a green test at the sim level is necessary but not sufficient. The synthesizer is a second, stricter reviewer — and it's worth running as early as possible.
+    </p>
+
+    <h3>2. The divider that didn't fit in the clock</h3>
+
+    <p>
+      Synthesis passed, but <strong>timing didn't close</strong>: WNS = −66 ns at 50 MHz. The critical path was 329 logic levels with <strong>287 CARRY4 cells</strong> on a single chain. The culprit: the purely combinational ALU's 32-bit signed division (<code>DIV</code> / <code>REM</code>), which the synthesizer unrolled into a 32-level subtractor chain.
+    </p>
+
+    <p>
+      There was no surface patch here — the root had to be fixed. The single-cycle combinational divider was replaced with a <strong>sequential, 1-bit-per-cycle restoring divider</strong> (~34 cycles, with a dedicated <code>ST_DIV_WAIT</code> state in the core, preserving C# division semantics: truncation toward zero, remainder sign matching the dividend). The result wasn't just timing closure — it was a significantly smaller chip:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Resource</th><th>Combinational</th><th>Iterative</th><th>Change</th></tr>
+      <tr><td>Slice LUT</td><td>5,722</td><td>3,559</td><td><strong>−37.8%</strong></td></tr>
+      <tr><td>CARRY4</td><td>869</td><td>302</td><td><strong>−65.2%</strong></td></tr>
+      <tr><td>Slice FF</td><td>1,354</td><td>1,564</td><td>+15.5%</td></tr>
+    </table>
+
+    <p>
+      The final build closed at <strong>WNS = +2.797 ns</strong> margin at 50 MHz, with zero failing endpoints. A classic hardware trade-off: a few extra flip-flops and a few cycles of latency in exchange for killing the combinational blowup.
+    </p>
+
+    <h3>3. The flash that wouldn't talk in four lanes</h3>
+
+    <p>
+      The sneakiest bug saved itself for last. Bitstream loaded, flash programmed, KEY2 pressed — and the serial port showed <code>3\r\n</code>. That's the <strong>TRAP_INVALID_OPCODE</strong> trap code: the core was reading garbage out of code memory.
+    </p>
+
+    <p>
+      The trail led to the flash. The core reads the program from the ISSI IS25LP128 flash using the <code>0x6B Quad Output Read</code> command — which requires the flash's <strong>QE (Quad Enable) bit</strong> to be 1. But this flash ships with QE = 0, the A7-Lite's MODE pins aren't strapped for SPIx4, so the FPGA startup ROM doesn't set it either, and openFPGALoader's <code>--enable-quad</code> doesn't recognize this variant. A four-lane command to a one-lane flash → pure garbage.
+    </p>
+
+    <p>
+      The fix, again at the root: after reset, the <code>cilcpu_qspi_controller</code> issues a <strong>WREN (0x06) + WRSR (0x01, 0x40)</strong> sequence to persistently set the flash Status Register's QE bit to 1 itself. I put it behind a <code>QE_INIT_ENABLE</code> parameter: 0 in simulation (existing test behavior stays unchanged), 1 on real hardware.
+    </p>
+
+    <div class="highlight-box">
+      <strong>None of these bugs showed up in simulation.</strong> The part-select and <code>begin/end</code> mattered to the synthesizer, the timing to a real clock, and the flash QE bit to a physical chip's factory default. Simulation checks your logic — hardware checks your assumptions.
+    </div>
+
+    <h2>The moment</h2>
+
+    <p>
+      Reset (KEY1), then start (KEY2). The serial terminal (COM3, 115200 8N1) showed six bytes:
+    </p>
+
+    <pre>36 37 36 35 0D 0A
+=  "6765\r\n"
+=  FibonacciIterative(20) = 6765  ✓</pre>
+
+    <p>
+      A function written in C# compiled to CIL bytecode, passed through my own linker, landed on a flash chip, and a processor I designed — on real silicon, in ~1.1 ms — computed the right answer. This is the CLI-CPU's first true sign of life beyond simulation.
+    </p>
+
+    <h2>Why the FPGA is worth it</h2>
+
+    <p>
+      These three bugs could have been found <em>after</em> fabricating the chip too. That looks drastically different:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Where the bug surfaces</th><th>Cost</th><th>Iteration time</th></tr>
+      <tr><td>Simulation</td><td>~€0</td><td>seconds</td></tr>
+      <tr><td>FPGA</td><td>~€0 (board already owned)</td><td>minutes (reflash)</td></tr>
+      <tr><td>ASIC tape-out</td><td>$1300+ (MPW shuttle)</td><td>months</td></tr>
+    </table>
+
+    <p>
+      This is what the F2.7 phase is about: <strong>no tape-out without FPGA validation</strong>. The flash QE bug was a few lines of RTL on an FPGA. The same bug on a fabricated chip is a dead die and a lost shuttle slot. The FPGA is where assumptions collapse for free.
+    </p>
+
+    <h2>One core, a bigger picture</h2>
+
+    <p>
+      This was a single Nano core on a single board. The CLI-CPU vision is orders of magnitude larger: many small, independent cores on one chip, wired together with hardware mailboxes — the "Cognitive Fabric." This run is the first tangible cornerstone of that vision: not a diagram, not a simulation, but working silicon.
+    </p>
+
+    <p>
+      The full toolchain works: C# → CIL-T0 → bitstream → flash → core → UART. That chain, which until now lived only in my head and in the tests, just closed on a physical device.
+    </p>
+
+    <div class="cta">
+      <h3>Open source</h3>
+      <p>The RTL, the simulator, the linker, and the full test suite are publicly available. The bring-up runbook is in the repo too.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub → CLI-CPU</a>
+        <a href="why-cli-cpu.html">Blog → Why I'm building this CPU</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+    <p style="margin-top:48px;font-style:italic;color:var(--text-dim);">
+      Simulation tells you that you <em>might</em> be right. Hardware tells you that you <em>are</em>. On May 23, 2026, the CLI-CPU crossed that line.
+    </p>
+
+  </div>
+</article>
+
+<nav style="max-width:720px;width:100%;margin:0 auto;padding:0 24px 48px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;font-family:var(--mono);font-size:0.9rem;border-top:1px solid var(--border);padding-top:24px;">
+  <a href="cfpu-ml-max.html">← CFPU-ML-Max</a>
+  <a href="why-cli-cpu.html">Why I'm building this CPU →</a>
+</nav>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 · FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>
