@@ -299,7 +299,20 @@ module cilcpu_a7lite_top #(
         .qspi_cs_psram_n    (qspi_cs_psram_n),
         .qspi_dq_out        (qspi_dq_out),
         .qspi_dq_in         (qspi_dq_in),
-        .qspi_dq_oe         (qspi_dq_oe)
+        .qspi_dq_oe         (qspi_dq_oe),
+        // hu: MMIO-master busz (F2.8 #6.2) — az MMIO wrapper-periféria (#6.5)
+        //     egyelőre nincs integrálva ezen a board-on, így a kimenetek
+        //     nyitva, az i_mmio_rdata 0-ra fogva. A jelenlegi single-core Fib
+        //     boot nem használ 0xF szegmensű LDIND/STIND-et → viselkedés-semleges.
+        // en: MMIO master bus (F2.8 #6.2) — the MMIO wrapper peripherals
+        //     (#6.5) are not yet integrated on this board, so outputs are left
+        //     open and i_mmio_rdata is tied to 0. The current single-core Fib
+        //     boot uses no 0xF-segment LDIND/STIND → behavior-neutral.
+        .o_mmio_addr        (),
+        .o_mmio_wdata       (),
+        .o_mmio_we          (),
+        .o_mmio_re          (),
+        .i_mmio_rdata       (32'd0)
     );
 
     // ============================================================

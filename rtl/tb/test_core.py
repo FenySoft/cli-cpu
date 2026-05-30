@@ -558,6 +558,85 @@ async def test_50_stind_ldind_indirect_addressing(dut):
         f"mem[100] visszaolvasás = {rv} (0x{rv:08X}), várt 42 — IND-címzés hibás?"
 
 
+def _ldc_i4(value):
+    """hu: LDC.I4 (0x20) + 4 byte LE immediate — teljes 32-bit konstans.
+    en: LDC.I4 (0x20) + 4-byte LE immediate — full 32-bit constant."""
+    v = value & 0xFFFFFFFF
+    return bytes([OP_LDC_I4, v & 0xFF, (v >> 8) & 0xFF,
+                  (v >> 16) & 0xFF, (v >> 24) & 0xFF])
+
+
+# hu: F2.8 #6.2 — szegmens-dekódolás: a 0xF szegmensű (MMIO) cím a core
+#     külső MMIO-master buszára kerül (architektúra B), nem az SRAM-ra.
+#     A perifériát a wrapper dekódolja; a core csak a buszt hajtja.
+# en: F2.8 #6.2 — segment decode: the 0xF (MMIO) segment goes to the core's
+#     external MMIO master bus (architecture B), not to SRAM. The wrapper
+#     decodes the peripheral; the core only drives the bus.
+MMIO_MAILBOX = 0xF0000100
+MMIO_GPIO    = 0xF0000200
+
+
+@cocotb.test()
+async def test_55_stind_mmio_write_drives_master_bus(dut):
+    """hu: STIND egy 0xF szegmensű címre → MMIO master busz write pulzus
+        (o_mmio_we / o_mmio_addr / o_mmio_wdata), NEM SRAM-írás. Egy monitor
+        koroutin elkapja az 1-ciklusos pulzust futás közben.
+    en: STIND to a 0xF-segment address → MMIO master bus write pulse
+        (o_mmio_we / o_mmio_addr / o_mmio_wdata), NOT an SRAM write. A
+        monitor coroutine catches the 1-cycle pulse during the run."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    captured = []
+
+    async def monitor():
+        while True:
+            await RisingEdge(dut.clk)
+            await Timer(1, units="ns")
+            try:
+                if int(dut.o_mmio_we.value) == 1:
+                    captured.append((int(dut.o_mmio_addr.value),
+                                     int(dut.o_mmio_wdata.value)))
+            except (ValueError, AttributeError):
+                pass
+
+    cocotb.start_soon(monitor())
+
+    # hu: LDC cím, LDC 42, STIND → MMIO write; majd LDC 7, RET (return 7).
+    program = (_ldc_i4(MMIO_MAILBOX) + _ldc_s(42) + bytes([OP_STIND_I4])
+               + _ldc_s(7) + bytes([OP_RET]))
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert rv == 7, f"return_value = {rv}, várt 7"
+    assert len(captured) == 1, \
+        f"pontosan 1 MMIO write pulzus várt, kaptam {len(captured)}"
+    addr, wdata = captured[0]
+    assert addr == MMIO_MAILBOX, \
+        f"o_mmio_addr = 0x{addr:08X}, várt 0x{MMIO_MAILBOX:08X}"
+    assert wdata == 42, f"o_mmio_wdata = {wdata}, várt 42"
+
+
+@cocotb.test()
+async def test_56_ldind_mmio_read_from_master_bus(dut):
+    """hu: LDIND egy 0xF szegmensű címről → o_mmio_re pulzus + a slave
+        i_mmio_rdata értékének push-ja (NEM SRAM-olvasás).
+    en: LDIND from a 0xF-segment address → o_mmio_re pulse + push of the
+        slave's i_mmio_rdata value (NOT an SRAM read)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    # hu: a "periféria" konstans értéket ad vissza a buszon
+    dut.i_mmio_rdata.value = 0x0BADF00D
+
+    program = _ldc_i4(MMIO_GPIO) + bytes([OP_LDIND_I4, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert rv == 0x0BADF00D, \
+        f"return_value = 0x{rv:08X}, várt 0x0BADF00D (MMIO read)"
+
+
 @cocotb.test()
 async def test_12_sub_10_4(dut):
     """hu: 10 - 4 = 6. en: 10 - 4 = 6."""

@@ -253,5 +253,7 @@
 `define SEG_CODE               4'h0    // CODE szegmens azonosító
 `define SEG_DATA               4'h1    // DATA szegmens azonosító
 `define SEG_STACK              4'h2    // STACK szegmens azonosító
+`define SEG_MMIO               4'hF    // MMIO szegmens (F2.8 #6.2): addr[31:28]==0xF
+                                        // → külső MMIO-master busz (architektúra B)
 
 `endif

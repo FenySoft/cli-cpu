@@ -57,7 +57,25 @@ module cilcpu_core #(
     output wire        qspi_cs_psram_n,
     output wire [3:0]  qspi_dq_out,
     input  wire [3:0]  qspi_dq_in,
-    output wire        qspi_dq_oe
+    output wire        qspi_dq_oe,
+
+    // hu: MMIO-master busz (F2.8 #6.2, architektúra B) — a 0xF szegmensű
+    //     (addr[31:28]==SEG_MMIO) LDIND/STIND a perifériákat a wrapperen át
+    //     éri el. A core csak a buszt hajtja; a periféria-dekódolást (mailbox
+    //     0xF000_0100 / GPIO 0xF000_0200 / trace 0xF000_0300) a wrapper végzi.
+    //     o_mmio_we/re: 1-ciklusos pulzus. i_mmio_rdata: a slave registered
+    //     olvasási eredménye, az o_mmio_re utáni ciklusban érvényes
+    //     (a mailbox/gpio/trace 1-ciklus registered read-jével egyezik).
+    // en: MMIO master bus (F2.8 #6.2, architecture B) — 0xF-segment
+    //     (addr[31:28]==SEG_MMIO) LDIND/STIND reach peripherals through the
+    //     wrapper. The core only drives the bus; the wrapper decodes the
+    //     peripheral. o_mmio_we/re: 1-cycle pulse. i_mmio_rdata: the slave's
+    //     registered read result, valid the cycle after o_mmio_re.
+    output reg  [31:0] o_mmio_addr,
+    output reg  [31:0] o_mmio_wdata,
+    output reg         o_mmio_we,
+    output reg         o_mmio_re,
+    input  wire [31:0] i_mmio_rdata
 );
 
     // ============================================================
@@ -169,6 +187,14 @@ module cilcpu_core #(
     reg  [31:0] r_alu_result_latched;
     reg         r_mem_phase;       // Sub3: 0 = pop1, 1 = SRAM write a pop_data-val
     reg  [13:0] r_mem_addr_latched;
+    // hu: F2.8 #6.2 — IND-cél szegmens: 1 = MMIO (külső master busz), 0 = SRAM.
+    //     A phase 0-ban dekódolt szegmenst őrzi a phase 1 / ST_MEM_WAIT phase 1
+    //     számára. r_mmio_addr_latched a teljes 32-bit MMIO-cím.
+    // en: F2.8 #6.2 — IND target segment: 1 = MMIO (external master bus),
+    //     0 = SRAM. Holds the segment decoded in phase 0 for phase 1 /
+    //     ST_MEM_WAIT phase 1. r_mmio_addr_latched is the full 32-bit MMIO addr.
+    reg         r_mem_is_mmio;
+    reg  [31:0] r_mmio_addr_latched;
 
     // hu: Sub5 — frame manager regiszterek (ST_CALL és ST_RET használja)
     // en: Sub5 — frame manager registers (used by ST_CALL and ST_RET)
@@ -777,6 +803,12 @@ module cilcpu_core #(
             r_alu_result_latched  <= 32'd0;
             r_mem_phase           <= 1'b0;
             r_mem_addr_latched    <= 14'd0;
+            r_mem_is_mmio         <= 1'b0;
+            r_mmio_addr_latched   <= 32'd0;
+            o_mmio_addr           <= 32'd0;
+            o_mmio_wdata          <= 32'd0;
+            o_mmio_we             <= 1'b0;
+            o_mmio_re             <= 1'b0;
             // hu: Sub5 — frame manager regiszterek reset
             // en: Sub5 — frame manager registers reset
             r_call_sub            <= CALL_HDR_REQ;
@@ -809,6 +841,8 @@ module cilcpu_core #(
             r_qspi_re        <= 1'b0;
             r_sram_we        <= 1'b0;
             r_sram_re        <= 1'b0;
+            o_mmio_we        <= 1'b0;
+            o_mmio_re        <= 1'b0;
             r_div_start      <= 1'b0;
             r_mul_start      <= 1'b0;
             r_sc_sp_load        <= 1'b0;
@@ -1209,26 +1243,35 @@ module cilcpu_core #(
                     //     `eff_idx` derives the index: short opcodes from
                     //     opcode[1:0], .S forms from r_operand[7:0].
                     if (uc_addr_src == `ADDR_SRC_IND) begin
-                        // hu: LDIND.I4 — a cím a TOS-ról jön (indirekt). Pop a
-                        //     címet, SRAM read indítás, az olvasott érték push-ja
-                        //     ST_MEM_WAIT phase 1-ben. Bounds check: addr+4 a
-                        //     16 KB SRAM-on belül (C# ExecuteLdindI4
-                        //     InvalidMemoryAccess paritás; negatív cím is trap,
-                        //     mert előjel nélküli összehasonlítás).
-                        // en: LDIND.I4 — address comes from TOS (indirect). Pop
-                        //     the address, start SRAM read, push the value in
-                        //     ST_MEM_WAIT phase 1. Bounds check: addr+4 within
-                        //     the 16 KB SRAM (parity with C# ExecuteLdindI4;
-                        //     negative addresses also trap via unsigned compare).
-                        if (w_sc_tos > (`SRAM_SIZE_BYTES - 4)) begin
+                        // hu: LDIND.I4 — a cím a TOS-ról jön (indirekt).
+                        //     Szegmens-dekódolás (F2.8 #6.2): addr[31:28]==0xF
+                        //     (SEG_MMIO) → külső MMIO master busz (o_mmio_re),
+                        //     egyébként on-chip SRAM. Pop a címet, a beolvasott
+                        //     érték push-ja ST_MEM_WAIT phase 1-ben. Az SRAM-ágon
+                        //     bounds check (C# ExecuteLdindI4 paritás; negatív
+                        //     cím is trap, mert előjel nélküli összehasonlítás).
+                        // en: LDIND.I4 — address comes from TOS (indirect).
+                        //     Segment decode (F2.8 #6.2): addr[31:28]==0xF
+                        //     (SEG_MMIO) → external MMIO master bus (o_mmio_re),
+                        //     otherwise on-chip SRAM. Pop the address, push the
+                        //     read value in ST_MEM_WAIT phase 1. SRAM path bounds
+                        //     check (parity with C#; negative addr traps unsigned).
+                        if (w_sc_tos[31:28] == `SEG_MMIO) begin
+                            o_mmio_addr   <= w_sc_tos;
+                            o_mmio_re     <= 1'b1;
+                            r_mem_is_mmio <= 1'b1;
+                            r_sc_pop_en   <= 1'b1;
+                            r_state       <= ST_MEM_WAIT;
+                        end else if (w_sc_tos > (`SRAM_SIZE_BYTES - 4)) begin
                             o_trap      <= 1'b1;
                             o_trap_code <= `TRAP_INVALID_MEMORY;
                             r_state     <= ST_TRAP;
                         end else begin
-                            r_sram_addr <= w_sc_tos[13:0];
-                            r_sram_re   <= 1'b1;
-                            r_sc_pop_en <= 1'b1;
-                            r_state     <= ST_MEM_WAIT;
+                            r_sram_addr   <= w_sc_tos[13:0];
+                            r_sram_re     <= 1'b1;
+                            r_mem_is_mmio <= 1'b0;
+                            r_sc_pop_en   <= 1'b1;
+                            r_state       <= ST_MEM_WAIT;
                         end
                     end else if (uc_addr_src == `ADDR_SRC_ARG &&
                         eff_idx >= {3'd0, r_arg_count}) begin
@@ -1241,9 +1284,10 @@ module cilcpu_core #(
                         o_trap_code <= `TRAP_INVALID_LOCAL;
                         r_state     <= ST_TRAP;
                     end else begin
-                        r_sram_addr <= addr_calc(uc_addr_src, eff_idx);
-                        r_sram_re   <= 1'b1;
-                        r_state     <= ST_MEM_WAIT;
+                        r_sram_addr   <= addr_calc(uc_addr_src, eff_idx);
+                        r_sram_re     <= 1'b1;
+                        r_mem_is_mmio <= 1'b0;
+                        r_state       <= ST_MEM_WAIT;
                     end
                 end else if (uc_sram_wr && r_mem_phase == 1'b0) begin
                     // hu: Sub3 — SRAM írás (STARG / STLOC) phase 0:
@@ -1259,21 +1303,31 @@ module cilcpu_core #(
                     //     TExecutor.cs: index check BEFORE pop).
                     if (uc_addr_src == `ADDR_SRC_IND) begin
                         // hu: STIND.I4 phase 0 — cím = TOS-1 (indirekt),
-                        //     érték = TOS. Pop az értéket (phase 1-ben
-                        //     w_sc_pop_data-ként érvényes), a címet latch-eljük
-                        //     a w_sc_tos1-ből. A cím-pop (2. pop) phase 1-ben.
-                        //     Bounds check a címre (C# ExecuteStindI4 paritás).
+                        //     érték = TOS. Szegmens-dekódolás (F2.8 #6.2):
+                        //     addr[31:28]==0xF (SEG_MMIO) → MMIO master busz
+                        //     (phase 1: o_mmio_we), egyébként SRAM. Pop az
+                        //     értéket (phase 1-ben w_sc_pop_data-ként érvényes),
+                        //     a címet latch-eljük. A cím-pop (2.) phase 1-ben.
+                        //     SRAM-ágon bounds check (C# ExecuteStindI4 paritás).
                         // en: STIND.I4 phase 0 — address = TOS-1 (indirect),
-                        //     value = TOS. Pop the value (available as
-                        //     w_sc_pop_data in phase 1), latch the address from
-                        //     w_sc_tos1. The address pop (2nd pop) is in phase 1.
-                        //     Bounds check on the address (parity with C#).
-                        if (w_sc_tos1 > (`SRAM_SIZE_BYTES - 4)) begin
+                        //     value = TOS. Segment decode (F2.8 #6.2):
+                        //     addr[31:28]==0xF (SEG_MMIO) → MMIO master bus
+                        //     (phase 1: o_mmio_we), otherwise SRAM. Pop the value
+                        //     (w_sc_pop_data in phase 1), latch the address. The
+                        //     address pop (2nd) is in phase 1. SRAM path bounds
+                        //     check (parity with C#).
+                        if (w_sc_tos1[31:28] == `SEG_MMIO) begin
+                            r_mmio_addr_latched <= w_sc_tos1;
+                            r_mem_is_mmio       <= 1'b1;
+                            r_sc_pop_en         <= 1'b1;
+                            r_mem_phase         <= 1'b1;
+                        end else if (w_sc_tos1 > (`SRAM_SIZE_BYTES - 4)) begin
                             o_trap      <= 1'b1;
                             o_trap_code <= `TRAP_INVALID_MEMORY;
                             r_state     <= ST_TRAP;
                         end else begin
                             r_mem_addr_latched <= w_sc_tos1[13:0];
+                            r_mem_is_mmio      <= 1'b0;
                             r_sc_pop_en        <= 1'b1;
                             r_mem_phase        <= 1'b1;
                         end
@@ -1289,19 +1343,30 @@ module cilcpu_core #(
                         r_state     <= ST_TRAP;
                     end else begin
                         r_mem_addr_latched <= addr_calc(uc_addr_src, eff_idx);
+                        r_mem_is_mmio      <= 1'b0;
                         r_sc_pop_en        <= 1'b1;
                         r_mem_phase        <= 1'b1;
                     end
                 end else if (uc_sram_wr && r_mem_phase == 1'b1) begin
-                    // hu: Sub3 — SRAM írás phase 1: a Stack Cache 1-ciklus
-                    //     regisztrált pop_data-ját az SRAM-ba írjuk.
-                    //     Ezután uc_done flow + ST_FETCH.
-                    // en: Sub3 — SRAM write phase 1: write the Stack Cache's
-                    //     1-cycle registered pop_data to SRAM. Then uc_done
-                    //     flow + ST_FETCH.
-                    r_sram_addr  <= r_mem_addr_latched;
-                    r_sram_wdata <= w_sc_pop_data;
-                    r_sram_we    <= 1'b1;
+                    // hu: Sub3 — írás phase 1: a Stack Cache 1-ciklus
+                    //     regisztrált pop_data-ját a célra írjuk. A cél a
+                    //     phase 0-ban dekódolt szegmens: r_mem_is_mmio=1 →
+                    //     külső MMIO master busz (o_mmio_we), egyébként on-chip
+                    //     SRAM. Ezután uc_done flow + ST_FETCH.
+                    // en: Sub3 — write phase 1: write the Stack Cache's 1-cycle
+                    //     registered pop_data to the target. The target is the
+                    //     segment decoded in phase 0: r_mem_is_mmio=1 → external
+                    //     MMIO master bus (o_mmio_we), otherwise on-chip SRAM.
+                    //     Then uc_done flow + ST_FETCH.
+                    if (r_mem_is_mmio) begin
+                        o_mmio_addr  <= r_mmio_addr_latched;
+                        o_mmio_wdata <= w_sc_pop_data;
+                        o_mmio_we    <= 1'b1;
+                    end else begin
+                        r_sram_addr  <= r_mem_addr_latched;
+                        r_sram_wdata <= w_sc_pop_data;
+                        r_sram_we    <= 1'b1;
+                    end
                     r_mem_phase  <= 1'b0;
                     if (uc_addr_src == `ADDR_SRC_IND) begin
                         // hu: STIND 2. pop — a cím (az érték phase 0-beli
@@ -1526,7 +1591,16 @@ module cilcpu_core #(
                 end else begin
                     r_mem_phase    <= 1'b0;
                     r_sc_push_en   <= 1'b1;
-                    r_sc_push_data <= r_sram_rdata_latched;
+                    // hu: F2.8 #6.2 — a push forrása a phase 0-ban dekódolt
+                    //     szegmens: MMIO read → i_mmio_rdata (a slave az
+                    //     o_mmio_re utáni ciklusban regisztrálva hajtja),
+                    //     egyébként az SRAM 1-ciklusos latched olvasása.
+                    // en: F2.8 #6.2 — push source per the segment decoded in
+                    //     phase 0: MMIO read → i_mmio_rdata (slave drives it
+                    //     registered the cycle after o_mmio_re), otherwise the
+                    //     SRAM's 1-cycle latched read.
+                    r_sc_push_data <= r_mem_is_mmio ? i_mmio_rdata
+                                                    : r_sram_rdata_latched;
                     if (uc_pc_wr) begin
                         r_pc          <= pc_next;
                         r_fetch_count <= 4'd0;
