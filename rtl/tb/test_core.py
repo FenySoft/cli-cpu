@@ -526,6 +526,38 @@ async def test_11_add_2_3(dut):
     await _run_binary_op(dut, OP_ADD, 2, 3, 5)
 
 
+# hu: F2.8 #6 — indirekt memória opkódok (a wrapper-integráció előfeltétele).
+# en: F2.8 #6 — indirect memory opcodes (prerequisite for wrapper integration).
+OP_LDIND_I4 = 0x4A
+OP_STIND_I4 = 0x54
+
+
+@cocotb.test()
+async def test_50_stind_ldind_indirect_addressing(dut):
+    """hu: LDIND/STIND TOS-cím használat. A hibát úgy exponáljuk, hogy KÉT
+        KÜLÖNBÖZŐ címre írunk (100, 104), majd az ELSŐT (100) olvassuk vissza.
+        Helyes IND-címzésnél a két cím független → mem[100]=42 marad.
+        Törött címzésnél (addr_calc IND → FP+12) mindkét write a FP+12-re megy,
+        a 2. (99) felülírja az 1.-t → a visszaolvasás 99 lenne (RED).
+    en: LDIND/STIND TOS-address use. Expose the bug by writing TWO DISTINCT
+        addresses (100, 104) then reading back the FIRST (100). With correct
+        indirect addressing the two are independent → mem[100]=42 survives.
+        With broken addressing (addr_calc IND → FP+12) both writes hit FP+12,
+        the 2nd (99) overwrites the 1st → readback would be 99 (RED)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    program = (
+        _ldc_s(100) + _ldc_s(42) + bytes([OP_STIND_I4])   # mem[100] = 42
+        + _ldc_s(104) + _ldc_s(99) + bytes([OP_STIND_I4]) # mem[104] = 99
+        + _ldc_s(100) + bytes([OP_LDIND_I4, OP_RET])      # return mem[100]
+    )
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert rv == 42, \
+        f"mem[100] visszaolvasás = {rv} (0x{rv:08X}), várt 42 — IND-címzés hibás?"
+
+
 @cocotb.test()
 async def test_12_sub_10_4(dut):
     """hu: 10 - 4 = 6. en: 10 - 4 = 6."""

@@ -1208,7 +1208,29 @@ module cilcpu_core #(
                     //        to ST_MEM_WAIT for push_data <= rdata + uc_done.
                     //     `eff_idx` derives the index: short opcodes from
                     //     opcode[1:0], .S forms from r_operand[7:0].
-                    if (uc_addr_src == `ADDR_SRC_ARG &&
+                    if (uc_addr_src == `ADDR_SRC_IND) begin
+                        // hu: LDIND.I4 — a cím a TOS-ról jön (indirekt). Pop a
+                        //     címet, SRAM read indítás, az olvasott érték push-ja
+                        //     ST_MEM_WAIT phase 1-ben. Bounds check: addr+4 a
+                        //     16 KB SRAM-on belül (C# ExecuteLdindI4
+                        //     InvalidMemoryAccess paritás; negatív cím is trap,
+                        //     mert előjel nélküli összehasonlítás).
+                        // en: LDIND.I4 — address comes from TOS (indirect). Pop
+                        //     the address, start SRAM read, push the value in
+                        //     ST_MEM_WAIT phase 1. Bounds check: addr+4 within
+                        //     the 16 KB SRAM (parity with C# ExecuteLdindI4;
+                        //     negative addresses also trap via unsigned compare).
+                        if (w_sc_tos > (`SRAM_SIZE_BYTES - 4)) begin
+                            o_trap      <= 1'b1;
+                            o_trap_code <= `TRAP_INVALID_MEMORY;
+                            r_state     <= ST_TRAP;
+                        end else begin
+                            r_sram_addr <= w_sc_tos[13:0];
+                            r_sram_re   <= 1'b1;
+                            r_sc_pop_en <= 1'b1;
+                            r_state     <= ST_MEM_WAIT;
+                        end
+                    end else if (uc_addr_src == `ADDR_SRC_ARG &&
                         eff_idx >= {3'd0, r_arg_count}) begin
                         o_trap      <= 1'b1;
                         o_trap_code <= `TRAP_INVALID_ARG;
@@ -1235,7 +1257,27 @@ module cilcpu_core #(
                     //     latch the address — phase 1 performs the write.
                     //     Range check precedes pop per ISA spec (see
                     //     TExecutor.cs: index check BEFORE pop).
-                    if (uc_addr_src == `ADDR_SRC_ARG &&
+                    if (uc_addr_src == `ADDR_SRC_IND) begin
+                        // hu: STIND.I4 phase 0 — cím = TOS-1 (indirekt),
+                        //     érték = TOS. Pop az értéket (phase 1-ben
+                        //     w_sc_pop_data-ként érvényes), a címet latch-eljük
+                        //     a w_sc_tos1-ből. A cím-pop (2. pop) phase 1-ben.
+                        //     Bounds check a címre (C# ExecuteStindI4 paritás).
+                        // en: STIND.I4 phase 0 — address = TOS-1 (indirect),
+                        //     value = TOS. Pop the value (available as
+                        //     w_sc_pop_data in phase 1), latch the address from
+                        //     w_sc_tos1. The address pop (2nd pop) is in phase 1.
+                        //     Bounds check on the address (parity with C#).
+                        if (w_sc_tos1 > (`SRAM_SIZE_BYTES - 4)) begin
+                            o_trap      <= 1'b1;
+                            o_trap_code <= `TRAP_INVALID_MEMORY;
+                            r_state     <= ST_TRAP;
+                        end else begin
+                            r_mem_addr_latched <= w_sc_tos1[13:0];
+                            r_sc_pop_en        <= 1'b1;
+                            r_mem_phase        <= 1'b1;
+                        end
+                    end else if (uc_addr_src == `ADDR_SRC_ARG &&
                         eff_idx >= {3'd0, r_arg_count}) begin
                         o_trap      <= 1'b1;
                         o_trap_code <= `TRAP_INVALID_ARG;
@@ -1261,6 +1303,15 @@ module cilcpu_core #(
                     r_sram_wdata <= w_sc_pop_data;
                     r_sram_we    <= 1'b1;
                     r_mem_phase  <= 1'b0;
+                    if (uc_addr_src == `ADDR_SRC_IND) begin
+                        // hu: STIND 2. pop — a cím (az érték phase 0-beli
+                        //     pop-ja után már a TOS-on van). STARG/STLOC csak
+                        //     1× pop-ol, ezért IND-feltételhez kötjük.
+                        // en: STIND 2nd pop — the address (now on TOS after the
+                        //     value was popped in phase 0). STARG/STLOC pop only
+                        //     once, hence gated on the IND condition.
+                        r_sc_pop_en <= 1'b1;
+                    end
                     if (uc_pc_wr) begin
                         r_pc          <= pc_next;
                         r_fetch_count <= 4'd0;
