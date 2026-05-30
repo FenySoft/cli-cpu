@@ -270,6 +270,28 @@ test_gpio:
 test_trace:
 	$(SUBMAKE) MODULE=test_trace TOPLEVEL=cilcpu_trace VERILOG_SOURCES="$(PWD)/../src/cilcpu_trace.v"
 
+# hu: F2.8 #6.5 — SoC wrapper (cilcpu_soc): core + MMIO-dekód + mailbox/gpio/
+#     trace. A test_soc.py a test_core boot-harness-ét importálja (a soc
+#     boot/qspi/státusz portjai névazonosak a core-éval).
+# en: F2.8 #6.5 — SoC wrapper (cilcpu_soc): core + MMIO decode + mailbox/gpio/
+#     trace. test_soc.py imports the test_core boot harness (the soc's
+#     boot/qspi/status ports share the core's names).
+test_soc:
+	$(SUBMAKE) MODULE=test_soc TOPLEVEL=cilcpu_soc VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/../src/cilcpu_fifo.v \
+$(PWD)/../src/cilcpu_mailbox.v \
+$(PWD)/../src/cilcpu_gpio.v \
+$(PWD)/../src/cilcpu_trace.v \
+$(PWD)/../src/cilcpu_soc.v"
+
 # hu: F2.7 Sub2 — 32-bit decimal printer (uart_tx-et példányosít).
 # en: F2.7 Sub2 — 32-bit decimal printer (instantiates uart_tx).
 test_decimal_printer:
@@ -279,4 +301,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_soc test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
