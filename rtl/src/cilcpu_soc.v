@@ -88,9 +88,18 @@ module cilcpu_soc #(
     output wire        o_host_outbox_empty,
     output wire        o_host_inbox_full,
 
-    // hu: Megszakítások (IRQ — #6.5c-ben a core-ba kötve) / en: Interrupts
+    // hu: Megszakítások (IRQ) — per-periféria + aggregált.
+    //     A CIL-T0 NEM preemptív (poll/blocking-receive actor-modell): a core
+    //     az IRQ-pending MMIO regisztert (0xF000_0000) olvassa polling-gal. Az
+    //     o_irq aggregált pin a chip-szintű / inter-core jelzés (CPU-figyelem =
+    //     van olvasatlan beérkező mail).
+    // en: Interrupts (IRQ) — per-peripheral + aggregate. CIL-T0 is NOT
+    //     preemptive (poll/blocking-receive actor model): the core polls the
+    //     IRQ-pending MMIO register (0xF000_0000). The o_irq aggregate pin is
+    //     the chip-level / inter-core signal (CPU-attention = unread inbox mail).
     output wire        o_irq_mailbox_in,
-    output wire        o_irq_mailbox_out
+    output wire        o_irq_mailbox_out,
+    output wire        o_irq
 );
 
     // ============================================================
@@ -110,6 +119,7 @@ module cilcpu_soc #(
     //     addr[11:8] = peripheral select (1=mailbox, 2=gpio, 3=trace),
     //     addr[5:2]  = word offset feeding the peripheral's 4-bit i_cpu_addr.
     // ============================================================
+    localparam [3:0] PSEL_IRQ     = 4'd0;   // 0xF000_0000 — IRQ-pending (RO)
     localparam [3:0] PSEL_MAILBOX = 4'd1;
     localparam [3:0] PSEL_GPIO    = 4'd2;
     localparam [3:0] PSEL_TRACE   = 4'd3;
@@ -117,6 +127,7 @@ module cilcpu_soc #(
     wire [3:0] w_psel    = w_mmio_addr[11:8];
     wire [3:0] w_reg_off = w_mmio_addr[5:2];
 
+    wire w_sel_irq     = (w_psel == PSEL_IRQ);
     wire w_sel_mailbox = (w_psel == PSEL_MAILBOX);
     wire w_sel_gpio    = (w_psel == PSEL_GPIO);
     wire w_sel_trace   = (w_psel == PSEL_TRACE);
@@ -142,12 +153,46 @@ module cilcpu_soc #(
     //     (including the cycle after o_mmio_re) → the mux picks correctly.
     always @(*) begin
         case (w_psel)
+            PSEL_IRQ:     w_mmio_rdata = r_irq_rdata;
             PSEL_MAILBOX: w_mmio_rdata = w_mb_rdata;
             PSEL_GPIO:    w_mmio_rdata = w_gpio_rdata;
             PSEL_TRACE:   w_mmio_rdata = w_trace_rdata;
             default:      w_mmio_rdata = 32'd0;
         endcase
     end
+
+    // ============================================================
+    // hu: IRQ-pending MMIO regiszter (0xF000_0000, read-only) — aggregálja
+    //     a periféria-IRQ-kat egyetlen szóba, hogy a core EGY LDIND-del
+    //     lekérdezhesse (poll-barát, CIL-T0 ISA-kompatibilis, nem preemptív).
+    //     Bit0 = mailbox inbox nem üres (CPU-nak van mail), bit1 = outbox nem
+    //     üres (host-figyelem). Registered read (1-ciklus latency), illeszkedik
+    //     a core ST_MEM_WAIT 2-fázisú szekvenszeréhez. Az o_irq aggregált pin
+    //     a CPU-figyelmet jelzi chip-szinten (bővíthető a többi periféria
+    //     IRQ-jával az OR-ban).
+    // en: IRQ-pending MMIO register (0xF000_0000, read-only) — aggregates the
+    //     peripheral IRQs into one word so the core can poll with a single
+    //     LDIND (poll-friendly, CIL-T0 ISA-compatible, non-preemptive).
+    //     Bit0 = mailbox inbox not empty (CPU has mail), bit1 = outbox not
+    //     empty (host attention). Registered read (1-cycle latency), matched to
+    //     the core's 2-phase ST_MEM_WAIT sequencer. The o_irq aggregate pin
+    //     signals CPU-attention at chip level (extensible by OR-ing further
+    //     peripheral IRQs).
+    // ============================================================
+    wire        w_irq_re = w_mmio_re & w_sel_irq;
+    wire [31:0] w_irq_status = {30'd0, o_irq_mailbox_out, o_irq_mailbox_in};
+    reg  [31:0] r_irq_rdata;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            r_irq_rdata <= 32'd0;
+        else if (w_irq_re)
+            r_irq_rdata <= w_irq_status;
+    end
+
+    // hu: aggregált CPU-figyelem IRQ — egyelőre csak a mailbox inbox.
+    // en: aggregate CPU-attention IRQ — currently the mailbox inbox only.
+    assign o_irq = o_irq_mailbox_in;
 
     // ============================================================
     // hu: Nano core / en: Nano core

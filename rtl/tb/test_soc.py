@@ -17,11 +17,12 @@ from cocotb.triggers import RisingEdge, Timer
 
 from test_core import (
     boot_and_run, _ldc_i4, _ldc_s,
-    OP_STIND_I4, OP_LDIND_I4, OP_RET,
+    OP_STIND_I4, OP_LDIND_I4, OP_RET, OP_POP,
 )
 
 # hu: MMIO-térkép — a wrapper dekódolja (addr[11:8]=periféria, addr[5:2]=reg).
 # en: MMIO map — decoded by the wrapper (addr[11:8]=peripheral, addr[5:2]=reg).
+IRQ_STATUS     = 0xF0000000   # aggregált IRQ-pending (RO): bit0 mailbox_in, bit1 mailbox_out
 MAILBOX_INBOX  = 0xF0000100   # CPU read → pop inbox
 MAILBOX_OUTBOX = 0xF0000104   # CPU write → push outbox
 MAILBOX_STATUS = 0xF0000108
@@ -176,3 +177,56 @@ async def test_05_trace_cfg_write_readback(dut):
         f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
     assert (rv & 0x7) == 3, \
         f"trace CFG readback sel = {rv & 0x7}, várt 3 (teljes rv=0x{rv:08X})"
+
+
+# ============================================================
+# IRQ — aggregált IRQ-pending MMIO regiszter (0xF000_0000) + SoC o_irq pin
+# ============================================================
+
+@cocotb.test()
+async def test_06_irq_pending_after_inbox_push(dut):
+    """hu: A host push-ol az inboxba, majd a program LDIND-del olvassa az
+        IRQ_STATUS regisztert → bit0 (mailbox_in) be van állítva. A SoC
+        aggregált o_irq pin is magas (mail a CPU-nak).
+    en: Host pushes into the inbox, the program LDINDs the IRQ_STATUS
+        register → bit0 (mailbox_in) set. The aggregate SoC o_irq pin is
+        high too (mail for the CPU)."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    _init_soc_inputs(dut)
+    cocotb.start_soon(push_inbox_once(dut, 0x000000AA))
+
+    program = _ldc_i4(IRQ_STATUS) + bytes([OP_LDIND_I4, OP_RET])
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert (rv & 0x1) == 1, \
+        f"IRQ_STATUS bit0 (mailbox_in) = {rv & 0x1}, várt 1 (push után)"
+    await Timer(1, units="ns")
+    assert int(dut.o_irq.value) == 1, \
+        "aggregált o_irq pin alacsony, holott van olvasatlan mail"
+
+
+@cocotb.test()
+async def test_07_irq_clears_after_inbox_read(dut):
+    """hu: Push után a program kiolvassa (popolja) az inboxot, majd az
+        IRQ_STATUS-t olvassa → bit0 már 0 (az inbox üres). A SoC o_irq pin
+        is alacsony.
+    en: After the push, the program reads (pops) the inbox, then reads
+        IRQ_STATUS → bit0 is now 0 (inbox empty). The SoC o_irq pin is low
+        too."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    _init_soc_inputs(dut)
+    cocotb.start_soon(push_inbox_once(dut, 0x000000BB))
+
+    program = (_ldc_i4(MAILBOX_INBOX) + bytes([OP_LDIND_I4, OP_POP])
+               + _ldc_i4(IRQ_STATUS) + bytes([OP_LDIND_I4, OP_RET]))
+    rv, tc, halt, trap, pc = await boot_and_run(dut, program)
+
+    assert halt == 1, \
+        f"core didn't halt (trap={trap}, code=0x{tc:02X}, pc=0x{pc:06X})"
+    assert (rv & 0x1) == 0, \
+        f"IRQ_STATUS bit0 = {rv & 0x1}, várt 0 (inbox-olvasás után törlődik)"
+    await Timer(1, units="ns")
+    assert int(dut.o_irq.value) == 0, \
+        "aggregált o_irq pin magas, holott az inbox már üres"
