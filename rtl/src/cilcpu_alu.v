@@ -30,7 +30,18 @@ module cilcpu_alu (
 
             `ALU_SUB: o_result = i_op_a - i_op_b;
 
-            `ALU_MUL: o_result = i_op_a * i_op_b;  // alsó 32 bit (wrapping)
+            // hu: ALU_MUL: a szekvenciális `cilcpu_multiplier.v` kezeli
+            //     (F2.6-prep — a kombinációs `i_op_a * i_op_b` egy teljes
+            //     32×32 párhuzamos szorzót inferált, a datapath legnagyobb
+            //     ALU-eleme). A core a MUL opkódot ST_MUL_WAIT-en át routolja
+            //     a multiplier-re; az ALU erre nem aktív, o_result a default
+            //     0 marad (a core a multiplier o_product kimenetét használja).
+            // en: ALU_MUL: handled by the sequential `cilcpu_multiplier.v`
+            //     (F2.6-prep — the combinational `i_op_a * i_op_b` inferred a
+            //     full 32×32 parallel multiplier, the largest ALU element).
+            //     The core routes the MUL opcode via ST_MUL_WAIT to the
+            //     multiplier; the ALU does not process it, o_result stays at
+            //     the default 0 (the core uses the multiplier's o_product).
 
             // hu: ALU_DIV / ALU_REM: a szekvenciális `cilcpu_divider.v`
             //     kezeli (F2.7 Sub5 timing-fix — a kombinációs osztó 86 ns

@@ -87,6 +87,21 @@ module cilcpu_core #(
     //     replace_top.
     localparam [3:0] ST_DIV_WAIT = 4'd10;
 
+    // hu: F2.6-prep — szekvenciális szorzó (cilcpu_multiplier) wait-állapota.
+    //     A MUL opkód ST_EXECUTE phase 0-ról ide ugrik, megvárja a multiplier
+    //     o_done-ját (≤32 ciklus, kis operandusoknál jóval kevesebb), majd a
+    //     normál phase 0 záró műveletek (latch + pop + phase 1) az ST_MUL_WAIT
+    //     done ágában futnak — innen vissza ST_EXECUTE phase 1-be a
+    //     replace_top-ra. A MUL-nak nincs trap-je (wrapping, unchecked).
+    // en: F2.6-prep — wait state for the sequential multiplier
+    //     (cilcpu_multiplier). The MUL opcode jumps here from ST_EXECUTE
+    //     phase 0, waits for the multiplier's o_done (≤32 cycles, far fewer
+    //     for small operands); the normal phase-0 closing actions (latch +
+    //     pop + phase 1) run in the ST_MUL_WAIT done branch — back to
+    //     ST_EXECUTE phase 1 for the replace_top. MUL has no trap
+    //     (wrapping, unchecked).
+    localparam [3:0] ST_MUL_WAIT = 4'd11;
+
     // hu: Sub5 — ST_CALL sub-states (frame push szekvencia)
     // en: Sub5 — ST_CALL sub-states (frame push sequence)
     localparam [3:0] CALL_HDR_REQ      = 4'd0;
@@ -441,6 +456,20 @@ module cilcpu_core #(
     reg         r_div_start;
     reg         r_div_is_rem;
 
+    // hu: F2.6-prep — szekvenciális szorzó (cilcpu_multiplier) bekötése.
+    //     A MUL-t r_mul_start 1-ciklusos pulzus indítja; a szorzó shift-add
+    //     algoritmussal (korai kilépés, ≤32 ciklus) adja az alsó 32 bites
+    //     szorzatot. Nincs trap (wrapping, unchecked) — az ST_MUL_WAIT csak
+    //     az o_done-t várja.
+    // en: F2.6-prep — sequential multiplier (cilcpu_multiplier) wiring. MUL
+    //     is launched by a 1-cycle r_mul_start pulse; the multiplier yields
+    //     the lower 32-bit product via shift-add (early exit, ≤32 cycles).
+    //     No trap (wrapping, unchecked) — ST_MUL_WAIT only waits for o_done.
+    wire [31:0] w_mul_product;
+    wire        w_mul_busy;
+    wire        w_mul_done;
+    reg         r_mul_start;
+
     // hu: ALU operandus mux — binary (pop=2): i_op_a=TOS1, i_op_b=TOS;
     //     unary (pop=1): i_op_a=TOS (a stack tetején lévő érték), i_op_b
     //     nem használt. A microcode `alu_unary` UC_STACK_POP=1, az ALU
@@ -484,6 +513,27 @@ module cilcpu_core #(
         .o_remainder     (w_div_remainder),
         .o_trap_div_zero (w_div_trap_div_zero),
         .o_trap_overflow (w_div_trap_overflow)
+    );
+
+    // hu: Szekvenciális szorzó példányosítás (MUL, F2.6-prep).
+    //     Operandusok: i_op_a = w_sc_tos1 (TOS-1), i_op_b = w_sc_tos (TOS).
+    //     Az r_mul_start pulzus ciklusában érvényesek; a szorzó belül
+    //     latch-eli őket. A flow az o_done-ig stallol és csak az ST_MUL_WAIT
+    //     záró ágában popol (egyszerűbb FSM, a divider-rel azonos minta).
+    // en: Sequential multiplier instantiation (MUL, F2.6-prep).
+    //     Operands: i_op_a = w_sc_tos1 (TOS-1), i_op_b = w_sc_tos (TOS).
+    //     Valid on the r_mul_start pulse cycle; the multiplier latches them
+    //     internally. The flow stalls until o_done and only pops in the
+    //     ST_MUL_WAIT closing branch (simpler FSM, same pattern as the divider).
+    cilcpu_multiplier u_multiplier (
+        .i_clk      (clk),
+        .i_rst_n    (rst_n),
+        .i_start    (r_mul_start),
+        .i_op_a     (w_sc_tos1),
+        .i_op_b     (w_sc_tos),
+        .o_busy     (w_mul_busy),
+        .o_done     (w_mul_done),
+        .o_product  (w_mul_product)
     );
 
     // ============================================================
@@ -713,6 +763,7 @@ module cilcpu_core #(
             r_sram_re        <= 1'b0;
             r_div_start      <= 1'b0;
             r_div_is_rem     <= 1'b0;
+            r_mul_start      <= 1'b0;
             r_sc_sp_load     <= 1'b0;
             r_sc_sp_init     <= 14'd0;
             r_sc_sp_depth    <= 7'd0;
@@ -759,6 +810,7 @@ module cilcpu_core #(
             r_sram_we        <= 1'b0;
             r_sram_re        <= 1'b0;
             r_div_start      <= 1'b0;
+            r_mul_start      <= 1'b0;
             r_sc_sp_load        <= 1'b0;
             r_sc_flush          <= 1'b0;
             r_sc_push_en        <= 1'b0;
@@ -1041,6 +1093,15 @@ module cilcpu_core #(
                         r_div_start  <= 1'b1;
                         r_div_is_rem <= (uc_alu_op == `ALU_REM);
                         r_state      <= ST_DIV_WAIT;
+                    end else if (uc_alu_op == `ALU_MUL) begin
+                        // hu: F2.6-prep — MUL a szekvenciális szorzóra
+                        //     (r_mul_start pulzus + ST_MUL_WAIT). A phase 0
+                        //     záró műveletei (latch + pop + phase 1) ott futnak.
+                        // en: F2.6-prep — MUL to the sequential multiplier
+                        //     (r_mul_start pulse + ST_MUL_WAIT). The phase-0
+                        //     closing actions (latch + pop + phase 1) run there.
+                        r_mul_start <= 1'b1;
+                        r_state     <= ST_MUL_WAIT;
                     end else begin
                         r_alu_result_latched <= w_alu_result;
                         if (uc_stack_pop == 2'd2) begin
@@ -1882,6 +1943,34 @@ module cilcpu_core #(
                 //     blokkban már 0-ra állt, így a divider nyugodtan fut.
                 // en: Otherwise we wait; r_div_start was already cleared
                 //     by the default-each-cycle block, so the divider
+                //     runs undisturbed.
+            end
+
+            // ====================================================
+            // hu: ST_MUL_WAIT — a szekvenciális szorzó (cilcpu_multiplier)
+            //     o_done-jára vár. Az r_mul_start 1-ciklusos pulzus
+            //     elindította a szorzót az ST_EXECUTE phase 0 átmenetben;
+            //     amint w_mul_done magas, a phase 0 záró műveletei (eredmény-
+            //     latch, pop1, phase 1) lefutnak, és visszatérünk ST_EXECUTE-ba
+            //     a phase 1-re (replace_top). A MUL binary, nincs trap.
+            // en: ST_MUL_WAIT — waits for the sequential multiplier's
+            //     (cilcpu_multiplier) o_done. The r_mul_start 1-cycle pulse
+            //     launched the multiplier at the ST_EXECUTE phase-0 entry;
+            //     once w_mul_done goes high, the phase-0 closing actions
+            //     (result latch, pop1, phase 1) run, and we return to
+            //     ST_EXECUTE for phase 1 (replace_top). MUL is binary, no trap.
+            // ====================================================
+            ST_MUL_WAIT: begin
+                if (w_mul_done) begin
+                    r_alu_result_latched <= w_mul_product;
+                    r_sc_pop_en <= 1'b1;
+                    r_alu_phase <= 2'd1;
+                    r_state     <= ST_EXECUTE;
+                end
+                // hu: Egyébként várunk; r_mul_start már 0-ra állt a
+                //     default-each-cycle blokkban, a szorzó nyugodtan fut.
+                // en: Otherwise we wait; r_mul_start was already cleared
+                //     by the default-each-cycle block, so the multiplier
                 //     runs undisturbed.
             end
 

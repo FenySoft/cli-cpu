@@ -97,25 +97,19 @@ async def test_sub_wrap(dut):
     await check(dut, INT_MIN, 1, ALU_SUB, INT_MAX, "INT_MIN-1 wraps")
 
 # ============================================================
-# MUL tesztek
+# hu: MUL tesztek áthelyezve a `cilcpu_multiplier.v` szekvenciális szorzó
+#     modulra (test_multiplier.py). Az ALU innentől nem kezeli a MUL-t — a
+#     kombinációs `i_op_a * i_op_b` egy teljes 32×32 párhuzamos szorzót
+#     inferált (a datapath legnagyobb ALU-eleme); a shift-add szekvenciális
+#     szorzó megspórolja ezt a területet (F2.6-prep, lásd `cilcpu_alu.v` és
+#     `cilcpu_core.v` ST_MUL_WAIT állapot).
+# en: MUL tests moved to the `cilcpu_multiplier.v` sequential multiplier
+#     module (test_multiplier.py). The ALU no longer handles MUL — the
+#     combinational `i_op_a * i_op_b` inferred a full 32×32 parallel
+#     multiplier (the largest ALU element); the shift-add sequential
+#     multiplier saves that area (F2.6-prep, see `cilcpu_alu.v` and the
+#     ST_MUL_WAIT state in `cilcpu_core.v`).
 # ============================================================
-
-@cocotb.test()
-async def test_mul_basic(dut):
-    await check(dut, 6, 7, ALU_MUL, 42, "6*7")
-
-@cocotb.test()
-async def test_mul_negative(dut):
-    await check(dut, -3, 4, ALU_MUL, -12, "-3*4")
-
-@cocotb.test()
-async def test_mul_zero(dut):
-    await check(dut, 12345, 0, ALU_MUL, 0, "x*0")
-
-@cocotb.test()
-async def test_mul_wrap(dut):
-    # 0x10000 * 0x10000 = 0x100000000 → lower 32 bits = 0
-    await check(dut, 0x10000, 0x10000, ALU_MUL, 0, "overflow wraps")
 
 # ============================================================
 # hu: DIV / REM tesztek áthelyezve a `cilcpu_divider.v` szekvenciális

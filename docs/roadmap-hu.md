@@ -6,7 +6,7 @@ status: living
 
 > English version: [roadmap-en.md](roadmap-en.md)
 
-> Version: 1.8
+> Version: 1.9
 
 A CLI-CPU projekt **hét fázisban** épül fel, a spec dokumentumtól az első működő, kezedben tartható szilíciumig és tovább, a teljes ECMA-335 CIL implementációig.
 
@@ -110,11 +110,12 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - F2.4 QSPI vezérlő — kód + adat fetch
 - F2.5a Top-level Nano core integráció (`cilcpu_core.v`) — 5 részegység + fetch unit + frame manager + memory bus arbiter
 - F2.5b Golden vector harness — cocotb vs C# szimulátor (CilCpu.Sim trace export, lépésről-lépésre összehasonlítás)
-- F2.6 Yosys szintézis — Sky130 PDK, terület becslés
+- F2.6 Yosys szintézis — Sky130/IHP PDK, terület becslés
 - F2.7 FPGA validáció — egymagos Nano core, valós hardveren (A7-Lite)
+- F2.8 TT-chip perifériák FPGA-validáció — UART RX, boot-over-UART loader, Mailbox, GPIO, trace MUX, IRQ + wrapper (A7-Lite + QSPI Pmod). Részletes terv: `F2.8-plan-hu.md`
 
 > **⚠️ Végrehajtási sorrend ≠ számozás.** Az alszakasz-számok **stabil azonosítók**, nem lépés-sorrend (a git commit-history is ezekre hivatkozik). A 2026-05-08-i sorrend-pivot óta a tényleges végrehajtási sorrend:
-> **F2.5 → F2.7 (FPGA validáció, A7-Lite) → F2.6 (Yosys/Sky130 szintézis) → F3 (Tiny Tapeout).**
+> **F2.5 → F2.7 (egymagos core FPGA) → F2.8 (TT-perifériák FPGA) → F2.6 (teljes chip IHP-szintézis) → F3 (Tiny Tapeout).**
 > **Mérnöki indok:** *„nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n"* — előbb FPGA-n verifikálunk, csak utána szintetizálunk Sky130-ra; az FPGA-n talált hibák olcsók, a Tiny Tapeout chipen nem.
 > **Pályázati vonatkozás:** az **F2.6 Sky130 szintézis az NLnet M1 mérföldkő MoU-utáni horgonya**. A befejezett FPGA-validáció (F2.7) erős M1-előbizonyíték a 2026-06-01 beadáshoz, de a finanszírozott, a MoU-időszakra eső, igazolható deliverable a Sky130 area/timing report — ezért az F2.6-ot tudatosan a MoU utánra időzítjük.
 
@@ -150,6 +151,36 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 **Költség:** ~€0 (az FPGA board az F4-hez is kell, már megrendeltük).
 
 **Miért fontos:** *„Nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n."* Az F2.5 ez az elv gyakorlatban — olcsó, gyors, és a hibákat az FPGA-n találjuk meg, nem a Tiny Tapeout chipen.
+
+---
+
+### F2.8 — TT-chip perifériák FPGA-validáció
+
+**Cél:** A Tiny Tapeout (F3) chipbe szánt **perifériák** megépítése (TDD) és **valós FPGA-n** (A7-Lite) történő validálása a tapeout **előtt** — ugyanaz az elv, mint az F2.7-nél, kiterjesztve a host-interfészre és az I/O-ra. Az F2.7 az egymagos core-t validálta; az F2.8 a chipet *használhatóvá* tevő perifériákat.
+
+**Platform:** MicroPhase A7-Lite XC7A200T + **QSPI Pmod** (W25Q128 flash + 2× APS6404L PSRAM) az A7-Lite PMOD-csatlakozóján — ugyanaz a memória-hardver, mint a TT-n.
+
+**Komponensek (mind TDD):**
+- UART RX (8N1), boot-over-UART loader (a hardkódolt boot-generic helyett)
+- Mailbox FIFO (inbox/outbox, MMIO `0xF000_0100`, IRQ in/out)
+- GPIO MMIO (`0xF000_0200`) — a CIL aktor olvas/hajt pineket
+- Trace MUX (`0xF000_0300`) — ciklus-pontos belső jel-megfigyelés, GPIO-val mód-megosztott
+- Bővített A7-Lite wrapper (a TT `tt_um` funkcionális ekvivalense)
+
+**Kimenet:**
+- `rtl/fpga/uart_rx.v`, `rtl/src/cilcpu_mailbox.v`, `cilcpu_gpio.v`, `cilcpu_trace.v` + cocotb tesztek
+- Bővített wrapper, integrált cocotb regresszió
+- A7-Lite demó: boot-over-UART betöltés → CIL-T0 futtatás, GPIO I/O, mailbox echo, trace kimenet
+
+**Kész kritérium:**
+- Minden periféria cocotb tesztje zöld (TDD RED→GREEN)
+- A7-Lite-on fizikailag fut: betöltés UART-on → végrehajtás → GPIO I/O + mailbox echo
+- QSPI Pmod (flash + PSRAM) működik az A7-Lite-on
+- Trace busz kiad belső jeleket (logikai analizátorral ellenőrizve)
+
+**Függőség:** F2.7 kész. **Kimenet → F2.6** (a validált teljes chip szintetizálható → valós tile-szám) **→ F3** (tapeout).
+
+**Részletes terv:** `F2.8-plan-hu.md`.
 
 ---
 
@@ -760,6 +791,7 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.9 | 2026-05-30 | **F2.8 alszakasz hozzáadva** — „TT-chip perifériák FPGA-validáció" az F2.7 (egymagos core) és F2.6 (teljes chip szintézis) közé. A perifériák (UART RX, boot-over-UART loader, Mailbox FIFO, GPIO MMIO, trace MUX, IRQ + wrapper) a tapeout ELŐTT A7-Lite-on validálva (a QSPI Pmod-dal együtt), a projekt „nincs tape-out FPGA-futás nélkül" elve szerint. Végrehajtási sorrend frissítve: F2.5 → F2.7 → **F2.8** → F2.6 → F3. F2.6 PDK Sky130→Sky130/IHP (IHP-pivot). Részletes terv: `F2.8-plan-hu.md`. |
 | 1.8 | 2026-05-17 | **F6.7 opcionális de-risk lépcső hozzáadva** — „Cognitive Fabric Dense" 22FDX node-shrink (GlobalFoundries Fab 1, Dresden) az F6-Silicon One és F7 közé. Áthidalja a roadmap legnagyobb technológiai szakadékát (130nm minden szilícium-bizonyíték ↔ 5nm termék-vízió, ~10× sűrűség). Decision-trail: 22FDX megtartva (köztes sűrűség + CFPU-profil illeszkedés + EU-föld + Europractice MPW), 28nm Crolles / TSMC 12nm / 130→5nm-ugrás elvetve. Munkaóra-tábla (~360 h, opcionális, totálba nem számít), Megjegyzések, ADR `Decisions/2026-05-17-f67-22fdx-intermediate-node.md`. Kaszkád: `chiplet-packaging`, `perf-vs-riscv`. |
 | 1.7 | 2026-05-17 | **F2.7 Sub5.A KÉSZ** — config-flash app-bázis-offszet gyökér-fix: paraméterezhető `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). A Sub5 build-infra „nyitott HW-kérdése" (bitstream@0x0 ↔ app@0x0 ütközés) megoldva: sim default 0 (bit-azonos paritás), FPGA 0xC00000 (12 MB, ~9,9 MB bitstream fölé). Egyetlen forrás: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 új cocotb teszt (test_30/31) RED→GREEN + 7 regressziós target zöld. SEG_DATA szándékosan offszetlen (indoklás dokumentálva). `todo.md` F2.7.E, README-k 0.5.1, Vault: project_flash_base_offset. |
 | 1.6 | 2026-05-16 | **F2.7.D KÉSZ** — rekurzív CALL/RET caller eval depth megőrzés gyökér-fix (flush SRAM-ba + eval depth a header reserved mezőjében + RET SPFILL cache-újratöltés, 3 modul: `cilcpu_stack_cache.v` + `cilcpu_core.v`). A korábbi „F2.5a egyszerűsítés" (project_recursive_call_bug, `TRAP_STACK_UNDERFLOW` rekurzív Fibonacci-nál) megoldva. test_core 49/49, test_stack_cache 28/28 (3 új unit teszt), wrapper/board mind zöld, új regresszió `test_52c` (Fib(10)=55). CORE_SPEC v1.5. Munkaóra-tábla + Mai státusz frissítve. |

@@ -57,6 +57,7 @@ set rtl_files [list \
     "$src_dir/cilcpu_stack_cache.v" \
     "$src_dir/cilcpu_qspi_controller.v" \
     "$src_dir/cilcpu_divider.v" \
+    "$src_dir/cilcpu_multiplier.v" \
     "$src_dir/cilcpu_core.v" \
     "$fpga_dir/uart_tx.v" \
     "$fpga_dir/decimal_printer.v" \

@@ -48,6 +48,15 @@ test_qspi_controller:
 test_divider:
 	$(SUBMAKE) MODULE=test_divider TOPLEVEL=cilcpu_divider VERILOG_SOURCES="$(PWD)/../src/cilcpu_divider.v"
 
+# hu: F2.6-prep — szekvenciális szorzó (cilcpu_multiplier) standalone teszt.
+#     A kombinációs ALU-szorzó (cilcpu_alu.v ALU_MUL) helyett shift-add
+#     többciklusú szorzó — terület-megtakarítás + ISA-spec megfelelés.
+# en: F2.6-prep — standalone sequential multiplier (cilcpu_multiplier) test.
+#     Replaces the combinational ALU multiplier (cilcpu_alu.v ALU_MUL) with
+#     a multi-cycle shift-add multiplier — area saving + ISA-spec alignment.
+test_multiplier:
+	$(SUBMAKE) MODULE=test_multiplier TOPLEVEL=cilcpu_multiplier VERILOG_SOURCES="$(PWD)/../src/cilcpu_multiplier.v"
+
 # hu: F2.7 Sub5 — QSPI Controller QE-init sequence verifikáció.
 #     QE_INIT_ENABLE=1 mellett a controller reset után WREN+WRSR-t küld.
 # en: F2.7 Sub5 — QSPI Controller QE-init sequence verification.
@@ -96,6 +105,7 @@ $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
 $(PWD)/../src/cilcpu_core.v"
 
 # hu: F2.5b golden vector harness — cocotb vs C# szim trace JSONL.
@@ -111,6 +121,7 @@ $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
 $(PWD)/../src/cilcpu_core.v"
 
 # hu: F2.7 Sub1 — A7-Lite top-level wrapper cocotb tesztek.
@@ -132,6 +143,7 @@ $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
@@ -159,6 +171,7 @@ $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
@@ -186,6 +199,7 @@ $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
@@ -210,6 +224,7 @@ $(PWD)/../src/cilcpu_microcode.v \
 $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v \
@@ -226,6 +241,35 @@ test_uart_tx:
 		LOCAL_COMPILE_ARGS="-GCLOCKS_PER_BAUD=8" \
 		VERILOG_SOURCES="$(PWD)/../fpga/uart_tx.v"
 
+# hu: F2.8.1 — UART receiver (8N1, bit-közép mintavétel, 2-FF sync).
+# en: F2.8.1 — UART receiver (8N1, bit-center sampling, 2-FF sync).
+test_uart_rx:
+	$(SUBMAKE) MODULE=test_uart_rx TOPLEVEL=uart_rx \
+		LOCAL_COMPILE_ARGS="-GCLOCKS_PER_BAUD=8" \
+		VERILOG_SOURCES="$(PWD)/../fpga/uart_rx.v"
+
+# hu: F2.8.3a — generikus szinkron FIFO (a Mailbox építőeleme).
+# en: F2.8.3a — generic synchronous FIFO (Mailbox building block).
+test_fifo:
+	$(SUBMAKE) MODULE=test_fifo TOPLEVEL=cilcpu_fifo VERILOG_SOURCES="$(PWD)/../src/cilcpu_fifo.v"
+
+# hu: F2.8.3 — Mailbox (inbox/outbox FIFO + MMIO + IRQ).
+# en: F2.8.3 — Mailbox (inbox/outbox FIFO + MMIO + IRQ).
+test_mailbox:
+	$(SUBMAKE) MODULE=test_mailbox TOPLEVEL=cilcpu_mailbox VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_fifo.v \
+$(PWD)/../src/cilcpu_mailbox.v"
+
+# hu: F2.8.4 — GPIO MMIO (in/out/oe, 2-FF input sync).
+# en: F2.8.4 — GPIO MMIO (in/out/oe, 2-FF input sync).
+test_gpio:
+	$(SUBMAKE) MODULE=test_gpio TOPLEVEL=cilcpu_gpio VERILOG_SOURCES="$(PWD)/../src/cilcpu_gpio.v"
+
+# hu: F2.8.5 — Trace MUX (konfigurálható belső-jel kimenet).
+# en: F2.8.5 — Trace MUX (configurable internal-signal output).
+test_trace:
+	$(SUBMAKE) MODULE=test_trace TOPLEVEL=cilcpu_trace VERILOG_SOURCES="$(PWD)/../src/cilcpu_trace.v"
+
 # hu: F2.7 Sub2 — 32-bit decimal printer (uart_tx-et példányosít).
 # en: F2.7 Sub2 — 32-bit decimal printer (instantiates uart_tx).
 test_decimal_printer:
@@ -235,4 +279,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib

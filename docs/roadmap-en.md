@@ -6,7 +6,7 @@ status: living
 
 > Magyar verzió: [roadmap-hu.md](roadmap-hu.md)
 
-> Version: 1.8
+> Version: 1.9
 
 The CLI-CPU project is built in **seven phases**, from the specification document to the first working, hand-held silicon and beyond, to a full ECMA-335 CIL implementation.
 
@@ -110,11 +110,12 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - F2.4 QSPI controller — code + data fetch
 - F2.5a Top-level Nano core integration (`cilcpu_core.v`) — 5 submodules + fetch unit + frame manager + memory bus arbiter
 - F2.5b Golden vector harness — cocotb vs C# simulator (CilCpu.Sim trace export, step-by-step comparison)
-- F2.6 Yosys synthesis — Sky130 PDK, area estimate
+- F2.6 Yosys synthesis — Sky130/IHP PDK, area estimate
 - F2.7 FPGA validation — single Nano core on real hardware (A7-Lite)
+- F2.8 TT-chip peripherals FPGA validation — UART RX, boot-over-UART loader, Mailbox, GPIO, trace MUX, IRQ + wrapper (A7-Lite + QSPI Pmod). Detailed plan: `F2.8-plan-hu.md`
 
 > **⚠️ Execution order ≠ numbering.** The subsection numbers are **stable identifiers**, not a step sequence (the git commit history also references them). Since the 2026-05-08 order pivot, the actual execution order is:
-> **F2.5 → F2.7 (FPGA validation, A7-Lite) → F2.6 (Yosys/Sky130 synthesis) → F3 (Tiny Tapeout).**
+> **F2.5 → F2.7 (single-core FPGA) → F2.8 (TT peripherals FPGA) → F2.6 (full-chip IHP synthesis) → F3 (Tiny Tapeout).**
 > **Engineering rationale:** *"No silicon tape-out with a design that hasn't run on FPGA."* — verify on FPGA first, synthesize to Sky130 only afterwards; bugs found on FPGA are cheap, bugs on the Tiny Tapeout chip are not.
 > **Grant implication:** the **F2.6 Sky130 synthesis is the post-MoU anchor of the NLnet M1 milestone**. The completed FPGA validation (F2.7) is strong M1 pre-evidence for the 2026-06-01 submission, but the funded, in-MoU-period, verifiable deliverable is the Sky130 area/timing report — hence F2.6 is deliberately timed after the MoU.
 
@@ -150,6 +151,36 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 **Cost:** ~€0 (the FPGA board is also needed for F4, already ordered).
 
 **Why this matters:** *"No silicon tape-out with a design that hasn't run on FPGA."* F2.7 is this principle in practice — cheap, fast, and bugs are found on FPGA, not on the Tiny Tapeout chip.
+
+---
+
+### F2.8 — TT-chip Peripherals FPGA Validation
+
+**Goal:** Build (TDD) and validate on real FPGA (A7-Lite) the **peripherals** destined for the Tiny Tapeout (F3) chip, **before** tape-out — the same principle as F2.7, extended to the host interface and I/O. F2.7 validated the single core; F2.8 validates the peripherals that make the chip *usable*.
+
+**Platform:** MicroPhase A7-Lite XC7A200T + **QSPI Pmod** (W25Q128 flash + 2× APS6404L PSRAM) on the A7-Lite PMOD connector — the same memory hardware as on the TT.
+
+**Components (all TDD):**
+- UART RX (8N1), boot-over-UART loader (replacing the hardcoded boot generic)
+- Mailbox FIFO (inbox/outbox, MMIO `0xF000_0100`, IRQ in/out)
+- GPIO MMIO (`0xF000_0200`) — the CIL actor reads/drives pins
+- Trace MUX (`0xF000_0300`) — cycle-accurate internal-signal observability, mode-shared with GPIO
+- Extended A7-Lite wrapper (functional equivalent of the TT `tt_um`)
+
+**Output:**
+- `rtl/fpga/uart_rx.v`, `rtl/src/cilcpu_mailbox.v`, `cilcpu_gpio.v`, `cilcpu_trace.v` + cocotb tests
+- Extended wrapper, integrated cocotb regression
+- A7-Lite demo: boot-over-UART load → CIL-T0 execution, GPIO I/O, mailbox echo, trace output
+
+**Done criteria:**
+- Every peripheral's cocotb test green (TDD RED→GREEN)
+- Physically runs on A7-Lite: load over UART → execute → GPIO I/O + mailbox echo
+- QSPI Pmod (flash + PSRAM) works on the A7-Lite
+- Trace bus emits internal signals (verified with a logic analyzer)
+
+**Dependency:** F2.7 done. **Output → F2.6** (the validated full chip can be synthesized → real tile count) **→ F3** (tape-out).
+
+**Detailed plan:** `F2.8-plan-hu.md`.
 
 ---
 
@@ -752,6 +783,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.9 | 2026-05-30 | **F2.8 subsection added** — "TT-chip peripherals FPGA validation" between F2.7 (single core) and F2.6 (full-chip synthesis). The peripherals (UART RX, boot-over-UART loader, Mailbox FIFO, GPIO MMIO, trace MUX, IRQ + wrapper) are validated on the A7-Lite (together with the QSPI Pmod) BEFORE tape-out, per the project's "no tape-out without FPGA" principle. Execution order updated: F2.5 → F2.7 → **F2.8** → F2.6 → F3. F2.6 PDK Sky130→Sky130/IHP (IHP pivot). Detailed plan: `F2.8-plan-hu.md`. |
 | 1.8 | 2026-05-17 | **F6.7 optional de-risk step added** — "Cognitive Fabric Dense" 22FDX node-shrink (GlobalFoundries Fab 1, Dresden) between F6-Silicon One and F7. Bridges the roadmap's largest technology gap (130nm — all silicon proofs ↔ 5nm product vision, ~10× density). Decision-trail: 22FDX retained (intermediate density + CFPU-profile fit + EU soil + Europractice MPW), 28nm Crolles / TSMC 12nm / 130→5nm jump rejected. Work-hours table (~360 h, optional, not counted in total), Notes, ADR `Decisions/2026-05-17-f67-22fdx-intermediate-node.md`. Cascade: `chiplet-packaging`, `perf-vs-riscv`. |
 | 1.7 | 2026-05-17 | **F2.7 Sub5.A DONE** — config-flash app base offset root fix: parameterizable `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). The Sub5 build-infra "open HW question" (bitstream@0x0 ↔ app@0x0 collision) resolved: sim default 0 (bit-identical parity), FPGA 0xC00000 (12 MB, above the ~9.9 MB bitstream). Single source: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 new cocotb tests (test_30/31) RED→GREEN + 7 regression targets green. SEG_DATA intentionally not offset (rationale documented). `todo.md` F2.7.E, READMEs 0.5.1, Vault: project_flash_base_offset. |
 | 1.6 | 2026-05-16 | **F2.7.D DONE** — recursive CALL/RET caller eval depth preservation root fix (flush to SRAM + eval depth in header reserved field + RET SPFILL cache refill, 3 modules: `cilcpu_stack_cache.v` + `cilcpu_core.v`). The former "F2.5a simplification" (project_recursive_call_bug, `TRAP_STACK_UNDERFLOW` on recursive Fibonacci) is resolved. test_core 49/49, test_stack_cache 28/28 (3 new unit tests), wrapper/board all green, new regression `test_52c` (Fib(10)=55). CORE_SPEC v1.5. Work-hours table + Current Status updated. |

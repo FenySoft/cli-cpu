@@ -57,6 +57,8 @@ RTL_SRCS := \
 	$(SRC_DIR)/cilcpu_microcode.v \
 	$(SRC_DIR)/cilcpu_stack_cache.v \
 	$(SRC_DIR)/cilcpu_qspi_controller.v \
+	$(SRC_DIR)/cilcpu_divider.v \
+	$(SRC_DIR)/cilcpu_multiplier.v \
 	$(SRC_DIR)/cilcpu_core.v \
 	$(FPGA_DIR)/uart_tx.v \
 	$(FPGA_DIR)/decimal_printer.v \

@@ -6,6 +6,40 @@
 
 ---
 
+## F2.8 — TT-chip perifériák FPGA-validáció
+
+- **Roadmap:** F2.8, `docs/roadmap-hu.md` / `docs/roadmap-en.md`
+- **Részletes terv:** `docs/F2.8-plan-hu.md`
+- **Státusz:** 🔄 FOLYAMATBAN — RTL + cocotb vázak elkészültek (TDD RED fázis)
+- **Felvéve:** 2026-05-30
+
+### Tervezett feladatok
+
+- F2.8.1 UART RX (8N1) + boot-over-UART loader
+- F2.8.3a generikus FIFO (cilcpu_fifo.v)
+- F2.8.3 Mailbox FIFO + MMIO + IRQ
+- F2.8.4 GPIO MMIO
+- F2.8.5 Trace MUX
+- F2.8.6 Bővített A7-Lite wrapper (TT `tt_um` ekvivalens)
+
+Részletes sub-feladatok és elfogadási kritériumok: `docs/F2.8-plan-hu.md`.
+
+---
+
+## F2.6 — Yosys szintézis (Sky130/IHP PDK, area estimate)
+
+- **Roadmap:** F2.6, `docs/roadmap-hu.md` / `docs/roadmap-en.md`
+- **Státusz:** ⏳ VÁRAKOZIK — az F2.8 FPGA-validáció után indul (NLnet M1 MoU-utáni anchor)
+- **Felvéve:** 2026-05-30
+
+### Előkészítés (F2.6-prep)
+
+A kombinációs ALU MUL (teljes 32×32 párhuzamos szorzó) lecserélve
+shift-add szekvenciális `cilcpu_multiplier.v`-re — területmegtakarítás
+az F2.6 area/timing reporthoz. Ugyanez az elv, mint a Sub5 osztónál.
+
+---
+
 ## F2.7.E — Config-flash app-bázis-offszet (Sub5.A)
 
 - **Roadmap:** F2.7 Sub5.A, `docs/roadmap-hu.md` / `docs/roadmap-en.md`
