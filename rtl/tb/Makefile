@@ -302,6 +302,11 @@ $(PWD)/../src/cilcpu_soc.v"
 # hu: megj. — a cilcpu_qspi_controller.v már a fenti listában; a cilcpu_soc
 #     mostantól (F1a) maga példányosítja a controllert (a core helyett).
 
+# hu: F2.8 #6.5b-F1b — UART boot-loader FSM (WRITE/BOOT keret-parser).
+# en: F2.8 #6.5b-F1b — UART boot-loader FSM (WRITE/BOOT frame parser).
+test_uart_loader:
+	$(SUBMAKE) MODULE=test_uart_loader TOPLEVEL=cilcpu_uart_loader VERILOG_SOURCES="$(PWD)/../src/cilcpu_uart_loader.v"
+
 # hu: F2.7 Sub2 — 32-bit decimal printer (uart_tx-et példányosít).
 # en: F2.7 Sub2 — 32-bit decimal printer (instantiates uart_tx).
 test_decimal_printer:
@@ -311,4 +316,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_soc test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_soc test_uart_loader test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
