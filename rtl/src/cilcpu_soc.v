@@ -37,17 +37,20 @@
 `default_nettype none
 
 module cilcpu_soc #(
-    parameter integer CODE_BASE_OFFSET = 0,
-    parameter integer QE_INIT_ENABLE   = 0,
-    parameter integer GPIO_WIDTH       = 8,
-    parameter integer TRACE_WIDTH      = 8,
-    parameter integer TRACE_NSRC       = 8
+    parameter integer CODE_BASE_OFFSET      = 0,
+    parameter integer QE_INIT_ENABLE        = 0,
+    parameter integer GPIO_WIDTH            = 8,
+    parameter integer TRACE_WIDTH           = 8,
+    parameter integer TRACE_NSRC            = 8,
+    parameter integer UART_CLOCKS_PER_BAUD  = 434
 ) (
     input  wire        clk,
     input  wire        rst_n,
 
-    // hu: Boot konfiguráció (névazonos a cilcpu_core-ral)
-    // en: Boot configuration (same names as cilcpu_core)
+    // hu: Boot konfiguráció — KÜLSŐ forrás (a meglévő flash-boot tesztekhez).
+    //     UART-boot esetén a belső loader felülírja (boot-mux, lásd lentebb).
+    // en: Boot configuration — EXTERNAL source (for the existing flash-boot
+    //     tests). On UART boot the internal loader overrides it (boot mux below).
     input  wire [23:0] i_boot_pc,
     input  wire [7:0]  i_boot_arg_count,
     input  wire [7:0]  i_boot_local_count,
@@ -55,6 +58,10 @@ module cilcpu_soc #(
     input  wire [31:0] i_boot_arg_data,
     input  wire        i_boot_arg_valid,
     output wire        o_boot_arg_ready,
+
+    // hu: Boot-over-UART loader soros bemenete (idle = 1). F2.8 #6.5b-F1b.
+    // en: Boot-over-UART loader serial input (idle = 1). F2.8 #6.5b-F1b.
+    input  wire        i_uart_rx,
 
     // hu: Státusz / en: Status
     output wire        o_halt,
@@ -197,21 +204,122 @@ module cilcpu_soc #(
     // ============================================================
     // hu: Nano core / en: Nano core
     // ============================================================
-    // hu: F1a — a Core külső-memória-master busza a SoC-szintű QSPI controllerhez.
-    // en: F1a — the Core's external-memory master bus to the SoC-level QSPI ctrl.
+    // hu: Core külső-memória-master busza (a fázis-MUX-on át a QSPI-re).
+    // en: Core external-memory master bus (through the phase MUX to the QSPI).
     wire [23:0] w_xmem_addr;
     wire        w_xmem_re;
-    wire [31:0] w_xmem_rdata;
-    wire        w_xmem_ready;
-    wire        w_xmem_busy;
+
+    // ============================================================
+    // hu: F1b — Boot-over-UART loader: uart_rx → cilcpu_uart_loader.
+    // en: F1b — Boot-over-UART loader: uart_rx → cilcpu_uart_loader.
+    // ============================================================
+    wire [7:0]  w_ld_byte;
+    wire        w_ld_byte_valid;
+    wire [23:0] w_ld_mem_addr;
+    wire [31:0] w_ld_mem_wdata;
+    wire        w_ld_mem_we;
+    wire        w_ld_boot_req;
+    wire [23:0] w_ld_boot_pc;
+    wire [7:0]  w_ld_boot_argc;
+    wire [7:0]  w_ld_boot_localc;
+    wire        w_ld_boot_code_src;
+    wire        w_ld_busy;
+
+    uart_rx #(
+        .CLOCKS_PER_BAUD (UART_CLOCKS_PER_BAUD)
+    ) u_uart_rx (
+        .clk         (clk),
+        .rst_n       (rst_n),
+        .i_rx        (i_uart_rx),
+        .o_data      (w_ld_byte),
+        .o_valid     (w_ld_byte_valid),
+        .o_frame_err ()
+    );
+
+    // hu: QSPI cpu_* visszacsatolás (a fázis-MUX mindkét mestere ezt látja).
+    // en: QSPI cpu_* feedback (both phase-MUX masters see these).
+    wire [31:0] w_qspi_cpu_rdata;
+    wire        w_qspi_cpu_ready;
+    wire        w_qspi_cpu_busy;
+
+    cilcpu_uart_loader u_loader (
+        .clk             (clk),
+        .rst_n           (rst_n),
+        .i_byte          (w_ld_byte),
+        .i_byte_valid    (w_ld_byte_valid),
+        .o_mem_addr      (w_ld_mem_addr),
+        .o_mem_wdata     (w_ld_mem_wdata),
+        .o_mem_we        (w_ld_mem_we),
+        .i_mem_ready     (w_qspi_cpu_ready),
+        .o_boot_req      (w_ld_boot_req),
+        .o_boot_pc       (w_ld_boot_pc),
+        .o_boot_argc     (w_ld_boot_argc),
+        .o_boot_localc   (w_ld_boot_localc),
+        .o_boot_code_src (w_ld_boot_code_src),
+        .o_busy          (w_ld_busy)
+    );
+
+    // ============================================================
+    // hu: Fázis-MUX vezérlés. r_load_mode: a loader-aktivitásra (o_busy) 1, a
+    //     BOOT-ra 0 (default 0 → a meglévő flash-boot tesztek érintetlenek).
+    //     FONTOS: az o_busy a keret ELEJÉN (az első o_mem_we ELŐTT) megy magasra,
+    //     így a fázis-MUX már az első írás-pulzusnál load-módban van (az o_mem_we
+    //     1-ciklusos pulzusát nem kapuzná ki egy egy-ciklussal késő latch).
+    //     r_code_src: a BOOT-kor latch-elt fetch-forrás (0=flash/SEG_CODE,
+    //     1=PSRAM/SEG_STACK).
+    // en: Phase-MUX control. r_load_mode: 1 on loader activity (o_busy), 0 on
+    //     BOOT (default 0 → existing flash-boot tests unaffected). IMPORTANT:
+    //     o_busy rises at the START of a frame (BEFORE the first o_mem_we), so
+    //     the phase MUX is already in load mode for the first write pulse (a
+    //     latch set one cycle late by o_mem_we would gate out the 1-cycle pulse).
+    //     r_code_src: fetch source latched at BOOT (0=flash/SEG_CODE,
+    //     1=PSRAM/SEG_STACK).
+    // ============================================================
+    reg  r_load_mode;
+    reg  r_code_src;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            r_load_mode <= 1'b0;
+            r_code_src  <= 1'b0;
+        end else if (w_ld_boot_req) begin
+            r_load_mode <= 1'b0;
+            r_code_src  <= w_ld_boot_code_src;
+        end else if (w_ld_busy) begin
+            r_load_mode <= 1'b1;
+        end
+    end
+
+    // hu: Run-fázis cím-szegmens remap a code_src szerint — a Core eszköz-
+    //     agnosztikus [19:0] CODE-címteret használ; a SoC teszi rá a szegmenst.
+    // en: Run-phase address segment remap by code_src — the Core uses a device-
+    //     agnostic [19:0] CODE space; the SoC applies the segment.
+    wire [3:0] w_core_seg = r_code_src ? `SEG_STACK : `SEG_CODE;
+
+    // hu: Fázis-MUX a QSPI cpu_* bemenetein (load = loader, run = core).
+    // en: Phase MUX on the QSPI cpu_* inputs (load = loader, run = core).
+    wire [23:0] w_qspi_cpu_addr  = r_load_mode ? w_ld_mem_addr
+                                   : {w_core_seg, w_xmem_addr[19:0]};
+    wire [31:0] w_qspi_cpu_wdata = r_load_mode ? w_ld_mem_wdata : 32'd0;
+    wire        w_qspi_cpu_we    = r_load_mode ? w_ld_mem_we    : 1'b0;
+    wire        w_qspi_cpu_re    = r_load_mode ? 1'b0           : w_xmem_re;
+
+    // hu: Boot-mux — a loader o_boot_req felülírja a külső i_boot_*-ot. Az
+    //     arg-streaming a külső portokról jön (UART-boot argc=0 → nem használt).
+    // en: Boot mux — the loader's o_boot_req overrides the external i_boot_*.
+    //     Arg streaming comes from the external ports (UART boot argc=0 → unused).
+    wire [23:0] w_core_boot_pc    = w_ld_boot_req ? w_ld_boot_pc       : i_boot_pc;
+    wire [7:0]  w_core_boot_argc  = w_ld_boot_req ? w_ld_boot_argc     : i_boot_arg_count;
+    wire [7:0]  w_core_boot_lcnt  = w_ld_boot_req ? w_ld_boot_localc   : i_boot_local_count;
+    wire        w_core_boot_start = i_boot_start | w_ld_boot_req;
 
     cilcpu_core u_core (
         .clk                (clk),
         .rst_n              (rst_n),
-        .i_boot_pc          (i_boot_pc),
-        .i_boot_arg_count   (i_boot_arg_count),
-        .i_boot_local_count (i_boot_local_count),
-        .i_boot_start       (i_boot_start),
+        .i_boot_pc          (w_core_boot_pc),
+        .i_boot_arg_count   (w_core_boot_argc),
+        .i_boot_local_count (w_core_boot_lcnt),
+        .i_boot_start       (w_core_boot_start),
         .i_boot_arg_data    (i_boot_arg_data),
         .i_boot_arg_valid   (i_boot_arg_valid),
         .o_boot_arg_ready   (o_boot_arg_ready),
@@ -222,9 +330,9 @@ module cilcpu_soc #(
         .o_return_value     (o_return_value),
         .o_xmem_addr        (w_xmem_addr),
         .o_xmem_re          (w_xmem_re),
-        .i_xmem_rdata       (w_xmem_rdata),
-        .i_xmem_ready       (w_xmem_ready),
-        .i_xmem_busy        (w_xmem_busy),
+        .i_xmem_rdata       (w_qspi_cpu_rdata),
+        .i_xmem_ready       (w_qspi_cpu_ready),
+        .i_xmem_busy        (w_qspi_cpu_busy),
         .o_mmio_addr        (w_mmio_addr),
         .o_mmio_wdata       (w_mmio_wdata),
         .o_mmio_we          (w_mmio_we),
@@ -232,23 +340,23 @@ module cilcpu_soc #(
         .i_mmio_rdata       (w_mmio_rdata)
     );
 
-    // hu: SoC-szintű QSPI controller (F1a — a Core-ból kiemelve). A Core
-    //     read-only mestere (cpu_we=0); a loader-írás F1b-ben jön a fázis-MUX-on.
-    // en: SoC-level QSPI controller (F1a — moved out of the Core). The Core is a
-    //     read-only master (cpu_we=0); loader writes arrive in F1b via the mux.
+    // hu: SoC-szintű QSPI controller — a fázis-MUX-on át a loader (write, load)
+    //     vagy a Core (read, run) hajtja.
+    // en: SoC-level QSPI controller — driven via the phase MUX by the loader
+    //     (write, load) or the Core (read, run).
     cilcpu_qspi_controller #(
         .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
         .QE_INIT_ENABLE   (QE_INIT_ENABLE)
     ) u_qspi (
         .clk             (clk),
         .rst_n           (rst_n),
-        .cpu_addr        (w_xmem_addr),
-        .cpu_wdata       (32'd0),
-        .cpu_rdata       (w_xmem_rdata),
-        .cpu_re          (w_xmem_re),
-        .cpu_we          (1'b0),
-        .cpu_ready       (w_xmem_ready),
-        .cpu_busy        (w_xmem_busy),
+        .cpu_addr        (w_qspi_cpu_addr),
+        .cpu_wdata       (w_qspi_cpu_wdata),
+        .cpu_rdata       (w_qspi_cpu_rdata),
+        .cpu_re          (w_qspi_cpu_re),
+        .cpu_we          (w_qspi_cpu_we),
+        .cpu_ready       (w_qspi_cpu_ready),
+        .cpu_busy        (w_qspi_cpu_busy),
         .qspi_clk        (qspi_clk),
         .qspi_cs_flash_n (qspi_cs_flash_n),
         .qspi_cs_psram_n (qspi_cs_psram_n),

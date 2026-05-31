@@ -9,6 +9,38 @@ import cocotb
 from cocotb.triggers import RisingEdge, Edge
 
 
+async def uart_tx_byte(dut, rx_signal, clocks_per_baud, byte_val):
+    """hu: Egyetlen 8N1 byte KÜLDÉSE a DUT `rx_signal` bemenetére (a teszt a
+        host UART-adó). Start bit (0), 8 data bit LSB-first, stop bit (1) —
+        mindegyik `clocks_per_baud` órajel-cikluson át.
+    en: SENDS a single 8N1 byte onto the DUT's `rx_signal` input (the test acts
+        as the host UART transmitter). Start bit (0), 8 data bits LSB-first,
+        stop bit (1) — each held for `clocks_per_baud` clock cycles."""
+    clk = dut.i_clk_50m if hasattr(dut, "i_clk_50m") else dut.clk
+
+    # hu: start bit
+    rx_signal.value = 0
+    for _ in range(clocks_per_baud):
+        await RisingEdge(clk)
+
+    # hu: 8 data bit, LSB-first
+    for i in range(8):
+        rx_signal.value = (byte_val >> i) & 1
+        for _ in range(clocks_per_baud):
+            await RisingEdge(clk)
+
+    # hu: stop bit (idle)
+    rx_signal.value = 1
+    for _ in range(clocks_per_baud):
+        await RisingEdge(clk)
+
+
+async def uart_tx_bytes(dut, rx_signal, clocks_per_baud, data):
+    """hu: Byte-sorozat küldése egymás után a DUT rx_signal bemenetére."""
+    for b in data:
+        await uart_tx_byte(dut, rx_signal, clocks_per_baud, b & 0xFF)
+
+
 async def uart_rx_byte(dut, tx_signal, clocks_per_baud):
     """hu: Egyetlen 8N1 byte dekódolása a `tx_signal`-ról. Vár a start bitre
         (magas → alacsony átmenet), a közepén mintavételez, majd 8 data bit

@@ -285,7 +285,7 @@ test_trace:
 #     trace. test_soc.py imports the test_core boot harness (the soc's
 #     boot/qspi/status ports share the core's names).
 test_soc:
-	$(SUBMAKE) MODULE=test_soc TOPLEVEL=cilcpu_soc VERILOG_SOURCES="\
+	$(SUBMAKE) MODULE=test_soc TOPLEVEL=cilcpu_soc LOCAL_COMPILE_ARGS="-GUART_CLOCKS_PER_BAUD=8" VERILOG_SOURCES="\
 $(PWD)/../src/cilcpu_alu.v \
 $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
@@ -298,9 +298,11 @@ $(PWD)/../src/cilcpu_fifo.v \
 $(PWD)/../src/cilcpu_mailbox.v \
 $(PWD)/../src/cilcpu_gpio.v \
 $(PWD)/../src/cilcpu_trace.v \
+$(PWD)/../src/cilcpu_uart_loader.v \
+$(PWD)/../fpga/uart_rx.v \
 $(PWD)/../src/cilcpu_soc.v"
 # hu: megj. — a cilcpu_qspi_controller.v már a fenti listában; a cilcpu_soc
-#     mostantól (F1a) maga példányosítja a controllert (a core helyett).
+#     (F1a) maga példányosítja a controllert, (F1b) az uart_rx + uart_loader-t is.
 
 # hu: F2.8 #6.5b-F1b — UART boot-loader FSM (WRITE/BOOT keret-parser).
 # en: F2.8 #6.5b-F1b — UART boot-loader FSM (WRITE/BOOT frame parser).

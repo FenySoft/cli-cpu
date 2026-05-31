@@ -148,23 +148,34 @@ module cilcpu_uart_loader (
                 // --------------------------------------------------
                 S_WDATA: begin
                     if (i_byte_valid) begin
-                        // hu: LE — az első bájt a legalacsonyabb cím (bit[7:0])
+                        // hu: BIG-ENDIAN szó-összeállítás — az első payload bájt
+                        //     (legalacsonyabb cím) a [31:24]-be. Ez illeszkedik a
+                        //     QSPI write→PSRAM→read→fetch round-trip-hez: a
+                        //     controller írás cpu_wdata=X-ből psram.mem[addr]=
+                        //     X[31:24]-t tárol (BE), és a fetch a flash-
+                        //     konvencióval (mem[offset]=program-bájt) működik.
+                        // en: BIG-ENDIAN word assembly — first payload byte
+                        //     (lowest address) into [31:24]. Matches the QSPI
+                        //     write→PSRAM→read→fetch round-trip: a write of
+                        //     cpu_wdata=X stores psram.mem[addr]=X[31:24] (BE),
+                        //     and fetch uses the flash convention (mem[offset]=
+                        //     program byte).
                         case (r_byteidx)
-                            2'd0: r_word[7:0]   <= i_byte;
-                            2'd1: r_word[15:8]  <= i_byte;
-                            2'd2: r_word[23:16] <= i_byte;
-                            default: r_word[31:24] <= i_byte;
+                            2'd0: r_word[31:24] <= i_byte;
+                            2'd1: r_word[23:16] <= i_byte;
+                            2'd2: r_word[15:8]  <= i_byte;
+                            default: r_word[7:0] <= i_byte;
                         endcase
                         r_recv <= r_recv + 16'd1;
 
                         if (r_byteidx == 2'd3) begin
                             // hu: szó kész — írás kiadása (1-ciklus o_mem_we
                             //     pulzus a következő, S_WWAIT ciklusban).
-                            o_mem_wdata[23:0]  <= r_word[23:0];
-                            o_mem_wdata[31:24] <= i_byte;   // a 4. bájt
-                            o_mem_we           <= 1'b1;
-                            r_byteidx          <= 2'd0;
-                            r_state            <= S_WWAIT;
+                            o_mem_wdata[31:8] <= r_word[31:8];
+                            o_mem_wdata[7:0]  <= i_byte;     // a 4. (legalsó) bájt
+                            o_mem_we          <= 1'b1;
+                            r_byteidx         <= 2'd0;
+                            r_state           <= S_WWAIT;
                         end else begin
                             r_byteidx <= r_byteidx + 2'd1;
                         end

@@ -19,6 +19,16 @@ from test_core import (
     boot_and_run, _ldc_i4, _ldc_s,
     OP_STIND_I4, OP_LDIND_I4, OP_RET, OP_POP,
 )
+from tb_uart import uart_tx_bytes
+from test_qspi_controller import (
+    TQSPIFlashModel, TQSPIPSRAMModel, qspi_slave_driver,
+)
+
+# hu: az e2e UART-load teszt baud-osztója (a Makefile -GUART_CLOCKS_PER_BAUD=8)
+UART_CPB  = 8
+CMD_WRITE = 0xC0
+CMD_BOOT  = 0xB0
+DEV_PSRAM = 0x01
 
 # hu: MMIO-térkép — a wrapper dekódolja (addr[11:8]=periféria, addr[5:2]=reg).
 # en: MMIO map — decoded by the wrapper (addr[11:8]=peripheral, addr[5:2]=reg).
@@ -41,6 +51,7 @@ def _init_soc_inputs(dut):
     dut.i_host_inbox_wdata.value = 0
     dut.i_host_inbox_push.value  = 0
     dut.i_host_outbox_pop.value  = 0
+    dut.i_uart_rx.value          = 1   # hu: UART idle (nincs loader-aktivitás)
 
 
 async def push_inbox_once(dut, value, after_cycles=8):
@@ -230,3 +241,79 @@ async def test_07_irq_clears_after_inbox_read(dut):
     await Timer(1, units="ns")
     assert int(dut.o_irq.value) == 0, \
         "aggregált o_irq pin magas, holott az inbox már üres"
+
+
+# ============================================================
+# F1b.2 — End-to-end: UART-load .t0 PSRAM-ba → BOOT → futás
+# ============================================================
+
+def _u16_be(v):
+    return [(v >> 8) & 0xFF, v & 0xFF]
+
+
+def _u24_be(v):
+    return [(v >> 16) & 0xFF, (v >> 8) & 0xFF, v & 0xFF]
+
+
+@cocotb.test()
+async def test_08_uart_load_psram_and_run(dut):
+    """hu: A host UART-on betölt egy kis .t0 programot PSRAM-ba (WRITE keret),
+        majd BOOT keret (code_src=1) elindítja → a core PSRAM-ból fetch-el,
+        lefuttatja, és visszaadja az eredményt (0x1234). Ez bizonyítja a teljes
+        boot-over-UART utat: uart_rx → loader → fázis-MUX → QSPI PSRAM-írás →
+        boot-mux → core PSRAM-fetch (code_src remap).
+    en: The host UART-loads a small .t0 program into PSRAM (WRITE frame), then a
+        BOOT frame (code_src=1) starts it → the core fetches from PSRAM, runs it,
+        and returns 0x1234. Proves the full boot-over-UART path."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    _init_soc_inputs(dut)
+    dut.i_boot_pc.value          = 0
+    dut.i_boot_arg_count.value   = 0
+    dut.i_boot_local_count.value = 0
+    dut.i_boot_start.value       = 0
+    dut.i_boot_arg_data.value    = 0
+    dut.i_boot_arg_valid.value   = 0
+
+    # hu: QSPI slave (flash üres, PSRAM read-write)
+    flash = TQSPIFlashModel()
+    psram = TQSPIPSRAMModel()
+    cocotb.start_soon(qspi_slave_driver(dut, flash, psram))
+
+    dut.rst_n.value = 0
+    for _ in range(5):
+        await RisingEdge(dut.clk)
+    dut.rst_n.value = 1
+    for _ in range(5):
+        await RisingEdge(dut.clk)
+    await Timer(1, units="ns")
+
+    # hu: program — LDC.I4 0x1234, RET; 8 bájtra paddolva (4 többszöröse)
+    program = _ldc_i4(0x1234) + bytes([OP_RET])
+    while len(program) % 4 != 0:
+        program += bytes([0x00])
+    plen = len(program)
+
+    write_frame = ([CMD_WRITE, DEV_PSRAM] + _u24_be(0x00000) + _u16_be(plen)
+                   + list(program))
+    boot_frame  = [CMD_BOOT, 0x01] + _u24_be(0x000000) + [0x00, 0x00]
+
+    await uart_tx_bytes(dut, dut.i_uart_rx, UART_CPB, write_frame)
+    for _ in range(40):
+        await RisingEdge(dut.clk)
+    await uart_tx_bytes(dut, dut.i_uart_rx, UART_CPB, boot_frame)
+
+    halted = False
+    for _ in range(4000):
+        await RisingEdge(dut.clk)
+        try:
+            if int(dut.o_halt.value) == 1 or int(dut.o_trap.value) == 1:
+                halted = True
+                break
+        except ValueError:
+            pass
+
+    assert halted, "a core nem haltolt/trap-elt a UART-load+boot után"
+    assert int(dut.o_trap.value) == 0, \
+        f"trap 0x{int(dut.o_trap_code.value):02X} (PSRAM-fetch / byte-order hiba?)"
+    assert int(dut.o_return_value.value) == 0x1234, \
+        f"return_value 0x{int(dut.o_return_value.value):08X}, várt 0x1234"

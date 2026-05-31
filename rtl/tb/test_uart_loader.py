@@ -73,9 +73,9 @@ def capture_writes(dut, sink):
 @cocotb.test()
 async def test_01_write_psram_two_words(dut):
     """hu: WRITE dev=1 (PSRAM), addr=0x02000, len=8, payload 8 bájt → 2 szó-írás
-        0x202000 és 0x202004 címre, LE szó-összeállítással.
+        0x202000 és 0x202004 címre, BIG-ENDIAN szó-összeállítással (round-trip).
     en: WRITE dev=1 (PSRAM), addr=0x02000, len=8, 8-byte payload → 2 word writes
-        at 0x202000 and 0x202004, little-endian word assembly."""
+        at 0x202000 and 0x202004, big-endian word assembly (round-trip)."""
     await reset_dut(dut)
     sink = []
     capture_writes(dut, sink)
@@ -95,9 +95,9 @@ async def test_01_write_psram_two_words(dut):
     addr0, w0 = sink[0]
     addr1, w1 = sink[1]
     assert addr0 == 0x202000, f"1. cím 0x{addr0:06X}, várt 0x202000 (SEG_STACK|0x02000)"
-    assert w0 == 0x44332211, f"1. szó 0x{w0:08X}, várt 0x44332211 (LE)"
+    assert w0 == 0x11223344, f"1. szó 0x{w0:08X}, várt 0x11223344 (BE)"
     assert addr1 == 0x202004, f"2. cím 0x{addr1:06X}, várt 0x202004"
-    assert w1 == 0x88776655, f"2. szó 0x{w1:08X}, várt 0x88776655 (LE)"
+    assert w1 == 0x55667788, f"2. szó 0x{w1:08X}, várt 0x55667788 (BE)"
 
 
 @cocotb.test()
@@ -123,7 +123,7 @@ async def test_02_write_flash_segment(dut):
     assert len(sink) == 1, f"1 szó-írás várt, kaptam {len(sink)}"
     addr0, w0 = sink[0]
     assert addr0 == 0x001000, f"cím 0x{addr0:06X}, várt 0x001000 (SEG_CODE|0x01000)"
-    assert w0 == 0xEFBEADDE, f"szó 0x{w0:08X}, várt 0xEFBEADDE (LE)"
+    assert w0 == 0xDEADBEEF, f"szó 0x{w0:08X}, várt 0xDEADBEEF (BE)"
 
 
 # ============================================================
