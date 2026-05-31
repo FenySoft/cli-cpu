@@ -741,28 +741,28 @@ async def test_break(dut):
 @cocotb.test()
 async def test_call(dut):
     """
-    hu: call: több lépéses sorozat. Az utolsó lépésnél frame_push, PC=call_target.
-    en: call: multi-step sequence. Final step: frame_push, PC=call_target.
+    hu: call: 1-lépéses microcode (a Sub5 rekurzív-CALL átdolgozás óta). A teljes
+        frame-építést (header-olvasás+validáció, arg-pop, header-write, locals-
+        nullázás) a top-level ST_CALL FSM végzi több cikluson át; a microcode
+        csak a vezérlőszót adja: frame_push=1, pc_wr=1, pc_src=CALL, done=1.
+        (Korábban 2-lépés volt, a step 0-ban header-olvasással — az átkerült a
+        top-level FSM-be.)
+    en: call: 1-step microcode (since the Sub5 recursive-CALL rework). The full
+        frame build (header read+validate, arg pop, header write, locals zero)
+        runs in the top-level ST_CALL FSM across multiple cycles; the microcode
+        only provides the control word: frame_push=1, pc_wr=1, pc_src=CALL,
+        done=1. (Previously 2-step with a header read in step 0 — moved to the
+        top-level FSM.)
     """
     nsteps = await get_nsteps(dut, OP_CALL)
-    assert nsteps >= 2, f"call: expected >=2 steps, got {nsteps}"
+    assert nsteps == 1, f"call: expected 1 step (Sub5), got {nsteps}"
 
-    # hu: Step 0: SRAM read (header validáció).
-    # en: Step 0: SRAM read (header validation).
     step0_ctrl = await uc(dut, OP_CALL, step=0)
-    assert bit(step0_ctrl, UC_SRAM_RD) == 1, "call step0: sram_rd"
-    assert field(step0_ctrl, UC_ADDR_SRC_HI, UC_ADDR_SRC_LO) == ADDR_SRC_FRAME, \
-        "call step0: addr_src=frame"
-    assert bit(step0_ctrl, UC_DONE) == 0, "call step0: not done"
-
-    # hu: Az utolsó lépésben: frame_push=1, pc_wr=1, pc_src=CALL.
-    # en: Last step must have: frame_push=1, pc_wr=1, pc_src=CALL.
-    last_ctrl = await uc(dut, OP_CALL, step=nsteps - 1)
-    assert bit(last_ctrl, UC_DONE) == 1, "call last step: done"
-    assert bit(last_ctrl, UC_FRAME_PUSH) == 1, "call last step: frame_push"
-    assert bit(last_ctrl, UC_PC_WR) == 1, "call last step: pc_wr"
-    assert field(last_ctrl, UC_PC_SRC_HI, UC_PC_SRC_LO) == PC_SRC_CALL, \
-        "call last step: pc_src=call"
+    assert bit(step0_ctrl, UC_DONE) == 1, "call: done"
+    assert bit(step0_ctrl, UC_FRAME_PUSH) == 1, "call: frame_push"
+    assert bit(step0_ctrl, UC_PC_WR) == 1, "call: pc_wr"
+    assert field(step0_ctrl, UC_PC_SRC_HI, UC_PC_SRC_LO) == PC_SRC_CALL, \
+        "call: pc_src=call"
 
 
 # ============================================================
@@ -855,8 +855,9 @@ EXPECTED_NSTEPS = {
     OP_BEQ_S: 1, OP_BGE_S: 1, OP_BGT_S: 1, OP_BLE_S: 1, OP_BLT_S: 1, OP_BNE_UN_S: 1,
     # Indirekt memória — 1 μstep
     OP_LDIND_I4: 1, OP_STIND_I4: 1,
-    # Call / Ret — 2 μstep
-    OP_CALL: 2, OP_RET: 2,
+    # Call — 1 μstep (Sub5: a frame-építés a top-level ST_CALL FSM-ben);
+    # Ret — 2 μstep (step0=return value pop, step1=frame_pop/halt)
+    OP_CALL: 1, OP_RET: 2,
     # Debug — 1 μstep
     OP_BREAK: 1,
 }
