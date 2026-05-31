@@ -97,8 +97,14 @@ test_qspi_controller_offset:
 
 # hu: F2.5a top-level core — 5 részegység + cilcpu_core
 # en: F2.5a top-level core — 5 submodules + cilcpu_core
+# hu: F2.8 #6.5b-F1a — a QSPI controller a Core-ból kiemelve; a test_core a
+#     tb_core fixture-t (core + qspi_controller) példányosítja, így a meglévő
+#     QSPI flash harness változatlanul fut.
+# en: F2.8 #6.5b-F1a — QSPI controller moved out of the Core; test_core uses the
+#     tb_core fixture (core + qspi_controller) so the existing QSPI flash harness
+#     runs unchanged.
 test_core:
-	$(SUBMAKE) MODULE=test_core TOPLEVEL=cilcpu_core VERILOG_SOURCES="\
+	$(SUBMAKE) MODULE=test_core TOPLEVEL=tb_core VERILOG_SOURCES="\
 $(PWD)/../src/cilcpu_alu.v \
 $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
@@ -106,7 +112,8 @@ $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_divider.v \
 $(PWD)/../src/cilcpu_multiplier.v \
-$(PWD)/../src/cilcpu_core.v"
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/tb_core.v"
 
 # hu: F2.5b golden vector harness — cocotb vs C# szim trace JSONL.
 #     A C# Runner DLL-nek le kell fordulva lennie:
@@ -114,7 +121,7 @@ $(PWD)/../src/cilcpu_core.v"
 # en: F2.5b golden vector harness — cocotb vs C# tracer JSONL.
 #     The C# Runner DLL must be built first.
 test_core_golden:
-	$(SUBMAKE) MODULE=test_core_golden TOPLEVEL=cilcpu_core VERILOG_SOURCES="\
+	$(SUBMAKE) MODULE=test_core_golden TOPLEVEL=tb_core VERILOG_SOURCES="\
 $(PWD)/../src/cilcpu_alu.v \
 $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \
@@ -122,7 +129,8 @@ $(PWD)/../src/cilcpu_stack_cache.v \
 $(PWD)/../src/cilcpu_qspi_controller.v \
 $(PWD)/../src/cilcpu_divider.v \
 $(PWD)/../src/cilcpu_multiplier.v \
-$(PWD)/../src/cilcpu_core.v"
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/tb_core.v"
 
 # hu: F2.7 Sub1 — A7-Lite top-level wrapper cocotb tesztek.
 #     A wrapper a `cilcpu_core`-t veszi körül clock/reset szinkronizerrel,
@@ -291,6 +299,8 @@ $(PWD)/../src/cilcpu_mailbox.v \
 $(PWD)/../src/cilcpu_gpio.v \
 $(PWD)/../src/cilcpu_trace.v \
 $(PWD)/../src/cilcpu_soc.v"
+# hu: megj. — a cilcpu_qspi_controller.v már a fenti listában; a cilcpu_soc
+#     mostantól (F1a) maga példányosítja a controllert (a core helyett).
 
 # hu: F2.7 Sub2 — 32-bit decimal printer (uart_tx-et példányosít).
 # en: F2.7 Sub2 — 32-bit decimal printer (instantiates uart_tx).

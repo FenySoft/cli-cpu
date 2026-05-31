@@ -114,6 +114,14 @@ async def golden_compare(dut, code_bytes, trace_entries, boot_pc=0,
         against the given trace."""
     boot_args = boot_args or []
 
+    # hu: F2.8 #6.5b-F1a — a Core a tb_core fixture-ben dut.u_core alatt van
+    #     (a QSPI controller kiemelése óta); a belső jeleket (r_state, r_pc…)
+    #     ezen a handle-ön át olvassuk. Régi (bare-core) toplevel-en dut maga.
+    # en: F2.8 #6.5b-F1a — under the tb_core fixture the Core is at dut.u_core
+    #     (since the QSPI controller was moved out); internal signals (r_state,
+    #     r_pc…) are read via this handle. On the old bare-core toplevel: dut.
+    core = getattr(dut, "u_core", dut)
+
     await reset_dut(dut, code_bytes)
 
     dut.i_boot_pc.value          = boot_pc
@@ -147,7 +155,7 @@ async def golden_compare(dut, code_bytes, trace_entries, boot_pc=0,
         await RisingEdge(dut.clk)
 
         try:
-            state = int(dut.r_state.value)
+            state = int(core.r_state.value)
             halt  = int(dut.o_halt.value)
             trap  = int(dut.o_trap.value)
         except ValueError:
@@ -161,16 +169,16 @@ async def golden_compare(dut, code_bytes, trace_entries, boot_pc=0,
         if state == _ST_DECODE and prev_state != _ST_DECODE:
             assert step_idx < len(trace_entries), (
                 f"RTL has more steps than trace ({step_idx} >= {len(trace_entries)}) "
-                f"at cycle {cycle}, RTL r_pc=0x{int(dut.r_pc.value):06X}"
+                f"at cycle {cycle}, RTL r_pc=0x{int(core.r_pc.value):06X}"
             )
 
             entry = trace_entries[step_idx]
-            rtl_pc = int(dut.r_pc.value)
-            rtl_sp = int(dut.r_sp.value)
-            rtl_fp = int(dut.r_fp.value)
-            rtl_cd = int(dut.r_call_depth.value)
-            rtl_ac = int(dut.r_arg_count.value)
-            rtl_lc = int(dut.r_local_count.value)
+            rtl_pc = int(core.r_pc.value)
+            rtl_sp = int(core.r_sp.value)
+            rtl_fp = int(core.r_fp.value)
+            rtl_cd = int(core.r_call_depth.value)
+            rtl_ac = int(core.r_arg_count.value)
+            rtl_lc = int(core.r_local_count.value)
 
             ctx = (
                 f"step {entry['step']} (cycle {cycle}): "

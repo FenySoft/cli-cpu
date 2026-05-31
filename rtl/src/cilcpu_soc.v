@@ -197,10 +197,15 @@ module cilcpu_soc #(
     // ============================================================
     // hu: Nano core / en: Nano core
     // ============================================================
-    cilcpu_core #(
-        .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
-        .QE_INIT_ENABLE   (QE_INIT_ENABLE)
-    ) u_core (
+    // hu: F1a — a Core külső-memória-master busza a SoC-szintű QSPI controllerhez.
+    // en: F1a — the Core's external-memory master bus to the SoC-level QSPI ctrl.
+    wire [23:0] w_xmem_addr;
+    wire        w_xmem_re;
+    wire [31:0] w_xmem_rdata;
+    wire        w_xmem_ready;
+    wire        w_xmem_busy;
+
+    cilcpu_core u_core (
         .clk                (clk),
         .rst_n              (rst_n),
         .i_boot_pc          (i_boot_pc),
@@ -215,17 +220,41 @@ module cilcpu_soc #(
         .o_trap_code        (o_trap_code),
         .o_pc               (o_pc),
         .o_return_value     (o_return_value),
-        .qspi_clk           (qspi_clk),
-        .qspi_cs_flash_n    (qspi_cs_flash_n),
-        .qspi_cs_psram_n    (qspi_cs_psram_n),
-        .qspi_dq_out        (qspi_dq_out),
-        .qspi_dq_in         (qspi_dq_in),
-        .qspi_dq_oe         (qspi_dq_oe),
+        .o_xmem_addr        (w_xmem_addr),
+        .o_xmem_re          (w_xmem_re),
+        .i_xmem_rdata       (w_xmem_rdata),
+        .i_xmem_ready       (w_xmem_ready),
+        .i_xmem_busy        (w_xmem_busy),
         .o_mmio_addr        (w_mmio_addr),
         .o_mmio_wdata       (w_mmio_wdata),
         .o_mmio_we          (w_mmio_we),
         .o_mmio_re          (w_mmio_re),
         .i_mmio_rdata       (w_mmio_rdata)
+    );
+
+    // hu: SoC-szintű QSPI controller (F1a — a Core-ból kiemelve). A Core
+    //     read-only mestere (cpu_we=0); a loader-írás F1b-ben jön a fázis-MUX-on.
+    // en: SoC-level QSPI controller (F1a — moved out of the Core). The Core is a
+    //     read-only master (cpu_we=0); loader writes arrive in F1b via the mux.
+    cilcpu_qspi_controller #(
+        .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
+        .QE_INIT_ENABLE   (QE_INIT_ENABLE)
+    ) u_qspi (
+        .clk             (clk),
+        .rst_n           (rst_n),
+        .cpu_addr        (w_xmem_addr),
+        .cpu_wdata       (32'd0),
+        .cpu_rdata       (w_xmem_rdata),
+        .cpu_re          (w_xmem_re),
+        .cpu_we          (1'b0),
+        .cpu_ready       (w_xmem_ready),
+        .cpu_busy        (w_xmem_busy),
+        .qspi_clk        (qspi_clk),
+        .qspi_cs_flash_n (qspi_cs_flash_n),
+        .qspi_cs_psram_n (qspi_cs_psram_n),
+        .qspi_dq_out     (qspi_dq_out),
+        .qspi_dq_in      (qspi_dq_in),
+        .qspi_dq_oe      (qspi_dq_oe)
     );
 
     // ============================================================

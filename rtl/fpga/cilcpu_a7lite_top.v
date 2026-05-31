@@ -276,10 +276,15 @@ module cilcpu_a7lite_top #(
     // hu: Nano core példányosítás
     // en: Nano core instantiation
     // ============================================================
-    cilcpu_core #(
-        .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
-        .QE_INIT_ENABLE   (QE_INIT_ENABLE)
-    ) u_core (
+    // hu: F1a — a Core külső-memória-master busza a lokális QSPI controllerhez.
+    // en: F1a — the Core's external-memory master bus to the local QSPI ctrl.
+    wire [23:0] w_xmem_addr;
+    wire        w_xmem_re;
+    wire [31:0] w_xmem_rdata;
+    wire        w_xmem_ready;
+    wire        w_xmem_busy;
+
+    cilcpu_core u_core (
         .clk                (i_clk_50m),
         .rst_n              (core_rst_n),
         .i_boot_pc          (BOOT_PC[23:0]),
@@ -294,12 +299,11 @@ module cilcpu_a7lite_top #(
         .o_trap_code        (core_trap_code),
         .o_pc               (core_pc),
         .o_return_value     (core_return_value),
-        .qspi_clk           (qspi_clk),
-        .qspi_cs_flash_n    (qspi_cs_flash_n),
-        .qspi_cs_psram_n    (qspi_cs_psram_n),
-        .qspi_dq_out        (qspi_dq_out),
-        .qspi_dq_in         (qspi_dq_in),
-        .qspi_dq_oe         (qspi_dq_oe),
+        .o_xmem_addr        (w_xmem_addr),
+        .o_xmem_re          (w_xmem_re),
+        .i_xmem_rdata       (w_xmem_rdata),
+        .i_xmem_ready       (w_xmem_ready),
+        .i_xmem_busy        (w_xmem_busy),
         // hu: MMIO-master busz (F2.8 #6.2) — az MMIO wrapper-periféria (#6.5)
         //     egyelőre nincs integrálva ezen a board-on, így a kimenetek
         //     nyitva, az i_mmio_rdata 0-ra fogva. A jelenlegi single-core Fib
@@ -313,6 +317,33 @@ module cilcpu_a7lite_top #(
         .o_mmio_we          (),
         .o_mmio_re          (),
         .i_mmio_rdata       (32'd0)
+    );
+
+    // hu: F1a — QSPI controller a Core-ból kiemelve a board-topra. A Core
+    //     read-only mestere (cpu_we=0); a flash QE-init + CODE_BASE_OFFSET
+    //     generic-ek mostantól ide kötve. A qspi_* pinek innen jönnek.
+    // en: F1a — QSPI controller moved out of the Core to the board top. The Core
+    //     is a read-only master (cpu_we=0); the flash QE-init + CODE_BASE_OFFSET
+    //     generics bind here now. The qspi_* pins originate here.
+    cilcpu_qspi_controller #(
+        .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
+        .QE_INIT_ENABLE   (QE_INIT_ENABLE)
+    ) u_qspi (
+        .clk             (i_clk_50m),
+        .rst_n           (core_rst_n),
+        .cpu_addr        (w_xmem_addr),
+        .cpu_wdata       (32'd0),
+        .cpu_rdata       (w_xmem_rdata),
+        .cpu_re          (w_xmem_re),
+        .cpu_we          (1'b0),
+        .cpu_ready       (w_xmem_ready),
+        .cpu_busy        (w_xmem_busy),
+        .qspi_clk        (qspi_clk),
+        .qspi_cs_flash_n (qspi_cs_flash_n),
+        .qspi_cs_psram_n (qspi_cs_psram_n),
+        .qspi_dq_out     (qspi_dq_out),
+        .qspi_dq_in      (qspi_dq_in),
+        .qspi_dq_oe      (qspi_dq_oe)
     );
 
     // ============================================================

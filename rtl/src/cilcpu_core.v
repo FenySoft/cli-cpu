@@ -11,27 +11,18 @@
 
 `default_nettype none
 
-module cilcpu_core #(
-    // hu: Sub5.A — CODE szegmens flash-bázis offszet, áthajtva a belső
-    //     `cilcpu_qspi_controller`-be. Default 0 → sim-paritás. FPGA-n a
-    //     top-level generic (lásd cilcpu_a7lite_top/board) a bitstream
-    //     fölé (0xC00000) állítja.
-    // en: Sub5.A — CODE segment flash base offset, forwarded to the inner
-    //     `cilcpu_qspi_controller`. Default 0 → sim parity. On FPGA the
-    //     top-level generic (see cilcpu_a7lite_top/board) sets it above
-    //     the bitstream (0xC00000).
-    parameter integer CODE_BASE_OFFSET = 0,
-
-    // hu: F2.7 Sub5 — flash QE-bit init engedélyezése a `cilcpu_qspi_controller`-ben.
-    //     Default 0 → sim-paritás (a meglévő tesztek változatlanok). FPGA-n a
-    //     top-level generic (lásd cilcpu_a7lite_top/board → create_project.tcl)
-    //     1-re állítja, hogy reset után WREN+WRSR sequence-szel beállítsa a flash QE-t.
-    // en: F2.7 Sub5 — flash QE-bit init enable for `cilcpu_qspi_controller`.
-    //     Default 0 → sim parity (existing tests unchanged). On FPGA the
-    //     top-level generic (see cilcpu_a7lite_top/board → create_project.tcl)
-    //     sets it to 1 so that WREN+WRSR runs after reset to set flash QE.
-    parameter integer QE_INIT_ENABLE = 0
-) (
+// hu: F2.8 #6.5b-F1a — a QSPI controller a Core-ból KIEMELVE a SoC-szintre
+//     (architektúra: a Core nem érintkezik közvetlenül a külső RAM/Flash
+//     perifériákkal). A Core eszköz-agnosztikus külső-memória-master portot ad
+//     (o_xmem_*/i_xmem_*); a CODE_BASE_OFFSET / QE_INIT_ENABLE paraméterek a
+//     SoC/board szintű cilcpu_qspi_controller-re kerültek. ADR:
+//     Vault/Decisions/2026-05-30-boot-load-architecture.md.
+// en: F2.8 #6.5b-F1a — the QSPI controller is MOVED OUT of the Core to the SoC
+//     level (the Core does not directly touch external RAM/Flash). The Core
+//     exposes a device-agnostic external-memory master (o_xmem_*/i_xmem_*); the
+//     CODE_BASE_OFFSET / QE_INIT_ENABLE params moved to the SoC/board-level
+//     cilcpu_qspi_controller.
+module cilcpu_core (
     input  wire        clk,
     input  wire        rst_n,
 
@@ -51,13 +42,21 @@ module cilcpu_core #(
     output reg  [23:0] o_pc,
     output reg  [31:0] o_return_value,
 
-    // hu: QSPI pinek / en: QSPI pins
-    output wire        qspi_clk,
-    output wire        qspi_cs_flash_n,
-    output wire        qspi_cs_psram_n,
-    output wire [3:0]  qspi_dq_out,
-    input  wire [3:0]  qspi_dq_in,
-    output wire        qspi_dq_oe,
+    // hu: Külső-memória-master busz (read-only) — a Core a CODE-ot fetch-eli
+    //     (instruction + CALL method-header) ezen át. A SoC/board köti egy
+    //     cilcpu_qspi_controller-re. addr[23:20] = szegmens (a controller
+    //     dekódolja). A Core SOHA nem ír külső memóriát (cpu_we a controlleren
+    //     fixen 0); a PSRAM-írást a loader végzi a SoC-szintű QSPI-n.
+    // en: External-memory master bus (read-only) — the Core fetches CODE
+    //     (instructions + CALL method headers) over this. The SoC/board wires it
+    //     to a cilcpu_qspi_controller. addr[23:20] = segment (decoded by the
+    //     controller). The Core NEVER writes external memory; the loader does
+    //     PSRAM writes on the SoC-level QSPI.
+    output wire [23:0] o_xmem_addr,
+    output wire        o_xmem_re,
+    input  wire [31:0] i_xmem_rdata,
+    input  wire        i_xmem_ready,
+    input  wire        i_xmem_busy,
 
     // hu: MMIO-master busz (F2.8 #6.2, architektúra B) — a 0xF szegmensű
     //     (addr[31:28]==SEG_MMIO) LDIND/STIND a perifériákat a wrapperen át
@@ -268,14 +267,24 @@ module cilcpu_core #(
     wire        w_sram_re    = w_sc_busy ? w_sc_sram_re         : r_sram_re;
 
     // ============================================================
-    // hu: QSPI controller bekötése
-    // en: QSPI controller wiring
+    // hu: Külső-memória-master bekötése. A belső jel-nevek (r_qspi_addr/re,
+    //     w_qspi_rdata/ready/busy) változatlanok maradnak — a fetch/CALL FSM
+    //     ezekre hivatkozik —, csak a modul-határ köti őket az o_xmem_*/i_xmem_*
+    //     portokra. A QSPI controller maga a SoC/board szinten él (F1a refaktor).
+    // en: External-memory master wiring. The internal signal names (r_qspi_addr/
+    //     re, w_qspi_rdata/ready/busy) are unchanged — the fetch/CALL FSM refers
+    //     to them — only the module boundary binds them to the o_xmem_*/i_xmem_*
+    //     ports. The QSPI controller itself lives at SoC/board level (F1a).
     // ============================================================
     reg  [23:0] r_qspi_addr;
     reg         r_qspi_re;
-    wire [31:0] w_qspi_rdata;
-    wire        w_qspi_ready;
-    wire        w_qspi_busy;
+
+    assign o_xmem_addr = r_qspi_addr;
+    assign o_xmem_re   = r_qspi_re;
+
+    wire [31:0] w_qspi_rdata = i_xmem_rdata;
+    wire        w_qspi_ready = i_xmem_ready;
+    wire        w_qspi_busy  = i_xmem_busy;
 
     // hu: Fetch addresszálás Sub2.1-ben bevezetett regiszterek.
     //     r_qspi_inflight = 1, ha épp folyamatban van fetch tranzakció;
@@ -296,26 +305,12 @@ module cilcpu_core #(
     reg         r_qspi_inflight;
     reg  [23:0] r_next_fetch_addr;
 
-    cilcpu_qspi_controller #(
-        .CODE_BASE_OFFSET (CODE_BASE_OFFSET),
-        .QE_INIT_ENABLE   (QE_INIT_ENABLE)
-    ) u_qspi (
-        .clk             (clk),
-        .rst_n           (rst_n),
-        .cpu_addr        (r_qspi_addr),
-        .cpu_wdata       (32'd0),
-        .cpu_rdata       (w_qspi_rdata),
-        .cpu_re          (r_qspi_re),
-        .cpu_we          (1'b0),
-        .cpu_ready       (w_qspi_ready),
-        .cpu_busy        (w_qspi_busy),
-        .qspi_clk        (qspi_clk),
-        .qspi_cs_flash_n (qspi_cs_flash_n),
-        .qspi_cs_psram_n (qspi_cs_psram_n),
-        .qspi_dq_out     (qspi_dq_out),
-        .qspi_dq_in      (qspi_dq_in),
-        .qspi_dq_oe      (qspi_dq_oe)
-    );
+    // hu: (F1a) A cilcpu_qspi_controller példányosítás INNEN ELTÁVOLÍTVA — a
+    //     controller a SoC/board szintre került. A fenti o_xmem_*/i_xmem_*
+    //     portok kötik a Core-t a SoC-szintű controllerhez.
+    // en: (F1a) The cilcpu_qspi_controller instance is REMOVED here — it lives
+    //     at SoC/board level now. The o_xmem_*/i_xmem_* ports above wire the
+    //     Core to the SoC-level controller.
 
     // ============================================================
     // hu: Decoder bekötése (kombinációs)
