@@ -299,6 +299,7 @@ $(PWD)/../src/cilcpu_mailbox.v \
 $(PWD)/../src/cilcpu_gpio.v \
 $(PWD)/../src/cilcpu_trace.v \
 $(PWD)/../src/cilcpu_uart_loader.v \
+$(PWD)/../src/cilcpu_boot_ctrl.v \
 $(PWD)/../fpga/uart_rx.v \
 $(PWD)/../src/cilcpu_soc.v"
 # hu: megj. — a cilcpu_qspi_controller.v már a fenti listában; a cilcpu_soc
@@ -314,6 +315,29 @@ test_uart_loader:
 test_boot_ctrl:
 	$(SUBMAKE) MODULE=test_boot_ctrl TOPLEVEL=cilcpu_boot_ctrl LOCAL_COMPILE_ARGS="-GAUTODETECT=1" VERILOG_SOURCES="$(PWD)/../src/cilcpu_boot_ctrl.v"
 
+# hu: F2.8 #6.5b-F1c.2 — SoC autonóm flash-boot (BOOT_AUTODETECT=1). Ugyanaz a
+#     forráslista mint a test_soc, csak a generic eltér.
+# en: F2.8 #6.5b-F1c.2 — SoC autonomous flash boot (BOOT_AUTODETECT=1). Same
+#     source list as test_soc, only the generic differs.
+test_soc_autoboot:
+	$(SUBMAKE) MODULE=test_soc_autoboot TOPLEVEL=cilcpu_soc LOCAL_COMPILE_ARGS="-GBOOT_AUTODETECT=1 -GUART_CLOCKS_PER_BAUD=8" VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/../src/cilcpu_fifo.v \
+$(PWD)/../src/cilcpu_mailbox.v \
+$(PWD)/../src/cilcpu_gpio.v \
+$(PWD)/../src/cilcpu_trace.v \
+$(PWD)/../src/cilcpu_uart_loader.v \
+$(PWD)/../src/cilcpu_boot_ctrl.v \
+$(PWD)/../fpga/uart_rx.v \
+$(PWD)/../src/cilcpu_soc.v"
+
 # hu: F2.7 Sub2 — 32-bit decimal printer (uart_tx-et példányosít).
 # en: F2.7 Sub2 — 32-bit decimal printer (instantiates uart_tx).
 test_decimal_printer:
@@ -323,4 +347,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_soc test_uart_loader test_boot_ctrl test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_soc test_soc_autoboot test_uart_loader test_boot_ctrl test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib

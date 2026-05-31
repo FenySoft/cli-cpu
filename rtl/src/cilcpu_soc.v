@@ -42,7 +42,8 @@ module cilcpu_soc #(
     parameter integer GPIO_WIDTH            = 8,
     parameter integer TRACE_WIDTH           = 8,
     parameter integer TRACE_NSRC            = 8,
-    parameter integer UART_CLOCKS_PER_BAUD  = 434
+    parameter integer UART_CLOCKS_PER_BAUD  = 434,
+    parameter integer BOOT_AUTODETECT       = 0
 ) (
     input  wire        clk,
     input  wire        rst_n,
@@ -260,6 +261,40 @@ module cilcpu_soc #(
     );
 
     // ============================================================
+    // hu: F1c — flash auto-detect boot controller (BOOT_AUTODETECT-tel gated).
+    //     Reset után (ha BOOT_AUTODETECT=1) beolvassa a flash header-szót és
+    //     autonóm flash-boot-ot indít érvényes magic esetén. A QSPI-t a
+    //     detect-fázisban birtokolja (w_bc_detect_active).
+    // en: F1c — flash auto-detect boot controller (gated by BOOT_AUTODETECT).
+    //     After reset (if BOOT_AUTODETECT=1) it reads the flash header word and
+    //     starts an autonomous flash boot on valid magic. Owns the QSPI during
+    //     the detect phase (w_bc_detect_active).
+    // ============================================================
+    wire [23:0] w_bc_mem_addr;
+    wire        w_bc_mem_re;
+    wire        w_bc_detect_active;
+    wire        w_bc_boot_req;
+    wire [23:0] w_bc_boot_pc;
+    wire [7:0]  w_bc_boot_argc;
+    wire [7:0]  w_bc_boot_localc;
+
+    cilcpu_boot_ctrl #(
+        .AUTODETECT (BOOT_AUTODETECT)
+    ) u_boot_ctrl (
+        .clk             (clk),
+        .rst_n           (rst_n),
+        .o_mem_addr      (w_bc_mem_addr),
+        .o_mem_re        (w_bc_mem_re),
+        .i_mem_rdata     (w_qspi_cpu_rdata),
+        .i_mem_ready     (w_qspi_cpu_ready),
+        .o_detect_active (w_bc_detect_active),
+        .o_boot_req      (w_bc_boot_req),
+        .o_boot_pc       (w_bc_boot_pc),
+        .o_boot_argc     (w_bc_boot_argc),
+        .o_boot_localc   (w_bc_boot_localc)
+    );
+
+    // ============================================================
     // hu: Fázis-MUX vezérlés. r_load_mode: a loader-aktivitásra (o_busy) 1, a
     //     BOOT-ra 0 (default 0 → a meglévő flash-boot tesztek érintetlenek).
     //     FONTOS: az o_busy a keret ELEJÉN (az első o_mem_we ELŐTT) megy magasra,
@@ -278,15 +313,61 @@ module cilcpu_soc #(
     reg  r_load_mode;
     reg  r_code_src;
 
+    // hu: Belső boot-paraméterek latch-elése. A Core az i_boot_pc-t KÉTSZER
+    //     olvassa (ST_RESET → r_pc, majd ST_BOOT → r_next_fetch_addr a
+    //     következő ciklusban), ezért a boot-paramétereket STABILAN kell
+    //     tartani, nem csak a 1-ciklusos boot_req pulzus alatt. Megoldás: a
+    //     belső boot forrás (boot_ctrl / loader) paramétereit latch-eljük
+    //     (r_lat_*) és a core boot-start-ját egy ciklussal eltoljuk
+    //     (r_int_boot_start), hogy a start a stabil latch után pulzáljon. A
+    //     külső i_boot_* utat (a meglévő tesztek) a r_int_boot_pending=0 ág
+    //     hagyja érintetlenül.
+    // en: Internal boot-parameter latching. The Core reads i_boot_pc TWICE
+    //     (ST_RESET → r_pc, then ST_BOOT → r_next_fetch_addr in the next
+    //     cycle), so the boot params must be held STABLE, not only during the
+    //     1-cycle boot_req pulse. Solution: latch the internal boot source's
+    //     (boot_ctrl / loader) params (r_lat_*) and shift the core boot-start
+    //     by one cycle (r_int_boot_start) so start pulses after the stable
+    //     latch. The external i_boot_* path (existing tests) is untouched via
+    //     the r_int_boot_pending=0 branch.
+    reg        r_int_boot_pending;
+    reg        r_int_boot_start;
+    reg [23:0] r_lat_pc;
+    reg [7:0]  r_lat_argc;
+    reg [7:0]  r_lat_localc;
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            r_load_mode <= 1'b0;
-            r_code_src  <= 1'b0;
-        end else if (w_ld_boot_req) begin
-            r_load_mode <= 1'b0;
-            r_code_src  <= w_ld_boot_code_src;
-        end else if (w_ld_busy) begin
-            r_load_mode <= 1'b1;
+            r_load_mode        <= 1'b0;
+            r_code_src         <= 1'b0;
+            r_int_boot_pending <= 1'b0;
+            r_int_boot_start   <= 1'b0;
+            r_lat_pc           <= 24'd0;
+            r_lat_argc         <= 8'd0;
+            r_lat_localc       <= 8'd0;
+        end else begin
+            r_int_boot_start <= 1'b0;   // hu: eltolt start pulzus alaphelyzet
+
+            if (w_bc_boot_req) begin
+                // hu: autonóm flash-boot → code_src = flash (SEG_CODE)
+                r_load_mode        <= 1'b0;
+                r_code_src         <= 1'b0;
+                r_lat_pc           <= w_bc_boot_pc;
+                r_lat_argc         <= w_bc_boot_argc;
+                r_lat_localc       <= w_bc_boot_localc;
+                r_int_boot_pending <= 1'b1;
+                r_int_boot_start   <= 1'b1;   // hu: a KÖVETKEZŐ ciklusban pulzál
+            end else if (w_ld_boot_req) begin
+                r_load_mode        <= 1'b0;
+                r_code_src         <= w_ld_boot_code_src;
+                r_lat_pc           <= w_ld_boot_pc;
+                r_lat_argc         <= w_ld_boot_argc;
+                r_lat_localc       <= w_ld_boot_localc;
+                r_int_boot_pending <= 1'b1;
+                r_int_boot_start   <= 1'b1;
+            end else if (w_ld_busy) begin
+                r_load_mode <= 1'b1;
+            end
         end
     end
 
@@ -296,22 +377,33 @@ module cilcpu_soc #(
     //     agnostic [19:0] CODE space; the SoC applies the segment.
     wire [3:0] w_core_seg = r_code_src ? `SEG_STACK : `SEG_CODE;
 
-    // hu: Fázis-MUX a QSPI cpu_* bemenetein (load = loader, run = core).
-    // en: Phase MUX on the QSPI cpu_* inputs (load = loader, run = core).
-    wire [23:0] w_qspi_cpu_addr  = r_load_mode ? w_ld_mem_addr
-                                   : {w_core_seg, w_xmem_addr[19:0]};
+    // hu: 3-way fázis-MUX a QSPI cpu_* bemenetein. Prioritás:
+    //     detect (boot_ctrl header-olvasás) > load (loader PSRAM-írás) > run (core).
+    // en: 3-way phase MUX on the QSPI cpu_* inputs. Priority:
+    //     detect (boot_ctrl header read) > load (loader PSRAM write) > run (core).
+    wire [23:0] w_qspi_cpu_addr  = w_bc_detect_active ? w_bc_mem_addr  :
+                                   r_load_mode        ? w_ld_mem_addr  :
+                                       {w_core_seg, w_xmem_addr[19:0]};
     wire [31:0] w_qspi_cpu_wdata = r_load_mode ? w_ld_mem_wdata : 32'd0;
-    wire        w_qspi_cpu_we    = r_load_mode ? w_ld_mem_we    : 1'b0;
-    wire        w_qspi_cpu_re    = r_load_mode ? 1'b0           : w_xmem_re;
+    wire        w_qspi_cpu_we    = (!w_bc_detect_active && r_load_mode) ? w_ld_mem_we : 1'b0;
+    wire        w_qspi_cpu_re    = w_bc_detect_active ? w_bc_mem_re :
+                                   r_load_mode        ? 1'b0        :
+                                                        w_xmem_re;
 
-    // hu: Boot-mux — a loader o_boot_req felülírja a külső i_boot_*-ot. Az
-    //     arg-streaming a külső portokról jön (UART-boot argc=0 → nem használt).
-    // en: Boot mux — the loader's o_boot_req overrides the external i_boot_*.
-    //     Arg streaming comes from the external ports (UART boot argc=0 → unused).
-    wire [23:0] w_core_boot_pc    = w_ld_boot_req ? w_ld_boot_pc       : i_boot_pc;
-    wire [7:0]  w_core_boot_argc  = w_ld_boot_req ? w_ld_boot_argc     : i_boot_arg_count;
-    wire [7:0]  w_core_boot_lcnt  = w_ld_boot_req ? w_ld_boot_localc   : i_boot_local_count;
-    wire        w_core_boot_start = i_boot_start | w_ld_boot_req;
+    // hu: Boot-mux — belső boot (r_int_boot_pending: boot_ctrl/loader, latch-elt
+    //     és STABIL paraméterek) VAGY külső i_boot_* (a meglévő tesztek). A start
+    //     belül a latch utáni eltolt pulzus (r_int_boot_start), kívül i_boot_start.
+    //     Az arg-streaming a külső portokról jön (belső boot argc a latch-ből,
+    //     args nem streamelt → argc=0 elvárt belső bootnál).
+    // en: Boot mux — internal boot (r_int_boot_pending: boot_ctrl/loader, latched
+    //     and STABLE params) OR external i_boot_* (existing tests). Internal
+    //     start is the post-latch shifted pulse (r_int_boot_start), external is
+    //     i_boot_start. Arg streaming comes from the external ports (internal
+    //     boot argc from the latch, args not streamed → argc=0 expected).
+    wire [23:0] w_core_boot_pc    = r_int_boot_pending ? r_lat_pc     : i_boot_pc;
+    wire [7:0]  w_core_boot_argc  = r_int_boot_pending ? r_lat_argc   : i_boot_arg_count;
+    wire [7:0]  w_core_boot_lcnt  = r_int_boot_pending ? r_lat_localc : i_boot_local_count;
+    wire        w_core_boot_start = i_boot_start | r_int_boot_start;
 
     cilcpu_core u_core (
         .clk                (clk),
