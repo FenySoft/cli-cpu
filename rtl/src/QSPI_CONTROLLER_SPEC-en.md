@@ -6,12 +6,12 @@
 >
 > **Scope:** Internal RTL work spec, not a public document.
 >
-> Version: 1.1
+> Version: 1.2
 
 ## Goal
 
 Translates the CPU's internal SRAM-like read/write requests to QSPI protocol. Manages two external devices:
-- **QSPI Flash** -- CODE and DATA segments (read-only)
+- **QSPI Flash** -- CODE and DATA segments (read **+ write**, since F2: erase+program)
 - **QSPI PSRAM** -- STACK segment (read-write)
 
 The module provides a CPU-side interface compatible with the stack cache `sram_*` master ports. The future I-cache and load/store unit will also access external memory through this interface (via bus arbiter).
@@ -48,12 +48,14 @@ The module provides a CPU-side interface compatible with the stack cache `sram_*
 
 | `cpu_addr[23:20]` | Segment | Device | Writable? | QSPI command (read) | QSPI command (write) |
 |--------------------|---------|--------|-----------|----------------------|----------------------|
-| `4'h0` | CODE | Flash | No | `0x6B` (Quad Output Read) | -- (rejected) |
-| `4'h1` | DATA | Flash | No | `0x6B` (Quad Output Read) | -- (rejected) |
+| `4'h0` | CODE | Flash | **Yes** (F2) | `0x6B` (Quad Output Read) | `0x06`/`0x20`/`0x02`/`0x05` (erase+program) |
+| `4'h1` | DATA | Flash | **Yes** (F2) | `0x6B` (Quad Output Read) | `0x06`/`0x20`/`0x02`/`0x05` (erase+program) |
 | `4'h2` | STACK | PSRAM | Yes | `0xEB` (Fast Read QIO) | `0x38` (Quad Write) |
 | other | -- | -- | -- | `cpu_ready=1` immediately, NOP | `cpu_ready=1` immediately, NOP |
 
-**Flash write rejection:** If `cpu_we=1` and the address falls in the CODE or DATA segment, the controller asserts `cpu_ready=1` immediately, without a QSPI transaction. No trap -- the microcode/firmware is responsible for not writing to read-only segments.
+**Flash erase+program (F2):** NOR flash only programs `1->0`, so the 4 KB sector must be erased BEFORE Page Program. A `cpu_we` to the CODE/DATA segment runs the full sequence: `WREN -> Sector Erase (0x20) -> WIP-poll -> WREN -> Page Program (0x02) -> WIP-poll`. **Auto-erase on sector change:** the controller keeps the last-erased 4 KB sector (`flash_addr[23:12]`) in `r_last_erased_sector` and erases only when the target sector differs (or none erased since reset). Thus streaming word-by-word loading erases **once** per sector and multi-word programs are not corrupted. The flash address for CODE is shifted above `CODE_BASE_OFFSET` (as for reads), for DATA it is `{4'h1, addr[19:0]}`.
+
+> **Note on flash-write latency:** A real sector erase is ~45 ms (>> one UART byte ~434 cycles @ 115200), so the host protocol must throttle during streaming load (buffer-less loader). The SoC-level e2e test (`test_soc.test_09`) models this with per-word throttling. See Vault: `f2-flash-write-uart-throttle`.
 
 ### Internal State
 
@@ -66,18 +68,32 @@ The module provides a CPU-side interface compatible with the stack cache `sram_*
 - `r_clk_phase` -- QSPI clock phase (toggle flip-flop, /2 divider)
 - `r_is_write` -- current transaction is a write
 - `r_device` -- 0=Flash, 1=PSRAM
+- `r_fw_step[2:0]` -- flash-write sub-sequencer step (F2): `FW_WREN_E / FW_ERASE / FW_POLL_E / FW_WREN_P / FW_PROGRAM / FW_POLL_P`
+- `r_status[7:0]` -- status byte read via RDSR (WIP = bit 0)
+- `r_last_erased_sector[11:0]` -- last erased 4 KB sector (`flash_addr[23:12]`)
+- `r_have_erased` -- 1 = at least one sector erased since reset
 
 ### FSM States
 
 ```
-localparam [3:0] ST_IDLE     = 4'd0;   // Wait for cpu_re/cpu_we
-localparam [3:0] ST_CMD      = 4'd1;   // Send 8-bit command (SPI, 1-bit)
-localparam [3:0] ST_ADDR     = 4'd2;   // Send 24-bit address (Quad, 4-bit)
-localparam [3:0] ST_DUMMY    = 4'd3;   // Dummy cycles (DQ Hi-Z)
-localparam [3:0] ST_DATA_RD  = 4'd4;   // Read 32-bit data (Quad, 4-bit)
-localparam [3:0] ST_DATA_WR  = 4'd5;   // Write 32-bit data (Quad, 4-bit)
-localparam [3:0] ST_DONE     = 4'd6;   // cpu_ready=1, CS# deassert, -> IDLE
+localparam [3:0] ST_IDLE        = 4'd0;   // Wait for cpu_re/cpu_we
+localparam [3:0] ST_CMD         = 4'd1;   // Send 8-bit command (SPI, 1-bit)
+localparam [3:0] ST_ADDR        = 4'd2;   // Send 24-bit address (Quad, 4-bit)
+localparam [3:0] ST_DUMMY       = 4'd3;   // Dummy cycles (DQ Hi-Z)
+localparam [3:0] ST_DATA_RD     = 4'd4;   // Read 32-bit data (Quad, 4-bit)
+localparam [3:0] ST_DATA_WR     = 4'd5;   // Write 32-bit data to PSRAM (Quad, 4-bit)
+localparam [3:0] ST_DONE        = 4'd6;   // cpu_ready=1, CS# deassert, -> IDLE
+localparam [3:0] ST_INIT_CS_HI  = 4'd7;   // F2.7 Sub5 QE-init CS# spacing
+localparam [3:0] ST_INIT_DATA_SPI = 4'd8; // F2.7 Sub5 QE-init WRSR data (SPI)
+// F2 -- flash erase+program (SPI mode, 1-1-1):
+localparam [3:0] ST_FW_CMD      = 4'd9;   // 8-bit CMD send (WREN/ERASE/PROGRAM/RDSR)
+localparam [3:0] ST_FW_ADDR     = 4'd10;  // 24-bit address send (erase/program)
+localparam [3:0] ST_FW_DATA     = 4'd11;  // 32-bit data send (program)
+localparam [3:0] ST_FW_RDSR_RD  = 4'd12;  // 8-bit status read on MISO (DQ[1])
+localparam [3:0] ST_FW_CS_HI    = 4'd13;  // CS# spacing + sub-sequencer advance
 ```
+
+**Flash-write sub-sequencer (F2):** A `cpu_we` to the CODE/DATA segment runs an `r_fw_step`-driven chain of CS#-separated SPI transactions. On sector change (or first write since reset): `FW_WREN_E -> FW_ERASE -> FW_POLL_E -> FW_WREN_P -> FW_PROGRAM -> FW_POLL_P -> ST_DONE`. Within the same sector the erase is skipped: `FW_WREN_P -> FW_PROGRAM -> FW_POLL_P -> ST_DONE`. The `FW_POLL_*` steps read RDSR until WIP (status bit 0) is 0.
 
 ### FSM Transitions
 
@@ -194,8 +210,14 @@ ST_IDLE -> ST_CMD -> ST_ADDR -> ST_DUMMY -> ST_DATA_RD -> ST_DONE -> ST_IDLE
 `define QSPI_CMD_FLASH_READ    8'h6B   // Quad Output Read (cmd+addr SPI, data Quad)
 `define QSPI_CMD_PSRAM_READ    8'hEB   // Fast Read Quad I/O (cmd SPI, addr+data Quad)
 `define QSPI_CMD_PSRAM_WRITE   8'h38   // Quad Write (cmd SPI, addr+data Quad)
+`define QSPI_CMD_FLASH_WREN    8'h06   // F2: Write Enable (WEL latch)
+`define QSPI_CMD_FLASH_RDSR    8'h05   // F2: Read Status Register (WIP = bit 0)
+`define QSPI_CMD_FLASH_ERASE   8'h20   // F2: Sector Erase (4 KB)
+`define QSPI_CMD_FLASH_PROGRAM 8'h02   // F2: Page Program
 `define QSPI_DUMMY_FLASH       6'd8    // 0x6B: 8 dummy QSPI cycles
 `define QSPI_DUMMY_PSRAM       6'd6    // 0xEB: 6 dummy QSPI cycles
+`define QSPI_FLASH_SECTOR_HI   23      // F2: sector = flash_addr[23:12]
+`define QSPI_FLASH_SECTOR_LO   12
 `define SEG_CODE               4'h0    // CODE segment identifier
 `define SEG_DATA               4'h1    // DATA segment identifier
 `define SEG_STACK              4'h2    // STACK segment identifier
@@ -206,8 +228,8 @@ ST_IDLE -> ST_CMD -> ST_ADDR -> ST_DUMMY -> ST_DATA_RD -> ST_DONE -> ST_IDLE
 ### QSPI Slave Behavioral Model
 
 Python cocotb coroutine simulating a QSPI slave device:
-- **QSPIFlashModel**: dict-based memory, read-only, recognizes 0x6B command
-- **QSPIPSRAMModel**: dict-based memory, read-write, recognizes 0xEB and 0x38 commands
+- **TQSPIFlashModel**: dict-based memory, read (0x6B) **+ write (F2)**: WREN (WEL latch), Sector Erase (0x20, sector -> 0xFF), Page Program (0x02, NOR `1->0` AND), RDSR (0x05, WIP busy counter). `erase_count`/`program_count` test introspection.
+- **TQSPIPSRAMModel**: dict-based memory, read-write, recognizes 0xEB and 0x38 commands
 - The model monitors CS#, CLK rising edges, DQ inputs
 - During reads, after the DUMMY phase, the model drives the `qspi_dq_in` line
 
@@ -229,7 +251,7 @@ Python cocotb coroutine simulating a QSPI slave device:
 7. **CODE->Flash CS#** -- `qspi_cs_flash_n=0` assert, `qspi_cs_psram_n=1`
 8. **DATA->Flash CS#** -- `cpu_addr[23:20]=1`, Flash CS# assert
 9. **STACK->PSRAM CS#** -- `qspi_cs_psram_n=0` assert, `qspi_cs_flash_n=1`
-10. **Flash write rejected** -- `cpu_we=1` to CODE address -> `cpu_ready=1` immediately, no QSPI transaction
+10. **Flash write PERFORMED (F2)** -- `cpu_we=1` to CODE address -> Flash CS# assert, erase+program, PSRAM CS# inactive, written word reads back (the old "rejected" behavior is gone)
 
 **Protocol (11-16):**
 11. **CMD phase timing** -- 8 QSPI CLK, DQ[0] MSB-first, correct command byte bits
@@ -254,9 +276,22 @@ Python cocotb coroutine simulating a QSPI slave device:
 **Stress (25):**
 25. **200 random R/W** -- seeded RNG, Python reference dict vs. PSRAM model, all data matches
 
+**Audit fixes (26-29):** CMD DQ[3:1]=0b111, IDLE dq_out=0xF, invalid segment NOP, request ignored while busy.
+
+**Sub5.A -- CODE_BASE_OFFSET (30-31):** offset applied / offset @ addr 0 (skipped at default 0).
+
+**F2 -- flash erase+program (32-35):**
+32. **Flash write->read round-trip** -- WREN->erase->program->WIP-poll, then 0x6B read returns the word; `erase_count>=1`, `program_count==1`
+33. **Multi-word in one sector -> 1 erase** -- 4 consecutive words in one sector, exactly 1 sector erase (auto-erase on sector change), all 4 read back correctly
+34. **WIP-poll** -- after programming the controller polls RDSR until WIP=0 (`wip_remaining==0` at the end); program actually ran
+35. **Erase clears old data** -- sector pre-loaded to 0x00, program 0xFFFFFFFF; without erase the NOR `1->0` AND would give 0x00000000 -> 0xFFFFFFFF proves the erase
+
+> **SoC-level e2e (`test_soc.test_09`):** UART WRITE (dev=0) -> flash erase+program -> BOOT (code_src=0) -> core flash-fetch -> run. Throttling host (flash latency >> UART byte).
+
 ## Changelog
 
 | Version | Date | Summary |
 |---------|------|---------|
 | 1.0 | 2026-04-28 | First version -- QSPI Flash + PSRAM controller, 0x6B/0xEB/0x38, 25 test points |
 | 1.1 | 2026-04-30 | HW interlock requirement for reset during transactions; CS# deassert strictly in ST_DONE |
+| 1.2 | 2026-06-01 | **F2 -- flash erase+program**: the Flash CODE/DATA segment became writable (WREN->Sector Erase->WIP-poll->WREN->Page Program->WIP-poll, SPI 1-1-1). Auto-erase on sector change (`r_last_erased_sector`/`r_have_erased`) -> buffer-less streaming load erases once per sector. 5 new FSM states (`ST_FW_*`), sub-sequencer (`r_fw_step`). Command codes: 0x06/0x05/0x20/0x02. 4 new controller tests (32-35) + SoC e2e (test_09). `test_10` behavior change (flash write is performed). |

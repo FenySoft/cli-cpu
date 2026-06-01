@@ -6,12 +6,12 @@
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum.
 >
-> Version: 1.1
+> Version: 1.2
 
 ## Cél
 
 A CPU belső SRAM-szerű olvasás/írás kéréseit QSPI protokollra fordítja. Két külső eszközt kezel:
-- **QSPI Flash** — CODE és DATA szegmens (read-only)
+- **QSPI Flash** — CODE és DATA szegmens (read **+ write**, F2 óta: erase+program)
 - **QSPI PSRAM** — STACK szegmens (read-write)
 
 A modul a stack cache `sram_*` master portjaival kompatibilis interfészt nyújt a CPU-oldali portokon. A jövőbeli I-cache és load/store unit is ezen az interfészen keresztül éri el a külső memóriát (bus arbiter-en át).
@@ -48,12 +48,14 @@ A modul a stack cache `sram_*` master portjaival kompatibilis interfészt nyújt
 
 | `cpu_addr[23:20]` | Szegmens | Eszköz | Írható? | QSPI parancs (olvasás) | QSPI parancs (írás) |
 |--------------------|----------|--------|---------|------------------------|----------------------|
-| `4'h0` | CODE | Flash | Nem | `0x6B` (Quad Output Read) | — (elutasítva) |
-| `4'h1` | DATA | Flash | Nem | `0x6B` (Quad Output Read) | — (elutasítva) |
+| `4'h0` | CODE | Flash | **Igen** (F2) | `0x6B` (Quad Output Read) | `0x06`/`0x20`/`0x02`/`0x05` (erase+program) |
+| `4'h1` | DATA | Flash | **Igen** (F2) | `0x6B` (Quad Output Read) | `0x06`/`0x20`/`0x02`/`0x05` (erase+program) |
 | `4'h2` | STACK | PSRAM | Igen | `0xEB` (Fast Read QIO) | `0x38` (Quad Write) |
 | egyéb | — | — | — | `cpu_ready=1` azonnal, NOP | `cpu_ready=1` azonnal, NOP |
 
-**Flash-be írás elutasítása:** Ha `cpu_we=1` és a cím CODE vagy DATA szegmensbe esik, a controller `cpu_ready=1`-et ad azonnal, QSPI tranzakció nélkül. Nem trap — a microcode/firmware felelőssége nem írni read-only szegmensbe.
+**Flash erase+program (F2):** A NOR flash csak `1→0` programozható, ezért a Page Program ELŐTT a 4 KB-os szektort törölni kell. Egy `cpu_we` a CODE/DATA szegmensre a teljes szekvenciát futtatja: `WREN → Sector Erase (0x20) → WIP-poll → WREN → Page Program (0x02) → WIP-poll`. **Auto-erase szektorváltáskor:** a controller az `r_last_erased_sector` regiszterben tartja az utoljára törölt 4 KB szektort (`flash_addr[23:12]`), és csak akkor töröl, ha a célszektor eltér (vagy reset óta még nem törölt). Így a streaming, szavankénti betöltés egy szektoron belül **egyszer** töröl, és a multi-word program nem korrumpálódik. A flash-cím a CODE szegmensnél a `CODE_BASE_OFFSET` fölé tolva (mint olvasásnál), DATA-nál `{4'h1, addr[19:0]}`.
+
+> **Megjegyzés a flash-írás latenciájáról:** A valós sector erase ~45 ms (≫ egy UART byte ~434 ciklus @ 115200), ezért a host-protokollnak throttle-öznie kell a streaming betöltésnél (buffer-mentes loader). Ezt a SoC-szintű e2e teszt (`test_soc.test_09`) szavankénti throttle-lel modellezi. Lásd Vault: `f2-flash-write-uart-throttle`.
 
 ### Belső állapot
 
@@ -66,18 +68,32 @@ A modul a stack cache `sram_*` master portjaival kompatibilis interfészt nyújt
 - `r_clk_phase` — QSPI órajel fázis (toggle flip-flop, /2 osztó)
 - `r_is_write` — aktuális tranzakció írás-e
 - `r_device` — 0=Flash, 1=PSRAM
+- `r_fw_step[2:0]` — flash-write al-szekvenszer lépés (F2): `FW_WREN_E / FW_ERASE / FW_POLL_E / FW_WREN_P / FW_PROGRAM / FW_POLL_P`
+- `r_status[7:0]` — RDSR-ből beolvasott status byte (WIP = bit 0)
+- `r_last_erased_sector[11:0]` — utoljára törölt 4 KB szektor (`flash_addr[23:12]`)
+- `r_have_erased` — 1 = reset óta legalább egy szektor törölve
 
 ### FSM állapotok
 
 ```
-localparam [3:0] ST_IDLE     = 4'd0;   // Vár cpu_re/cpu_we-re
-localparam [3:0] ST_CMD      = 4'd1;   // 8-bit parancs küldése (SPI, 1-bit)
-localparam [3:0] ST_ADDR     = 4'd2;   // 24-bit cím küldése (Quad, 4-bit)
-localparam [3:0] ST_DUMMY    = 4'd3;   // Dummy ciklusok (DQ Hi-Z)
-localparam [3:0] ST_DATA_RD  = 4'd4;   // 32-bit adat olvasás (Quad, 4-bit)
-localparam [3:0] ST_DATA_WR  = 4'd5;   // 32-bit adat írás (Quad, 4-bit)
-localparam [3:0] ST_DONE     = 4'd6;   // cpu_ready=1, CS# deassert, → IDLE
+localparam [3:0] ST_IDLE        = 4'd0;   // Vár cpu_re/cpu_we-re
+localparam [3:0] ST_CMD         = 4'd1;   // 8-bit parancs küldése (SPI, 1-bit)
+localparam [3:0] ST_ADDR        = 4'd2;   // 24-bit cím küldése (Quad, 4-bit)
+localparam [3:0] ST_DUMMY       = 4'd3;   // Dummy ciklusok (DQ Hi-Z)
+localparam [3:0] ST_DATA_RD     = 4'd4;   // 32-bit adat olvasás (Quad, 4-bit)
+localparam [3:0] ST_DATA_WR     = 4'd5;   // 32-bit adat írás PSRAM-ba (Quad, 4-bit)
+localparam [3:0] ST_DONE        = 4'd6;   // cpu_ready=1, CS# deassert, → IDLE
+localparam [3:0] ST_INIT_CS_HI  = 4'd7;   // F2.7 Sub5 QE-init CS# spacing
+localparam [3:0] ST_INIT_DATA_SPI = 4'd8; // F2.7 Sub5 QE-init WRSR data (SPI)
+// F2 — flash erase+program (SPI mód, 1-1-1):
+localparam [3:0] ST_FW_CMD      = 4'd9;   // 8-bit CMD küldés (WREN/ERASE/PROGRAM/RDSR)
+localparam [3:0] ST_FW_ADDR     = 4'd10;  // 24-bit cím küldés (erase/program)
+localparam [3:0] ST_FW_DATA     = 4'd11;  // 32-bit adat küldés (program)
+localparam [3:0] ST_FW_RDSR_RD  = 4'd12;  // 8-bit status olvasás MISO-n (DQ[1])
+localparam [3:0] ST_FW_CS_HI    = 4'd13;  // CS# spacing + al-szekvenszer léptetés
 ```
+
+**Flash-write al-szekvenszer (F2):** A CODE/DATA szegmensre érkező `cpu_we` az `r_fw_step` által vezérelt, CS#-szel elválasztott SPI tranzakció-láncot futtat. Szektorváltáskor (vagy reset óta első írás): `FW_WREN_E → FW_ERASE → FW_POLL_E → FW_WREN_P → FW_PROGRAM → FW_POLL_P → ST_DONE`. Azonos szektoron belül az erase kimarad: `FW_WREN_P → FW_PROGRAM → FW_POLL_P → ST_DONE`. A `FW_POLL_*` lépések RDSR-t olvasnak, amíg a WIP (status bit 0) nem 0.
 
 ### FSM átmenetek
 
@@ -194,8 +210,14 @@ ST_IDLE ─→ ST_CMD ─→ ST_ADDR ─→ ST_DUMMY ─→ ST_DATA_RD ─→ ST
 `define QSPI_CMD_FLASH_READ    8'h6B   // Quad Output Read (cmd+addr SPI, data Quad)
 `define QSPI_CMD_PSRAM_READ    8'hEB   // Fast Read Quad I/O (cmd SPI, addr+data Quad)
 `define QSPI_CMD_PSRAM_WRITE   8'h38   // Quad Write (cmd SPI, addr+data Quad)
+`define QSPI_CMD_FLASH_WREN    8'h06   // F2: Write Enable (WEL latch)
+`define QSPI_CMD_FLASH_RDSR    8'h05   // F2: Read Status Register (WIP = bit 0)
+`define QSPI_CMD_FLASH_ERASE   8'h20   // F2: Sector Erase (4 KB)
+`define QSPI_CMD_FLASH_PROGRAM 8'h02   // F2: Page Program
 `define QSPI_DUMMY_FLASH       6'd8    // 0x6B: 8 dummy QSPI ciklus
 `define QSPI_DUMMY_PSRAM       6'd6    // 0xEB: 6 dummy QSPI ciklus
+`define QSPI_FLASH_SECTOR_HI   23      // F2: szektor = flash_addr[23:12]
+`define QSPI_FLASH_SECTOR_LO   12
 `define SEG_CODE               4'h0    // CODE szegmens azonosító
 `define SEG_DATA               4'h1    // DATA szegmens azonosító
 `define SEG_STACK              4'h2    // STACK szegmens azonosító
@@ -206,8 +228,8 @@ ST_IDLE ─→ ST_CMD ─→ ST_ADDR ─→ ST_DUMMY ─→ ST_DATA_RD ─→ ST
 ### QSPI Slave Behavioral Model
 
 Python cocotb koroutin, ami QSPI slave eszközt szimulál:
-- **QSPIFlashModel**: dict-alapú memória, read-only, 0x6B parancsot ismeri
-- **QSPIPSRAMModel**: dict-alapú memória, read-write, 0xEB és 0x38 parancsokat ismeri
+- **TQSPIFlashModel**: dict-alapú memória, read (0x6B) **+ write (F2)**: WREN (WEL latch), Sector Erase (0x20, szektor → 0xFF), Page Program (0x02, NOR `1→0` AND), RDSR (0x05, WIP busy számláló). `erase_count`/`program_count` teszt-introspekció.
+- **TQSPIPSRAMModel**: dict-alapú memória, read-write, 0xEB és 0x38 parancsokat ismeri
 - A modell figyeli CS#, CLK rising edge-eket, DQ bemeneteket
 - Olvasáskor a DUMMY fázis után a modell hajtja a `qspi_dq_in` vonalat
 
@@ -229,7 +251,7 @@ Python cocotb koroutin, ami QSPI slave eszközt szimulál:
 7. **CODE→Flash CS#** — `qspi_cs_flash_n=0` assert, `qspi_cs_psram_n=1`
 8. **DATA→Flash CS#** — `cpu_addr[23:20]=1`, Flash CS# assert
 9. **STACK→PSRAM CS#** — `qspi_cs_psram_n=0` assert, `qspi_cs_flash_n=1`
-10. **Flash-be írás elutasítva** — `cpu_we=1` CODE címre → `cpu_ready=1` azonnal, nincs QSPI tranzakció
+10. **Flash-be írás VÉGREHAJTÓDIK (F2)** — `cpu_we=1` CODE címre → Flash CS# assert, erase+program, PSRAM CS# inaktív, beírt szó visszaolvasható (a korábbi „elutasítva" viselkedés megszűnt)
 
 **Protokoll (11–16):**
 11. **CMD fázis időzítés** — 8 QSPI CLK, DQ[0] MSB-first, helyes parancs byte bitek
@@ -254,9 +276,22 @@ Python cocotb koroutin, ami QSPI slave eszközt szimulál:
 **Stressz (25):**
 25. **200 random R/W** — seeded RNG, Python referencia dict vs. PSRAM model, minden adat egyezik
 
+**Audit-javítások (26–29):** CMD DQ[3:1]=0b111, IDLE dq_out=0xF, érvénytelen szegmens NOP, busy alatt új kérés ignorálva.
+
+**Sub5.A — CODE_BASE_OFFSET (30–31):** offszet alkalmazva / offset @ addr 0 (skip default 0-nál).
+
+**F2 — flash erase+program (32–35):**
+32. **Flash írás→olvasás round-trip** — WREN→erase→program→WIP-poll, majd 0x6B olvasás visszaadja a szót; `erase_count>=1`, `program_count==1`
+33. **Multi-word egy szektorban → 1 erase** — 4 egymás utáni szó egy szektorban, pontosan 1 sector erase (auto-erase szektorváltáskor), mind a 4 helyesen visszaolvasható
+34. **WIP-poll** — a controller program után RDSR-rel WIP=0-ig pollozik (`wip_remaining==0` a végén); program tényleg lefutott
+35. **Erase törli a régi adatot** — előre 0x00-ra töltött szektor, program 0xFFFFFFFF; erase nélkül a NOR `1→0` AND 0x00000000-t adna → a 0xFFFFFFFF bizonyítja az erase-t
+
+> **SoC-szintű e2e (`test_soc.test_09`):** UART WRITE (dev=0) → flash erase+program → BOOT (code_src=0) → core flash-fetch → futás. Throttle-öző host (a flash-latencia ≫ UART byte miatt).
+
 ## Changelog
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
 | 1.0 | 2026-04-28 | Első verzió — QSPI Flash + PSRAM controller, 0x6B/0xEB/0x38, 25 teszt-pont |
 | 1.1 | 2026-04-30 | HW interlock kikötés reset alatti tranzakcióhoz; CS# deassert szigorítva ST_DONE-ban |
+| 1.2 | 2026-06-01 | **F2 — flash erase+program**: a Flash CODE/DATA szegmens írhatóvá vált (WREN→Sector Erase→WIP-poll→WREN→Page Program→WIP-poll, SPI 1-1-1). Auto-erase szektorváltáskor (`r_last_erased_sector`/`r_have_erased`) → buffer-mentes streaming betöltés egy szektorban 1 erase. 5 új FSM állapot (`ST_FW_*`), al-szekvenszer (`r_fw_step`). Parancskódok: 0x06/0x05/0x20/0x02. 4 új controller teszt (32–35) + SoC e2e (test_09). `test_10` viselkedésváltás (flash-írás végrehajtódik). |

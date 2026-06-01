@@ -107,10 +107,35 @@ localparam [3:0] ST_DONE    = 4'd6;
 localparam [3:0] ST_INIT_CS_HI    = 4'd7;
 localparam [3:0] ST_INIT_DATA_SPI = 4'd8;
 
+// hu: F2 — flash erase+program FSM állapotok. Egy szó-írás a flash-be a
+//     WREN → Sector Erase → WIP-poll → WREN → Page Program → WIP-poll
+//     szekvenciát futtatja (több, CS#-szel elválasztott SPI tranzakció).
+//     A lépéseket az r_fw_step al-szekvenszer vezérli; a közös SPI-fázisok
+//     (CMD/ADDR/DATA/RDSR/CS-spacing) az alábbi állapotokban futnak.
+// en: F2 — flash erase+program FSM states. A word write to flash runs the
+//     WREN → Sector Erase → WIP-poll → WREN → Page Program → WIP-poll
+//     sequence (multiple CS#-separated SPI transactions). The steps are
+//     driven by the r_fw_step sub-sequencer; the shared SPI phases
+//     (CMD/ADDR/DATA/RDSR/CS-spacing) run in the states below.
+localparam [3:0] ST_FW_CMD     = 4'd9;    // 8-bit CMD küldés SPI módban
+localparam [3:0] ST_FW_ADDR    = 4'd10;   // 24-bit cím küldés SPI módban
+localparam [3:0] ST_FW_DATA    = 4'd11;   // 32-bit adat küldés SPI módban (program)
+localparam [3:0] ST_FW_RDSR_RD = 4'd12;   // 8-bit status olvasás MISO-n (DQ[1])
+localparam [3:0] ST_FW_CS_HI   = 4'd13;   // CS# spacing + al-szekvenszer léptetés
+
 localparam [1:0] INIT_WREN     = 2'd0;
 localparam [1:0] INIT_WRSR_CMD = 2'd1;
 localparam [1:0] INIT_WRSR_DAT = 2'd2;
 localparam [1:0] INIT_DONE     = 2'd3;
+
+// hu: Flash-write al-szekvenszer lépések (r_fw_step)
+// en: Flash-write sub-sequencer steps (r_fw_step)
+localparam [2:0] FW_WREN_E  = 3'd0;   // WREN az erase előtt
+localparam [2:0] FW_ERASE   = 3'd1;   // 0x20 Sector Erase + cím
+localparam [2:0] FW_POLL_E  = 3'd2;   // RDSR amíg WIP=0 (erase vége)
+localparam [2:0] FW_WREN_P  = 3'd3;   // WREN a program előtt
+localparam [2:0] FW_PROGRAM = 3'd4;   // 0x02 Page Program + cím + adat
+localparam [2:0] FW_POLL_P  = 3'd5;   // RDSR amíg WIP=0 (program vége)
 
 // ============================================================
 // hu: Belső regiszterek
@@ -132,6 +157,42 @@ reg         r_clk_en;      // hu: CLK gating: 1 ha aktív tranzakció
 // en: F2.7 Sub5 — flash QE-init state
 reg  [1:0]  r_init_phase;  // aktuális init fázis (WREN/WRSR_CMD/WRSR_DAT/DONE)
 reg         r_init_done;   // 1 = QE-init lefutott, normál üzem engedélyezve
+
+// hu: F2 — flash erase+program állapot
+// en: F2 — flash erase+program state
+reg  [2:0]  r_fw_step;            // aktuális al-szekvenszer lépés (FW_*)
+reg  [7:0]  r_status;             // RDSR-ből beolvasott status byte (WIP=bit0)
+reg  [11:0] r_last_erased_sector; // utoljára törölt szektor (flash_addr[23:12])
+reg         r_have_erased;        // 1 = reset óta legalább egy szektor törölve
+
+// hu: Kombinációs flash-write cím — a CODE szegmens a CODE_BASE_OFFSET fölé
+//     tolva (mint olvasásnál), a DATA szegmens {4'h1, addr[19:0]}. A szektor-
+//     azonosító (4 KB) a törlés-szükségesség eldöntéséhez.
+// en: Combinational flash-write address — CODE segment shifted above
+//     CODE_BASE_OFFSET (as for reads), DATA segment {4'h1, addr[19:0]}. The
+//     sector id (4 KB) decides whether an erase is needed.
+wire [23:0] w_flash_waddr = (cpu_addr[23:20] == `SEG_CODE)
+                            ? (CODE_BASE_OFFSET[23:0] + {4'h0, cpu_addr[19:0]})
+                            : {4'h1, cpu_addr[19:0]};
+wire [11:0] w_wsector     = w_flash_waddr[`QSPI_FLASH_SECTOR_HI:`QSPI_FLASH_SECTOR_LO];
+wire        w_need_erase  = (!r_have_erased) || (w_wsector != r_last_erased_sector);
+
+// hu: Flash SPI parancs indítása — CS# low, CMD MSB előre, CLK aktív, → ST_FW_CMD.
+//     Minden flash-write parancs (0x06/0x05/0x20/0x02) MSB-je 0 → DQ[0]=0.
+// en: Launch a flash SPI command — CS# low, CMD MSB first, CLK active, → ST_FW_CMD.
+//     Every flash-write command (0x06/0x05/0x20/0x02) has MSB 0 → DQ[0]=0.
+task launch_flash_cmd(input [7:0] cmd_byte);
+begin
+    r_cmd           <= cmd_byte;
+    qspi_cs_flash_n <= 1'b0;
+    r_bit_cnt       <= 6'd7;
+    r_clk_en        <= 1'b1;
+    r_clk_phase     <= 1'b0;
+    qspi_dq_oe      <= 1'b1;
+    qspi_dq_out     <= {3'b111, cmd_byte[7]};
+    r_state         <= ST_FW_CMD;
+end
+endtask
 
 // ============================================================
 // hu: QSPI CLK kimenet — kombinációs, gated
@@ -169,6 +230,13 @@ always @(posedge clk or negedge rst_n) begin
         cpu_ready        <= 1'b0;
         cpu_rdata        <= 32'd0;
         qspi_cs_psram_n  <= 1'b1;
+
+        // hu: F2 — flash-write állapot törlése (reset → még nincs törölt szektor)
+        // en: F2 — clear flash-write state (reset → no sector erased yet)
+        r_fw_step             <= FW_WREN_E;
+        r_status              <= 8'd0;
+        r_last_erased_sector  <= 12'd0;
+        r_have_erased         <= 1'b0;
 
         if (QE_INIT_ENABLE != 0) begin
             // hu: QE-init aktív — WREN tranzakció indítása
@@ -248,9 +316,26 @@ always @(posedge clk or negedge rst_n) begin
                             qspi_dq_out      <= 4'b1110;  // DQ[3:1]=111, DQ[0]=0 (0x6B MSB=0)
                             r_state          <= ST_CMD;
                         end else begin
-                            // hu: Flash-be írás elutasítva — cpu_ready azonnal
-                            // en: Flash write rejected — immediate cpu_ready
-                            cpu_ready <= 1'b1;
+                            // hu: F2 — Flash CODE írás: erase+program szekvencia.
+                            //     A szegmens-cím a CODE_BASE_OFFSET fölé tolva
+                            //     (mint olvasásnál). need_erase: ha új szektor
+                            //     (vagy reset óta első írás) → WREN+erase előbb.
+                            // en: F2 — Flash CODE write: erase+program sequence.
+                            //     Segment address shifted above CODE_BASE_OFFSET
+                            //     (as for reads). need_erase: new sector (or first
+                            //     write since reset) → WREN+erase first.
+                            r_addr      <= w_flash_waddr;
+                            r_shift_out <= cpu_wdata;
+                            r_is_write  <= 1'b1;
+                            r_device    <= 1'b0;
+                            if (w_need_erase) begin
+                                r_fw_step            <= FW_WREN_E;
+                                r_last_erased_sector <= w_wsector;
+                                r_have_erased        <= 1'b1;
+                            end else begin
+                                r_fw_step            <= FW_WREN_P;
+                            end
+                            launch_flash_cmd(`QSPI_CMD_FLASH_WREN);
                         end
                     end
 
@@ -271,9 +356,22 @@ always @(posedge clk or negedge rst_n) begin
                             qspi_dq_out      <= 4'b1110;  // DQ[0]=0 (0x6B MSB=0)
                             r_state          <= ST_CMD;
                         end else begin
-                            // hu: Flash-be írás elutasítva
-                            // en: Flash write rejected
-                            cpu_ready <= 1'b1;
+                            // hu: F2 — Flash DATA írás: erase+program szekvencia.
+                            //     A DATA szegmens flash-címe {4'h1, addr[19:0]}.
+                            // en: F2 — Flash DATA write: erase+program sequence.
+                            //     DATA segment flash address is {4'h1, addr[19:0]}.
+                            r_addr      <= w_flash_waddr;
+                            r_shift_out <= cpu_wdata;
+                            r_is_write  <= 1'b1;
+                            r_device    <= 1'b0;
+                            if (w_need_erase) begin
+                                r_fw_step            <= FW_WREN_E;
+                                r_last_erased_sector <= w_wsector;
+                                r_have_erased        <= 1'b1;
+                            end else begin
+                                r_fw_step            <= FW_WREN_P;
+                            end
+                            launch_flash_cmd(`QSPI_CMD_FLASH_WREN);
                         end
                     end
 
@@ -655,6 +753,199 @@ always @(posedge clk or negedge rst_n) begin
                     r_bit_cnt   <= r_bit_cnt - 6'd1;
                     qspi_dq_out <= {3'b111, r_shift_out[r_bit_cnt - 1]};
                 end
+            end
+        end
+
+        // --------------------------------------------------------
+        // hu: ST_FW_CMD — F2 flash-write: 8-bit CMD küldés SPI módban (DQ[0]),
+        //     azonos mintával mint ST_CMD/ST_INIT_DATA_SPI. Az utolsó bit után
+        //     az r_fw_step alapján ágazik: WREN → CS-spacing; ERASE/PROGRAM →
+        //     ADDR; RDSR → status-olvasás (DQ release).
+        // en: ST_FW_CMD — F2 flash-write: 8-bit CMD send in SPI mode (DQ[0]),
+        //     same pattern as ST_CMD/ST_INIT_DATA_SPI. After the last bit it
+        //     branches on r_fw_step: WREN → CS-spacing; ERASE/PROGRAM → ADDR;
+        //     RDSR → status read (release DQ).
+        // --------------------------------------------------------
+        ST_FW_CMD: begin
+            r_clk_phase <= ~r_clk_phase;
+
+            if (r_clk_phase) begin
+                // hu: Falling edge — következő bit setup vagy átmenet
+                // en: Falling edge — setup next bit or transition
+                if (r_bit_cnt == 6'd0) begin
+                    case (r_fw_step)
+                        FW_ERASE, FW_PROGRAM: begin
+                            // hu: 24-bit cím küldés SPI módban
+                            // en: send 24-bit address in SPI mode
+                            r_bit_cnt   <= 6'd23;
+                            qspi_dq_out <= {3'b111, r_addr[23]};
+                            r_state     <= ST_FW_ADDR;
+                        end
+                        FW_POLL_E, FW_POLL_P: begin
+                            // hu: RDSR — DQ elengedése, 8 status bit olvasás MISO-n
+                            // en: RDSR — release DQ, read 8 status bits on MISO
+                            qspi_dq_oe <= 1'b0;
+                            qspi_dq_out <= 4'hF;
+                            r_bit_cnt  <= 6'd7;
+                            r_status   <= 8'd0;
+                            r_state    <= ST_FW_RDSR_RD;
+                        end
+                        default: begin
+                            // hu: WREN (FW_WREN_E/FW_WREN_P) — nincs addr/data,
+                            //     CS# spacing, majd al-szekvenszer léptetés.
+                            // en: WREN — no addr/data, CS# spacing, then advance.
+                            r_bit_cnt <= 6'd3;
+                            r_state   <= ST_FW_CS_HI;
+                        end
+                    endcase
+                end else begin
+                    r_bit_cnt   <= r_bit_cnt - 6'd1;
+                    qspi_dq_out <= {3'b111, r_cmd[r_bit_cnt - 1]};
+                end
+            end
+        end
+
+        // --------------------------------------------------------
+        // hu: ST_FW_ADDR — 24-bit cím küldés SPI módban (erase/program).
+        //     Az utolsó bit után: ERASE → CS-spacing; PROGRAM → 32-bit adat.
+        // en: ST_FW_ADDR — send 24-bit address in SPI mode (erase/program).
+        //     After last bit: ERASE → CS-spacing; PROGRAM → 32-bit data.
+        // --------------------------------------------------------
+        ST_FW_ADDR: begin
+            r_clk_phase <= ~r_clk_phase;
+
+            if (r_clk_phase) begin
+                if (r_bit_cnt == 6'd0) begin
+                    if (r_fw_step == FW_PROGRAM) begin
+                        // hu: 32-bit adat küldés SPI módban (MSB előre)
+                        // en: send 32-bit data in SPI mode (MSB first)
+                        r_bit_cnt   <= 6'd31;
+                        qspi_dq_out <= {3'b111, r_shift_out[31]};
+                        r_state     <= ST_FW_DATA;
+                    end else begin
+                        // hu: ERASE — nincs adat, CS-spacing
+                        // en: ERASE — no data, CS-spacing
+                        r_bit_cnt <= 6'd3;
+                        r_state   <= ST_FW_CS_HI;
+                    end
+                end else begin
+                    r_bit_cnt   <= r_bit_cnt - 6'd1;
+                    qspi_dq_out <= {3'b111, r_addr[r_bit_cnt - 1]};
+                end
+            end
+        end
+
+        // --------------------------------------------------------
+        // hu: ST_FW_DATA — 32-bit adat küldés SPI módban (Page Program),
+        //     MSB előre (big-endian: r_shift_out[31] = a legalacsonyabb
+        //     flash-cím bájtjának MSB-je). Az utolsó bit után CS-spacing.
+        // en: ST_FW_DATA — send 32-bit data in SPI mode (Page Program),
+        //     MSB first (big-endian: r_shift_out[31] = MSB of the lowest
+        //     flash-address byte). After last bit → CS-spacing.
+        // --------------------------------------------------------
+        ST_FW_DATA: begin
+            r_clk_phase <= ~r_clk_phase;
+
+            if (r_clk_phase) begin
+                if (r_bit_cnt == 6'd0) begin
+                    r_bit_cnt <= 6'd3;
+                    r_state   <= ST_FW_CS_HI;
+                end else begin
+                    r_bit_cnt   <= r_bit_cnt - 6'd1;
+                    qspi_dq_out <= {3'b111, r_shift_out[r_bit_cnt - 1]};
+                end
+            end
+        end
+
+        // --------------------------------------------------------
+        // hu: ST_FW_RDSR_RD — 8-bit status olvasás MISO-n (DQ[1]), MSB előre,
+        //     rising edge-en mintavétel (mint a DATA_RD). Az utolsó (8.) bit a
+        //     WIP (status[0]). Olvasás után CS-spacing, a WIP-döntés a
+        //     CS_HI-ban (poll-again vagy léptetés).
+        // en: ST_FW_RDSR_RD — read 8 status bits on MISO (DQ[1]), MSB first,
+        //     sampled on rising edge (like DATA_RD). The last (8th) bit is WIP
+        //     (status[0]). After read → CS-spacing; the WIP decision is in
+        //     CS_HI (poll-again or advance).
+        // --------------------------------------------------------
+        ST_FW_RDSR_RD: begin
+            r_clk_phase <= ~r_clk_phase;
+
+            if (!r_clk_phase) begin
+                // hu: Rising edge — MISO (DQ[1]) mintavétel
+                // en: Rising edge — sample MISO (DQ[1])
+                r_status <= {r_status[6:0], qspi_dq_in[1]};
+
+                if (r_bit_cnt == 6'd0) begin
+                    r_clk_en  <= 1'b0;
+                    r_bit_cnt <= 6'd3;
+                    r_state   <= ST_FW_CS_HI;
+                end else begin
+                    r_bit_cnt <= r_bit_cnt - 6'd1;
+                end
+            end
+        end
+
+        // --------------------------------------------------------
+        // hu: ST_FW_CS_HI — CS# spacing két SPI tranzakció között (4 ciklus),
+        //     majd az r_fw_step al-szekvenszer léptetése. A WIP-poll lépéseknél
+        //     (FW_POLL_E/FW_POLL_P) a status[0] dönt: WIP=1 → újabb RDSR, WIP=0
+        //     → következő lépés. A FW_POLL_P WIP=0 a teljes írás vége → ST_DONE.
+        // en: ST_FW_CS_HI — CS# spacing between two SPI transactions (4 cycles),
+        //     then advance the r_fw_step sub-sequencer. On WIP-poll steps
+        //     (FW_POLL_E/FW_POLL_P) status[0] decides: WIP=1 → another RDSR,
+        //     WIP=0 → next step. FW_POLL_P WIP=0 ends the whole write → ST_DONE.
+        // --------------------------------------------------------
+        ST_FW_CS_HI: begin
+            qspi_cs_flash_n <= 1'b1;
+            r_clk_en        <= 1'b0;
+            r_clk_phase     <= 1'b0;
+            qspi_dq_oe      <= 1'b0;
+            qspi_dq_out     <= 4'hF;
+
+            if (r_bit_cnt == 6'd0) begin
+                case (r_fw_step)
+                    FW_WREN_E: begin
+                        r_fw_step <= FW_ERASE;
+                        launch_flash_cmd(`QSPI_CMD_FLASH_ERASE);
+                    end
+                    FW_ERASE: begin
+                        r_fw_step <= FW_POLL_E;
+                        launch_flash_cmd(`QSPI_CMD_FLASH_RDSR);
+                    end
+                    FW_POLL_E: begin
+                        if (r_status[0]) begin
+                            // hu: erase még folyamatban → újabb RDSR
+                            // en: erase still in progress → another RDSR
+                            launch_flash_cmd(`QSPI_CMD_FLASH_RDSR);
+                        end else begin
+                            // hu: erase kész → WREN a program előtt
+                            // en: erase done → WREN before program
+                            r_fw_step <= FW_WREN_P;
+                            launch_flash_cmd(`QSPI_CMD_FLASH_WREN);
+                        end
+                    end
+                    FW_WREN_P: begin
+                        r_fw_step <= FW_PROGRAM;
+                        launch_flash_cmd(`QSPI_CMD_FLASH_PROGRAM);
+                    end
+                    FW_PROGRAM: begin
+                        r_fw_step <= FW_POLL_P;
+                        launch_flash_cmd(`QSPI_CMD_FLASH_RDSR);
+                    end
+                    default: begin   // FW_POLL_P
+                        if (r_status[0]) begin
+                            // hu: program még folyamatban → újabb RDSR
+                            // en: program still in progress → another RDSR
+                            launch_flash_cmd(`QSPI_CMD_FLASH_RDSR);
+                        end else begin
+                            // hu: program kész → teljes flash-write vége
+                            // en: program done → whole flash-write complete
+                            r_state <= ST_DONE;
+                        end
+                    end
+                endcase
+            end else begin
+                r_bit_cnt <= r_bit_cnt - 6'd1;
             end
         end
 

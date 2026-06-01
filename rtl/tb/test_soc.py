@@ -28,6 +28,7 @@ from test_qspi_controller import (
 UART_CPB  = 8
 CMD_WRITE = 0xC0
 CMD_BOOT  = 0xB0
+DEV_FLASH = 0x00
 DEV_PSRAM = 0x01
 
 # hu: MMIO-térkép — a wrapper dekódolja (addr[11:8]=periféria, addr[5:2]=reg).
@@ -317,3 +318,115 @@ async def test_08_uart_load_psram_and_run(dut):
         f"trap 0x{int(dut.o_trap_code.value):02X} (PSRAM-fetch / byte-order hiba?)"
     assert int(dut.o_return_value.value) == 0x1234, \
         f"return_value 0x{int(dut.o_return_value.value):08X}, várt 0x1234"
+
+
+@cocotb.test()
+async def test_09_uart_load_flash_and_run(dut):
+    """hu: F2 — perzisztens dev=flash betöltés. A host UART-on betölt egy kis
+        .t0 programot a FLASH-be (WRITE keret, dev=0), ami a QSPI controller
+        F2 erase+program szekvenciáját gyakorolja (WREN→sector-erase→WIP-poll→
+        WREN→page-program→WIP-poll). Ezután BOOT keret (code_src=0) elindítja →
+        a core FLASH-ből fetch-el, lefuttatja, és visszaadja az eredményt
+        (0x0ACE). Ez a teljes dev=flash út: uart_rx → loader → fázis-MUX →
+        QSPI flash erase+program → boot-mux → core flash-fetch.
+    en: F2 — persistent dev=flash loading. The host UART-loads a small .t0
+        program into FLASH (WRITE frame, dev=0), exercising the QSPI controller's
+        F2 erase+program sequence. A BOOT frame (code_src=0) then starts it → the
+        core fetches from flash, runs, and returns 0x0ACE. Full dev=flash path:
+        uart_rx → loader → phase MUX → QSPI flash erase+program → boot-mux →
+        core flash-fetch."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    _init_soc_inputs(dut)
+    dut.i_boot_pc.value          = 0
+    dut.i_boot_arg_count.value   = 0
+    dut.i_boot_local_count.value = 0
+    dut.i_boot_start.value       = 0
+    dut.i_boot_arg_data.value    = 0
+    dut.i_boot_arg_valid.value   = 0
+
+    # hu: QSPI slave — a flash most read-write (F2 erase+program)
+    # en: QSPI slave — flash is now read-write (F2 erase+program)
+    flash = TQSPIFlashModel()
+    psram = TQSPIPSRAMModel()
+    cocotb.start_soon(qspi_slave_driver(dut, flash, psram))
+
+    dut.rst_n.value = 0
+    for _ in range(5):
+        await RisingEdge(dut.clk)
+    dut.rst_n.value = 1
+    for _ in range(5):
+        await RisingEdge(dut.clk)
+    await Timer(1, units="ns")
+
+    # hu: program — LDC.I4 0x0ACE, RET; 4-szeresre paddolva
+    program = _ldc_i4(0x0ACE) + bytes([OP_RET])
+    while len(program) % 4 != 0:
+        program += bytes([0x00])
+    plen = len(program)
+
+    n_words = plen // 4
+    header = [CMD_WRITE, DEV_FLASH] + _u24_be(0x00000) + _u16_be(plen)
+    boot_frame = [CMD_BOOT, 0x00] + _u24_be(0x000000) + [0x00, 0x00]
+
+    # hu: A WRITE fejléc nem indít flash-írást → fast stream.
+    # en: The WRITE header triggers no flash write → fast stream.
+    await uart_tx_bytes(dut, dut.i_uart_rx, UART_CPB, header)
+
+    # hu: Throttle-öző host: a flash erase+program szavanként SOK ciklus (valós
+    #     HW-en a sector erase ~45 ms ≫ egy UART byte ~434 ciklus @ 115200),
+    #     ezért a host szavanként küld, és megvárja az adott szó kiírását,
+    #     mielőtt a következő szó bájtjait küldi. Buffer-mentes loader esetén ez
+    #     KÖTELEZŐ — különben a flash-írás közben érkező bájtok elvesznének.
+    # en: Throttling host: flash erase+program is MANY cycles per word (on real
+    #     HW the sector erase ~45 ms ≫ one UART byte ~434 cycles @ 115200), so
+    #     the host sends word by word and waits for each word to be written
+    #     before sending the next word's bytes. With a buffer-less loader this
+    #     is REQUIRED — otherwise bytes arriving mid-write would be lost.
+    for wi in range(n_words):
+        word_bytes = list(program[wi * 4:(wi + 1) * 4])
+        await uart_tx_bytes(dut, dut.i_uart_rx, UART_CPB, word_bytes)
+        written = False
+        for _ in range(8000):
+            await RisingEdge(dut.clk)
+            if flash.program_count >= wi + 1:
+                written = True
+                break
+        assert written, f"a(z) {wi}. szó flash-írása nem fejeződött be időben"
+        # hu: a program_count az írás KÖZBEN (PROGRAM tranzakció) nő; megvárjuk a
+        #     WIP-poll farkát + cpu_ready-t + a loader S_WWAIT→S_WDATA léptetését,
+        #     mielőtt a következő szó bájtjait küldjük (különben elvesznének).
+        # en: program_count rises DURING the write (PROGRAM transaction); wait for
+        #     the WIP-poll tail + cpu_ready + the loader's S_WWAIT→S_WDATA advance
+        #     before sending the next word's bytes (else they'd be lost).
+        for _ in range(400):
+            await RisingEdge(dut.clk)
+
+    # hu: a program tényleg a flash-be került (perzisztens betöltés bizonyítéka)
+    # en: the program actually landed in flash (proof of persistent loading)
+    assert flash.program_count == n_words, \
+        f"a loader nem írta ki mind a {n_words} szót (program_count={flash.program_count})"
+    assert flash.erase_count == 1, \
+        f"egy szektoron belül pontosan 1 erase várt (erase_count={flash.erase_count})"
+
+    # hu: néhány ciklus, hogy a loader teljesen IDLE-be (r_load_mode=0) kerüljön
+    # en: a few cycles so the loader fully returns to IDLE (r_load_mode=0)
+    for _ in range(40):
+        await RisingEdge(dut.clk)
+
+    await uart_tx_bytes(dut, dut.i_uart_rx, UART_CPB, boot_frame)
+
+    halted = False
+    for _ in range(4000):
+        await RisingEdge(dut.clk)
+        try:
+            if int(dut.o_halt.value) == 1 or int(dut.o_trap.value) == 1:
+                halted = True
+                break
+        except ValueError:
+            pass
+
+    assert halted, "a core nem haltolt/trap-elt a UART-flash-load+boot után"
+    assert int(dut.o_trap.value) == 0, \
+        f"trap 0x{int(dut.o_trap_code.value):02X} (flash-fetch / byte-order hiba?)"
+    assert int(dut.o_return_value.value) == 0x0ACE, \
+        f"return_value 0x{int(dut.o_return_value.value):08X}, várt 0x0ACE"

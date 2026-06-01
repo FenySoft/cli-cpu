@@ -250,6 +250,17 @@
 `define QSPI_CMD_PSRAM_WRITE   8'h38   // Quad Write (cmd SPI, addr+data Quad)
 `define QSPI_DUMMY_FLASH       6'd8    // 0x6B: 8 dummy QSPI ciklus
 `define QSPI_DUMMY_PSRAM       6'd6    // 0xEB: 6 dummy QSPI ciklus
+
+// hu: F2 — flash erase+program parancsok (SPI mód, 1-1-1). A NOR flash csak
+//     1→0 programozható → a Page Program ELŐTT a 4 KB szektort törölni kell.
+// en: F2 — flash erase+program commands (SPI mode, 1-1-1). NOR flash only
+//     programs 1→0 → the 4 KB sector must be erased BEFORE Page Program.
+`define QSPI_CMD_FLASH_WREN    8'h06   // Write Enable (WEL latch)
+`define QSPI_CMD_FLASH_RDSR    8'h05   // Read Status Register (WIP = bit 0)
+`define QSPI_CMD_FLASH_ERASE   8'h20   // Sector Erase (4 KB)
+`define QSPI_CMD_FLASH_PROGRAM 8'h02   // Page Program
+`define QSPI_FLASH_SECTOR_HI   23      // sector azonosító = flash_addr[23:12]
+`define QSPI_FLASH_SECTOR_LO   12
 `define SEG_CODE               4'h0    // CODE szegmens azonosító
 `define SEG_DATA               4'h1    // DATA szegmens azonosító
 `define SEG_STACK              4'h2    // STACK szegmens azonosító

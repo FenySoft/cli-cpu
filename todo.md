@@ -10,19 +10,37 @@
 
 - **Roadmap:** F2.8, `docs/roadmap-hu.md` / `docs/roadmap-en.md`
 - **Részletes terv:** `docs/F2.8-plan-hu.md`
-- **Státusz:** 🔄 FOLYAMATBAN — RTL + cocotb vázak elkészültek (TDD RED fázis)
+- **Státusz:** 🔄 FOLYAMATBAN — perifériák RTL + cocotb zöld; SoC-integráció és
+  boot/load alrendszer (#6.5a/b/c + F2) kész; HW bring-up hátravan
 - **Felvéve:** 2026-05-30
 
 ### Tervezett feladatok
 
-- F2.8.1 UART RX (8N1) + boot-over-UART loader
-- F2.8.3a generikus FIFO (cilcpu_fifo.v)
-- F2.8.3 Mailbox FIFO + MMIO + IRQ
-- F2.8.4 GPIO MMIO
-- F2.8.5 Trace MUX
-- F2.8.6 Bővített A7-Lite wrapper (TT `tt_um` ekvivalens)
+- ✅ F2.8.1 UART RX (8N1) + boot-over-UART loader (`uart_rx`, `cilcpu_uart_loader`)
+- ✅ F2.8.3a generikus FIFO (`cilcpu_fifo.v`)
+- ✅ F2.8.3 Mailbox FIFO + MMIO + IRQ (`cilcpu_mailbox.v`, #6.5c IRQ-pending)
+- ✅ F2.8.4 GPIO MMIO (`cilcpu_gpio.v`)
+- ✅ F2.8.5 Trace MUX (`cilcpu_trace.v`)
+- ✅ #6.5a SoC wrapper (`cilcpu_soc.v`) — MMIO-dekód + perifériák
+- ✅ #6.5b boot/load alrendszer (ADR 2026-05-30): F1a QSPI kiemelés,
+  F1b UART loader + PSRAM-írás, F1c flash auto-detect, **F2 flash erase+program**
+- ⬜ F2.8.6 Bővített A7-Lite wrapper (TT `tt_um` ekvivalens) — a SoC bekötése
+- ⬜ A7-Lite HW bring-up (QSPI Pmod, boot-over-UART, mailbox echo, trace)
 
 Részletes sub-feladatok és elfogadási kritériumok: `docs/F2.8-plan-hu.md`.
+
+### Megjegyzés — flash-írás throttle (NEM aknázás, dokumentált jellemző)
+
+A QSPI flash erase+program (F2) szavanként sok ciklus (valós sector erase
+~45 ms ≫ UART byte ~434 ciklus @ 115200). A jelenlegi `cilcpu_uart_loader`
+**buffer-mentes**: míg a flash-írásra vár (`S_WWAIT`), a beérkező UART-bájtok
+nem kerülnek fogadásra. Ezért a streaming flash-betöltésnél a **host
+throttle-öl** (szavanként vár a kiírásra) — ahogy a `test_soc.test_09` is
+modellezi, és ahogy a valós HW-en a flash-latencia úgyis kikényszeríti.
+Opcionális jövőbeli optimalizáció (külön taszk, ha kell): page-buffer a
+loaderben (egy 256-bájtos page-et pufferel, majd egy Page Program-mal ír),
+hogy a host ne kelljen throttle-özzön. PSRAM-betöltésnél (dev=1) nincs ilyen
+korlát (az írás gyors). Vault: `f2-flash-write-uart-throttle`.
 
 ---
 

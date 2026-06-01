@@ -20,6 +20,17 @@ QSPI_CMD_FLASH_READ  = 0x6B  # Quad Output Read (Flash)
 QSPI_CMD_PSRAM_READ  = 0xEB  # Fast Read Quad I/O (PSRAM)
 QSPI_CMD_PSRAM_WRITE = 0x38  # Quad Write (PSRAM)
 
+# hu: F2 — flash erase+program parancsok (SPI mód, 1-1-1). NOR flash csak
+#     1→0 programozható → a programozás ELŐTT szektort kell törölni.
+# en: F2 — flash erase+program commands (SPI mode, 1-1-1). NOR flash only
+#     programs 1→0 → a sector must be erased BEFORE programming.
+QSPI_CMD_FLASH_WREN    = 0x06  # Write Enable (WEL latch)
+QSPI_CMD_FLASH_RDSR    = 0x05  # Read Status Register (WIP = bit 0)
+QSPI_CMD_FLASH_ERASE   = 0x20  # Sector Erase (4 KB)
+QSPI_CMD_FLASH_PROGRAM = 0x02  # Page Program
+
+FLASH_SECTOR_SIZE = 0x1000     # 4 KB szektor (W25Q / IS25L)
+
 QSPI_DUMMY_FLASH = 8  # 0x6B dummy QSPI ciklusok
 QSPI_DUMMY_PSRAM = 6  # 0xEB dummy QSPI ciklusok
 
@@ -69,14 +80,74 @@ class TQSPISlaveModel:
 
 
 class TQSPIFlashModel(TQSPISlaveModel):
-    """hu: QSPI Flash — read-only, 0x6B parancsot ismeri.
-    en: QSPI Flash — read-only, supports 0x6B command."""
+    """hu: QSPI Flash — read (0x6B) + erase/program (F2). NOR szemantika:
+        a Sector Erase a 4 KB szektort 0xFF-re állítja, a Page Program
+        CSAK 1→0 biteket válthat (AND a meglévő tartalommal). A WREN a WEL
+        latch-et állítja; erase/program WEL nélkül no-op (mint a valós chip).
+        A WIP (Write In Progress) bitet egy számláló modellezi: erase/program
+        után néhány RDSR-olvasáson át WIP=1, majd 0 — így a controller WIP-
+        pollozása tesztelhető.
+    en: QSPI Flash — read (0x6B) + erase/program (F2). NOR semantics: Sector
+        Erase sets the 4 KB sector to 0xFF; Page Program can only flip 1→0
+        (AND with existing content). WREN sets the WEL latch; erase/program
+        without WEL is a no-op (like the real chip). The WIP (Write In
+        Progress) bit is modelled by a counter: WIP=1 for a few RDSR reads
+        after erase/program, then 0 — so the controller's WIP polling is
+        testable."""
+
+    # hu: WIP busy ciklusszám (RDSR-olvasások száma, amíg WIP=1 marad)
+    # en: WIP busy cycle count (number of RDSR reads while WIP stays 1)
+    WIP_READS_AFTER_OP = 3
 
     def __init__(self, mem_init=None):
         super().__init__("Flash", mem_init)
+        self.wel = False           # Write Enable Latch
+        self.wip_remaining = 0     # hány RDSR-olvasáson át WIP=1
+        self.erase_count = 0       # hány sector erase történt (teszt-introspekció)
+        self.program_count = 0     # hány page program történt
 
     def supports_write(self):
-        return False
+        return True
+
+    def write_enable(self):
+        """hu: WREN — WEL latch beállítása. / en: WREN — set WEL latch."""
+        self.wel = True
+
+    def erase_sector(self, addr):
+        """hu: Sector Erase — a címet tartalmazó 4 KB szektor 0xFF-re.
+            WEL nélkül no-op. / en: Sector Erase — set the 4 KB sector
+            containing addr to 0xFF. No-op without WEL."""
+        if not self.wel:
+            return
+        base = addr & ~(FLASH_SECTOR_SIZE - 1)
+        for a in range(base, base + FLASH_SECTOR_SIZE):
+            self.mem[a] = 0xFF
+        self.erase_count += 1
+        self.wel = False
+        self.wip_remaining = self.WIP_READS_AFTER_OP
+
+    def program_word(self, addr, value):
+        """hu: Page Program — 32-bit szó, NOR 1→0 (AND), big-endian.
+            WEL nélkül no-op. / en: Page Program — 32-bit word, NOR 1→0
+            (AND), big-endian. No-op without WEL."""
+        if not self.wel:
+            return
+        bytes_be = [(value >> 24) & 0xFF, (value >> 16) & 0xFF,
+                    (value >> 8) & 0xFF, value & 0xFF]
+        for i, b in enumerate(bytes_be):
+            self.mem[addr + i] = self.mem.get(addr + i, 0xFF) & b
+        self.program_count += 1
+        self.wel = False
+        self.wip_remaining = self.WIP_READS_AFTER_OP
+
+    def read_status(self):
+        """hu: RDSR — status byte. WIP=bit0, WEL=bit1. Minden olvasás
+            csökkenti a WIP számlálót. / en: RDSR — status byte. WIP=bit0,
+            WEL=bit1. Each read decrements the WIP counter."""
+        wip = 1 if self.wip_remaining > 0 else 0
+        if self.wip_remaining > 0:
+            self.wip_remaining -= 1
+        return (wip & 0x1) | ((1 if self.wel else 0) << 1)
 
 
 class TQSPIPSRAMModel(TQSPISlaveModel):
@@ -105,27 +176,64 @@ async def qspi_slave_driver(dut, flash_model, psram_model):
         DATA_RD phase.
     """
 
+    async def _shift_in_spi(nbits):
+        """hu: nbits bit beolvasása SPI módban (DQ[0]), MSB-first, rising edge.
+        en: Shift in nbits in SPI mode (DQ[0]), MSB-first, on rising edge."""
+        val = 0
+        for _ in range(nbits):
+            await RisingEdge(dut.qspi_clk)
+            val = (val << 1) | (int(dut.qspi_dq_out.value) & 0x01)
+        return val
+
     async def _handle_transaction(dut, model, is_flash):
         """hu: Egyetlen QSPI tranzakció dekódolása és válasz.
         en: Decode a single QSPI transaction and respond."""
 
         # hu: 1. CMD fázis — 8 bit SPI (DQ[0]), CLK rising edge-en mintavétel
         # en: 1. CMD phase — 8 bits SPI (DQ[0]), sample on CLK rising edge
-        cmd = 0
-        for i in range(8):
-            await RisingEdge(dut.qspi_clk)
-            bit = int(dut.qspi_dq_out.value) & 0x01
-            cmd = (cmd << 1) | bit
+        cmd = await _shift_in_spi(8)
+
+        # hu: F2 — flash erase/program parancsok (SPI mód, csak Flash CS#-en)
+        # en: F2 — flash erase/program commands (SPI mode, Flash CS# only)
+        if is_flash and cmd == QSPI_CMD_FLASH_WREN:
+            # hu: WREN — nincs több bit, csak a WEL latch beállítása
+            # en: WREN — no further bits, just set the WEL latch
+            model.write_enable()
+            return
+
+        if is_flash and cmd == QSPI_CMD_FLASH_RDSR:
+            # hu: RDSR — 8 status bit hajtása MISO-n (DQ[1]), MSB-first,
+            #     falling edge setup. WIP=bit0. / en: RDSR — drive 8 status
+            #     bits on MISO (DQ[1]), MSB-first, setup on falling. WIP=bit0.
+            status = model.read_status()
+            for i in range(8):
+                await FallingEdge(dut.qspi_clk)
+                bit = (status >> (7 - i)) & 0x1
+                dut.qspi_dq_in.value = (bit << 1)   # DQ[1] = MISO
+            return
+
+        if is_flash and cmd == QSPI_CMD_FLASH_ERASE:
+            # hu: Sector Erase — 24-bit cím SPI módban, nincs adat
+            # en: Sector Erase — 24-bit address in SPI mode, no data
+            addr = await _shift_in_spi(24)
+            model.erase_sector(addr)
+            return
+
+        if is_flash and cmd == QSPI_CMD_FLASH_PROGRAM:
+            # hu: Page Program — 24-bit cím + 32-bit adat (4 bájt) SPI módban,
+            #     MSB-first (big-endian). / en: Page Program — 24-bit address +
+            #     32-bit data (4 bytes) in SPI mode, MSB-first (big-endian).
+            addr = await _shift_in_spi(24)
+            data = await _shift_in_spi(32)
+            model.program_word(addr, data)
+            return
 
         # hu: 2. ADDR fázis — parancs-függő: 0x6B = SPI (24 bit), 0xEB/0x38 = Quad (6 CLK)
         # en: 2. ADDR phase — command-dependent: 0x6B = SPI (24 bits), 0xEB/0x38 = Quad (6 CLKs)
         addr = 0
         if cmd == QSPI_CMD_FLASH_READ:
             # hu: SPI mód — 24 bit, 1 bit/CLK
-            for i in range(24):
-                await RisingEdge(dut.qspi_clk)
-                bit = int(dut.qspi_dq_out.value) & 0x01
-                addr = (addr << 1) | bit
+            addr = await _shift_in_spi(24)
         else:
             # hu: Quad mód — 24 bit, 4 bit/CLK = 6 CLK
             for i in range(6):
@@ -275,6 +383,18 @@ async def do_write(dut, addr, data, timeout=200):
             pass
 
     raise TimeoutError(f"cpu_ready not asserted within {timeout} cycles for write @ 0x{addr:06X}")
+
+
+async def do_flash_write(dut, addr, data, timeout=4000):
+    """
+    hu: Flash-írás (erase+program) — hosszabb timeout, mert a controller a
+        WREN→sector-erase→WIP-poll→WREN→page-program→WIP-poll szekvenciát
+        hajtja (több QSPI tranzakció). Egyébként azonos a do_write-tal.
+    en: Flash write (erase+program) — longer timeout, since the controller
+        runs the WREN→sector-erase→WIP-poll→WREN→page-program→WIP-poll
+        sequence (multiple QSPI transactions). Otherwise identical to do_write.
+    """
+    return await do_write(dut, addr, data, timeout=timeout)
 
 
 # ============================================================
@@ -490,32 +610,51 @@ async def test_09_stack_segment_selects_psram(dut):
 
 
 @cocotb.test()
-async def test_10_write_to_flash_rejected(dut):
-    """hu: Flash-be írás elutasítva — cpu_ready=1 azonnal, nincs QSPI tranzakció.
-    en: Write to Flash rejected — cpu_ready=1 immediately, no QSPI transaction."""
+async def test_10_flash_write_accepted(dut):
+    """hu: F2 — Flash-be írás VÉGREHAJTÓDIK (erase+program). A korábbi
+           "elutasítva" viselkedés megszűnt (ADR 2026-05-30, F2 fázis): a
+           controller a CODE szegmens írásra Flash CS#-et assertál, lefuttatja
+           a WREN→erase→program→WIP-poll szekvenciát, a PSRAM CS# végig
+           inaktív, és a beírt szó vissza is olvasható.
+    en: F2 — Flash write is now PERFORMED (erase+program). The old "rejected"
+           behaviour is gone (ADR 2026-05-30, F2 phase): the controller asserts
+           Flash CS# for a CODE-segment write, runs WREN→erase→program→WIP-poll,
+           PSRAM CS# stays inactive throughout, and the written word reads back."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
-    await reset_dut(dut)
+    flash_model, _ = await reset_dut(dut)
 
+    addr = 0x000100
+    val = 0xBAADF00D
+
+    # hu: Írás indítása, közben figyeljük: Flash CS# lemegy, PSRAM CS# nem.
+    # en: Start write while watching: Flash CS# goes low, PSRAM CS# never does.
     await FallingEdge(dut.clk)
-    dut.cpu_addr.value = make_addr(SEG_CODE, 0x100)
-    dut.cpu_wdata.value = 0xBAADF00D
+    dut.cpu_addr.value = make_addr(SEG_CODE, addr)
+    dut.cpu_wdata.value = val
     dut.cpu_we.value = 1
     await RisingEdge(dut.clk)
     dut.cpu_we.value = 0
 
-    # hu: cpu_ready-nek 1-2 cikluson belül meg kell jelennie, CS# NEM assert
-    found_ready = False
-    for _ in range(3):
+    flash_cs_seen = False
+    for _ in range(4000):
         await RisingEdge(dut.clk)
-        assert int(dut.qspi_cs_flash_n.value) == 1, \
-            "Flash CS# should NOT assert for write"
-        assert int(dut.qspi_cs_psram_n.value) == 1, \
-            "PSRAM CS# should NOT assert for write to CODE"
-        if int(dut.cpu_ready.value) == 1:
-            found_ready = True
-            break
+        try:
+            if int(dut.qspi_cs_flash_n.value) == 0:
+                flash_cs_seen = True
+            assert int(dut.qspi_cs_psram_n.value) == 1, \
+                "PSRAM CS# should NOT assert for a CODE-segment flash write"
+            if int(dut.cpu_ready.value) == 1:
+                break
+        except ValueError:
+            pass
 
-    assert found_ready, "cpu_ready not asserted for rejected Flash write"
+    assert flash_cs_seen, "Flash CS# was never asserted for a CODE-segment write"
+    assert flash_model.program_count == 1, \
+        f"1 page program várt, lett {flash_model.program_count}"
+
+    result = await do_read(dut, make_addr(SEG_CODE, addr))
+    assert result == val, \
+        f"Flash write round-trip: várt 0x{val:08X}, lett 0x{result:08X}"
 
 
 @cocotb.test()
@@ -1240,4 +1379,128 @@ async def test_31_code_base_offset_addr_zero(dut):
         f"flash 0x{CODE_BASE_OFFSET:06X}-ról kellene olvasni "
         f"(várt 0x{val:08X}), de 0x{result:08X} jött "
         f"(0x{bit_ph:08X} = a bitstream placeholder a 0x0-án)"
+    )
+
+
+# ============================================================
+# hu: F2 — flash erase+program (perzisztens dev=flash betöltés)
+#     A NOR flash csak 1→0 programozható → a controllernek a Page Program
+#     ELŐTT szektort kell törölnie. Auto-erase szektorváltáskor: a controller
+#     egy r_last_erased_sector regisztert tart, és csak akkor töröl, ha a
+#     célszektor eltér az utoljára töröltől (vagy reset óta még nem törölt) →
+#     így a streaming, szavankénti loader-írás egy szektoron belül EGYSZER
+#     töröl, a multi-word program nem korrumpálódik.
+# en: F2 — flash erase+program (persistent dev=flash loading). NOR flash only
+#     programs 1→0 → the controller must erase a sector BEFORE Page Program.
+#     Auto-erase on sector change: the controller keeps an r_last_erased_sector
+#     register and erases only when the target sector differs from the last
+#     erased one (or none erased since reset) → so streaming word-by-word
+#     loader writes erase ONCE per sector; multi-word programs are not
+#     corrupted.
+# ============================================================
+
+
+@cocotb.test()
+async def test_32_flash_write_then_read(dut):
+    """hu: Flash írás→olvasás round-trip — WREN→erase→program→WIP-poll,
+           majd 0x6B olvasás visszaadja a beírt szót. erase_count>=1,
+           program_count==1.
+    en: Flash write→read round-trip — WREN→erase→program→WIP-poll, then
+           0x6B read returns the written word. erase_count>=1, program_count==1."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    flash_model, _ = await reset_dut(dut)
+
+    addr = 0x000100
+    val = 0xCAFEBABE
+    await do_flash_write(dut, make_addr(SEG_CODE, addr), val)
+
+    assert flash_model.program_count == 1, \
+        f"Pontosan 1 page program várt, lett {flash_model.program_count}"
+    assert flash_model.erase_count >= 1, \
+        f"Legalább 1 sector erase várt (reset óta első írás), lett {flash_model.erase_count}"
+
+    result = await do_read(dut, make_addr(SEG_CODE, addr))
+    assert result == val, \
+        f"Flash round-trip: várt 0x{val:08X}, lett 0x{result:08X}"
+
+
+@cocotb.test()
+async def test_33_flash_multiword_same_sector_single_erase(dut):
+    """hu: 4 egymás utáni szó EGY szektoron belül → PONTOSAN 1 erase
+           (auto-erase csak szektorváltáskor). Mind a 4 szó helyesen
+           olvasható vissza — ha a controller minden szónál törölne,
+           csak az utolsó szó maradna meg → RED.
+    en: 4 consecutive words within ONE sector → EXACTLY 1 erase (auto-erase
+           only on sector change). All 4 words read back correctly — if the
+           controller erased on every word, only the last would survive → RED."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    flash_model, _ = await reset_dut(dut)
+
+    base = 0x002000   # hu: szektor-igazított cím (0x2000 & ~0xFFF == 0x2000)
+    words = [0x11111111, 0x22222222, 0x33333333, 0x44444444]
+    for i, w in enumerate(words):
+        await do_flash_write(dut, make_addr(SEG_CODE, base + i * 4), w)
+
+    assert flash_model.erase_count == 1, (
+        f"Egy szektoron belül 4 szó → pontosan 1 erase várt, lett "
+        f"{flash_model.erase_count} (per-szó erase korrumpálná a programot)"
+    )
+    assert flash_model.program_count == 4, \
+        f"4 page program várt, lett {flash_model.program_count}"
+
+    for i, w in enumerate(words):
+        result = await do_read(dut, make_addr(SEG_CODE, base + i * 4))
+        assert result == w, \
+            f"Szó #{i} @ 0x{base + i*4:06X}: várt 0x{w:08X}, lett 0x{result:08X}"
+
+
+@cocotb.test()
+async def test_34_flash_write_polls_wip(dut):
+    """hu: A controller a program után WIP-pollozik (RDSR) amíg a WIP bit 0
+           nem lesz. A modell az op után WIP_READS_AFTER_OP olvasáson át
+           WIP=1-et ad; ha a controller pollozott, a tranzakció végén
+           wip_remaining==0. Ha nem pollozna, wip_remaining>0 maradna → RED.
+    en: After programming, the controller polls WIP (RDSR) until the WIP bit
+           is 0. The model returns WIP=1 for WIP_READS_AFTER_OP reads; if the
+           controller polled, wip_remaining==0 at the end. If it did not poll,
+           wip_remaining>0 → RED."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+    flash_model, _ = await reset_dut(dut)
+
+    await do_flash_write(dut, make_addr(SEG_CODE, 0x000040), 0x0BADF00D)
+
+    # hu: Az op tényleg lefutott (különben a WIP-ellenőrzés triviálisan
+    #     teljesülne, mert wip_remaining sosem lenne >0).
+    # en: The op actually ran (otherwise the WIP check would trivially pass,
+    #     since wip_remaining would never become >0).
+    assert flash_model.program_count == 1, \
+        f"1 page program várt, lett {flash_model.program_count}"
+    assert flash_model.wip_remaining == 0, (
+        f"A controllernek WIP=0-ig kellene pollozni a program után, de "
+        f"wip_remaining={flash_model.wip_remaining} maradt (nem pollozott)"
+    )
+
+
+@cocotb.test()
+async def test_35_flash_erase_clears_old_data(dut):
+    """hu: A Page Program NOR-szemantika (csak 1→0). A célszektort
+           előre 0x00000000-ra töltjük; erase NÉLKÜL a program(0xFFFFFFFF)
+           AND-elne → 0x00000000. Erase UTÁN a szektor 0xFF → program →
+           0xFFFFFFFF. A round-trip 0xFFFFFFFF-et ad → bizonyítja az erase-t.
+    en: Page Program is NOR (1→0 only). Pre-load the target sector to
+           0x00000000; WITHOUT erase, program(0xFFFFFFFF) would AND →
+           0x00000000. AFTER erase the sector is 0xFF → program → 0xFFFFFFFF.
+           The round-trip yields 0xFFFFFFFF → proves the erase happened."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    addr = 0x004000
+    flash_mem = {addr: 0x00, addr + 1: 0x00, addr + 2: 0x00, addr + 3: 0x00}
+    flash_model, _ = await reset_dut(dut, flash_mem=flash_mem)
+
+    await do_flash_write(dut, make_addr(SEG_CODE, addr), 0xFFFFFFFF)
+
+    result = await do_read(dut, make_addr(SEG_CODE, addr))
+    assert result == 0xFFFFFFFF, (
+        f"Erase után a program 0xFFFFFFFF-et ad; lett 0x{result:08X}. "
+        f"0x00000000 = az erase NEM futott le (NOR 1→0 AND a régi 0x00-val)"
     )
