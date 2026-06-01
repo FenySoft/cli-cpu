@@ -6,7 +6,9 @@
 //     tape-out wrapper funkcionális precursor-a — az F3 ezt minimális átírással
 //     csomagolja a `tt_um_<név>` modulba.
 //
-//     Pin-map (megerősített, ADR 2026-06-01):
+//     Pin-map (ADR 2026-06-01, qspi-pmod-igazítva): a uio blokk a mole99
+//     QSPI Pmod (W25Q128 flash + 2× APS6404L PSRAM) FIX pinout-ját követi, hogy
+//     a Pmod közvetlenül használható legyen (TT-szabvány):
 //       ui_in[0]    UART RX (host → loader)
 //       ui_in[7:1]  GPIO_IN[6:0]
 //       uo_out[0]   UART TX (eredmény-printer)
@@ -14,13 +16,18 @@
 //       uo_out[2]   trap
 //       uo_out[3]   IRQ (aggregált)
 //       uo_out[7:4] MUX: trace_mode ? trace[3:0] : gpio_out[3:0]
-//       uio[3:0]    QSPI DQ[3:0]   (bidir, oe = qspi_dq_oe)
-//       uio[4]      QSPI cs_flash_n (out)
-//       uio[5]      QSPI cs_psram_n (out)
-//       uio[6]      QSPI clk        (out)
-//       uio[7]      MUX: trace_mode ? trace[4] : gpio_out[4] (out)
+//       uio[0]      QSPI CS0  = cs_flash_n        (out)
+//       uio[1]      QSPI SD0  = DQ0  (bidir, oe = qspi_dq_oe)
+//       uio[2]      QSPI SD1  = DQ1  (bidir, oe = qspi_dq_oe)
+//       uio[3]      QSPI SCK  = clk               (out)
+//       uio[4]      QSPI SD2  = DQ2  (bidir, oe = qspi_dq_oe)
+//       uio[5]      QSPI SD3  = DQ3  (bidir, oe = qspi_dq_oe)
+//       uio[6]      QSPI CS1  = cs_psram_n (RAM A) (out)
+//       uio[7]      QSPI CS2  = RAM B (nem használt, magasra hajtva → deselect)
 //     A mailbox host-oldal NINCS pin — az F3 chip-en UART-protokollon érhető el
 //     (a loader-keret bővítése; külön taszk). Itt belül tied-off / open.
+//     A qspi-pmod mind a 8 uio-t elhasználja → a trace/gpio mux a dedikált
+//     uo_out[7:4]-en (4 bit), nincs uio mux-bit.
 //
 // en: CLI-CPU F2.8.6 — Tiny Tapeout `tt_um` equivalent top-level wrapper.
 //     Binds `cilcpu_soc` (Nano core + UART loader/boot_ctrl + mailbox/gpio/trace
@@ -97,7 +104,11 @@ module cilcpu_tt_top #(
     wire        w_qspi_cs_psram_n;
     wire [3:0]  w_qspi_dq_out;
     wire        w_qspi_dq_oe;
-    wire [3:0]  w_qspi_dq_in = uio_in[3:0];
+    // hu: DQ bemenet a qspi-pmod szétszórt pinjeiről: SD0=uio[1], SD1=uio[2],
+    //     SD2=uio[4], SD3=uio[5] → a controller {DQ3,DQ2,DQ1,DQ0} sorrendje.
+    // en: DQ input gathered from the qspi-pmod scattered pins: SD0=uio[1],
+    //     SD1=uio[2], SD2=uio[4], SD3=uio[5] → controller {DQ3,DQ2,DQ1,DQ0}.
+    wire [3:0]  w_qspi_dq_in = {uio_in[5], uio_in[4], uio_in[2], uio_in[1]};
 
     wire [GPIO_WIDTH-1:0]  w_gpio_out;
     wire [GPIO_WIDTH-1:0]  w_gpio_oe;   // hu: belső GPIO-irány; a TT pin-irány a pin-mapból jön
@@ -250,37 +261,48 @@ module cilcpu_tt_top #(
     // hu: Kimeneti pin-leképezés
     // en: Output pin mapping
     // ============================================================
-    // hu: 5-bit muxolt csoport — trace VAGY gpio-out (o_trace_mode dönt).
-    //     {uio[7], uo_out[7:4]} = trace_mode ? trace[4:0] : gpio_out[4:0].
-    // en: 5-bit muxed group — trace OR gpio-out (selected by o_trace_mode).
-    wire [4:0] w_mux = w_trace_mode ? w_trace[4:0] : w_gpio_out[4:0];
+    // hu: 4-bit muxolt csoport — trace VAGY gpio-out (o_trace_mode dönt).
+    //     uo_out[7:4] = trace_mode ? trace[3:0] : gpio_out[3:0]. (A qspi-pmod
+    //     mind a 8 uio-t elfoglalja, ezért a mux a dedikált kimeneten van.)
+    // en: 4-bit muxed group — trace OR gpio-out (selected by o_trace_mode).
+    //     uo_out[7:4] = trace_mode ? trace[3:0] : gpio_out[3:0]. (The qspi-pmod
+    //     consumes all 8 uio, so the mux lives on the dedicated output.)
+    wire [3:0] w_mux = w_trace_mode ? w_trace[3:0] : w_gpio_out[3:0];
 
     assign uo_out[0]   = w_uart_tx;     // UART TX (printer)
     assign uo_out[1]   = w_halt;
     assign uo_out[2]   = w_trap;
     assign uo_out[3]   = w_irq;
-    assign uo_out[7:4] = w_mux[3:0];
+    assign uo_out[7:4] = w_mux;
 
-    // hu: QSPI a bidi pineken. A DQ[3:0] iránya a controller oe-je; a
-    //     cs/clk/mux pinek mindig kimenetek (oe=1).
-    // en: QSPI on the bidir pins. DQ[3:0] direction follows the controller oe;
-    //     the cs/clk/mux pins are always outputs (oe=1).
-    assign uio_out[3:0] = w_qspi_dq_out;
-    assign uio_out[4]   = w_qspi_cs_flash_n;
-    assign uio_out[5]   = w_qspi_cs_psram_n;
-    assign uio_out[6]   = w_qspi_clk;
-    assign uio_out[7]   = w_mux[4];
+    // hu: QSPI a uio pineken a qspi-pmod FIX pinout-ja szerint. A DQ (SD0..SD3)
+    //     iránya a controller oe-je; a CS/SCK pinek mindig kimenetek (oe=1).
+    //     A CS2 (RAM B, uio[7]) nem használt → magasra hajtva (deselect).
+    // en: QSPI on the uio pins per the qspi-pmod FIXED pinout. DQ (SD0..SD3)
+    //     direction follows the controller oe; CS/SCK pins are always outputs
+    //     (oe=1). CS2 (RAM B, uio[7]) is unused → driven high (deselect).
+    assign uio_out[0] = w_qspi_cs_flash_n;   // CS0 (Flash)
+    assign uio_out[1] = w_qspi_dq_out[0];    // SD0/DQ0
+    assign uio_out[2] = w_qspi_dq_out[1];    // SD1/DQ1
+    assign uio_out[3] = w_qspi_clk;          // SCK
+    assign uio_out[4] = w_qspi_dq_out[2];    // SD2/DQ2
+    assign uio_out[5] = w_qspi_dq_out[3];    // SD3/DQ3
+    assign uio_out[6] = w_qspi_cs_psram_n;   // CS1 (RAM A)
+    assign uio_out[7] = 1'b1;                // CS2 (RAM B) — deselect
 
-    assign uio_oe[3:0] = {4{w_qspi_dq_oe}};
-    assign uio_oe[4]   = 1'b1;
-    assign uio_oe[5]   = 1'b1;
-    assign uio_oe[6]   = 1'b1;
-    assign uio_oe[7]   = 1'b1;
+    assign uio_oe[0] = 1'b1;            // CS0
+    assign uio_oe[1] = w_qspi_dq_oe;    // SD0
+    assign uio_oe[2] = w_qspi_dq_oe;    // SD1
+    assign uio_oe[3] = 1'b1;            // SCK
+    assign uio_oe[4] = w_qspi_dq_oe;    // SD2
+    assign uio_oe[5] = w_qspi_dq_oe;    // SD3
+    assign uio_oe[6] = 1'b1;            // CS1
+    assign uio_oe[7] = 1'b1;            // CS2
 
     // hu: Fel nem használt belső jelek (lint-csend)
     // en: Unused internal signals (lint silence)
-    wire _unused = &{1'b0, w_pc, w_gpio_out[GPIO_WIDTH-1:5], w_gpio_oe,
-                     w_trace[TRACE_WIDTH-1:5], 1'b0};
+    wire _unused = &{1'b0, w_pc, w_gpio_out[GPIO_WIDTH-1:4], w_gpio_oe,
+                     w_trace[TRACE_WIDTH-1:4], 1'b0};
 
 endmodule
 

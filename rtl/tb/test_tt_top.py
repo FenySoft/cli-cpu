@@ -33,20 +33,51 @@ UO_UART_TX = 0
 UO_HALT    = 1
 UO_TRAP    = 2
 UO_IRQ     = 3
-# uo_out[7:4] + uio[7] = MUX(trace/gpio_out[4:0])
-UIO_CS_FL  = 4
-UIO_CS_PS  = 5
-UIO_CLK    = 6
-UIO_MUX4   = 7
+# uo_out[7:4] = MUX(trace/gpio_out[3:0])
+# hu: uio a qspi-pmod FIX pinout-ja szerint
+# en: uio per the qspi-pmod FIXED pinout
+UIO_CS_FL  = 0   # CS0 (Flash)
+UIO_DQ0    = 1   # SD0
+UIO_DQ1    = 2   # SD1
+UIO_SCK    = 3   # SCK
+UIO_DQ2    = 4   # SD2
+UIO_DQ3    = 5   # SD3
+UIO_CS_PS  = 6   # CS1 (RAM A)
+UIO_CS_PS2 = 7   # CS2 (RAM B) — deselect (1)
+
+
+class _ScatterDQ:
+    """hu: A 4-bit DQ nibble-t a qspi-pmod szétszórt uio_in pinjeire írja:
+        DQ0→uio_in[1], DQ1→uio_in[2], DQ2→uio_in[4], DQ3→uio_in[5]. A
+        qspi_slave_driver `dut.qspi_dq_in.value = nibble`-t hív (csak írás).
+    en: Writes the 4-bit DQ nibble to the qspi-pmod scattered uio_in pins:
+        DQ0→uio_in[1], DQ1→uio_in[2], DQ2→uio_in[4], DQ3→uio_in[5]. The
+        qspi_slave_driver calls `dut.qspi_dq_in.value = nibble` (write only)."""
+
+    def __init__(self, dut):
+        self._dut = dut
+
+    @property
+    def value(self):
+        return 0
+
+    @value.setter
+    def value(self, nibble):
+        n = int(nibble)
+        v = (((n >> 0) & 1) << UIO_DQ0) | (((n >> 1) & 1) << UIO_DQ1) \
+          | (((n >> 2) & 1) << UIO_DQ2) | (((n >> 3) & 1) << UIO_DQ3)
+        self._dut.uio_in.value = v
 
 
 class _SocQspiView:
     """hu: Shim — a qspi_slave_driver a SoC belső QSPI-portjain dolgozzon, és a
-        DQ-bemenetet a uio_in[3:0] porton hajtsa. A driver dut.qspi_* neveket
-        használ; ezt a view a hierarchikus jelekre képezi.
+        DQ-bemenetet a qspi-pmod szétszórt uio_in pinjeire hajtsa (_ScatterDQ).
+        A driver dut.qspi_* neveket használ; a view ezeket a hierarchikus
+        jelekre képezi (clk/cs/dq_out a SoC belső portja, dq_in a scatter-proxy).
     en: Shim — lets qspi_slave_driver operate on the SoC's internal QSPI ports
-        and drive the DQ input via uio_in[3:0]. The driver uses dut.qspi_*
-        names; this view maps them to the hierarchical signals."""
+        and drive the DQ input to the qspi-pmod scattered uio_in pins
+        (_ScatterDQ). clk/cs/dq_out are the SoC's internal ports, dq_in is the
+        scatter proxy."""
 
     def __init__(self, dut):
         self.clk              = dut.clk
@@ -54,9 +85,7 @@ class _SocQspiView:
         self.qspi_cs_flash_n  = dut.u_soc.qspi_cs_flash_n
         self.qspi_cs_psram_n  = dut.u_soc.qspi_cs_psram_n
         self.qspi_dq_out      = dut.u_soc.qspi_dq_out
-        # hu: a driver ide ír (DQ MISO) — a tt_top a uio_in[3:0]-t használja
-        # en: the driver writes here (DQ MISO) — tt_top uses uio_in[3:0]
-        self.qspi_dq_in       = dut.uio_in
+        self.qspi_dq_in       = _ScatterDQ(dut)
 
 
 def _bits(val, hi, lo):
@@ -157,20 +186,26 @@ async def _wait_halt(dut, timeout=6000):
 
 @cocotb.test()
 async def test_01_reset_pin_state(dut):
-    """hu: Reset után a pin-irányok és status pinek alaphelyzetben. A QSPI
-        cs/clk/mux pinek kimenetek (uio_oe[7:4]=1), a DQ irány a controller
-        oe-je (IDLE-ban 0 → uio_oe[3:0]=0). A status pinek (halt/trap/irq) 0.
-    en: After reset the pin directions and status pins are at their defaults.
-        The QSPI cs/clk/mux pins are outputs (uio_oe[7:4]=1), DQ direction is
-        the controller oe (0 in IDLE → uio_oe[3:0]=0). Status pins are 0."""
+    """hu: Reset után a pin-irányok és status pinek alaphelyzetben. A qspi-pmod
+        CS/SCK pinjei (uio 0,3,6,7) kimenetek, a DQ (uio 1,2,4,5) iránya a
+        controller oe-je (IDLE-ban 0 → bemenet). A CS2 (uio[7]) magas (deselect).
+        A status pinek (halt/trap/irq) 0, az UART TX idle (1).
+    en: After reset the pin directions and status pins are at defaults. The
+        qspi-pmod CS/SCK pins (uio 0,3,6,7) are outputs, the DQ (uio 1,2,4,5)
+        direction is the controller oe (0 in IDLE → input). CS2 (uio[7]) is high
+        (deselect). Status pins (halt/trap/irq) are 0, UART TX idle (1)."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _reset(dut)
 
     oe = int(dut.uio_oe.value)
-    assert _bits(oe, 7, 4) == 0xF, \
-        f"uio_oe[7:4] (cs/clk/mux) = 0x{_bits(oe,7,4):X}, várt 0xF (mind kimenet)"
-    assert _bits(oe, 3, 0) == 0x0, \
-        f"uio_oe[3:0] (DQ) = 0x{_bits(oe,3,0):X}, várt 0x0 (IDLE: controller oe=0)"
+    for b in (UIO_CS_FL, UIO_SCK, UIO_CS_PS, UIO_CS_PS2):
+        assert _bits(oe, b, b) == 1, f"uio_oe[{b}] (CS/SCK) nem kimenet (1)"
+    for b in (UIO_DQ0, UIO_DQ1, UIO_DQ2, UIO_DQ3):
+        assert _bits(oe, b, b) == 0, f"uio_oe[{b}] (DQ) nem 0 (bemenet) IDLE-ban"
+
+    # hu: CS2 (RAM B) magasra hajtva — deselect
+    assert _bits(int(dut.uio_out.value), UIO_CS_PS2, UIO_CS_PS2) == 1, \
+        "uio[7] (CS2/RAM B) nem deselect (1)"
 
     uo = int(dut.uo_out.value)
     assert _bits(uo, UO_HALT, UO_HALT) == 0, "halt pin nem 0 reset után"
@@ -212,11 +247,11 @@ async def test_02_boot_e2e_uart_to_uart(dut):
 @cocotb.test()
 async def test_03_gpio_out_and_trace_mux(dut):
     """hu: A program a GPIO_OE-t és GPIO_OUT-ot írja (STIND). trace_mode=0
-        (default) → a muxolt pinek a gpio_out[4:0]-t mutatják:
-        {uio[7], uo_out[7:4]} == gpio_out[4:0]. A gpio_out[4:0]=0x15 (10101).
+        (default) → a muxolt pinek (uo_out[7:4], 4 bit) a gpio_out[3:0]-t
+        mutatják. A gpio_out[3:0]=0x0D (1101).
     en: The program writes GPIO_OE and GPIO_OUT (STIND). With trace_mode=0
-        (default) the muxed pins show gpio_out[4:0]:
-        {uio[7], uo_out[7:4]} == gpio_out[4:0]. gpio_out[4:0]=0x15 (10101)."""
+        (default) the muxed pins (uo_out[7:4], 4-bit) show gpio_out[3:0].
+        gpio_out[3:0]=0x0D (1101)."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
     await _reset(dut)
 
@@ -224,24 +259,18 @@ async def test_03_gpio_out_and_trace_mux(dut):
     psram = TQSPIPSRAMModel()
     cocotb.start_soon(qspi_slave_driver(_SocQspiView(dut), flash, psram))
 
-    gpio_val = 0x15   # alsó 5 bit: 1 0101
-    program = (_ldc_i4(GPIO_OE)  + _ldc_i4(0x1F) + bytes([OP_STIND_I4])
+    gpio_val = 0x0D   # alsó 4 bit (a mux 4 bites: uo_out[7:4])
+    program = (_ldc_i4(GPIO_OE)  + _ldc_i4(0x0F) + bytes([OP_STIND_I4])
                + _ldc_i4(GPIO_OUT) + _ldc_s(gpio_val) + bytes([OP_STIND_I4])
                + _ldc_s(0) + bytes([OP_RET]))
     await _uart_load_and_boot(dut, program)
     await _wait_halt(dut)
     await Timer(1, units="ns")
 
-    uo  = int(dut.uo_out.value)
-    uio = int(dut.uio_out.value)
-    # hu: muxolt érték: uo_out[7:4] = gpio_out[3:0], uio[7] = gpio_out[4]
-    mux = (_bits(uio, UIO_MUX4, UIO_MUX4) << 4) | _bits(uo, 7, 4)
+    # hu: muxolt érték: uo_out[7:4] == gpio_out[3:0] (trace_mode=0)
+    mux = _bits(int(dut.uo_out.value), 7, 4)
     assert mux == gpio_val, \
-        f"muxolt GPIO-out = 0x{mux:02X}, várt 0x{gpio_val:02X} (trace_mode=0)"
-
-    # hu: a uio_oe[7] (mux pin) mindig kimenet
-    assert _bits(int(dut.uio_oe.value), UIO_MUX4, UIO_MUX4) == 1, \
-        "uio[7] (mux) nem kimenet"
+        f"muxolt GPIO-out (uo_out[7:4]) = 0x{mux:X}, várt 0x{gpio_val:X} (trace_mode=0)"
 
 
 @cocotb.test()
