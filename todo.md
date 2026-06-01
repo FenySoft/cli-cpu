@@ -30,8 +30,34 @@
   — a QSPI a mole99/qspi-pmod-ra megy a JP1-en (8× IOBUF, NINCS STARTUPE2 — a clk
   sima I/O pin); uio→FPGA F13/E13/D14/E16/F14/E14/D15/D16; sim-validált
   (`test_tt_board` 2/2). Vault: `reference_a7lite_pinout`, ADR `2026-06-01-tt-pin-map`
-- ⬜ Vivado/OpenXC7 build a tt_board-hoz (bitstream-generálás, timing-zárás)
+- ✅ Vivado + OpenXC7 build-scriptek a tt_board-hoz (`rtl/fpga/tt/OpenXC7/Makefile`
+  + `tt/Vivado/create_project.tcl` + README). NINCS STARTUPE2 → OpenXC7 teljes
+  támogatás. A tényleges build WSL-en/Vivado-n fut (a kártya megjöttére kész).
 - ⬜ A7-Lite HW bring-up (qspi-pmod adapter, boot-over-UART, mailbox echo, trace)
+  — a build futtatása + flashelés + UART-teszt, ha megjött a qspi-pmod kártya.
+
+### tt_board HW bring-up kockázatok (dokumentált, NEM rejtett akna)
+
+A sim zöld (`test_tt_board` 2/2), de a valós HW-en ellenőrizendő (lásd
+`rtl/fpga/tt/README-hu.md` „Ismert bring-up kockázatok"):
+
+1. **W25Q128 QE-bit** (flash 0x6B Quad-read) — `QE_INIT_ENABLE=1` kezeli;
+   ha garbage, ez a gyanús (mint F2.7 Sub5 config-flash).
+2. **APS6404L PSRAM Quad-mód (0x35)** — a `cilcpu_qspi_controller` NEM ad 0x35
+   „Enter Quad Mode"-ot; a PSRAM-betöltés (dev=1) a HW-en valószínűleg PSRAM-quad-
+   init RTL-bővítést igényel. Külön taszk, ha a HW-en kiderül. Flash-boot (dev=0)
+   ettől független.
+3. **QSPI clk sima GPIO-n (uio[3]=E16)** — /2 gated clk nem clock-capable pinen;
+   25 MHz-en várhatóan jó, ha nem → ODDR forward (RTL-finomítás).
+
+## F2.6 — TT tile-szám + Sky130 area becslés (PREREQUISITE-FÜGGŐ)
+
+- **Státusz:** ⏳ VÁRAKOZIK — a becslést CSAK akkor csináljuk, ha minden megvan
+  hozzá (felhasználói elv, 2026-06-01). Lásd Vault: `feedback_no_premature_tile_estimate`.
+- **Prerequisite-ek:** (1) Sky130 PDK + liberty (`sky130_fd_sc_hd`) vagy OpenLane2;
+  (2) véglegesített F3 design (mit szintetizálunk: tt_top / SoC / core+mailbox+uart);
+  (3) TT tile-méretezés + aktuális $/tile ár.
+- Yosys ELÉRHETŐ (homebrew); a Sky130 liberty hiányzik → emiatt vár.
 
 Részletes sub-feladatok és elfogadási kritériumok: `docs/F2.8-plan-hu.md`.
 
