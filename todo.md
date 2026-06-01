@@ -26,8 +26,12 @@
   F1b UART loader + PSRAM-írás, F1c flash auto-detect, **F2 flash erase+program**
 - ✅ F2.8.6 TT `tt_um` ekvivalens wrapper (`cilcpu_tt_top.v`) — SoC + eredmény-
   printer a 24-pin TT interfészre (sim-validált: `test_tt_top` 4/4)
-- ⬜ A7-Lite board-szintű XDC a tt_top-hoz (STARTUPE2/IOBUF, uio→fizikai pinek)
-- ⬜ A7-Lite HW bring-up (QSPI Pmod, boot-over-UART, mailbox echo, trace)
+- ✅ A7-Lite board-szintű wrapper + XDC (`cilcpu_tt_board.v` + `cilcpu_tt_a7lite.xdc`)
+  — a QSPI a mole99/qspi-pmod-ra megy a JP1-en (8× IOBUF, NINCS STARTUPE2 — a clk
+  sima I/O pin); uio→FPGA F13/E13/D14/E16/F14/E14/D15/D16; sim-validált
+  (`test_tt_board` 2/2). Vault: `reference_a7lite_pinout`, ADR `2026-06-01-tt-pin-map`
+- ⬜ Vivado/OpenXC7 build a tt_board-hoz (bitstream-generálás, timing-zárás)
+- ⬜ A7-Lite HW bring-up (qspi-pmod adapter, boot-over-UART, mailbox echo, trace)
 
 Részletes sub-feladatok és elfogadási kritériumok: `docs/F2.8-plan-hu.md`.
 

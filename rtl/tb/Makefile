@@ -333,6 +333,35 @@ $(PWD)/../fpga/decimal_printer.v \
 $(PWD)/../src/cilcpu_soc.v \
 $(PWD)/../fpga/cilcpu_tt_top.v"
 
+# hu: F2.8.6 — A7-Lite board top a tt_top köré (cilcpu_tt_board). A QSPI a
+#     qspi-pmod-ra megy a JP1-en (IOBUF) — sim módban (+DCILCPU_SIM_BOARD) split
+#     debug portok a uio inout busz helyett. Nincs STARTUPE2 (a clk sima I/O pin).
+# en: F2.8.6 — A7-Lite board top around tt_top (cilcpu_tt_board). QSPI goes to
+#     the qspi-pmod via JP1 (IOBUF) — in sim (+DCILCPU_SIM_BOARD) split debug
+#     ports instead of the uio inout bus. No STARTUPE2 (clk is a plain I/O pin).
+test_tt_board:
+	$(SUBMAKE) MODULE=test_tt_board TOPLEVEL=cilcpu_tt_board LOCAL_COMPILE_ARGS="-GCLOCKS_PER_BAUD=8 -DCILCPU_SIM_BOARD" VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/../src/cilcpu_fifo.v \
+$(PWD)/../src/cilcpu_mailbox.v \
+$(PWD)/../src/cilcpu_gpio.v \
+$(PWD)/../src/cilcpu_trace.v \
+$(PWD)/../src/cilcpu_uart_loader.v \
+$(PWD)/../src/cilcpu_boot_ctrl.v \
+$(PWD)/../fpga/uart_rx.v \
+$(PWD)/../fpga/uart_tx.v \
+$(PWD)/../fpga/decimal_printer.v \
+$(PWD)/../src/cilcpu_soc.v \
+$(PWD)/../fpga/cilcpu_tt_top.v \
+$(PWD)/../fpga/cilcpu_tt_board.v"
+
 # hu: F2.8 #6.5b-F1b — UART boot-loader FSM (WRITE/BOOT keret-parser).
 # en: F2.8 #6.5b-F1b — UART boot-loader FSM (WRITE/BOOT frame parser).
 test_uart_loader:
@@ -375,4 +404,4 @@ test_decimal_printer:
 $(PWD)/../fpga/uart_tx.v \
 $(PWD)/../fpga/decimal_printer.v"
 
-.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_soc test_soc_autoboot test_uart_loader test_boot_ctrl test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib
+.PHONY: test_alu test_decoder test_microcode test_stack_cache test_qspi_controller test_qspi_controller_offset test_divider test_multiplier test_qspi_qe_init test_core test_core_golden test_a7lite_top test_uart_tx test_uart_rx test_fifo test_mailbox test_gpio test_trace test_soc test_soc_autoboot test_uart_loader test_boot_ctrl test_decimal_printer test_a7lite_fib test_a7lite_board test_a7lite_board_fib test_tt_top test_tt_board
