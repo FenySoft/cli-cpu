@@ -24,7 +24,9 @@
 - ✅ #6.5a SoC wrapper (`cilcpu_soc.v`) — MMIO-dekód + perifériák
 - ✅ #6.5b boot/load alrendszer (ADR 2026-05-30): F1a QSPI kiemelés,
   F1b UART loader + PSRAM-írás, F1c flash auto-detect, **F2 flash erase+program**
-- ⬜ F2.8.6 Bővített A7-Lite wrapper (TT `tt_um` ekvivalens) — a SoC bekötése
+- ✅ F2.8.6 TT `tt_um` ekvivalens wrapper (`cilcpu_tt_top.v`) — SoC + eredmény-
+  printer a 24-pin TT interfészre (sim-validált: `test_tt_top` 4/4)
+- ⬜ A7-Lite board-szintű XDC a tt_top-hoz (STARTUPE2/IOBUF, uio→fizikai pinek)
 - ⬜ A7-Lite HW bring-up (QSPI Pmod, boot-over-UART, mailbox echo, trace)
 
 Részletes sub-feladatok és elfogadási kritériumok: `docs/F2.8-plan-hu.md`.

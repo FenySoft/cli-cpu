@@ -305,6 +305,34 @@ $(PWD)/../src/cilcpu_soc.v"
 # hu: megj. — a cilcpu_qspi_controller.v már a fenti listában; a cilcpu_soc
 #     (F1a) maga példányosítja a controllert, (F1b) az uart_rx + uart_loader-t is.
 
+# hu: F2.8.6 — Tiny Tapeout tt_um ekvivalens top (cilcpu_soc + eredmény-printer
+#     a 24-pin TT interfészre). A SoC összes forrása + uart_rx (loader) +
+#     uart_tx/decimal_printer (eredmény) + cilcpu_tt_top.
+# en: F2.8.6 — Tiny Tapeout tt_um equivalent top (cilcpu_soc + result printer
+#     on the 24-pin TT interface). All SoC sources + uart_rx (loader) +
+#     uart_tx/decimal_printer (result) + cilcpu_tt_top.
+test_tt_top:
+	$(SUBMAKE) MODULE=test_tt_top TOPLEVEL=cilcpu_tt_top LOCAL_COMPILE_ARGS="-GCLOCKS_PER_BAUD=8" VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/../src/cilcpu_fifo.v \
+$(PWD)/../src/cilcpu_mailbox.v \
+$(PWD)/../src/cilcpu_gpio.v \
+$(PWD)/../src/cilcpu_trace.v \
+$(PWD)/../src/cilcpu_uart_loader.v \
+$(PWD)/../src/cilcpu_boot_ctrl.v \
+$(PWD)/../fpga/uart_rx.v \
+$(PWD)/../fpga/uart_tx.v \
+$(PWD)/../fpga/decimal_printer.v \
+$(PWD)/../src/cilcpu_soc.v \
+$(PWD)/../fpga/cilcpu_tt_top.v"
+
 # hu: F2.8 #6.5b-F1b — UART boot-loader FSM (WRITE/BOOT keret-parser).
 # en: F2.8 #6.5b-F1b — UART boot-loader FSM (WRITE/BOOT frame parser).
 test_uart_loader:
