@@ -6,7 +6,7 @@ status: draft
 
 > English version: [ISA-CIL-Seal-en.md](ISA-CIL-Seal-en.md)
 
-> Version: 0.1 (draft)
+> Version: 0.2 (draft)
 
 Ez a dokumentum a **CIL-Seal** utasításkészletet specifikálja, amely a Seal Core firmware-jének ISA-ja. A CIL-Seal a CIL-T0 **superset-je**: minden CIL-T0 opkód elérhető, plusz tömb-kezelés és external hardware unit hívás.
 
@@ -244,7 +244,7 @@ public static class MerklePath
 
 1. **Stack irány** — alulról felfelé, kompatibilis a meglévő TCpu szimulátorral. A heap felülről lefelé nő, egymás felé haladnak.
 2. **External call jelölés** — `[CryptoCall(index)]` custom attribute a `static extern` metódusokon. A dispatch index explicit a forráskódban, a linker a metaadat custom attribute-ból olvassa.
-3. **Cella méret: 16B header + 64B payload = 80 byte** — az interconnect spec (v2.0) szerinti fix cella. A 128B payload elvetett opció: a tipikus actor workload ~80%-a ≤48 byte, a 64B cella ~38%-kal jobb aggregált throughput-ot ad a 10 000 core-os mesh-ben (kevesebb link-foglalás kicsi üzenetekre, alacsonyabb HOL blocking). A code-load throughput kérdése multi-cell streaming-gel megoldott (256 cella = 16KB, ~8μs @ 500 MHz). Az ML-Max saját systolic routert használ, nem a fő mesh-t.
+3. **Cella méret: 16B header + max 128B payload = max 144 byte** — az interconnect spec (v3.1) szerinti fix buffer, változó link foglalás (lásd `interconnect-hu.md` v3.1, `specs/cell-format-hu.md`, `decision-bus-rollback-hu.md`). A 128 byte payload a v3.1 alapértelmezett: a 16 byte header pontosan 1 flit a 128-bit L0 buszon (nincs padding waste), a payload a DDR5 BL32 (128 byte) natív burst-höz illeszkedik, és a tipikus — kicsi — actor üzenet egyetlen cellába fér. A code-load throughput multi-cell streaming-gel megoldott (16 KB metódus = 128 cella × 128B payload, pipeline-olva). Az ML-Max saját systolic routert használ, nem a fő mesh-t.
 
 ## Nyitott kérdések
 
@@ -265,3 +265,4 @@ public static class MerklePath
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
 | 0.1 | 2026-04-20 | Kezdeti draft. CIL-T0 superset: tömb opkódok (newarr, ldlen, ldelem.u1, stelem.i1), external call dispatch (SHA-256, WOTS+, Merkle), heap memória modell, Seal Core állapotgép. |
+| 0.2 | 2026-06-01 | **Cellaformátum frissítve v2.0 → v3.1-re** (Eldöntött kérdések, 3. pont). A korábbi 16B + 64B = 80B (v2.0) cella két verzióval elavult volt; az aktuális interconnect spec v3.1: **16B header + max 128B payload = max 144B**. Az indoklás átírva a v3.1 érvekre (header = 1 flit a 128-bit L0 buszon, DDR5 BL32 illeszkedés, multi-cell streaming code-load). A megalapozatlan, körkörösen hivatkozott „~80% ≤48 byte" eloszlás-szám eltávolítva (nem mért adat). Kaszkád-javítás a v3.1 bus-rollback átvezetésből. |

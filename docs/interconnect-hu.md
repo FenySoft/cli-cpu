@@ -6,7 +6,7 @@ status: vision
 
 > English version: [interconnect-en.md](interconnect-en.md)
 
-> Version: 3.2
+> Version: 3.5
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **on-chip interconnect hálózatát** specifikálja: a topológiát, a switching modellt, a router belső felépítését, a fizikai elrendezést, a core családot és a node-skálázási stratégiát.
 
@@ -131,7 +131,7 @@ Példák:
 
 **HW költség:** 4 bites számláló per port + shift. Nincs LUT, nincs tail bit, nincs link-szélességi overhead.
 
-**Hatás a hálózat áteresztőképességére:** az actor üzenetek ~80%-a ≤48 byte payload. Változó link foglalással a linkek **átlagosan ~43%-kal kevesebb ideig foglaltak**, ami közel megduplázza az effektív hálózati áteresztőképességet.
+**Hatás a hálózat áteresztőképességére:** az actor üzenetek becsült ~80%-a ≤48 byte payload (**tervezési feltételezés, nem mért** — Akka.NET/Erlang-stílusú actor workloadok jellemzően kis üzenetei alapján; valódi eloszlás-mérés későbbi fázisra ütemezve). Változó link foglalással a linkek **átlagosan ~43%-kal kevesebb ideig foglaltak**, ami közel megduplázza az effektív hálózati áteresztőképességet.
 
 **Split SRAM design:** a header és a payload **külön SRAM-ban** tárolódik a routerben. Ez természetes, mert funkcionálisan különböznek: a scheduler a headert olvassa a routing döntéshez, miközben a payload még érkezik — **1 ciklus latencia-megtakarítás**. Nincs port-verseny a scheduler és a crossbar között. Mindkét SRAM 2-hatvány igazított: header = slot × 16, payload = slot × 128 — egyszerű shift-es címzés, nincs szükség szorzóra.
 
@@ -159,7 +159,7 @@ A v3.1-ben a payload max mérete **128 byte** (a v3.0-ban 256 byte volt). A vál
 
 > **Megjegyzés:** a változó link foglalásnak köszönhetően a fenti worst-case flit számok ritkán fordulnak elő. Egy tipikus 32 byte-os actor üzenet: 128-bit L0-on 3 flit (header + 2 payload) — a link **gyorsan felszabadul**.
 
-**Döntő érv: tiszta flit-illesztés.** A 128-bit-es L0 busz pont 1 flit a header-nek, padding waste nélkül. A tipikus actor üzenet (~80% ≤48 byte) 2–4 flit alatt áthalad. A nagy üzenetek (state migráció, code-load chunk) 2× több cellára darabolódnak, mint a v3.0-ban (de a worst-case latency változatlan, mert a flit-szám ugyanaz).
+**Döntő érv: tiszta flit-illesztés.** A 128-bit-es L0 busz pont 1 flit a header-nek, padding waste nélkül. A tipikus actor üzenet (becsült ~80% ≤48 byte, lásd a fenti megjegyzést) 2–4 flit alatt áthalad. A nagy üzenetek (state migráció, code-load chunk) 2× több cellára darabolódnak, mint a v3.0-ban (de a worst-case latency változatlan, mert a flit-szám ugyanaz).
 
 Az Akka/actor stílusú rendszerekben az üzenetek nagy többsége kicsi (parancsok, események, rövid válaszok: 16–64 byte), amelyek egyetlen 128B cellába bőven elférnek — multi-cell fragmentáció nélkül.
 
@@ -807,6 +807,66 @@ A döntés a workload-tól függ — az RTL `SRAM_KB_PER_CORE` paramétere gyár
 
 A tipikus cross-régió latencia ~93 ciklus (186 ns @ 500 MHz) 48B payload-ra, worst-case 128B payload-ra ~171 ciklus (342 ns) — a kisebb cluster fizikai méret a fejlettebb node-okon részben kompenzálja a mélyebb hierarchiát.
 
+## Memória-tier (HBM3)
+
+> **Státusz: javaslat (extrapoláció).** A HBM3 spec-számok verifikáltak (JEDEC JESD238). A CFPU-specifikus tier-felépítés (port-számok, link-szélességek, topológia) a NoC-képletből **származtatott javaslat**, nem lezárt döntés — az F4/F5 RTL és a véglegesített chiplet-geometria validálja. A DDR5 memória-interfész ezzel szemben lezárt: lásd [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md).
+
+A négy-szintű L0–L3 hierarchia a **compute-fabric**: kis actor-üzenetekre (≤128 byte cella) optimalizált. A HBM3 forgalma minden dimenzióban más (bulk, many-to-few, nagyságrenddel nagyobb sávszélesség), ezért **külön memória-tier-t** igényel, nem a compute-mesh linkjeit.
+
+### Miért külön tier? — a sávszélesség-eltérés
+
+A HBM3 verifikált paraméterei (JEDEC JESD238):
+
+| Paraméter | Érték |
+|-----------|-------|
+| Sávszélesség | 819 GB/s / stack |
+| Csatorna | 16 channel / 32 pseudo-channel |
+| Interfész szélesség | 1024 bit (16 × 64-bit) |
+| Per-pin adatráta | 6,4 Gb/s |
+
+Az L0 cluster mesh link @ 500 MHz = 8 GB/s (128 bit × 500 MHz / 8). Egyetlen HBM3 stack telítéséhez **819 ÷ 8 = ~102 darab 128-bites port** kellene — fizikailag irreális egyetlen controllerbe vezetni.
+
+Összevetésként a DDR5 (~76 GB/s) ÷ 8 GB/s = ~10 port, ami **elfér a meglévő NoC-on** (a DDR5 Controller 10 × 128-bit portja, lásd [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md)). A HBM3 ~10,7× sávszélessége az, ami áttöri a 128-bites megközelítést.
+
+### Döntés-trail
+
+| Alternatíva | Miért (el)vetve |
+|-------------|-----------------|
+| A) A compute L0 128-bit mesh újrahasználata | Elvetve — ~102 port/stack irreális; incast-hotspot a mesh szélén, az XY-routing befullad |
+| B) Megosztott VN a compute mesh-en (3. VN bulk-ra) | Elvetve — head-of-line blocking + a sávszélesség-eltérés kiéhezteti az actor-üzeneteket |
+| C) **Külön, széles memória-NoC sík** | **Választott** — fizikai izoláció + teljes HBM3 sávszélesség |
+
+### A választott tier felépítése
+
+1. **Külön fizikai NoC-sík** — nem az L0–L3 compute-hierarchia, hanem dedikált memória-sík. Az actor-forgalom és a bulk memória-forgalom nem osztozik linken → nincs head-of-line blocking.
+2. **Széles linkek + két emelő.** A sebesség a `szélesség × órajel / 8` képletből nő: szélesebb link **és/vagy** magasabb memória-tier órajel.
+3. **Él-koncentrált topológia.** A HBM3 stackek a 2.5D interposer **szélén** ülnek → a forgalom a peremre áramlik. Fat-tree / edge-ring aggregálja a compute-fabric kéréseit a peremi controllerek felé (nem sík XY-mesh).
+4. **Channel-szórás.** A kéréseket a controller a **32 pseudo-channel** közt interleave-eli a sávszélesség kihasználásához.
+5. **HW RTL HBM3 Controller mint NoC-végpont** — ugyanaz az elv, mint a DDR5-nél ([`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) 1.c döntés): nincs szoftveres core a hurokban, mert egy szoftveres gateway-core áteresztése csak ~0,5–1 GB/s.
+6. **Capability újrahasználat.** Ugyanaz a `flags.DDR5_CAP` / QRAM HW Capability Slot modell, mint a DDR5-nél ([`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) 2. döntés) — a HBM3 nem igényel új biztonsági mechanizmust. A TB-skálás multi-stack HBM3-hoz a **page-aligned 32-bit `region_base` (16 TB)** alkalmazandó (lásd ddr5-architecture-hu.md 2.b, v1.4) — a korábbi 36-bit byte-base csak 64 GB-ot (1 stack) fedett.
+
+### Sebesség és port-igény (származtatott, @ 500 MHz)
+
+| Memória-tier link | Nyers / port | Port / HBM3 stack (819 GB/s) |
+|-------------------|-------------|------------------------------|
+| 128-bit | 8 GB/s | ~102 (irreális) |
+| 256-bit | 16 GB/s | ~51 |
+| 512-bit | 32 GB/s | ~26 |
+| **1024-bit** | **64 GB/s** | **~13** |
+
+> A port-szám lineárisan feleződik az órajel duplázásával: 1024-bit @ 1 GHz = 128 GB/s/port → ~7 port/stack. A ~11% header-overhead (1 header-flit / 8 payload-flit) itt is érvényes; a stream-mód nagy szekvenciális blokkokkal amortizálja.
+
+### Kapcsolat a DDR5-tel
+
+| | DDR5 (lezárt) | HBM3 (javaslat) |
+|--|---------------|------------------|
+| Sávszél | ~76 GB/s (2ch) | 819 GB/s / stack |
+| NoC-megoldás | meglévő L0, 10 × 128-bit controller-port | külön memória-tier, ~13 × 1024-bit @ 500 MHz |
+| Topológia | NoC-végpont a fabric-on | külön él-koncentrált sík |
+| Capability | DDR5_CAP / QRAM slot | ugyanaz |
+
+A DDR5 elfér a meglévő interconnecten; a HBM3 az, ami ezt a külön tier-t indokolja.
+
 ## Kizárt alternatívák (és indoklás)
 
 | Alternatíva | Miért kizárva |
@@ -833,6 +893,7 @@ Ez a dokumentum az alábbi Symphact hardware requirement-ekre válaszol:
 ## Kapcsolódó dokumentumok
 
 - [Topológia skálázás](topology-scaling-hu.md) — általános NoC topológia összehasonlítás (Bus/Ring/Mesh/Torus/Crossbar/Fat-tree/Hierarchikus) area + BW + latencia képletekkel, a hierarchikus választás matematikai indoklása
+- [DDR5 architektúra](ddr5-architecture-hu.md) — a külső DDR5 memória-interfész HW architektúrája (RTL controller, capability slot, stream/request mód); a HBM3 memória-tier ezt veszi alapul
 - [Quench-RAM](quench-ram-hu.md) — per-blokk immutability, atomi wipe-on-release, QRAM+hálózat szimbiózis
 - [AuthCode](authcode-hu.md) — kód-hitelesítés, a Seal Core ellenőrzi minden betöltött kód aláírását
 - [Architektúra](architecture-hu.md) — a teljes CFPU mikroarchitektúra áttekintés
@@ -842,6 +903,9 @@ Ez a dokumentum az alábbi Symphact hardware requirement-ekre válaszol:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 3.5 | 2026-06-01 | **HBM3 tier capability-pontosítás.** A „capability újrahasználat" pont kiegészítve: a TB-skálás multi-stack HBM3 a **page-aligned 32-bit `region_base` (16 TB)** modellt használja (ddr5-architecture v1.4), nem a korábbi 36-bit byte-base-t (csak 64 GB / 1 stack). Kaszkád a ddr5-architecture v1.4 capability-slot revízióból. |
+| 3.4 | 2026-06-01 | **Új „Memória-tier (HBM3)" szakasz.** A HBM3 (819 GB/s/stack, 16 channel / 32 pseudo-channel, JEDEC JESD238) külön, széles memória-NoC síkot igényel, mert a compute L0 128-bit linken ~102 port/stack kellene (irreális). Döntés-trail: L0-újrahasználat (elvetve) / megosztott VN (elvetve) / külön memória-tier (választott). Él-koncentrált topológia (2.5D interposer-perem), 32 pseudo-channel interleaving, HW RTL HBM3 controller, capability-újrahasználat (DDR5_CAP/QRAM). Származtatott port-tábla @ 500 MHz: 1024-bit → ~13 port/stack. A DDR5 ezzel szemben elfér a meglévő NoC-on (10 × 128-bit). **Státusz: javaslat/extrapoláció** — HBM3 spec verifikált, a CFPU tier-felépítés F4/F5 RTL-ben validálandó. Kaszkád: ddr5-architecture-hu.md hozzáadva a kapcsolódó dokumentumokhoz. |
+| 3.3 | 2026-06-01 | **A „~80% ≤48 byte" actor-üzenet eloszlás explicit tervezési feltételezésként jelölve (nem mért adat).** A `decision-bus-rollback` korábban egy nemlétező „interconnect v2.4 elemzésre" hivatkozott — körkörös önhivatkozás. A szám most „becsült ~80%" formában, „nem mért, Akka/Erlang-workload alapján, valódi mérés későbbi fázisra ütemezve" megjegyzéssel szerepel. Csak jelölés-pontosítás; a méretezési döntések változatlanok. |
 | 3.2 | 2026-04-28 | **L1 tile crossbar link 84-bit → 128-bit + 8 bit kontroll.** A v1.0-ból örökölt 84-bit párhuzamos link nem volt 2-hatvány, nem aligned a header (128-bit) és L0 (128-bit) szélességével — felesleges design hiba. Az L1 mostantól egyezik az L0-val: 128-bit data + 8-bit kontroll (valid/head/tail/vn/credit_back/parity/spare) = 136 wire/irány. Header pontosan 1 flit az L1-en is, nincs width-transition a cluster gateway-ben. Latencia javulás: cross-cluster typ 45→39 cc (worst 69→59), cross-tile typ 75→63 cc (worst 129→109), cross-régió typ 105→93 cc (210→186 ns), worst 191→171 cc (382→342 ns). L1 throughput 5,2→8 GB/s. Cell-format / internal-bus szinkronizálva |
 | 3.1 | 2026-04-28 | **L0 busz visszaléptetés 256→128 bit** (FPGA-barát konzervatív lépés F2.7 A7-Lite 200T bring-up-hoz). Skálázási elv rögzítve: `header = 1 flit = BUS_WIDTH/8 byte`, `payload = 8 flit`. **Header layout változatlan** (16 byte = 1 flit a 128-bit linken). **Cella:** max 144 byte (16B header + 128B payload). Flit modell: 128-bit linken header=1 flit (no padding waste, vs v3.0 fél flit), worst case 2H+8 (változatlan), tipikus 2H+3. Latencia táblák újraszámolva. Cross-régió tipikus ~105 cc (210 ns), worst case ~191 cc (382 ns) — a worst case **jobb mint v3.0** (kisebb cella → gyorsabb L1/L2/L3 szerializáció). L0 throughput ~8 GB/s (vs v3.0 ~16 GB/s, vs v2.4 ~2,6 GB/s). `BUS_WIDTH` RTL paraméter bevezetve (default 128, jövőbeli upscale 256/512/1024). Indoklás: [`decision-bus-rollback-hu.md`](decision-bus-rollback-hu.md) |
 | 3.0 | 2026-04-28 | **Header v3.0:** 4×32-bit word-határos elrendezés. `src_actor`/`dst_actor` 16→8 bit (max 256 aktor/core). `src_actor` kitöltő: core scheduler→core HW (aktív actor context regiszter, nem hamisítható). `seq` 8→16 bit (max 65 536 fragment). `len[8]` = len+1 szemantika (1–256 byte payload, 0 byte-os payload nincs). CRC-16 hozzáadva (payload integritás, a header-ben). `flags[8]` bővítve: `[VN:1][relay:1][Pri:2][reserved:4]`. `reserved` 16→8 bit. HMAC és perms törölve — HW-managed Capability Slot Table (CST) QSRAM-ban. **L0 link:** 42→256 bit (tile-szintű NoC, `internal-bus-hu.md` alapján). **Cella:** max 272 byte (16B header + 256B payload). Flit modell: 256-bit linken header=1 flit, worst case 2H+8, tipikus 2H+2. Latencia táblák újraszámolva (tipikus 48B + worst case 256B). Cross-régió tipikus ~103 cc (206 ns), worst case ~317 cc (634 ns). L0 throughput ~16 GB/s (vs régi ~2,6 GB/s) |

@@ -2,7 +2,7 @@
 
 > English version: [cell-format-en.md](cell-format-en.md)
 
-> Version: 2.3
+> Version: 2.4
 
 > Forrás: `docs/interconnect-hu.md` v3.1 (2026-04-28)
 
@@ -166,7 +166,7 @@ A jövőbeli `BUS_WIDTH=256` upscale-nél a 256B payload egyetlen cellában fog 
 
 ### 1. döntés: Miért fix buffer, változó link?
 
-**Elvetett:** Teljesen fix cella (mindig teljes méret a linken). Az actor üzenetek ~80%-a ≤48 byte — a fix foglalás a link kapacitás nagy részét pazarolja.
+**Elvetett:** Teljesen fix cella (mindig teljes méret a linken). Az actor üzenetek becsült ~80%-a ≤48 byte (tervezési feltételezés, nem mért — lásd `docs/interconnect-hu.md`) — a fix foglalás a link kapacitás nagy részét pazarolja.
 
 **Elvetett:** Változó méretű buffer. Fragmentáció, bonyolult SRAM kezelés, nem-determinisztikus időzítés.
 
@@ -230,6 +230,7 @@ A jövőbeli `BUS_WIDTH=256` upscale-nél a 256B payload egyetlen cellában fog 
 
 | Verzió | Dátum | Változás |
 |--------|-------|---------|
+| 2.4 | 2026-06-01 | **A „~80% ≤48 byte" eloszlás tervezési feltételezésként jelölve (nem mért).** Az „Elvetett: teljesen fix cella" indoklásban a szám most „becsült", a forrás az `interconnect-hu.md` fő megjegyzésére mutat. Csak jelölés-pontosítás; a formátum spec változatlan. |
 | 2.3 | 2026-05-03 | **Sávszélesség táblázat-bővítés** a "Jövőbeli upscale" szekcióban — minden `BUS_WIDTH` értékhez (128/256/512/1024 bit) raw link sávszélesség 50 MHz / 500 MHz / 1 GHz órajeleken. Frekvencia oszlopok indoklása: 50 MHz Sky130 I/O target, 500 MHz CFPU referencia core órajel, 1 GHz aspirációs F6+. Effektív payload sávszélesség (~88,9% raw worst-case) megjegyzésben rögzítve. Tartalmi változás csak additív; a formátum spec változatlan. |
 | 2.2 | 2026-04-28 | **`flags.ddr5_cap` HW-only bit allokálva.** A korábbi `reserved[3]` bit-ből egyet (bit 2) elneveztük `ddr5_cap`-nek, jelentés: a payload első 8 byte-ja egy HW-attached DDR5 capability slot. A bitet **CSAK a core HW request assembler-e állíthatja be**; az aktor SW `send` opkódja maszkolva 0-ra. A flags tábla "Ki írhatja?" oszloppal bővült. Részletek: [`docs/ddr5-architecture-hu.md`](../docs/ddr5-architecture-hu.md) v1.3 |
 | 2.1 | 2026-04-28 | **v3.1 interconnect rollback szinkronizáció:** L0 busz 256→128 bit, max payload 256→128 byte (`CELL_SIZE = 128`), buffer slot 272→144 byte. Header layout **változatlan** (16 byte, 4×32 bit). `len[8]` szemantika változatlan (`len+1`), de v3.1-ben max 128 (`len ≤ 127`); a felső 128 érték a jövőbeli `BUS_WIDTH` upscale-re fenntartva. `BUS_WIDTH` RTL paraméter bevezetve (default 128, jövőbeli 256/512/1024). DDR5 burst illeszkedés frissítve (BL32 = 128 byte natív). Indoklás: [`docs/decision-bus-rollback-hu.md`](../docs/decision-bus-rollback-hu.md) |

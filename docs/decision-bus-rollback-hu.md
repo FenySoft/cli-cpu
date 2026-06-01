@@ -6,7 +6,7 @@ status: decision
 
 > English version: [decision-bus-rollback-en.md](decision-bus-rollback-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > Státusz: Architektúra döntés, hatályos 2026-04-28-tól. Érinti az `interconnect-hu.md` v3.1-et, a `specs/cell-format-hu.md` v2.1-et és az `internal-bus-hu.md` v1.1-et.
 
@@ -51,7 +51,7 @@ A header layout v3.0-ban már 128 bit (4 × 32 bit word, lásd `interconnect-hu.
 
 ### A tipikus actor üzenet még mindig kicsi
 
-Az interconnect-hu.md v2.4 elemzése szerint az actor üzenetek ~80%-a ≤48 byte payload, ~15% 49-64 byte, ~5% nagyobb. 128 byte max payload **lefedi a forgalom 95-100%-át** egyetlen cellában — a state migráció és code-load chunk-ok 2× több cellára darabolódnak (~10% header overhead a ritka nagy üzeneteknél), de ez nem dominálja a rendszert.
+**Tervezési feltételezés (nem mért):** az actor üzenetek becsült ~80%-a ≤48 byte payload, ~15% 49-64 byte, ~5% nagyobb — Akka.NET/Erlang-stílusú workloadok jellemzően kis üzenetei alapján; valódi eloszlás-mérés későbbi fázisra ütemezve. E feltételezés szerint a 128 byte max payload **lefedné a forgalom ~95-100%-át** egyetlen cellában — a state migráció és code-load chunk-ok 2× több cellára darabolódnak (~10% header overhead a ritka nagy üzeneteknél), de ez nem dominálja a rendszert.
 
 ### DDR5 burst alignment
 
@@ -146,3 +146,4 @@ Az RTL paraméterezés (jövőbeli F4 fázis) bevezeti a `BUS_WIDTH` RTL paramé
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
 | 1.0 | 2026-04-28 | Kezdeti verzió — L0 busz visszaléptetés 256→128 bit indoklása, skálázási elv (header = 1 flit, payload = 8 flit), alternatívák A/B/C/D, felfelé skálázás kritériumai |
+| 1.1 | 2026-06-01 | **A „~80% ≤48 byte" eloszlás hamis forrás-attribúciója javítva.** A v1.0 egy nemlétező „interconnect-hu.md v2.4 elemzésre" hivatkozott; valójában ez sosem volt mérés. A szám most explicit **tervezési feltételezésként (nem mért)** szerepel, Akka/Erlang-workload alapú indoklással. A tartalmi döntés (256→128 bit rollback) változatlan. |

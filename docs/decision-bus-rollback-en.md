@@ -6,7 +6,7 @@ status: decision
 
 > Magyar verzió: [decision-bus-rollback-hu.md](decision-bus-rollback-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > Status: Architecture decision, effective 2026-04-28. Affects `interconnect-en.md` v3.1, `specs/cell-format-en.md` v2.1, and `internal-bus-en.md` v1.1.
 
@@ -51,7 +51,7 @@ The header layout is already 128 bit in v3.0 (4 × 32 bit words, see `interconne
 
 ### Typical actor messages remain small
 
-The interconnect-hu.md v2.4 analysis shows that ~80% of actor messages have ≤48 byte payload, ~15% are 49-64 byte, ~5% are larger. A 128-byte max payload **covers 95-100% of traffic** in a single cell — state migration and code-load chunks split into 2× more cells (~10% header overhead in those rare large messages), but this does not dominate the system.
+**Design assumption (not measured):** an estimated ~80% of actor messages have ≤48 byte payload, ~15% are 49-64 byte, ~5% are larger — based on the typically small messages of Akka.NET/Erlang-style workloads; real distribution measurement scheduled for a future phase. Under this assumption, a 128-byte max payload **would cover ~95-100% of traffic** in a single cell — state migration and code-load chunks split into 2× more cells (~10% header overhead in those rare large messages), but this does not dominate the system.
 
 ### DDR5 burst alignment
 
@@ -146,3 +146,4 @@ The RTL parameterization (future F4 phase) introduces the `BUS_WIDTH` RTL parame
 | Version | Date | Summary |
 |---------|------|---------|
 | 1.0 | 2026-04-28 | Initial version — rationale for L0 bus rollback 256→128 bit, scaling rule (header = 1 flit, payload = 8 flits), alternatives A/B/C/D, upscale criteria |
+| 1.1 | 2026-06-01 | **Fixed the false source attribution of the "~80% ≤48 byte" distribution.** v1.0 cited a non-existent "interconnect-hu.md v2.4 analysis"; this was never a measurement. The figure now appears as an explicit **design assumption (not measured)**, with an Akka/Erlang-workload rationale. The substantive decision (256→128 bit rollback) is unchanged. |

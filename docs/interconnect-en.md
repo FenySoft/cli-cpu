@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [interconnect-hu.md](interconnect-hu.md)
 
-> Version: 3.2
+> Version: 3.5
 
 This document specifies the **on-chip interconnect network** of the Cognitive Fabric Processing Unit (CFPU): the topology, switching model, router internals, physical layout, core family, and node-scaling strategy.
 
@@ -131,7 +131,7 @@ Examples:
 
 **HW cost:** 4-bit counter per port + shift. No LUT, no tail bit, no link-width overhead.
 
-**Impact on network throughput:** ~80% of actor messages have ≤48 byte payloads. With variable link occupancy, links are **occupied ~43% less on average**, nearly doubling effective network throughput.
+**Impact on network throughput:** an estimated ~80% of actor messages have ≤48 byte payloads (**design assumption, not measured** — based on the typically small messages of Akka.NET/Erlang-style actor workloads; real distribution measurement scheduled for a future phase). With variable link occupancy, links are **occupied ~43% less on average**, nearly doubling effective network throughput.
 
 **Split SRAM design:** header and payload are stored in **separate SRAMs** inside the router. This is natural because they serve different functions: the scheduler reads the header for routing decisions while the payload is still arriving — **1 cycle latency saving**. No port contention between scheduler and crossbar. Both SRAMs are power-of-2 aligned: header = slot × 16, payload = slot × 128 — simple shift addressing, no multiplier needed.
 
@@ -159,7 +159,7 @@ In v3.1, the max payload size is **128 bytes** (was 256 bytes in v3.0). For full
 
 > **Note:** thanks to variable link occupancy, the worst-case flit counts above are rare. A typical 32-byte actor message: 3 flits on the 128-bit L0 (header + 2 payload) — the link **frees up quickly**.
 
-**Decisive argument: clean flit alignment.** The 128-bit L0 bus makes the header exactly 1 flit with no padding waste. Typical actor messages (~80% ≤48 bytes) traverse in 2–4 flits. Large messages (state migration, code-load chunks) split into 2× more cells than v3.0 (but worst-case latency is unchanged, since the flit count is the same).
+**Decisive argument: clean flit alignment.** The 128-bit L0 bus makes the header exactly 1 flit with no padding waste. Typical actor messages (estimated ~80% ≤48 bytes, see the note above) traverse in 2–4 flits. Large messages (state migration, code-load chunks) split into 2× more cells than v3.0 (but worst-case latency is unchanged, since the flit count is the same).
 
 In Akka/actor-style systems, the vast majority of messages are small (commands, events, short responses: 16–64 bytes), which fit easily in a single 128B cell — without multi-cell fragmentation.
 
@@ -807,6 +807,66 @@ The choice depends on the workload — the RTL `SRAM_KB_PER_CORE` parameter is s
 
 Typical cross-region latency is ~93 cycles (186 ns @ 500 MHz) for 48B payloads, worst-case 128B payloads ~171 cycles (342 ns) — smaller cluster physical size at advanced nodes partially compensates for the deeper hierarchy.
 
+## Memory Tier (HBM3)
+
+> **Status: proposal (extrapolation).** The HBM3 spec figures are verified (JEDEC JESD238). The CFPU-specific tier design (port counts, link widths, topology) is a **derived proposal** from the NoC formula, not a finalized decision — to be validated by F4/F5 RTL and the finalized chiplet geometry. The DDR5 memory interface, by contrast, is finalized: see [`ddr5-architecture-en.md`](ddr5-architecture-en.md).
+
+The four-level L0–L3 hierarchy is the **compute fabric**: optimized for small actor messages (≤128 byte cell). HBM3 traffic differs in every dimension (bulk, many-to-few, an order of magnitude more bandwidth), so it requires a **separate memory tier**, not the compute-mesh links.
+
+### Why a separate tier? — the bandwidth mismatch
+
+Verified HBM3 parameters (JEDEC JESD238):
+
+| Parameter | Value |
+|-----------|-------|
+| Bandwidth | 819 GB/s / stack |
+| Channels | 16 channels / 32 pseudo-channels |
+| Interface width | 1024 bit (16 × 64-bit) |
+| Per-pin data rate | 6.4 Gb/s |
+
+The L0 cluster mesh link @ 500 MHz = 8 GB/s (128 bit × 500 MHz / 8). Saturating a single HBM3 stack would need **819 ÷ 8 = ~102 links of 128-bit** — physically unrealistic to route into a single controller.
+
+By comparison, DDR5 (~76 GB/s) ÷ 8 GB/s = ~10 ports, which **fits on the existing NoC** (the DDR5 Controller's 10 × 128-bit ports, see [`ddr5-architecture-en.md`](ddr5-architecture-en.md)). It is HBM3's ~10.7× bandwidth that breaks the 128-bit approach.
+
+### Decision trail
+
+| Alternative | Why (re)jected |
+|-------------|----------------|
+| A) Reuse the compute L0 128-bit mesh | Rejected — ~102 ports/stack unrealistic; incast hotspot at the mesh edge, XY routing chokes |
+| B) Shared VN on the compute mesh (3rd VN for bulk) | Rejected — head-of-line blocking + the bandwidth mismatch starves actor messages |
+| C) **Separate, wide memory NoC plane** | **Chosen** — physical isolation + full HBM3 bandwidth |
+
+### Structure of the chosen tier
+
+1. **Separate physical NoC plane** — not the L0–L3 compute hierarchy but a dedicated memory plane. Actor traffic and bulk memory traffic do not share links → no head-of-line blocking.
+2. **Wide links + two levers.** Speed grows from `width × clock / 8`: a wider link **and/or** a higher memory-tier clock.
+3. **Edge-concentrated topology.** HBM3 stacks sit at the **edge** of the 2.5D interposer → traffic flows to the periphery. A fat-tree / edge-ring aggregates compute-fabric requests toward the peripheral controllers (not a flat XY mesh).
+4. **Channel scattering.** The controller interleaves requests across the **32 pseudo-channels** to use the bandwidth.
+5. **HW RTL HBM3 Controller as NoC endpoint** — same principle as DDR5 ([`ddr5-architecture-en.md`](ddr5-architecture-en.md) decision 1.c): no software core in the loop, because a software gateway core's throughput is only ~0.5–1 GB/s.
+6. **Capability reuse.** The same `flags.DDR5_CAP` / QRAM HW Capability Slot model as DDR5 ([`ddr5-architecture-en.md`](ddr5-architecture-en.md) decision 2) — HBM3 needs no new security mechanism. For TB-scale multi-stack HBM3, the **page-aligned 32-bit `region_base` (16 TB)** applies (see ddr5-architecture-en.md 2.b, v1.4) — the earlier 36-bit byte base covered only 64 GB (1 stack).
+
+### Speed and port requirement (derived, @ 500 MHz)
+
+| Memory-tier link | Raw / port | Ports / HBM3 stack (819 GB/s) |
+|------------------|-----------|-------------------------------|
+| 128-bit | 8 GB/s | ~102 (unrealistic) |
+| 256-bit | 16 GB/s | ~51 |
+| 512-bit | 32 GB/s | ~26 |
+| **1024-bit** | **64 GB/s** | **~13** |
+
+> The port count halves linearly when the clock doubles: 1024-bit @ 1 GHz = 128 GB/s/port → ~7 ports/stack. The ~11% header overhead (1 header flit / 8 payload flits) also applies here; stream mode amortizes it with large sequential blocks.
+
+### Relationship to DDR5
+
+| | DDR5 (finalized) | HBM3 (proposal) |
+|--|------------------|------------------|
+| Bandwidth | ~76 GB/s (2ch) | 819 GB/s / stack |
+| NoC solution | existing L0, 10 × 128-bit controller ports | separate memory tier, ~13 × 1024-bit @ 500 MHz |
+| Topology | NoC endpoint on the fabric | separate edge-concentrated plane |
+| Capability | DDR5_CAP / QRAM slot | same |
+
+DDR5 fits on the existing interconnect; HBM3 is what justifies this separate tier.
+
 ## Excluded Alternatives (and Rationale)
 
 | Alternative | Why excluded |
@@ -833,6 +893,7 @@ This document addresses the following Symphact hardware requirements:
 ## Related Documents
 
 - [Topology scaling](topology-scaling-en.md) — general NoC topology comparison (Bus/Ring/Mesh/Torus/Crossbar/Fat-tree/Hierarchical) with area + BW + latency formulas; mathematical justification for the hierarchical choice
+- [DDR5 Architecture](ddr5-architecture-en.md) — HW architecture of the external DDR5 memory interface (RTL controller, capability slot, stream/request mode); the HBM3 memory tier builds on this
 - [Quench-RAM](quench-ram-en.md) — per-block immutability, atomic wipe-on-release, QRAM + network symbiosis
 - [AuthCode](authcode-en.md) — code authentication; the Seal Core verifies the signature of every loaded code block
 - [Architecture](architecture-en.md) — full CFPU microarchitecture overview
@@ -842,6 +903,9 @@ This document addresses the following Symphact hardware requirements:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 3.5 | 2026-06-01 | **HBM3 tier capability clarification.** The "capability reuse" point extended: TB-scale multi-stack HBM3 uses the **page-aligned 32-bit `region_base` (16 TB)** model (ddr5-architecture v1.4), not the earlier 36-bit byte base (only 64 GB / 1 stack). Cascade from the ddr5-architecture v1.4 capability-slot revision. |
+| 3.4 | 2026-06-01 | **New "Memory Tier (HBM3)" section.** HBM3 (819 GB/s/stack, 16 channels / 32 pseudo-channels, JEDEC JESD238) requires a separate, wide memory NoC plane, because the compute L0 128-bit link would need ~102 ports/stack (unrealistic). Decision trail: reuse L0 (rejected) / shared VN (rejected) / separate memory tier (chosen). Edge-concentrated topology (2.5D interposer edge), 32 pseudo-channel interleaving, HW RTL HBM3 controller, capability reuse (DDR5_CAP/QRAM). Derived port table @ 500 MHz: 1024-bit → ~13 ports/stack. DDR5, by contrast, fits on the existing NoC (10 × 128-bit). **Status: proposal/extrapolation** — HBM3 spec verified, the CFPU tier design to be validated in F4/F5 RTL. Cascade: ddr5-architecture-en.md added to Related Documents. |
+| 3.3 | 2026-06-01 | **The "~80% ≤48 byte" actor-message distribution marked as an explicit design assumption (not measured data).** `decision-bus-rollback` previously cited a non-existent "interconnect v2.4 analysis" — a circular self-reference. The figure now appears as "estimated ~80%" with a "not measured, based on Akka/Erlang workloads, real measurement scheduled for a future phase" note. Annotation clarification only; sizing decisions unchanged. |
 | 3.2 | 2026-04-28 | **L1 tile crossbar link 84-bit → 128-bit + 8-bit control.** The 84-bit parallel link inherited from v1.0 was not a power of 2 and not aligned with the header (128-bit) or L0 (128-bit) widths — an unjustified design relic. L1 now matches L0: 128-bit data + 8-bit control (valid/head/tail/vn/credit_back/parity/spare) = 136 wires/direction. Header is exactly 1 flit on L1 too, no width transition at the cluster gateway. Latency improvements: cross-cluster typ 45→39 cc (worst 69→59), cross-tile typ 75→63 cc (worst 129→109), cross-region typ 105→93 cc (210→186 ns), worst 191→171 cc (382→342 ns). L1 throughput 5.2→8 GB/s. Cell-format / internal-bus synchronized |
 | 3.1 | 2026-04-28 | **L0 bus rollback 256→128 bit** (FPGA-friendly conservative step for F2.7 A7-Lite 200T bring-up). Scaling rule codified: `header = 1 flit = BUS_WIDTH/8 byte`, `payload = 8 flit`. **Header layout unchanged** (16 byte = 1 flit on 128-bit link). **Cell:** max 144 byte (16B header + 128B payload). Flit model: on 128-bit link header=1 flit (no padding waste, vs v3.0 half flit), worst case 2H+8 (unchanged), typical 2H+3. Latency tables recalculated. Cross-region typical ~105 cc (210 ns), worst case ~191 cc (382 ns) — worst case **better than v3.0** (smaller cell → faster L1/L2/L3 serialization). L0 throughput ~8 GB/s (vs v3.0 ~16 GB/s, vs v2.4 ~2.6 GB/s). `BUS_WIDTH` RTL parameter introduced (default 128, future upscale 256/512/1024). Rationale: [`decision-bus-rollback-en.md`](decision-bus-rollback-en.md) |
 | 3.0 | 2026-04-28 | **Header v3.0:** 4×32-bit word-aligned layout. `src_actor`/`dst_actor` 16→8 bits (max 256 actors/core). `src_actor` writer: core scheduler→core HW (active actor context register, cannot be spoofed). `seq` 8→16 bits (max 65,536 fragments). `len[8]` = len+1 semantics (1–256 byte payload, no zero-byte payload). CRC-16 added (payload integrity, stored in header). `flags[8]` expanded: `[VN:1][relay:1][Pri:2][reserved:4]`. `reserved` 16→8 bits. HMAC and perms removed — HW-managed Capability Slot Table (CST) in QSRAM. **L0 link:** 42→256 bits (tile-level NoC, per `internal-bus-hu.md`). **Cell:** max 272 bytes (16B header + 256B payload). Flit model: on 256-bit link header=1 flit, worst case 2H+8, typical 2H+2. Latency tables recalculated (typical 48B + worst case 256B). Cross-region typical ~103 cc (206 ns), worst case ~317 cc (634 ns). L0 throughput ~16 GB/s (vs old ~2.6 GB/s) |

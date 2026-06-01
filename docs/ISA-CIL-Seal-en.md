@@ -6,7 +6,7 @@ status: draft
 
 > Magyar verzió: [ISA-CIL-Seal-hu.md](ISA-CIL-Seal-hu.md)
 
-> Version: 0.1 (draft)
+> Version: 0.2 (draft)
 
 This document specifies the **CIL-Seal** instruction set, which is the ISA for the Seal Core firmware. CIL-Seal is a **superset of CIL-T0**: all CIL-T0 opcodes are available, plus array handling and external hardware unit calls.
 
@@ -244,7 +244,7 @@ public static class MerklePath
 
 1. **Stack direction** — bottom-up, compatible with the existing TCpu simulator. The heap grows top-down, they grow toward each other.
 2. **External call marking** — `[CryptoCall(index)]` custom attribute on `static extern` methods. The dispatch index is explicit in the source code, the linker reads it from the metadata custom attribute.
-3. **Cell size: 16B header + 64B payload = 80 bytes** — per the interconnect spec (v2.0) fixed cell. The 128B payload option was rejected: the typical actor workload is ~80% ≤48 bytes, and the 64B cell yields ~38% better aggregate throughput in the 10,000-core mesh (less link occupancy for small messages, lower HOL blocking). The code-load throughput question is solved with multi-cell streaming (256 cells = 16KB, ~8μs @ 500 MHz). ML-Max uses its own systolic router, not the main mesh.
+3. **Cell size: 16B header + max 128B payload = max 144 bytes** — per the interconnect spec (v3.1): fixed buffer, variable link occupancy (see `interconnect-en.md` v3.1, `specs/cell-format-en.md`, `decision-bus-rollback-en.md`). The 128-byte payload is the v3.1 default: the 16-byte header is exactly 1 flit on the 128-bit L0 bus (no padding waste), the payload matches the DDR5 BL32 (128-byte) native burst, and a typical — small — actor message fits in a single cell. Code-load throughput is solved with multi-cell streaming (16 KB method = 128 cells × 128B payload, pipelined). ML-Max uses its own systolic router, not the main mesh.
 
 ## Open Questions
 
@@ -265,3 +265,4 @@ public static class MerklePath
 | Version | Date | Summary |
 |---------|------|---------|
 | 0.1 | 2026-04-20 | Initial draft. CIL-T0 superset: array opcodes (newarr, ldlen, ldelem.u1, stelem.i1), external call dispatch (SHA-256, WOTS+, Merkle), heap memory model, Seal Core state machine. |
+| 0.2 | 2026-06-01 | **Cell format updated v2.0 → v3.1** (Decided Questions, item 3). The previous 16B + 64B = 80B (v2.0) cell was two versions stale; the current interconnect spec is v3.1: **16B header + max 128B payload = max 144B**. The rationale was rewritten with the v3.1 arguments (header = 1 flit on the 128-bit L0 bus, DDR5 BL32 alignment, multi-cell streaming code-load). The unsupported, circularly-referenced "~80% ≤48 bytes" distribution figure was removed (not measured data). Cascade fix from the v3.1 bus-rollback propagation. |
