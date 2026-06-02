@@ -93,6 +93,7 @@ TRAP_INVALID_BRANCH      = 0x06
 TRAP_DIV_BY_ZERO         = 0x08
 TRAP_OVERFLOW            = 0x09
 TRAP_DEBUG_BREAK         = 0x0B
+TRAP_SRAM_OVERFLOW       = 0x0D
 
 # ============================================================
 # hu: QSPI Flash slave modell — a CODE szegmens betöltése
@@ -1366,15 +1367,20 @@ async def test_53_invalid_call_target(dut):
 
 @cocotb.test()
 async def test_54_call_depth_exceeded(dut):
-    """hu: Végtelen rekurzió önhívással — TRAP_CALL_DEPTH_EXCEEDED (0x0A)
-        a 512. mélységnél.
+    """hu: Végtelen rekurzió önhívással. F3 (4 KB egységes on-chip SRAM): a
+        rekurzív frame-ek a 2 KB stack-régiót (STACK_BASE..4096) töltik meg
+        ~128 mélységnél → TRAP_SRAM_OVERFLOW (0x0D) — ami a 512-es call-depth
+        cap (CALL_DEPTH_EXCEEDED, 0x0A) ELŐTT következik be, mert 512 frame nem
+        fér a 4 KB SRAM-ba. A CALL_VALIDATE SRAM-overflow őre tisztán trap-el
+        (nem hagyja a frame-eket túlcímezni → aliasing/korrupció).
         Layout:
           @0..7:   recursive header (arg_count=0, local_count=0)
-          @8..12:  CALL 0 (önmagát hívja) — végtelen mélység
-          @13:     RET (sosem fut le)
+          @8..13:  CALL 0 (önmagát hívja) + RET (sosem fut le)
           @14..20: caller (boot_pc=14): CALL recursive_fn, RET
-    en: Infinite self-recursion — TRAP_CALL_DEPTH_EXCEEDED (0x0A)
-        at depth 512."""
+    en: Infinite self-recursion. F3 (4 KB unified on-chip SRAM): the recursive
+        frames fill the 2 KB stack region at ~depth 128 → TRAP_SRAM_OVERFLOW
+        (0x0D), which occurs BEFORE the 512 call-depth cap (512 frames don't fit
+        in 4 KB). The CALL_VALIDATE SRAM-overflow guard traps cleanly."""
     cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
 
     program = (
@@ -1392,5 +1398,6 @@ async def test_54_call_depth_exceeded(dut):
     )
     assert trap == 1, \
         f"expected trap, got halt={halt}, rv={rv}"
-    assert tc == TRAP_CALL_DEPTH_EXCEEDED, \
-        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_CALL_DEPTH_EXCEEDED:02X} (CALL_DEPTH_EXCEEDED)"
+    # hu: F3 — a 4 KB SRAM-limit (SRAM_OVERFLOW) ér el a 512-es call-depth cap előtt.
+    assert tc == TRAP_SRAM_OVERFLOW, \
+        f"trap_code = 0x{tc:02X}, expected 0x{TRAP_SRAM_OVERFLOW:02X} (SRAM_OVERFLOW, F3 4 KB)"

@@ -30,23 +30,22 @@
 //     QSPI flash-en. Az egységesítés a STACK-et a STACK_BASE-re relokálja,
 //     hogy a CODE+DATA a [0, STACK_BASE) tartományba férjen.
 //
-//     MÉRET (F3): a végleges F3 SRAM = 4 KB (1024×32, IHP-makró). A
-//     SRAM_SIZE_BYTES alább MÉG 16384 (a jelenlegi r_sram [0:4095] tömbbel
-//     konzisztens); a 4096-ra flip + tömb-átméretezés a GREEN refaktorban
-//     történik (egyszerre, hogy a stack-overflow határ konzisztens maradjon).
+//     MÉRET (F3): a végleges F3 SRAM = 4 KB (1024×32, IHP-makró) — a CODE+DATA
+//     a [0, STACK_BASE)=[0,2048) tartományban (2 KB), a STACK a [STACK_BASE,
+//     4096)=[2048,4096) tartományban (2 KB). A stack-túlcsordulás határa
+//     SRAM_SIZE_BYTES-4 = 4092.
 //
 // en: F3 UNIFIED ON-CHIP SRAM MEMORY MAP (scratchpad / TCM). The core runs the
 //     whole program from its own on-chip SRAM: CODE + DATA + STACK in one linear
 //     space. Code fetch comes from on-chip SRAM (~1-2 cycles), NOT the external
 //     o_xmem bus (QSPI = load-time backing store). STACK is relocated to
 //     STACK_BASE so CODE+DATA fit in [0, STACK_BASE); frames keep growing UP
-//     (preserves the existing CALL/RET machinery). Final F3 SRAM = 4 KB;
-//     SRAM_SIZE_BYTES below is still 16384 (matches the current r_sram array);
-//     the flip to 4096 + array resize happens in the GREEN refactor together.
+//     (preserves the existing CALL/RET machinery). F3 SRAM = 4 KB: CODE+DATA in
+//     [0,2048), STACK in [2048,4096); stack-overflow bound = SRAM_SIZE_BYTES-4.
 // ============================================================
 
-`define SRAM_SIZE_BYTES     16384   // hu: jelenlegi 16 KB tömb; F3-cél 4096 (GREEN-ben flip)
-`define SRAM_ADDR_WIDTH     14      // log2(16384); F3-cél 12 (4096)
+`define SRAM_SIZE_BYTES     4096    // hu: F3 egységes on-chip SRAM (4 KB, 1024×32)
+`define SRAM_ADDR_WIDTH     12      // log2(4096)
 
 // hu: STACK_BASE — a root frame bázisa az egységes térképben (a STACK régió
 //     alja). A CODE+DATA a [0, STACK_BASE) tartományba kerül; a stack innen

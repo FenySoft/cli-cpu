@@ -250,8 +250,11 @@ module cilcpu_core (
     reg  [3:0]  r_fetch_count;
     reg  [23:0] r_fetch_pc;     // a buffer első byte-jának PC-je
 
-    // hu: Belső 16 KB SRAM (4096 × 32-bit) — inferred BRAM
-    reg  [31:0] r_sram [0:4095];
+    // hu: Belső 4 KB egységes on-chip SRAM (1024 × 32-bit) — CODE+DATA+STACK
+    //     (F3 scratchpad/TCM). Szintézisben SRAM-makró (IHP 1P 1024x32).
+    // en: Internal 4 KB unified on-chip SRAM (1024 × 32-bit) — CODE+DATA+STACK
+    //     (F3 scratchpad/TCM). SRAM macro in synthesis (IHP 1P 1024x32).
+    reg  [31:0] r_sram [0:1023];
 
     // hu: Aktuális utasítás (decode után latched)
     reg  [15:0] r_opcode;
@@ -340,7 +343,13 @@ module cilcpu_core (
     //     ST_RESET-ben, a microcode és a fetch run közben — diszjunkt).
     wire [13:0] w_nonsc_addr = i_ld_we    ? i_ld_addr  :
                                w_mc_active ? r_sram_addr : fa_sram_addr;
-    wire [11:0] w_sram_idx   = w_sc_busy ? w_sc_sram_addr[13:2] : w_nonsc_addr[13:2];
+    // hu: 4 KB SRAM → 10-bit szó-index (byte-cím [11:2]). A 14-bit byte-címek
+    //     felső bitjei 0-k (a stack-túlcsordulás-trap 4092-nél garantálja a
+    //     <4096 tartományt), így a [11:2] szelet helyes.
+    // en: 4 KB SRAM → 10-bit word index (byte addr [11:2]). The upper bits of the
+    //     14-bit byte addresses are 0 (the stack-overflow trap at 4092 keeps
+    //     addresses < 4096), so the [11:2] slice is correct.
+    wire [9:0]  w_sram_idx   = w_sc_busy ? w_sc_sram_addr[11:2] : w_nonsc_addr[11:2];
     wire [31:0] w_sram_wdata = w_sc_busy ? w_sc_sram_wdata
                                          : (i_ld_we ? w_ld_wdata_le : r_sram_wdata);
     wire        w_sram_we    = w_sc_busy ? w_sc_sram_we : (r_sram_we | i_ld_we);
@@ -1818,8 +1827,13 @@ module cilcpu_core (
                             {5'd0,
                              (r_call_total_depth - {2'd0, r_new_arg_count}),
                              2'd0};
-                        // hu: SRAM overflow: FP_new + frame_size > 16384.
-                        // en: SRAM overflow: FP_new + frame_size > 16384.
+                        // hu: SRAM overflow: FP_new + frame_size > SRAM_SIZE_BYTES
+                        //     (F3: 4096). KORÁBban hardkódolt 16384 volt — a 4 KB
+                        //     resize-nál ez engedte a frame-eket túlcímezni
+                        //     (aliasing → korrupció → hamis INVALID_CALL_TARGET).
+                        // en: SRAM overflow: FP_new + frame_size > SRAM_SIZE_BYTES
+                        //     (F3: 4096). Was hardcoded 16384 — at the 4 KB resize
+                        //     that let frames over-address (aliasing → corruption).
                         if ({1'b0, r_sp} +
                             {1'b0,
                              {5'd0,
@@ -1827,7 +1841,7 @@ module cilcpu_core (
                               2'd0}} +
                             {1'b0, 14'd12} +
                             {8'd0, r_new_arg_count, 2'd0} +
-                            {8'd0, r_new_local_count, 2'd0} > 15'h4000) begin
+                            {8'd0, r_new_local_count, 2'd0} > 15'd4096) begin
                             o_trap      <= 1'b1;
                             o_trap_code <= `TRAP_SRAM_OVERFLOW;
                             r_state     <= ST_TRAP;
