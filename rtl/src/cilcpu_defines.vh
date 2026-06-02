@@ -9,11 +9,55 @@
 `define CILCPU_DEFINES_VH
 
 // ============================================================
-// SRAM és frame layout konstansok (TCpu.cs-ből)
+// hu: F3 EGYSÉGES ON-CHIP SRAM MEMÓRIA-TÉRKÉP (scratchpad / TCM)
+//     ADR: Vault/Decisions/2026-06-01-unified-onchip-sram.
+//
+//     A core a TELJES programot a saját on-chip SRAM-jából futtatja:
+//     CODE + DATA + STACK egyetlen lineáris címtérben. A CODE-fetch az
+//     on-chip SRAM-ból megy (~1-2 ciklus), NEM a külső o_xmem buszon
+//     (QSPI = betöltés-idejű backing store, NEM per-utasítás fetch).
+//
+//       0x000  ┌───────────────┐  CODE  (boot_pc itt; a loader / flash→SRAM
+//              │ CODE          │        copy tölti)
+//              │ DATA          │  DATA  (program ldind/stind scratch)
+//              │  ... szabad   │
+//       STACK_ ├───────────────┤  STACK_BASE
+//        BASE  │ STACK ▲       │  frame-ek FELFELÉ nőnek (FP/SP = STACK_BASE
+//              │ (frames)      │        boot-kor); megőrzi a meglévő CALL/RET
+//       0xFFF  └───────────────┘        frame-gépezetet (felfelé-növő stack).
+//
+//     A korábbi modell: STACK az SRAM 0. bájtjától felfelé, CODE külön a
+//     QSPI flash-en. Az egységesítés a STACK-et a STACK_BASE-re relokálja,
+//     hogy a CODE+DATA a [0, STACK_BASE) tartományba férjen.
+//
+//     MÉRET (F3): a végleges F3 SRAM = 4 KB (1024×32, IHP-makró). A
+//     SRAM_SIZE_BYTES alább MÉG 16384 (a jelenlegi r_sram [0:4095] tömbbel
+//     konzisztens); a 4096-ra flip + tömb-átméretezés a GREEN refaktorban
+//     történik (egyszerre, hogy a stack-overflow határ konzisztens maradjon).
+//
+// en: F3 UNIFIED ON-CHIP SRAM MEMORY MAP (scratchpad / TCM). The core runs the
+//     whole program from its own on-chip SRAM: CODE + DATA + STACK in one linear
+//     space. Code fetch comes from on-chip SRAM (~1-2 cycles), NOT the external
+//     o_xmem bus (QSPI = load-time backing store). STACK is relocated to
+//     STACK_BASE so CODE+DATA fit in [0, STACK_BASE); frames keep growing UP
+//     (preserves the existing CALL/RET machinery). Final F3 SRAM = 4 KB;
+//     SRAM_SIZE_BYTES below is still 16384 (matches the current r_sram array);
+//     the flip to 4096 + array resize happens in the GREEN refactor together.
 // ============================================================
 
-`define SRAM_SIZE_BYTES     16384   // 16 KB per Nano core
-`define SRAM_ADDR_WIDTH     14      // log2(16384)
+`define SRAM_SIZE_BYTES     16384   // hu: jelenlegi 16 KB tömb; F3-cél 4096 (GREEN-ben flip)
+`define SRAM_ADDR_WIDTH     14      // log2(16384); F3-cél 12 (4096)
+
+// hu: STACK_BASE — a root frame bázisa az egységes térképben (a STACK régió
+//     alja). A CODE+DATA a [0, STACK_BASE) tartományba kerül; a stack innen
+//     felfelé nő. F3: 2 KB CODE+DATA / 2 KB STACK osztás (4 KB SRAM-on). A boot
+//     FP=SP=STACK_BASE-re inicializál (a 0 helyett).
+// en: STACK_BASE — root frame base in the unified map (bottom of the STACK
+//     region). CODE+DATA live in [0, STACK_BASE); the stack grows up from here.
+//     F3: 2 KB CODE+DATA / 2 KB STACK split on the 4 KB SRAM. Boot inits
+//     FP=SP=STACK_BASE (instead of 0).
+`define STACK_BASE          14'h0800   // 2048 — CODE+DATA / STACK határ
+
 `define FRAME_HEADER_SIZE   12      // 12 byte header
 `define OFF_RETURN_PC       0       // [FP+0]  ReturnPC (i32)
 `define OFF_PREV_FRAME_BASE 4       // [FP+4]  PrevFrameBase (i32)

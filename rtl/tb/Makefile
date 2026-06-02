@@ -115,6 +115,22 @@ $(PWD)/../src/cilcpu_multiplier.v \
 $(PWD)/../src/cilcpu_core.v \
 $(PWD)/tb_core.v"
 
+# hu: F3 egységes on-chip SRAM RED/GREEN tesztek — a program backdoor-poke-kal
+#     kerül a core r_sram-jába → --public-flat-rw kell a belső tömb eléréséhez.
+# en: F3 unified on-chip SRAM tests — program backdoor-poked into the core's
+#     r_sram → --public-flat-rw is required to access the internal array.
+test_core_unified:
+	$(SUBMAKE) MODULE=test_core_unified TOPLEVEL=tb_core EXTRA_ARGS="--trace -I$(PWD)/../src --public-flat-rw" VERILOG_SOURCES="\
+$(PWD)/../src/cilcpu_alu.v \
+$(PWD)/../src/cilcpu_decoder.v \
+$(PWD)/../src/cilcpu_microcode.v \
+$(PWD)/../src/cilcpu_stack_cache.v \
+$(PWD)/../src/cilcpu_qspi_controller.v \
+$(PWD)/../src/cilcpu_divider.v \
+$(PWD)/../src/cilcpu_multiplier.v \
+$(PWD)/../src/cilcpu_core.v \
+$(PWD)/tb_core.v"
+
 # hu: F2.5b golden vector harness — cocotb vs C# szim trace JSONL.
 #     A C# Runner DLL-nek le kell fordulva lennie:
 #     `dotnet build src/CilCpu.Sim.Runner/CilCpu.Sim.Runner.csproj`
