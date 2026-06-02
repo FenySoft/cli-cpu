@@ -30,7 +30,7 @@ from cocotb.triggers import RisingEdge
 from test_core import (
     OP_LDC_I4_5, OP_LDC_I4_2, OP_LDC_I4_3, OP_RET, OP_ADD, OP_LDARG_0, OP_LDARG_1,
     OP_CALL,
-    reset_dut,
+    reset_dut, STACK_BASE,
 )
 
 
@@ -188,9 +188,16 @@ async def golden_compare(dut, code_bytes, trace_entries, boot_pc=0,
                 f"cd={rtl_cd} ac={rtl_ac} lc={rtl_lc}"
             )
 
+            # hu: F3 — az RTL a root frame-et STACK_BASE-re relokálja (egységes
+            #     on-chip SRAM: CODE+DATA alul, STACK felül), míg a C# golden
+            #     0-bázisú frame-et modellez. A különbség KONSTANS STACK_BASE,
+            #     ezért az elvárt sp/fp-hez hozzáadjuk. (PC/cd/ac/lc változatlan.)
+            # en: F3 — the RTL relocates the root frame to STACK_BASE (unified
+            #     on-chip SRAM), while the C# golden models a 0-based frame. The
+            #     difference is a CONSTANT STACK_BASE, so add it to expected sp/fp.
             assert rtl_pc == entry["pc"], f"PC mismatch — {ctx}"
-            assert rtl_sp == entry["sp"], f"SP mismatch — {ctx}"
-            assert rtl_fp == entry["fp"], f"FP mismatch — {ctx}"
+            assert rtl_sp == entry["sp"] + STACK_BASE, f"SP mismatch — {ctx}"
+            assert rtl_fp == entry["fp"] + STACK_BASE, f"FP mismatch — {ctx}"
             assert rtl_cd == entry["cd"], f"CallDepth mismatch — {ctx}"
             assert rtl_ac == entry["ac"], f"ArgCount mismatch — {ctx}"
             assert rtl_lc == entry["lc"], f"LocalCount mismatch — {ctx}"

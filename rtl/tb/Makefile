@@ -104,7 +104,7 @@ test_qspi_controller_offset:
 #     tb_core fixture (core + qspi_controller) so the existing QSPI flash harness
 #     runs unchanged.
 test_core:
-	$(SUBMAKE) MODULE=test_core TOPLEVEL=tb_core VERILOG_SOURCES="\
+	$(SUBMAKE) MODULE=test_core TOPLEVEL=tb_core EXTRA_ARGS="--trace -I$(PWD)/../src --public-flat-rw" VERILOG_SOURCES="\
 $(PWD)/../src/cilcpu_alu.v \
 $(PWD)/../src/cilcpu_decoder.v \
 $(PWD)/../src/cilcpu_microcode.v \

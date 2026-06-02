@@ -92,7 +92,13 @@ module tb_core #(
         .o_mmio_wdata       (o_mmio_wdata),
         .o_mmio_we          (o_mmio_we),
         .o_mmio_re          (o_mmio_re),
-        .i_mmio_rdata       (i_mmio_rdata)
+        .i_mmio_rdata       (i_mmio_rdata),
+        // hu: F3 — a core-tesztek backdoor-poke-kal töltik az r_sram-ot, a
+        //     load-write portot lekötjük.
+        // en: F3 — the core tests backdoor-poke r_sram; tie off the load port.
+        .i_ld_we            (1'b0),
+        .i_ld_addr          (14'd0),
+        .i_ld_wdata         (32'd0)
     );
 
     cilcpu_qspi_controller #(

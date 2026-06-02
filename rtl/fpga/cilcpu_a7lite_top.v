@@ -316,7 +316,20 @@ module cilcpu_a7lite_top #(
         .o_mmio_wdata       (),
         .o_mmio_we          (),
         .o_mmio_re          (),
-        .i_mmio_rdata       (32'd0)
+        .i_mmio_rdata       (32'd0),
+        // hu: F3 — on-chip SRAM load-write port LEKÖTVE. Ez a LEGACY F2.7
+        //     wrapper (közvetlen core+QSPI, NINCS loader/copy-engine), így nincs
+        //     útja a programot az on-chip SRAM-ba juttatni → az egységes-SRAM
+        //     core ezen a board-on NEM futtatható. F3-ban a SoC-alapú
+        //     `cilcpu_tt_board` váltja ki (loader + copy-engine). Lásd a
+        //     test_a7lite_* skip-jét.
+        // en: F3 — on-chip SRAM load-write port TIED OFF. This is the LEGACY F2.7
+        //     wrapper (direct core+QSPI, NO loader/copy engine), so it has no way
+        //     to populate the on-chip SRAM → the unified-SRAM core cannot run on
+        //     this board. Superseded by the SoC-based `cilcpu_tt_board` in F3.
+        .i_ld_we            (1'b0),
+        .i_ld_addr          (14'd0),
+        .i_ld_wdata         (32'd0)
     );
 
     // hu: F1a — QSPI controller a Core-ból kiemelve a board-topra. A Core

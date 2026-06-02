@@ -133,7 +133,7 @@ async def _read_uart_line(dut, max_bytes=16):
 # en: Tests
 # ============================================================
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_board (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_board váltja ki
 async def test_01_fibonacci_iterative_e2e_board(dut):
     """hu: End-to-end FibonacciIterative(20) = 6765 a board.v szintjén.
         Bizonyítja, hogy a teljes toolchain (C# → Roslyn → linker → core

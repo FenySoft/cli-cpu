@@ -23,6 +23,9 @@ def _init(dut):
     dut.i_host_inbox_push.value  = 0
     dut.i_host_outbox_pop.value  = 0
     dut.i_uart_rx.value          = 1
+    # hu: F3 — autoboot flash-ből → mód B (copy-engine QSPI→on-chip SRAM).
+    # en: F3 — autoboot from flash → mode B (copy engine QSPI→on-chip SRAM).
+    dut.i_boot_mode.value        = 1
     # hu: NINCS külső boot — az auto-detect indít
     dut.i_boot_pc.value          = 0
     dut.i_boot_arg_count.value   = 0

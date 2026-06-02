@@ -130,7 +130,7 @@ async def _setup(dut, code_bytes):
 # en: Tests
 # ============================================================
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_top/tt_board váltja ki
 async def test_01_reset_state(dut):
     """hu: Reset után LED-ek inaktívak (active low: kimenet = 1).
     en: After reset both LEDs are inactive (active low: output = 1)."""
@@ -142,7 +142,7 @@ async def test_01_reset_state(dut):
     assert int(dut.r_trapped.value) == 0
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_top/tt_board váltja ki
 async def test_02_idle_no_start(dut):
     """hu: KEY2 gomb nélkül a core nem indul el — LED-ek nem világítanak.
     en: Without KEY2 press, the core never starts — LEDs stay off."""
@@ -157,7 +157,7 @@ async def test_02_idle_no_start(dut):
         assert int(dut.o_led2_n.value) == 1, "trap LED rose without start"
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_top/tt_board váltja ki
 async def test_03_ldarg_ret_smoke(dut):
     """hu: KEY2-re a wrapper push-olja a default arg-ot (5), a core
         LDARG_0 + RET-re ezt visszaadja. Halt LED felgyullad.
@@ -179,7 +179,7 @@ async def test_03_ldarg_ret_smoke(dut):
     assert int(dut.o_led2_n.value) == 1, "trap LED should be inactive (high)"
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_top/tt_board váltja ki
 async def test_04_ldarg_add_smoke(dut):
     """hu: Program: LDARG_0 + LDC.I4_3 + ADD + RET → eredmény = arg + 3.
     en: Program: LDARG_0 + LDC.I4_3 + ADD + RET → result = arg + 3."""
@@ -197,7 +197,7 @@ async def test_04_ldarg_add_smoke(dut):
         f"expected {BOOT_ARG_VALUE + 3}, got {ret}"
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_top/tt_board váltja ki
 async def test_05_invalid_opcode_trap(dut):
     """hu: Érvénytelen opkód → trap, trap LED felgyullad, halt LED nem.
     en: Invalid opcode → trap, trap LED lights, halt LED does not."""
@@ -217,7 +217,7 @@ async def test_05_invalid_opcode_trap(dut):
     assert int(dut.o_led2_n.value) == 0, "trap LED should be active (low)"
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_top/tt_board váltja ki
 async def test_07_uart_halt_prints_return_value(dut):
     """hu: Sub2 — halt után a wrapper a return_value-t signed-ként kiírja
         UART-on, '\\r\\n' terminátorral. BOOT_ARG_VALUE=5, így "5\\r\\n".
@@ -235,7 +235,7 @@ async def test_07_uart_halt_prints_return_value(dut):
     assert int(dut.o_led1_n.value) == 0
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_top/tt_board váltja ki
 async def test_08_uart_trap_prints_code(dut):
     """hu: Sub2 — trap esetén a wrapper a trap_code-ot unsigned-ként írja ki.
         TRAP_INVALID_OPCODE = 3, így "3\\r\\n".
@@ -254,7 +254,7 @@ async def test_08_uart_trap_prints_code(dut):
     assert int(dut.o_led2_n.value) == 0
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_top/tt_board váltja ki
 async def test_06_short_press_ignored(dut):
     """hu: Túl rövid (debounce limit alatti) gomb-impulzust a wrapper figyelmen
         kívül hagy — a core nem indul el.

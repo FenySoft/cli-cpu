@@ -154,6 +154,14 @@ module cilcpu_tt_top #(
 
         .i_uart_rx           (w_uart_rx),
 
+        // hu: F3 boot-mód strap = ui_in[1] (egyúttal gpio_in[0] — valós HW
+        //     strap-minta). L → mód A (UART→on-chip SRAM direkt), H → mód B
+        //     (loader→QSPI + boot-kori copy-engine QSPI→SRAM).
+        // en: F3 boot-mode strap = ui_in[1] (also gpio_in[0] — real-HW strap
+        //     pattern). L → mode A (UART→on-chip SRAM direct), H → mode B
+        //     (loader→QSPI + boot-time copy engine QSPI→SRAM).
+        .i_boot_mode         (ui_in[1]),
+
         .o_halt              (w_halt),
         .o_trap              (w_trap),
         .o_trap_code         (w_trap_code),

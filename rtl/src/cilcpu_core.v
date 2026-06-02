@@ -74,7 +74,24 @@ module cilcpu_core (
     output reg  [31:0] o_mmio_wdata,
     output reg         o_mmio_we,
     output reg         o_mmio_re,
-    input  wire [31:0] i_mmio_rdata
+    input  wire [31:0] i_mmio_rdata,
+
+    // hu: F3 — on-chip SRAM betöltő (load) write-port. A program betöltése a
+    //     boot ELŐTT történik (a core ST_RESET-ben van): a SoC ezen a porton
+    //     írja a CODE-ot az on-chip SRAM-ba — mód A-ban közvetlenül az UART-
+    //     loader, mód B-ben a QSPI→SRAM copy-engine. i_ld_wdata BIG-ENDIAN
+    //     (byte@addr a [31:24]-en, ahogy a loader/QSPI adja); a core LE-re
+    //     fordítva tárolja (a fetch adapter LE-t vár). i_ld_addr = on-chip
+    //     byte-cím (a [13:0] számít). 1-ciklusos write.
+    // en: F3 — on-chip SRAM loader write port. The program is loaded BEFORE boot
+    //     (core in ST_RESET): the SoC writes CODE into the on-chip SRAM over this
+    //     port — directly from the UART loader in mode A, from the QSPI→SRAM copy
+    //     engine in mode B. i_ld_wdata is BIG-ENDIAN (byte@addr in [31:24], as the
+    //     loader/QSPI provide); the core stores it byte-swapped to LE (the fetch
+    //     adapter expects LE). i_ld_addr = on-chip byte address ([13:0] used).
+    input  wire        i_ld_we,
+    input  wire [13:0] i_ld_addr,
+    input  wire [31:0] i_ld_wdata
 );
 
     // ============================================================
@@ -251,59 +268,113 @@ module cilcpu_core (
     reg         r_sram_re;
     reg  [31:0] r_sram_rdata_latched;
 
-    // hu: SRAM bus arbiter — a két forrás (Stack Cache spill/fill `w_sc_*`
-    //     PRIORITÁSSAL, ill. a microcode/boot `r_sram_*`) egyetlen single-port
-    //     cím-/adat-/enable-jelkészletre muxolva. A muxolás a memória-blokkon
-    //     KÍVÜL történik, hogy a Vivado tiszta single-port BRAM-ot inferáljon
-    //     (a blokkon belüli elágaztatást több portos memóriának látná).
-    // en: SRAM bus arbiter — the two sources (Stack Cache spill/fill `w_sc_*`
-    //     with PRIORITY, and the microcode/boot `r_sram_*`) muxed into one
-    //     single-port address/data/enable set. The mux lives OUTSIDE the
-    //     memory block so Vivado infers a clean single-port BRAM (branching
-    //     inside the block would look like a multi-port memory).
-    wire [11:0] w_sram_idx   = w_sc_busy ? w_sc_sram_addr[13:2] : r_sram_addr[13:2];
-    wire [31:0] w_sram_wdata = w_sc_busy ? w_sc_sram_wdata      : r_sram_wdata;
-    wire        w_sram_we    = w_sc_busy ? w_sc_sram_we         : r_sram_we;
-    wire        w_sram_re    = w_sc_busy ? w_sc_sram_re         : r_sram_re;
+    // ============================================================
+    // hu: F3 — instrukció-fetch SRAM adapter regiszterei + kérő-jelek.
+    //     A fetch/CALL FSM változatlanul a "QSPI" kérő-jeleket használja
+    //     (r_qspi_addr/re, r_qspi_inflight) és a w_qspi_* választ várja, de
+    //     ezeket az on-chip r_sram-ból az alábbi adapter hajtja (lásd a fetch
+    //     adapter FSM-et a memória-blokk után), NEM a külső o_xmem busz.
+    // en: F3 — instruction-fetch SRAM adapter regs + request signals. The
+    //     fetch/CALL FSM keeps using the "QSPI" request signals and waits for
+    //     w_qspi_*, but the adapter below (see the fetch adapter FSM after the
+    //     memory block) drives them from the on-chip r_sram, NOT o_xmem.
+    // ============================================================
+    // hu: A fetch byte-granuláris (a fetch FSM 4 byte-ot vár a PONTOS
+    //     r_qspi_addr byte-címtől, ami branch után tetszőleges igazítású). Az
+    //     on-chip SRAM viszont szó-szervezésű → az adapter KÉT szomszédos szót
+    //     olvas (W0=addr>>2, W1=W0+1), és a {W1,W0}-ból a byte-offszettől
+    //     (addr[1:0]) vonja ki a 4 byte-ot. ISSUE0/CAP0 → W0, ISSUE1/CAP1 → W1.
+    // en: Fetch is byte-granular (the fetch FSM expects 4 bytes from the EXACT
+    //     r_qspi_addr byte address, arbitrarily aligned after a branch). The
+    //     on-chip SRAM is word-organized → the adapter reads TWO adjacent words
+    //     (W0=addr>>2, W1=W0+1) and extracts the 4 bytes at byte offset addr[1:0]
+    //     from {W1,W0}. ISSUE0/CAP0 → W0, ISSUE1/CAP1 → W1.
+    localparam [2:0] FA_IDLE   = 3'd0;
+    localparam [2:0] FA_ISSUE0 = 3'd1;   // W0 read kiadva
+    localparam [2:0] FA_CAP0    = 3'd2;   // W0 latch + W1 read kiadása
+    localparam [2:0] FA_ISSUE1 = 3'd3;   // W1 read kiadva
+    localparam [2:0] FA_CAP1    = 3'd4;   // W1 latch + 4-byte kivonás + ready
+    reg  [2:0]  r_fa_st;
+    reg  [13:0] r_fa_addr;
+    reg  [31:0] r_fa_w0;
+    reg  [31:0] r_fa_word;
+    reg         r_fa_ready;
+    wire        fa_sram_re   = (r_fa_st == FA_ISSUE0) || (r_fa_st == FA_ISSUE1);
+    wire [13:0] fa_sram_addr = (r_fa_st == FA_ISSUE1) ? (r_fa_addr + 14'd4)
+                                                      : r_fa_addr;
+    // hu: {W1,W0} eltolva a byte-offszettel → az alsó 32 bit = a 4 byte a
+    //     byte-címtől (LE). FA_CAP1-ben r_sram_rdata_latched = W1, r_fa_w0 = W0.
+    // en: {W1,W0} shifted by the byte offset → low 32 bits = the 4 bytes from
+    //     the byte address (LE). In FA_CAP1, r_sram_rdata_latched = W1.
+    wire [63:0] w_fa_shift   = {r_sram_rdata_latched, r_fa_w0}
+                               >> {r_fa_addr[1:0], 3'b000};
 
-    // ============================================================
-    // hu: Külső-memória-master bekötése. A belső jel-nevek (r_qspi_addr/re,
-    //     w_qspi_rdata/ready/busy) változatlanok maradnak — a fetch/CALL FSM
-    //     ezekre hivatkozik —, csak a modul-határ köti őket az o_xmem_*/i_xmem_*
-    //     portokra. A QSPI controller maga a SoC/board szinten él (F1a refaktor).
-    // en: External-memory master wiring. The internal signal names (r_qspi_addr/
-    //     re, w_qspi_rdata/ready/busy) are unchanged — the fetch/CALL FSM refers
-    //     to them — only the module boundary binds them to the o_xmem_*/i_xmem_*
-    //     ports. The QSPI controller itself lives at SoC/board level (F1a).
-    // ============================================================
+    // hu: A fetch/CALL FSM kérő-/állapot-regiszterei (korábban lentebb voltak;
+    //     ide kerültek, hogy az adapter és az arbiter is lássa őket).
+    // en: Fetch/CALL FSM request/state registers (moved up so the adapter and
+    //     the arbiter can both see them).
     reg  [23:0] r_qspi_addr;
     reg         r_qspi_re;
-
-    assign o_xmem_addr = r_qspi_addr;
-    assign o_xmem_re   = r_qspi_re;
-
-    wire [31:0] w_qspi_rdata = i_xmem_rdata;
-    wire        w_qspi_ready = i_xmem_ready;
-    wire        w_qspi_busy  = i_xmem_busy;
-
-    // hu: Fetch addresszálás Sub2.1-ben bevezetett regiszterek.
-    //     r_qspi_inflight = 1, ha épp folyamatban van fetch tranzakció;
-    //     r_next_fetch_addr = a következő fetch cél címe (független
-    //     r_pc/r_fetch_count NBA scheduling-jétől). A korábbi
-    //     `r_qspi_addr <= r_pc + r_fetch_count` képlet Verilator NBA-ban
-    //     racy volt: az 1. APPEND után cycle X+1-ben r_fetch_count még
-    //     0-n látszott egyes path-eken, ezért a 2. fetch addr=0-t kapott
-    //     4 helyett. Itt explicit állapotot tartunk fenn.
-    // en: Fetch addressing registers introduced in Sub2.1.
-    //     r_qspi_inflight = 1 when a fetch transaction is currently in
-    //     flight; r_next_fetch_addr = target address of the next fetch
-    //     (independent of r_pc/r_fetch_count NBA scheduling). The earlier
-    //     `r_qspi_addr <= r_pc + r_fetch_count` was racy on Verilator NBA:
-    //     after the 1st APPEND, cycle X+1 sometimes still saw r_fetch_count
-    //     as 0 on certain paths, so the 2nd fetch got addr=0 instead of 4.
-    //     Here we keep explicit state.
     reg         r_qspi_inflight;
     reg  [23:0] r_next_fetch_addr;
+
+    // hu: SRAM bus arbiter — HÁROM forrás: Stack Cache spill/fill (`w_sc_*`,
+    //     PRIORITÁS) > microcode/boot (`r_sram_*`) > instrukció-fetch adapter
+    //     (`fa_*`). A microcode és a fetch temporálisan diszjunkt (fetch csak
+    //     ST_FETCH / CALL-header-olvasásnál, microcode csak ST_EXECUTE/
+    //     ST_MEM_WAIT-ben) → a prioritás csak biztonsági háló. A muxolás a
+    //     memória-blokkon KÍVÜL történik (tiszta single-port BRAM-inferencia).
+    // en: SRAM bus arbiter — THREE sources: Stack Cache spill/fill (`w_sc_*`,
+    //     PRIORITY) > microcode/boot (`r_sram_*`) > instruction-fetch adapter
+    //     (`fa_*`). microcode and fetch are temporally disjoint, so the priority
+    //     is just a safety net. The mux lives OUTSIDE the memory block (clean
+    //     single-port BRAM inference).
+    // hu: A loader write BIG-ENDIAN szót ad (byte@addr a [31:24]-en) → LE-re
+    //     fordítva tároljuk (a fetch adapter LE-t vár az r_sram-ban).
+    // en: The loader write provides a BIG-ENDIAN word (byte@addr in [31:24]) →
+    //     store byte-swapped to LE (the fetch adapter expects LE in r_sram).
+    wire [31:0] w_ld_wdata_le = { i_ld_wdata[ 7: 0], i_ld_wdata[15: 8],
+                                  i_ld_wdata[23:16], i_ld_wdata[31:24] };
+    wire        w_mc_active  = r_sram_re | r_sram_we;        // microcode/boot
+    // hu: non-SC cím prioritás: load > microcode/boot > fetch (a load csak
+    //     ST_RESET-ben, a microcode és a fetch run közben — diszjunkt).
+    wire [13:0] w_nonsc_addr = i_ld_we    ? i_ld_addr  :
+                               w_mc_active ? r_sram_addr : fa_sram_addr;
+    wire [11:0] w_sram_idx   = w_sc_busy ? w_sc_sram_addr[13:2] : w_nonsc_addr[13:2];
+    wire [31:0] w_sram_wdata = w_sc_busy ? w_sc_sram_wdata
+                                         : (i_ld_we ? w_ld_wdata_le : r_sram_wdata);
+    wire        w_sram_we    = w_sc_busy ? w_sc_sram_we : (r_sram_we | i_ld_we);
+    wire        w_sram_re    = w_sc_busy ? w_sc_sram_re : (r_sram_re | fa_sram_re);
+
+    // ============================================================
+    // hu: F3 — külső-memória-master LEKÖTVE. A Core a CODE-ot az on-chip
+    //     SRAM-ból fetch-eli (fetch adapter), NEM a külső o_xmem buszon, ezért
+    //     o_xmem_re VÉGIG 0 (egységes on-chip SRAM invariáns; lásd
+    //     test_core_unified). A w_qspi_* választ a fetch adapter hajtja az
+    //     r_fa_* regiszterekből: az r_sram LE szavát big-endian-re fordítja,
+    //     hogy a fetch FSM meglévő byte-swap-je helyes LE buffer-t adjon (és a
+    //     CALL-header magic a [31:24]-en jó legyen). Az i_xmem_* bemenetek így
+    //     használaton kívül (a QSPI a SoC-szintű betöltés-idejű backing store).
+    // en: F3 — external-memory master TIED OFF. The Core fetches CODE from the
+    //     on-chip SRAM (fetch adapter), NOT the external o_xmem bus, so
+    //     o_xmem_re stays 0 throughout (unified on-chip SRAM invariant; see
+    //     test_core_unified). The w_qspi_* response is driven by the fetch
+    //     adapter from the r_fa_* registers: it byte-swaps the LE r_sram word to
+    //     big-endian so the fetch FSM's existing swap yields a correct LE buffer
+    //     (and the CALL header magic reads right at [31:24]). The i_xmem_* inputs
+    //     are thus unused (QSPI is the SoC-level load-time backing store).
+    // ============================================================
+    assign o_xmem_addr = 24'd0;
+    assign o_xmem_re   = 1'b0;
+
+    wire [31:0] w_qspi_rdata = { r_fa_word[ 7: 0], r_fa_word[15: 8],
+                                 r_fa_word[23:16], r_fa_word[31:24] };
+    wire        w_qspi_ready = r_fa_ready;
+    wire        w_qspi_busy  = (r_fa_st != FA_IDLE);
+
+    // hu: Használaton kívüli i_xmem_* bemenetek elnyelése (Verilator lint).
+    // en: Sink unused i_xmem_* inputs (Verilator lint).
+    wire        w_unused_xmem = &{1'b0, i_xmem_rdata, i_xmem_ready, i_xmem_busy};
 
     // hu: (F1a) A cilcpu_qspi_controller példányosítás INNEN ELTÁVOLÍTVA — a
     //     controller a SoC/board szintre került. A fenti o_xmem_*/i_xmem_*
@@ -747,6 +818,63 @@ module cilcpu_core (
     end
 
     // ============================================================
+    // hu: F3 — instrukció-fetch SRAM adapter FSM. A fetch/CALL FSM r_qspi_re
+    //     kérés-pulzusát on-chip SRAM-olvasásra fordítja, és a w_qspi_ready
+    //     pulzust + a beolvasott szót szolgáltatja vissza:
+    //       FA_IDLE  : r_qspi_re=1 → cím-latch, FA_ISSUE
+    //       FA_ISSUE : fa_sram_re=1 (az arbiteren át) → SRAM 1-ciklus read; a
+    //                  r_sram_rdata_latched a KÖVETKEZŐ ciklusban érvényes
+    //       FA_CAP   : r_fa_word <= r_sram_rdata_latched, r_fa_ready pulzus
+    //     A latencia (~3 ciklus issue→ready) bőven a QSPI ~58-98 alatt; a
+    //     fetch/CALL FSM handshake-je (inflight + w_qspi_ready) változatlan.
+    // en: F3 — instruction-fetch SRAM adapter FSM. Translates the fetch/CALL
+    //     FSM's r_qspi_re request pulse into an on-chip SRAM read and returns the
+    //     w_qspi_ready pulse + the read word. Latency (~3 cycles issue→ready) is
+    //     far below QSPI ~58-98; the fetch/CALL FSM handshake is unchanged.
+    // ============================================================
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            r_fa_st    <= FA_IDLE;
+            r_fa_addr  <= 14'd0;
+            r_fa_w0    <= 32'd0;
+            r_fa_word  <= 32'd0;
+            r_fa_ready <= 1'b0;
+        end else begin
+            r_fa_ready <= 1'b0;   // hu: 1-ciklusos ready pulzus alaphelyzet
+            case (r_fa_st)
+                FA_IDLE: begin
+                    if (r_qspi_re) begin
+                        r_fa_addr <= r_qspi_addr[13:0];
+                        r_fa_st   <= FA_ISSUE0;
+                    end
+                end
+                FA_ISSUE0: begin
+                    // hu: fa_sram_re=1, fa_sram_addr=W0 → SRAM latch; W0 a CAP0-ban jó.
+                    r_fa_st <= FA_CAP0;
+                end
+                FA_CAP0: begin
+                    r_fa_w0 <= r_sram_rdata_latched;   // W0 (addr>>2)
+                    r_fa_st <= FA_ISSUE1;              // W1 read kiadása
+                end
+                FA_ISSUE1: begin
+                    r_fa_st <= FA_CAP1;
+                end
+                FA_CAP1: begin
+                    // hu: {W1,W0} >> (byte_offset*8) alsó 32 bitje = a 4 byte a
+                    //     byte-címtől, LE sorrendben (r_fa_word[7:0] = byte@addr).
+                    //     A w_qspi_rdata ezt big-endian-re fordítja a fetch FSM-nek.
+                    // en: {W1,W0} >> (byte_offset*8) low 32 bits = the 4 bytes from
+                    //     the byte address, LE (r_fa_word[7:0] = byte@addr).
+                    r_fa_word  <= w_fa_shift[31:0];
+                    r_fa_ready <= 1'b1;
+                    r_fa_st    <= FA_IDLE;
+                end
+                default: r_fa_st <= FA_IDLE;
+            endcase
+        end
+    end
+
+    // ============================================================
     // hu: Fő FSM
     // en: Main FSM
     // ============================================================
@@ -870,8 +998,12 @@ module cilcpu_core (
                     r_arg_count    <= i_boot_arg_count[4:0];
                     r_local_count  <= i_boot_local_count[4:0];
                     r_pc           <= i_boot_pc;
-                    r_fp           <= 14'd0;
-                    r_sp           <= 14'd0;
+                    // hu: F3 — a root frame a STACK_BASE-re kerül (a CODE+DATA
+                    //     a [0, STACK_BASE) tartományba), nem a 0. bájtra.
+                    // en: F3 — root frame at STACK_BASE (CODE+DATA in
+                    //     [0, STACK_BASE)), not at byte 0.
+                    r_fp           <= `STACK_BASE;
+                    r_sp           <= `STACK_BASE;
                     r_call_depth   <= 10'd1;
                     r_boot_arg_idx <= 5'd0;
                     r_boot_local_idx <= 5'd0;
@@ -886,19 +1018,19 @@ module cilcpu_core (
             ST_BOOT: begin
                 case (r_boot_sub)
                     BOOT_HDR0: begin
-                        r_sram_addr  <= 14'd0;     // FP+0 = 0
+                        r_sram_addr  <= `STACK_BASE + 14'd0;     // FP+0
                         r_sram_wdata <= 32'hFFFF_FFFF;  // ReturnPC = -1
                         r_sram_we    <= 1'b1;
                         r_boot_sub   <= BOOT_HDR1;
                     end
                     BOOT_HDR1: begin
-                        r_sram_addr  <= 14'd4;     // FP+4
+                        r_sram_addr  <= `STACK_BASE + 14'd4;     // FP+4
                         r_sram_wdata <= 32'hFFFF_FFFF;  // PrevFrameBase = -1
                         r_sram_we    <= 1'b1;
                         r_boot_sub   <= BOOT_HDR2;
                     end
                     BOOT_HDR2: begin
-                        r_sram_addr  <= 14'd8;     // FP+8
+                        r_sram_addr  <= `STACK_BASE + 14'd8;     // FP+8
                         r_sram_wdata <= {16'd0,
                                          3'd0, r_local_count,
                                          3'd0, r_arg_count};
@@ -915,7 +1047,7 @@ module cilcpu_core (
                         // hu: Várjuk az i_boot_arg_valid pulzust
                         o_boot_arg_ready <= 1'b1;
                         if (i_boot_arg_valid) begin
-                            r_sram_addr  <= 14'd12 + {7'd0, r_boot_arg_idx, 2'd0};
+                            r_sram_addr  <= `STACK_BASE + 14'd12 + {7'd0, r_boot_arg_idx, 2'd0};
                             r_sram_wdata <= i_boot_arg_data;
                             r_sram_we    <= 1'b1;
                             r_boot_arg_idx <= r_boot_arg_idx + 5'd1;
@@ -930,7 +1062,7 @@ module cilcpu_core (
                         end
                     end
                     BOOT_LOCALS: begin
-                        r_sram_addr  <= 14'd12
+                        r_sram_addr  <= `STACK_BASE + 14'd12
                                         + {7'd0, r_arg_count, 2'd0}
                                         + {7'd0, r_boot_local_idx, 2'd0};
                         r_sram_wdata <= 32'd0;
@@ -941,14 +1073,14 @@ module cilcpu_core (
                         end
                     end
                     BOOT_FINAL: begin
-                        // hu: SP = 12 + arg_count*4 + local_count*4
-                        r_sp <= 14'd12
+                        // hu: SP = STACK_BASE + 12 + arg_count*4 + local_count*4
+                        r_sp <= `STACK_BASE + 14'd12
                                 + {7'd0, r_arg_count, 2'd0}
                                 + {7'd0, r_local_count, 2'd0};
                         // hu: Stack Cache reset az új SP-re (boot: üres eval)
                         // en: Stack Cache reset to new SP (boot: empty eval)
                         r_sc_sp_load <= 1'b1;
-                        r_sc_sp_init <= 14'd12
+                        r_sc_sp_init <= `STACK_BASE + 14'd12
                                         + {7'd0, r_arg_count, 2'd0}
                                         + {7'd0, r_local_count, 2'd0};
                         r_sc_sp_depth <= 7'd0;

@@ -189,9 +189,37 @@ async def qspi_flash_driver(dut, flash):
 # ============================================================
 
 
+# hu: F3 egységes on-chip SRAM — STACK_BASE (cilcpu_defines.vh) szóban: a CODE
+#     régió [0, STACK_BASE) az on-chip SRAM-ban, fölötte a STACK. A CODE-ot
+#     backdoor-poke-kal töltjük (a core onnan fetch-el; a QSPI nem érintett).
+# en: F3 unified on-chip SRAM — STACK_BASE (cilcpu_defines.vh) in words: CODE
+#     region [0, STACK_BASE) in the on-chip SRAM, STACK above. CODE is loaded by
+#     backdoor poke (the core fetches from there; the QSPI is untouched).
+STACK_BASE = 0x0800
+_CODE_WORDS = STACK_BASE // 4
+
+
+def _preload_core_sram(dut, code_bytes):
+    """hu: a programot az on-chip r_sram CODE-régiójába írja (LE szavak). A CODE
+        régiót előbb 0xFF-fel tölti (a régi flash-default reprodukciója: olvasatlan
+        cím → INVALID_OPCODE, ha a végrehajtás túlfut)."""
+    for k in range(_CODE_WORDS):
+        dut.u_core.r_sram[k].value = 0xFFFFFFFF
+    b = list(code_bytes or [])
+    while len(b) % 4 != 0:
+        b.append(0x00)
+    for k in range(0, len(b), 4):
+        word = b[k] | (b[k + 1] << 8) | (b[k + 2] << 16) | (b[k + 3] << 24)
+        dut.u_core.r_sram[k // 4].value = word
+
+
 async def reset_dut(dut, code_bytes=None):
-    """hu: 3-ciklusú reset, friss QSPI flash slave indítás.
-    en: 3-cycle reset, fresh QSPI flash slave start."""
+    """hu: 3-ciklusú reset. F3: a CODE-ot az on-chip SRAM-ba backdoor-poke-oljuk
+        (a core onnan fetch-el). A QSPI flash slave változatlanul indul, de a core
+        már nem hajtja a külső buszt → tétlen marad (kompatibilitás).
+    en: 3-cycle reset. F3: CODE is backdoor-poked into the on-chip SRAM (the core
+        fetches from there). The QSPI flash slave still starts but the core no
+        longer drives the external bus → it stays idle (compatibility)."""
     global _slave_task
 
     if _slave_task is not None and not _slave_task.done():
@@ -221,6 +249,11 @@ async def reset_dut(dut, code_bytes=None):
 
     for _ in range(2):
         await RisingEdge(dut.clk)
+
+    # hu: F3 — CODE betöltése az on-chip SRAM-ba (reset után, a memória nem
+    #     resetelődik). Boot előtt kell, hogy az 1. fetch már a kódot lássa.
+    if code_bytes is not None:
+        _preload_core_sram(dut, code_bytes)
 
     return flash
 

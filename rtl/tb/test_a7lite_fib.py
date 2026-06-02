@@ -163,7 +163,7 @@ async def _wait_halt_or_trap_diag(dut, max_cycles=2_000_000):
     raise TimeoutError(f"no halt/trap within {max_cycles} cycles")
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_top (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_board váltja ki
 async def test_01_fibonacci_iterative_e2e(dut):
     """hu: End-to-end FibonacciIterative(20) = 6765 — KEY2 lenyomásra a
         wrapper elindítja a Roslyn-fordított CIL-T0 binárist, push-olja

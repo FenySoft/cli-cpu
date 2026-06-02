@@ -64,6 +64,22 @@ module cilcpu_soc #(
     // en: Boot-over-UART loader serial input (idle = 1). F2.8 #6.5b-F1b.
     input  wire        i_uart_rx,
 
+    // hu: F3 — boot-mód strap (I/O bemenet). A core MINDIG az on-chip SRAM-ból
+    //     fut; a strap a CODE betöltési útját választja:
+    //       L (0) → mód A: az UART-loader KÖZVETLENÜL az on-chip SRAM-ba ír
+    //               (gyors dev; a QSPI tétlen, nincs perzisztencia).
+    //       H (1) → mód B: a loader a QSPI-ra ír (perzisztencia), és boot-kor egy
+    //               copy-engine a QSPI→on-chip SRAM-ba másolja a kódot, majd a
+    //               core onnan fut (a flash-autodetect cold-boot is így megy).
+    // en: F3 — boot-mode strap (I/O input). The core ALWAYS runs from on-chip
+    //     SRAM; the strap selects the CODE load path:
+    //       L (0) → mode A: the UART loader writes the on-chip SRAM DIRECTLY
+    //               (fast dev; QSPI idle, no persistence).
+    //       H (1) → mode B: the loader writes QSPI (persistence) and a copy engine
+    //               copies QSPI→on-chip SRAM at boot, then the core runs from it
+    //               (flash-autodetect cold-boot also takes this path).
+    input  wire        i_boot_mode,
+
     // hu: Státusz / en: Status
     output wire        o_halt,
     output wire        o_trap,
@@ -251,7 +267,8 @@ module cilcpu_soc #(
         .o_mem_addr      (w_ld_mem_addr),
         .o_mem_wdata     (w_ld_mem_wdata),
         .o_mem_we        (w_ld_mem_we),
-        .i_mem_ready     (w_qspi_cpu_ready),
+        // hu: mód A: az on-chip SRAM write 1-ciklusos ready-je; mód B: a QSPI ready.
+        .i_mem_ready     (w_ld_mem_ready),
         .o_boot_req      (w_ld_boot_req),
         .o_boot_pc       (w_ld_boot_pc),
         .o_boot_argc     (w_ld_boot_argc),
@@ -277,6 +294,7 @@ module cilcpu_soc #(
     wire [23:0] w_bc_boot_pc;
     wire [7:0]  w_bc_boot_argc;
     wire [7:0]  w_bc_boot_localc;
+    wire [11:0] w_bc_boot_nwords;   // hu: F3 — autoboot copy-hossz (csize-ból)
 
     cilcpu_boot_ctrl #(
         .AUTODETECT (BOOT_AUTODETECT)
@@ -291,7 +309,8 @@ module cilcpu_soc #(
         .o_boot_req      (w_bc_boot_req),
         .o_boot_pc       (w_bc_boot_pc),
         .o_boot_argc     (w_bc_boot_argc),
-        .o_boot_localc   (w_bc_boot_localc)
+        .o_boot_localc   (w_bc_boot_localc),
+        .o_boot_nwords   (w_bc_boot_nwords)
     );
 
     // ============================================================
@@ -313,28 +332,45 @@ module cilcpu_soc #(
     reg  r_load_mode;
     reg  r_code_src;
 
-    // hu: Belső boot-paraméterek latch-elése. A Core az i_boot_pc-t KÉTSZER
-    //     olvassa (ST_RESET → r_pc, majd ST_BOOT → r_next_fetch_addr a
-    //     következő ciklusban), ezért a boot-paramétereket STABILAN kell
-    //     tartani, nem csak a 1-ciklusos boot_req pulzus alatt. Megoldás: a
-    //     belső boot forrás (boot_ctrl / loader) paramétereit latch-eljük
-    //     (r_lat_*) és a core boot-start-ját egy ciklussal eltoljuk
-    //     (r_int_boot_start), hogy a start a stabil latch után pulzáljon. A
-    //     külső i_boot_* utat (a meglévő tesztek) a r_int_boot_pending=0 ág
-    //     hagyja érintetlenül.
-    // en: Internal boot-parameter latching. The Core reads i_boot_pc TWICE
-    //     (ST_RESET → r_pc, then ST_BOOT → r_next_fetch_addr in the next
-    //     cycle), so the boot params must be held STABLE, not only during the
-    //     1-cycle boot_req pulse. Solution: latch the internal boot source's
-    //     (boot_ctrl / loader) params (r_lat_*) and shift the core boot-start
-    //     by one cycle (r_int_boot_start) so start pulses after the stable
-    //     latch. The external i_boot_* path (existing tests) is untouched via
-    //     the r_int_boot_pending=0 branch.
+    // hu: Belső boot-paraméterek latch-elése (lásd lentebb a magyarázatot).
+    // en: Internal boot-parameter latching (see explanation below).
     reg        r_int_boot_pending;
     reg        r_int_boot_start;
     reg [23:0] r_lat_pc;
     reg [7:0]  r_lat_argc;
     reg [7:0]  r_lat_localc;
+
+    // hu: F3 COPY-ENGINE (mód B) — boot-kor a kódrégiót a QSPI-ből (a code_src
+    //     szegmens szerint) az on-chip SRAM-ba másolja (a core i_ld_* portján),
+    //     majd elindítja a core boot-ját. Hossz: a loader write-végéből
+    //     (w_ld_mem_addr[13:2]) → csak a tényleges programot másolja (gyors).
+    //     A core MINDIG az on-chip SRAM-ból fut; a QSPI a betöltés-idejű
+    //     backing store (ADR: unified-onchip-sram).
+    // en: F3 COPY ENGINE (mode B) — at boot, copies the code region from QSPI
+    //     (per the code_src segment) into the on-chip SRAM (over the core's
+    //     i_ld_* port), then starts the core boot. Length from the loader's
+    //     write end (w_ld_mem_addr[13:2]) → copies only the real program (fast).
+    localparam [2:0] CP_IDLE   = 3'd0;
+    localparam [2:0] CP_RD     = 3'd1;   // QSPI read pulzus
+    localparam [2:0] CP_RDWAIT = 3'd2;   // vár cpu_ready-re, szó latch
+    localparam [2:0] CP_WR     = 3'd3;   // on-chip SRAM write (i_ld_we)
+    localparam [2:0] CP_DONE   = 3'd4;   // boot indítása
+    reg  [2:0]  r_cp_st;
+    reg  [11:0] r_cp_idx;          // másolt szó-index
+    reg  [11:0] r_copy_end_word;   // hány szót másoljon
+    reg  [31:0] r_cp_word;         // a QSPI-ból olvasott szó
+    reg         r_cp_re;           // QSPI read pulzus (copy)
+    reg         r_ld_a_ready;      // mód A: 1-ciklusos on-chip SRAM write ready
+
+    wire        w_copy_active = (r_cp_st != CP_IDLE);
+
+    // hu: Run-fázis cím-szegmens remap a code_src szerint.
+    // en: Run-phase address segment remap by code_src.
+    wire [3:0]  w_core_seg = r_code_src ? `SEG_STACK : `SEG_CODE;
+
+    // hu: copy-engine QSPI-olvasó cím/re (a code_src szegmens + szó-offszet).
+    // en: copy-engine QSPI read addr/re (code_src segment + word offset).
+    wire [23:0] cp_qspi_addr = {w_core_seg, 6'd0, r_cp_idx, 2'b00};
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -345,9 +381,46 @@ module cilcpu_soc #(
             r_lat_pc           <= 24'd0;
             r_lat_argc         <= 8'd0;
             r_lat_localc       <= 8'd0;
+            r_cp_st            <= CP_IDLE;
+            r_cp_idx           <= 12'd0;
+            r_copy_end_word    <= 12'd0;
+            r_cp_word          <= 32'd0;
+            r_cp_re            <= 1'b0;
+            r_ld_a_ready       <= 1'b0;
         end else begin
             r_int_boot_start <= 1'b0;   // hu: eltolt start pulzus alaphelyzet
+            r_cp_re          <= 1'b0;   // hu: copy QSPI-read pulzus alaphelyzet
+            // hu: mód A — az on-chip SRAM write 1 ciklus alatt kész (ld write után).
+            r_ld_a_ready     <= (i_boot_mode == 1'b0) ? w_ld_mem_we : 1'b0;
 
+            // ----- copy-engine FSM (mód B) -----
+            case (r_cp_st)
+                CP_RD: begin
+                    r_cp_re <= 1'b1;
+                    r_cp_st <= CP_RDWAIT;
+                end
+                CP_RDWAIT: begin
+                    if (w_qspi_cpu_ready) begin
+                        r_cp_word <= w_qspi_cpu_rdata;
+                        r_cp_st   <= CP_WR;
+                    end
+                end
+                CP_WR: begin
+                    // hu: i_ld_we = (r_cp_st==CP_WR) → SRAM write erre a ciklusra.
+                    r_cp_idx <= r_cp_idx + 12'd1;
+                    if (r_cp_idx + 12'd1 >= r_copy_end_word)
+                        r_cp_st <= CP_DONE;
+                    else
+                        r_cp_st <= CP_RD;
+                end
+                CP_DONE: begin
+                    r_int_boot_start <= 1'b1;   // hu: copy kész → boot
+                    r_cp_st          <= CP_IDLE;
+                end
+                default: ;   // CP_IDLE
+            endcase
+
+            // ----- boot-trigger + load-mode -----
             if (w_bc_boot_req) begin
                 // hu: autonóm flash-boot → code_src = flash (SEG_CODE)
                 r_load_mode        <= 1'b0;
@@ -356,7 +429,17 @@ module cilcpu_soc #(
                 r_lat_argc         <= w_bc_boot_argc;
                 r_lat_localc       <= w_bc_boot_localc;
                 r_int_boot_pending <= 1'b1;
-                r_int_boot_start   <= 1'b1;   // hu: a KÖVETKEZŐ ciklusban pulzál
+                if (i_boot_mode) begin
+                    // hu: mód B autonóm flash-boot — a copy-hossz a boot_ctrl
+                    //     csize-alapú nwords-éből (a header [4:5] kódméret mező).
+                    // en: mode B autonomous flash boot — copy length from the
+                    //     boot_ctrl's csize-based nwords (header [4:5] code size).
+                    r_copy_end_word <= w_bc_boot_nwords;
+                    r_cp_idx        <= 12'd0;
+                    r_cp_st         <= CP_RD;
+                end else begin
+                    r_int_boot_start <= 1'b1;
+                end
             end else if (w_ld_boot_req) begin
                 r_load_mode        <= 1'b0;
                 r_code_src         <= w_ld_boot_code_src;
@@ -364,31 +447,54 @@ module cilcpu_soc #(
                 r_lat_argc         <= w_ld_boot_argc;
                 r_lat_localc       <= w_ld_boot_localc;
                 r_int_boot_pending <= 1'b1;
-                r_int_boot_start   <= 1'b1;
+                if (i_boot_mode) begin
+                    // hu: mód B — a QSPI-ba töltött kódot copy-engine másolja SRAM-ba
+                    r_copy_end_word <= w_ld_mem_addr[13:2];
+                    r_cp_idx        <= 12'd0;
+                    r_cp_st         <= CP_RD;
+                end else begin
+                    // hu: mód A — a program már az on-chip SRAM-ban (a loader
+                    //     közvetlenül oda írt) → azonnali boot.
+                    r_int_boot_start <= 1'b1;
+                end
             end else if (w_ld_busy) begin
                 r_load_mode <= 1'b1;
             end
         end
     end
 
-    // hu: Run-fázis cím-szegmens remap a code_src szerint — a Core eszköz-
-    //     agnosztikus [19:0] CODE-címteret használ; a SoC teszi rá a szegmenst.
-    // en: Run-phase address segment remap by code_src — the Core uses a device-
-    //     agnostic [19:0] CODE space; the SoC applies the segment.
-    wire [3:0] w_core_seg = r_code_src ? `SEG_STACK : `SEG_CODE;
-
-    // hu: 3-way fázis-MUX a QSPI cpu_* bemenetein. Prioritás:
-    //     detect (boot_ctrl header-olvasás) > load (loader PSRAM-írás) > run (core).
-    // en: 3-way phase MUX on the QSPI cpu_* inputs. Priority:
-    //     detect (boot_ctrl header read) > load (loader PSRAM write) > run (core).
-    wire [23:0] w_qspi_cpu_addr  = w_bc_detect_active ? w_bc_mem_addr  :
-                                   r_load_mode        ? w_ld_mem_addr  :
+    // hu: Fázis-MUX a QSPI cpu_* bemenetein. Prioritás: detect (boot_ctrl) >
+    //     copy (copy-engine read) > load (csak mód B: loader QSPI-írás) > run
+    //     (core — F3-ban o_xmem_re=0, így nem olvas). Mód A-ban a loader NEM a
+    //     QSPI-t hajtja (i_boot_mode && r_load_mode = 0) → a QSPI tétlen.
+    // en: Phase MUX on the QSPI cpu_* inputs. Priority: detect (boot_ctrl) >
+    //     copy (copy-engine read) > load (mode B only: loader QSPI write) > run
+    //     (core — o_xmem_re=0 in F3, so no reads). In mode A the loader does NOT
+    //     drive QSPI (i_boot_mode && r_load_mode = 0) → QSPI idle.
+    wire [23:0] w_qspi_cpu_addr  = w_bc_detect_active ? w_bc_mem_addr :
+                                   w_copy_active       ? cp_qspi_addr  :
+                                   (i_boot_mode && r_load_mode) ? w_ld_mem_addr :
                                        {w_core_seg, w_xmem_addr[19:0]};
-    wire [31:0] w_qspi_cpu_wdata = r_load_mode ? w_ld_mem_wdata : 32'd0;
-    wire        w_qspi_cpu_we    = (!w_bc_detect_active && r_load_mode) ? w_ld_mem_we : 1'b0;
+    wire [31:0] w_qspi_cpu_wdata = (i_boot_mode && r_load_mode) ? w_ld_mem_wdata : 32'd0;
+    wire        w_qspi_cpu_we    = (!w_bc_detect_active && !w_copy_active
+                                    && i_boot_mode && r_load_mode) ? w_ld_mem_we : 1'b0;
     wire        w_qspi_cpu_re    = w_bc_detect_active ? w_bc_mem_re :
-                                   r_load_mode        ? 1'b0        :
-                                                        w_xmem_re;
+                                   w_copy_active       ? r_cp_re     :
+                                   (i_boot_mode && r_load_mode) ? 1'b0 :
+                                       w_xmem_re;
+
+    // hu: loader i_mem_ready — mód A: on-chip SRAM write ready; mód B: QSPI ready.
+    // en: loader i_mem_ready — mode A: on-chip SRAM write ready; mode B: QSPI ready.
+    wire        w_ld_mem_ready = i_boot_mode ? w_qspi_cpu_ready : r_ld_a_ready;
+
+    // hu: core on-chip SRAM load-write port — mód A: közvetlen loader-írás;
+    //     mód B: a copy-engine (CP_WR) írása. i_ld_wdata BIG-ENDIAN (a core LE-re
+    //     fordítja). Mód A: a cím a loader [13:0] (a szegmens-nibble levágva).
+    // en: core on-chip SRAM load-write port — mode A: direct loader write; mode B:
+    //     copy-engine (CP_WR) write. i_ld_wdata BIG-ENDIAN (core swaps to LE).
+    wire        w_core_ld_we    = i_boot_mode ? (r_cp_st == CP_WR) : w_ld_mem_we;
+    wire [13:0] w_core_ld_addr  = i_boot_mode ? {r_cp_idx, 2'b00}  : w_ld_mem_addr[13:0];
+    wire [31:0] w_core_ld_wdata = i_boot_mode ? r_cp_word          : w_ld_mem_wdata;
 
     // hu: Boot-mux — belső boot (r_int_boot_pending: boot_ctrl/loader, latch-elt
     //     és STABIL paraméterek) VAGY külső i_boot_* (a meglévő tesztek). A start
@@ -429,7 +535,11 @@ module cilcpu_soc #(
         .o_mmio_wdata       (w_mmio_wdata),
         .o_mmio_we          (w_mmio_we),
         .o_mmio_re          (w_mmio_re),
-        .i_mmio_rdata       (w_mmio_rdata)
+        .i_mmio_rdata       (w_mmio_rdata),
+        // hu: F3 — on-chip SRAM load-write port (mód A: loader, mód B: copy-engine)
+        .i_ld_we            (w_core_ld_we),
+        .i_ld_addr          (w_core_ld_addr),
+        .i_ld_wdata         (w_core_ld_wdata)
     );
 
     // hu: SoC-szintű QSPI controller — a fázis-MUX-on át a loader (write, load)

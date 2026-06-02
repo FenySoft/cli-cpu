@@ -139,7 +139,7 @@ async def _setup(dut, code_bytes):
 # en: Tests
 # ============================================================
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_board (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_board váltja ki
 async def test_01_reset_state(dut):
     """hu: Reset után a board szintű LED-ek inaktívak (active low).
     en: After reset, board-level LEDs are inactive (active low)."""
@@ -150,7 +150,7 @@ async def test_01_reset_state(dut):
     assert int(dut.o_qspi_cs_n.value) == 1, "CS# should be deasserted in idle"
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_board (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_board váltja ki
 async def test_02_ldarg_ret_halt_uart(dut):
     """hu: KEY2 → push 5 → LDARG_0 + RET → halt, UART "5\\r\\n".
         Ez egy teljes round-trip a board wrapper-en keresztül, beleértve
@@ -173,7 +173,7 @@ async def test_02_ldarg_ret_halt_uart(dut):
     assert int(dut.o_led2_n.value) == 1, "trap LED should be inactive"
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_board (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_board váltja ki
 async def test_03_ldarg_add_halt(dut):
     """hu: LDARG_0 + LDC.I4_3 + ADD + RET → return = arg + 3 = 8.
         Bizonyítja, hogy az ALU út is működik a board.v-en át.
@@ -193,7 +193,7 @@ async def test_03_ldarg_add_halt(dut):
         f"expected {BOOT_ARG_VALUE + 3}, got {ret}"
 
 
-@cocotb.test()
+@cocotb.test(skip=True)  # F3: legacy a7lite_board (direct core+QSPI, nincs loader/copy) → on-chip SRAM nem tölthető; SoC-alapú tt_board váltja ki
 async def test_04_invalid_opcode_trap_uart(dut):
     """hu: 0xFF opkód → trap, UART "3\\r\\n" (TRAP_INVALID_OPCODE = 3).
     en: 0xFF opcode → trap, UART "3\\r\\n" (TRAP_INVALID_OPCODE = 3)."""
