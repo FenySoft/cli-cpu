@@ -1,8 +1,8 @@
 # hu: CLI-CPU cocotb közös QSPI flash slave modell. Kiemelve a test_core.py
-#     mintájából, hogy a wrapper (cilcpu_a7lite_top) és minden további
+#     mintájából, hogy a wrapper (cilcpu_tt_top) és minden további
 #     top-level cocotb teszt ugyanazt a flash slave-et használhassa.
 # en: CLI-CPU cocotb shared QSPI flash slave model. Extracted from the
-#     test_core.py pattern so that the wrapper (cilcpu_a7lite_top) and any
+#     test_core.py pattern so that the wrapper (cilcpu_tt_top) and any
 #     future top-level cocotb test can reuse the same flash slave.
 
 import cocotb

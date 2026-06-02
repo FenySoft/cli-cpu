@@ -39,16 +39,16 @@ module cilcpu_qspi_controller #(
     //     KÖTELEZŐ (a board MODE pinjei SPI x1 boot-ra konfiguráltak, így
     //     az FPGA startup ROM nem állítja be a flash QE-jét → a core 0x6B
     //     Quad Output Read parancsa garbage-t kapna). Sim-ben default 0,
-    //     hogy a meglévő unit-tesztek (test_qspi_controller, test_core,
-    //     test_a7lite_*) változatlan reset-utáni viselkedést kapjanak; a
+    //     hogy a meglévő unit-tesztek (test_qspi_controller, test_core)
+    //     változatlan reset-utáni viselkedést kapjanak; a
     //     dedikált test_qspi_qe_init expliciten 1-re állítja.
     //     Vivado FPGA build: set_property generic QE_INIT_ENABLE=1.
     // en: F2.7 Sub5 — enable flash QE-bit init after reset. REQUIRED on
     //     real HW (the board's MODE pins are configured for SPI x1 boot,
     //     so the FPGA startup ROM does not set the flash QE → the core's
     //     0x6B Quad Output Read would return garbage). Default 0 in sim
-    //     so existing unit tests (test_qspi_controller, test_core,
-    //     test_a7lite_*) see unchanged post-reset behaviour; the
+    //     so existing unit tests (test_qspi_controller, test_core)
+    //     see unchanged post-reset behaviour; the
     //     dedicated test_qspi_qe_init sets it to 1 explicitly.
     //     Vivado FPGA build: set_property generic QE_INIT_ENABLE=1.
     parameter integer QE_INIT_ENABLE = 0

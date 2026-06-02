@@ -1,8 +1,8 @@
 # hu: CIL-T0 opcode és trap konstansok cocotb tesztekhez. Egy helyen,
-#     hogy a top-level (cilcpu_a7lite_top) és minden további wrapper
+#     hogy a top-level (cilcpu_tt_top) és minden további wrapper
 #     teszt ugyanazt használhassa.
 # en: CIL-T0 opcode and trap constants for cocotb tests. Centralized so
-#     the top-level (cilcpu_a7lite_top) and any future wrapper test can
+#     the top-level (cilcpu_tt_top) and any future wrapper test can
 #     share them.
 
 # ============================================================
