@@ -6,7 +6,32 @@
 >
 > **Hatókör:** Belső RTL munka-spec, nem publikus dokumentum. A publikus ISA spec a `docs/ISA-CIL-T0-{hu,en}.md`, a publikus architektúra a `docs/architecture-hu.md`.
 >
-> Version: 1.5
+> Version: 1.6
+
+### Changelog
+- **1.6 (F3 — egységes on-chip SRAM):** A core a TELJES programot a saját 4 KB
+  on-chip SRAM-jából futtatja (CODE+DATA+STACK egy lineáris térben). Az alábbi
+  F2.5a memória/fetch/boot leírást ez **felülírja** — lásd a „F3 egységes
+  on-chip SRAM" szekciót. ADR: `Vault/Decisions/2026-06-01-unified-onchip-sram`.
+- 1.5 és korábbi: F2.4–F2.8 (16 KB SRAM stack-only, CODE-fetch a QSPI flash-ből).
+
+### F3 — egységes on-chip SRAM (felülírja az F2.5a memória-modellt)
+- **4 KB egységes on-chip SRAM** `reg [31:0] r_sram[0:1023]` — CODE + DATA + STACK
+  egy lineáris címtérben (scratchpad/TCM). Szintézisben SRAM-makró (IHP 1P 1024×32).
+  Térkép: CODE+DATA `[0, STACK_BASE)`=`[0,2048)`, STACK `[STACK_BASE,4096)`. A
+  `STACK_BASE`=`0x800` (`cilcpu_defines.vh`). Stack-túlcsordulás határ = 4092.
+- **CODE-fetch az on-chip SRAM-ból** egy belső *fetch-SRAM adapteren* át (a fetch/
+  CALL FSM változatlanul a `r_qspi_*`/`w_qspi_*` kérő-jeleket használja, de azokat
+  az adapter hajtja az `r_sram`-ból: byte-granuláris 2-szavas olvasás + LE→BE
+  byteswap). A külső `o_xmem` busz **lekötve** (`o_xmem_re` VÉGIG 0).
+- **Boot:** a root frame a `STACK_BASE`-re kerül (`FP=SP=STACK_BASE`, nem 0).
+- **`i_ld_*` SRAM load-write port:** a programot a boot ELŐTT írja az SRAM-ba a
+  SoC — mód A-ban közvetlenül az UART-loader, mód B-ben a QSPI→SRAM copy-engine.
+- **Boot-mód strap (`i_boot_mode`, SoC):** L=mód A (UART→SRAM direkt, QSPI tétlen),
+  H=mód B (loader→QSPI + boot-kori copy-engine QSPI→SRAM; perzisztencia + autonóm
+  flash cold-boot). A QSPI = betöltés-idejű backing store.
+- A `cilcpu_qspi_controller`/`cilcpu_mailbox` RTL a repóban marad (F4); a mailbox
+  az F3 tape-out-configból kimarad.
 
 ## Cél
 

@@ -184,30 +184,30 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 ---
 
-### F3 — Tiny Tapeout Submission (egymagos CIL-T0 + Mailbox)
+### F3 — Tiny Tapeout Submission (egymagos CIL-T0, egységes on-chip SRAM)
 
-**Cél:** Az első valódi CLI-CPU szilícium. Sky130 PDK-n, Tiny Tapeout shuttle-n, egymagos CIL-T0 subset + **hardveres mailbox interfésszel**, ami az első „hálózatba illeszthető csomópont" demót teszi lehetővé.
+**Cél:** Az első valódi CLI-CPU szilícium. Egymagos CIL-T0 subset, amely a **teljes programot a saját 4 KB on-chip SRAM-jából** futtatja (CODE+DATA+STACK; scratchpad/TCM). A host-kommunikáció **UART-on** (boot-over-UART betöltés + decimális eredmény-kiírás). ADR: `Vault/Decisions/2026-06-01-unified-onchip-sram`.
 
-**Platform:** Tiny Tapeout (TTSKY26a vagy későbbi shuttle, amelyik időben elérhető), Sky130 PDK, OpenLane2. Egy tile ~160×100 μm, ~1K logic gate kapacitás. A Nano core + Mailbox + UART **12–16 tile-t** igényel (~12K–16K gate, a routing overhead-del együtt). 24 GPIO (8 in + 8 out + 8 bidi), min. 50 MHz clock.
+**Mailbox → F4.** A HW-mailbox az F3-ból kimaradt (egymagos chipnél redundáns a UART-tal; a valódi inter-core érték a router + cella-transport, az F4). A `cilcpu_mailbox` RTL a repóban marad F4-hez.
+
+**Boot-mód strap (`i_boot_mode`):** L = mód A (UART → on-chip SRAM **direkt**, QSPI tétlen — gyors dev, nincs qspi-pmod kártya-függőség); H = mód B (loader → QSPI + boot-kori copy-engine QSPI → on-chip SRAM — perzisztencia + autonóm flash cold-boot). A QSPI = betöltés-idejű backing store.
+
+**Platform / méret (IHP, az ADR + tile-becslés szerint):** IHP SG13G2 (ttihp), egy tile 200×150 μm. A 4 KB egységes on-chip SRAM **makró** dominál (~5 tile); a logika ~14 tile → **össz ~19 tile (~$950, $50/tile)**. Sky130 alternatíva drágább (~$2 870 a 16 KB-os korábbi becslésnél; 4 KB-ra arányosan kevesebb). 24 pin (tt_um), min. 50 MHz.
 
 **Kimenet:**
-- `tt/` — Tiny Tapeout submission könyvtár (`info.yaml`, `src/`, `docs/`, stb.)
+- RTL **KÉSZ + szimulált:** `cilcpu_core` (egységes-SRAM fetch + fetch-adapter), `cilcpu_soc` (loader + copy-engine + A/B boot-mux), `cilcpu_tt_top`/`tt_board` (24-pin wrapper + A7-Lite board). Teljes cocotb regresszió zöld + golden-vektor egyezés.
+- `tt/` — Tiny Tapeout submission könyvtár (`info.yaml`, `src/`, `docs/`)
 - `tt/test/` — post-silicon bring-up tesztek
-- `hw/bringup/` — bring-up board tervei (KiCad): QSPI flash socket, QSPI PSRAM socket, FTDI USB-UART (a mailbox külső bridge-éhez), power, debug LEDek, PMOD csatlakozók
-
-**Új F3 komponens a spec szerint:**
-- **Mailbox MMIO blokk** — 8 mélységű inbox + outbox FIFO, `0xF000_0100` címen, részletek a `docs/ISA-CIL-T0-hu.md`-ben. Lehetővé teszi, hogy egy host számítógép UART-on keresztül üzeneteket küldjön a chipnek, amit a chip CIL programmal dolgoz fel és válaszol vissza.
+- `hw/bringup/` — bring-up board tervei (KiCad): qspi-pmod (flash + 2× PSRAM), FTDI USB-UART, power, debug LEDek
 
 **Kész kritérium:**
-- GDS elfogadva a Tiny Tapeout shuttle-re
+- GDS elfogadva a Tiny Tapeout (IHP) shuttle-re
 - Gate-level szimuláció zöld
-- Bring-up board legyártatva (JLCPCB), bekábelezve
-- **Fizikailag futó `Fibonacci(10)` a saját chipeden**, UART-on kiíratva
-- **Első „echo neuron" demó:** a host üzenetet küld a mailbox-on át, a chip CIL programja feldolgozza és visszaküldi — a cognitive fabric koncepció első szilícium-szintű bizonyítéka
+- **Fizikailag futó `Fibonacci(N)` a saját chipeden**, UART-on kiíratva (mód A: UART-betöltés on-chip SRAM-ba; mód B: flash-perzisztencia + cold-boot)
 
-**Függőség:** F2 kész.
+**Függőség:** F2 kész; az F3 unified-SRAM RTL kész (lásd fent), hátravan a GDS/tapeout.
 
-**Költség-nagyságrend:** ~$900–$1,300 (12–16 tile TT submission, base + extra tile-ok ~$50/tile) + ~$80 (bring-up PCB + alkatrészek). Az 1 tile-os early bird ár (~$150) a Nano core-hoz nem elég — a ~10K std cell-es core + mailbox + UART minimum 8 tile-t igényel, 12–16 tile ajánlott a routing tartalékra.
+**Költség-nagyságrend:** ~$950 (IHP ~19 tile @ $50/tile, 4 KB on-chip SRAM-makró) + ~$80 (bring-up PCB + alkatrészek). A fő költség-kar az on-chip SRAM mérete (kisebb SRAM → kevesebb tile).
 
 ---
 
@@ -227,7 +227,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Új mikroarchitektúra elemek:**
 - Router FSM (~1000 std cell)
-- Per-core mailbox FIFO (már F3-ban megvolt, itt csak kapcsolódik a router-re)
+- Per-core mailbox FIFO (RTL F3 óta kész, itt kapcsolódik először a router-re)
 - Wake-from-sleep interrupt vonal
 - Globális clock broadcast hálózat
 
@@ -558,7 +558,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Megjegyzés a Symphact fázisolásáról:** A Symphact **nem önálló fázis**, hanem **organikusan épül fel** az F1-F7 fázisok mentén:
 - **F1**: minimal `Symphact.Core` library a C# szimulátorban (Actor<T>, in-memory mailbox)
-- **F3**: egy-aktoros bootloader a Tiny Tapeout chipen (echo neuron demó)
+- **F3**: egy-aktoros UART boot-loader a Tiny Tapeout chipen (Fibonacci UART-on; az echo/mailbox demó az F4-re csúszik)
 - **F4**: 4-aktoros rendszer scheduler + router kezdeti implementációval
 - **F5**: teljes supervision fa, per-core GC, capability-alapú isolation, Roslyn source generator a `[RunsOn]` attribútumra
 - **F6**: hot code loading, writable microcode, elosztott aktorok több chipen

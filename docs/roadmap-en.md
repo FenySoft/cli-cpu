@@ -184,30 +184,30 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 ---
 
-### F3 — Tiny Tapeout Submission (single-core CIL-T0 + Mailbox)
+### F3 — Tiny Tapeout Submission (single-core CIL-T0, unified on-chip SRAM)
 
-**Goal:** The first real CLI-CPU silicon. On Sky130 PDK, via Tiny Tapeout shuttle, single-core CIL-T0 subset + **hardware mailbox interface**, enabling the first "networkable node" demo.
+**Goal:** The first real CLI-CPU silicon. A single-core CIL-T0 subset that runs the **whole program from its own 4 KB on-chip SRAM** (CODE+DATA+STACK; scratchpad/TCM). Host communication over **UART** (boot-over-UART load + decimal result print). ADR: `Vault/Decisions/2026-06-01-unified-onchip-sram`.
 
-**Platform:** Tiny Tapeout (TTSKY26a or a later shuttle, whichever is available in time), Sky130 PDK, OpenLane2. One tile is ~160x100 um, ~1K logic gate capacity. The Nano core + Mailbox + UART **requires 12–16 tiles** (~12K–16K gates, including routing overhead). 24 GPIO (8 in + 8 out + 8 bidi), min. 50 MHz clock.
+**Mailbox → F4.** The HW mailbox is dropped from F3 (redundant with UART on a single-core chip; the real inter-core value is the router + cell transport, which is F4). The `cilcpu_mailbox` RTL stays in the repo for F4.
+
+**Boot-mode strap (`i_boot_mode`):** L = mode A (UART → on-chip SRAM **direct**, QSPI idle — fast dev, no qspi-pmod card dependency); H = mode B (loader → QSPI + boot-time copy engine QSPI → on-chip SRAM — persistence + autonomous flash cold-boot). QSPI = load-time backing store.
+
+**Platform / size (IHP, per the ADR + tile estimate):** IHP SG13G2 (ttihp), one tile 200x150 um. The 4 KB unified on-chip SRAM **macro** dominates (~5 tiles); logic ~14 tiles → **~19 tiles total (~$950, $50/tile)**. Sky130 is pricier. 24 pins (tt_um), min. 50 MHz.
 
 **Output:**
-- `tt/` — Tiny Tapeout submission directory (`info.yaml`, `src/`, `docs/`, etc.)
+- RTL **DONE + simulated:** `cilcpu_core` (unified-SRAM fetch + fetch adapter), `cilcpu_soc` (loader + copy engine + A/B boot mux), `cilcpu_tt_top`/`tt_board` (24-pin wrapper + A7-Lite board). Full cocotb regression green + golden-vector match.
+- `tt/` — Tiny Tapeout submission directory (`info.yaml`, `src/`, `docs/`)
 - `tt/test/` — post-silicon bring-up tests
-- `hw/bringup/` — bring-up board designs (KiCad): QSPI flash socket, QSPI PSRAM socket, FTDI USB-UART (for the mailbox external bridge), power, debug LEDs, PMOD connectors
-
-**New F3 component per spec:**
-- **Mailbox MMIO block** — 8-deep inbox + outbox FIFO at address `0xF000_0100`, details in `docs/ISA-CIL-T0.md`. Allows a host computer to send messages to the chip over UART, which the chip processes with a CIL program and responds back.
+- `hw/bringup/` — bring-up board designs (KiCad): qspi-pmod (flash + 2× PSRAM), FTDI USB-UART, power, debug LEDs
 
 **Done criteria:**
-- GDS accepted by the Tiny Tapeout shuttle
+- GDS accepted by the Tiny Tapeout (IHP) shuttle
 - Gate-level simulation green
-- Bring-up board manufactured (JLCPCB), wired up
-- **Physically running `Fibonacci(10)` on your own chip**, output over UART
-- **First "echo neuron" demo:** the host sends a message through the mailbox, the chip's CIL program processes it and sends it back — the first silicon-level proof of the cognitive fabric concept
+- **Physically running `Fibonacci(N)` on your own chip**, output over UART (mode A: UART load into on-chip SRAM; mode B: flash persistence + cold-boot)
 
-**Dependency:** F2 done.
+**Dependency:** F2 done; the F3 unified-SRAM RTL is complete (see above), GDS/tape-out remains.
 
-**Cost estimate:** ~$900–$1,300 (12–16 tile TT submission, base + extra tiles ~$50/tile) + ~$80 (bring-up PCB + components). The 1-tile early bird price (~$150) is not enough for the Nano core — the ~10K std cell core + mailbox + UART requires at least 8 tiles, 12–16 tiles recommended for routing margin.
+**Cost estimate:** ~$950 (IHP ~19 tiles @ $50/tile, 4 KB on-chip SRAM macro) + ~$80 (bring-up PCB + components). The main cost lever is the on-chip SRAM size (smaller SRAM → fewer tiles).
 
 ---
 
@@ -227,7 +227,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **New microarchitecture elements:**
 - Router FSM (~1000 std cells)
-- Per-core mailbox FIFO (already present in F3, here it just connects to the router)
+- Per-core mailbox FIFO (RTL ready since F3, first wired up here to the router)
 - Wake-from-sleep interrupt line
 - Global clock broadcast network
 
@@ -558,7 +558,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Note on Symphact phasing:** The Symphact is **not a standalone phase**, but **builds organically** along the F1-F7 phases:
 - **F1**: minimal `Symphact.Core` library in the C# simulator (Actor<T>, in-memory mailbox)
-- **F3**: single-actor bootloader on the Tiny Tapeout chip (echo neuron demo)
+- **F3**: single-actor UART boot-loader on the Tiny Tapeout chip (Fibonacci over UART; the echo/mailbox demo moves to F4)
 - **F4**: 4-actor system with initial scheduler + router implementation
 - **F5**: full supervision tree, per-core GC, capability-based isolation, Roslyn source generator for the `[RunsOn]` attribute
 - **F6**: hot code loading, writable microcode, distributed actors across multiple chips

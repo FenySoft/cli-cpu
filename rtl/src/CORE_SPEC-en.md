@@ -6,7 +6,33 @@
 >
 > **Scope:** Internal RTL working spec, not a public document. The public ISA spec is `docs/ISA-CIL-T0-{hu,en}.md`, the public architecture is `docs/architecture-en.md`.
 >
-> Version: 1.5
+> Version: 1.6
+
+### Changelog
+- **1.6 (F3 — unified on-chip SRAM):** The core runs the WHOLE program from its
+  own 4 KB on-chip SRAM (CODE+DATA+STACK in one linear space). This **supersedes**
+  the F2.5a memory/fetch/boot description below — see the "F3 unified on-chip
+  SRAM" section. ADR: `Vault/Decisions/2026-06-01-unified-onchip-sram`.
+- 1.5 and earlier: F2.4–F2.8 (16 KB stack-only SRAM, CODE fetched from QSPI flash).
+
+### F3 — unified on-chip SRAM (supersedes the F2.5a memory model)
+- **4 KB unified on-chip SRAM** `reg [31:0] r_sram[0:1023]` — CODE + DATA + STACK
+  in one linear address space (scratchpad/TCM). SRAM macro in synthesis (IHP 1P
+  1024×32). Map: CODE+DATA `[0, STACK_BASE)`=`[0,2048)`, STACK `[STACK_BASE,4096)`.
+  `STACK_BASE`=`0x800` (`cilcpu_defines.vh`). Stack-overflow bound = 4092.
+- **CODE fetch from the on-chip SRAM** via an internal *fetch-SRAM adapter* (the
+  fetch/CALL FSM keeps using the `r_qspi_*`/`w_qspi_*` request signals, but the
+  adapter drives them from `r_sram`: byte-granular 2-word read + LE→BE byteswap).
+  The external `o_xmem` bus is **tied off** (`o_xmem_re` stays 0).
+- **Boot:** the root frame lives at `STACK_BASE` (`FP=SP=STACK_BASE`, not 0).
+- **`i_ld_*` SRAM load-write port:** the SoC writes the program into SRAM BEFORE
+  boot — directly from the UART loader in mode A, from the QSPI→SRAM copy engine
+  in mode B.
+- **Boot-mode strap (`i_boot_mode`, SoC):** L=mode A (UART→SRAM direct, QSPI idle),
+  H=mode B (loader→QSPI + boot-time copy engine QSPI→SRAM; persistence + autonomous
+  flash cold-boot). QSPI = load-time backing store.
+- The `cilcpu_qspi_controller`/`cilcpu_mailbox` RTL stays in the repo (F4); the
+  mailbox is excluded from the F3 tape-out config.
 
 ## Goal
 
