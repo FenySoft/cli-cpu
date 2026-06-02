@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [ddr5-architecture-hu.md](ddr5-architecture-hu.md)
 
-> Version: 1.3
+> Version: 1.5
 
 This document records the **hardware architecture** of the interface between the CFPU and external DDR5 memory. It documents not only the final result, but also the **reasoning trail**: what alternatives were evaluated, why they were rejected, and what trade-offs led to the final decisions.
 
@@ -125,12 +125,31 @@ In v1.2, this was done by a large CAM table in the DDR5 Controller. The **CAM si
 
 ```
 +---------------------------------------------------+
-| Bit 63..28:  region_base[36]   DDR5 byte address   |
-| Bit 27..4:   region_size[24]   Region length (B)   |
-| Bit 3:       valid                                 |
-| Bit 2..0:    perms[3]          R / W / X           |
+| Bit 63..32:  region_base[32]   4 KB-aligned        |
+|                                page number → 16 TB |
+| Bit 31..24:  reserved[8]       base ext-able to 40b |
+| Bit 23..8:   region_size[16]   in 4 KB pages        |
+|                                → max 256 MB         |
+| Bit 7:       valid                                 |
+| Bit 6..4:    perms[3]          R / W / X (X: below) |
+| Bit 3..0:    reserved (4 bits)                     |
 +---------------------------------------------------+
 ```
+
+The controller reconstructs the actual byte address as `(region_base << 12) + offset` and checks the bound as `offset < (region_size << 12)` — the slot is **fully page-granular** (4 KB), except the `valid`/`perms` bits.
+
+**Full page granularity — why?** Since **two actors never share a page**, isolation is inherently page-level, so both `region_base` AND `region_size` are expressed in 4 KB pages. No sub-page sharing → no need for byte-precise bounds (reading into the slack of one's own last page is not a cross-actor leak, only intra-actor).
+
+Decision trail:
+
+| Field | Alternative | Chosen |
+|-------|-------------|--------|
+| `region_base` | byte-36 (64 GB, under) / byte-40 (1 TB, +slot) | **page-32 → 16 TB** (in the 8-byte slot) |
+| `region_size` | byte-24 (16 MB, granularity mismatch) / byte-16 (64 KB) | **page-16 → 256 MB** (consistent, no page-share) |
+
+The `reserved[8]` next to the base holds room for a future **40-bit page → 4 PB** extension. The core ISA stays **32-bit regardless** — `region_base` is a descriptor (data), not a pointer dereferenced by the core (see below).
+
+**The `perms` X (execute) bit:** for **Seal-verified code only** (e.g., already-verified code cached in DRAM to speed up slow flash). **Running runtime-generated / unverified code is FORBIDDEN** — no signature → no trust. ⚠️ Its relationship to [decision 6](#code-data-separation) (»DDR5 is primarily data«) and the integrity mechanism of the cached code (tamper protection post-verification) is an **OPEN question** — requires a separate decision.
 
 **Storage:** **per core, in QRAM (Quench-RAM)**, under SEAL invariant.
 
@@ -305,6 +324,35 @@ The DDR5 Controller sequentially reads/writes large blocks and **pushes** them t
 
 ---
 
+## Addressing Model: Capability Segmentation and >4 GB Data
+
+> **Status:** the capability slot widening (2.b) and the low-level primitives (`ddr5_load`/stream) are finalized; the high-level programmer lowering (streaming abstraction → chunk-stream) is **design intent** (CFPU toolchain, F2/F3), not a finished feature.
+
+### The mechanism: capability-based segmentation
+
+The `slot_id + offset` addressing is structurally a descendant of **segmentation** (DS/CS): the slot provides a base (`region_base`), the offset is added to it. The reason for the choice is **not programmer convenience** — a managed runtime (.NET) hides **any** memory model, flat or segmented alike (.NET forbids the raw cross-object pointer arithmetic that would expose it). The real reasons are two:
+
+1. **HW-enforced isolation.** A capability is not a bare base but `base + size + perms + valid`, QRAM-protected, HW-attached, unforgeable → this is the foundation of hardware isolation between actors, which the runtime alone could not guarantee against a compromised actor.
+2. **Area.** Protection has to live somewhere: x86 had segmentation AND paging — it kept paging (flat + per-page) and dropped segmentation. The CFPU does the reverse: it **drops the MMU/paging** (a full MMU + TLB + page-walk × thousands of cores = too much area) and provides isolation via **capability segmentation** — cheaper per core → more cores fit (see [`microarch-philosophy-en.md`](microarch-philosophy-en.md): TLP > ILP).
+
+### >4 GB data: descriptor, not pointer
+
+The core ISA stays **32-bit**. Nobody accesses >4 GB data via a flat pointer:
+
+- The wide physical address (`region_base`) is a **descriptor (data)** that software computes and passes along — not a pointer it dereferences. A 32-bit core can compute with a 40-bit descriptor (multi-word) because it never dereferences it; the actual access is performed by the **controller**.
+- The **OS/runtime** (`kernel_io_sup`) knows the full dataset's location/size (TB scale) and **chunks** it for streaming/partitioning. It thus manages TBs on 32-bit cores.
+- The **actor** sees only its own ≤256 MB window (`region_size[16]`, in 4 KB pages), with a 32-bit bounded offset, ~256 KB at a time in local SRAM.
+
+### Programmer model (design intent)
+
+The programmer writes a **streaming/windowed abstraction** (idiomatic .NET — `foreach`, `Span`, LINQ), and the toolchain/runtime generates the chunk transitions (new grant, `region_base` advance) — the source code does not juggle the "segment". This is the difference from the DOS-era `far`-pointer model, where segment handling leaked into the source. (A managed runtime would hide classic DS/CS too — so the distinction is not ergonomic, see above.)
+
+### The irreducible limit
+
+One case **no runtime can hide**: random access over a single >4 GB flat structure (e.g., a 10 GB hash table with scattered access). Here flat-64 hardware genuinely wins; the capability/streaming model pays a grant round per chunk transition. The CFPU **deliberately concedes** this workload class — it optimizes for partitionable/streamable load (system throughput is the metric, not single-thread random latency).
+
+---
+
 ## Decision 5: Where Should the Capability Table Live?
 
 This is the main architectural question of v1.3. Five alternatives were evaluated:
@@ -476,7 +524,9 @@ Runtime:
   Core SRAM CODE <-- SealRAM (NoC read, anyone can read)
 ```
 
-**Code is never stored in DDR5.** This means DDR5 compromise can only affect data, not code — the attack surface is architecturally reduced.
+**By default, no code is stored in DDR5.** This means DDR5 compromise can only affect data, not code — the attack surface is architecturally reduced.
+
+> ⚠️ **Open question (v1.5):** the capability slot `perms` X bit reserves a future case where **Seal-verified code may be cached in DRAM** (to speed up slow flash). This is in tension with the "by default, no code" principle above. The reconciliation — and the **integrity mechanism** for the cached code (tamper protection post-verification, e.g. W⊕X) — is **not yet decided**. Until then, DDR5 stores **data only**; running runtime-generated / unverified code is **FORBIDDEN in all cases**.
 
 ### Three Memory Types Summary
 
@@ -494,6 +544,8 @@ Runtime:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.5 | 2026-06-02 | **Capability slot full page granularity + perms X clarification.** `region_size` is now also **byte → 4 KB page-granular** (16-bit → 256 MB max region), with **`reserved[8]`** next to the base for a future 40-bit page (4 PB) extension. Rationale: since **two actors never share a page** (user decision), isolation is page-level → byte-precise size is unnecessary (it would have been an intra-actor bug-catcher, not isolation). New layout: `region_base[32] + reserved[8] + region_size[16] + valid[1] + perms[3] + reserved[4]`. **`perms` X bit:** for **Seal-verified code only** (DRAM-as-flash-cache); **runtime-generated code FORBIDDEN** (not authenticatable). ⚠️ The X bit's relationship to decision 6 (»DDR5 = data«) + the cached-code integrity mechanism is **OPEN**. The bit format lives only here + in quench-ram-en.md (sweep confirmed). |
+| 1.4 | 2026-06-01 | **Capability slot: `region_base` 36-bit byte address → 32-bit page-aligned (4 KB) → 16 TB.** The earlier 36-bit (64 GB) is under-provisioned for today's capacities (128 GB consumer RAM, 1+ TB server/accelerator horizon). Page alignment yields 16 TB in the same 8-byte slot (32+24+1+3=60 bits). Decision trail: byte-36 (under) / byte-40 (larger slot) / **page-32 (chosen)**. **New "Addressing Model" section:** (1) the `slot_id + offset` is capability-based **segmentation** — the real justification is HW isolation + area (NOT ergonomics, since a managed runtime hides any model, including classic DS/CS); (2) >4 GB data is a **descriptor (data), not a pointer** — the core ISA stays 32-bit, the wide address lives in the controller/capability, the OS chunks and streams it; (3) programmer model = streaming lowering (**design intent**, F2/F3); (4) irreducible limit: random access over a >4 GB flat structure — flat-64 wins here, the CFPU deliberately concedes it. Core ISA stays 32-bit. |
 | 1.3 | 2026-04-28 | **CAM table → HW Capability Slot (in QRAM).** Instead of the 21 MB central CAM rejected in 5.b: each core's QRAM holds an 8 KB capability slot table (256 actors × 4 slots × 8 bytes), managed by Seal Core SEAL/RELEASE. New `flags.DDR5_CAP` HW-only header bit on the cell (only the source core's HW request assembler can set it, actor SW cannot). The 5.c capability token + HMAC alternative also rejected (HMAC is redundant when Quench-RAM SEAL gate-keep is sufficient). New decision trail: 5.a–5.e (software / CAM / HMAC token / per-core CAM / **HW Capability Slot**). Revocation = QRAM RELEASE (atomic, 1 cycle). Memory summary table DDR5 row updated. **Rationale:** central CAM doesn't scale on-chip, Quench-RAM and the v3.0 CST model provide a pattern for a stateless, HW-only capability mechanism |
 | 1.2 | 2026-04-24 | src_actor field narrowed from 16→8 bits (max 256 actors/core), consistent with the CST model and interconnect specs. |
 | 1.1 | 2026-04-22 | SealRAM / SealFlash introduced for code storage, DDR5 = data only. Three memory types summary table. |

@@ -6,7 +6,7 @@ status: vision
 
 > English version: [ddr5-architecture-en.md](ddr5-architecture-en.md)
 
-> Version: 1.3
+> Version: 1.5
 
 Ez a dokumentum a CFPU és a külső DDR5 memória közötti interfész **hardveres architektúráját** rögzíti. Nem csak a végeredményt, hanem az **érvelési utat** is dokumentálja: milyen alternatívákat vizsgáltunk, miért vetettük el őket, és milyen trade-off-ok vezettek a végső döntésekhez.
 
@@ -125,12 +125,31 @@ A v1.2-ben ezt egy nagy CAM tábla végezte a DDR5 Controllerben. A **CAM méret
 
 ```
 +---------------------------------------------------+
-| Bit 63..28:  region_base[36]   DDR5 byte cím      |
-| Bit 27..4:   region_size[24]   Régió hossza (B)   |
-| Bit 3:       valid                                |
-| Bit 2..0:    perms[3]          R / W / X          |
+| Bit 63..32:  region_base[32]   4 KB-igazított      |
+|                                lap-szám → 16 TB    |
+| Bit 31..24:  reserved[8]       base 40-bitre bőv.  |
+| Bit 23..8:   region_size[16]   4 KB-lapokban       |
+|                                → max 256 MB        |
+| Bit 7:       valid                                |
+| Bit 6..4:    perms[3]          R / W / X (X: lásd) |
+| Bit 3..0:    reserved (4 bit)                     |
 +---------------------------------------------------+
 ```
+
+A controller a tényleges byte-címet `(region_base << 12) + offset` formában rekonstruálja, a határt `offset < (region_size << 12)` szerint ellenőrzi — a slot **teljesen page-granuláris** (4 KB), a `valid`/`perms` bitek kivételével.
+
+**Teljes page-granularitás — miért?** Mivel **két aktor sosem oszt meg egy lapot**, az izoláció eleve page-szintű, ezért a `region_base` ÉS a `region_size` is 4 KB-os lapokban értendő. Nincs sub-page megosztás → byte-pontos határra nincs szükség (a saját utolsó lapja slack-jébe olvasás nem cross-actor szivárgás, csak intra-actor).
+
+Döntés-trail:
+
+| Mező | Alternatíva | Választott |
+|------|-------------|-----------|
+| `region_base` | byte-36 (64 GB, alul) / byte-40 (1 TB, +slot) | **page-32 → 16 TB** (a 8-byte slotban) |
+| `region_size` | byte-24 (16 MB, granularitás-eltérés) / byte-16 (64 KB) | **page-16 → 256 MB** (konzisztens, no page-share) |
+
+A `reserved[8]` a base mellett a jövőbeli **40-bit page → 4 PB** bővítést tartja fenn. A core ISA **változatlanul 32-bit** — a `region_base` descriptor (adat), nem a mag által dereferált pointer (lásd lent).
+
+**A `perms` X (execute) bit:** kizárólag **Seal-verifikált kódra** (pl. a lassú flash gyorsítására DRAM-ba cache-elt, már hitelesített kód). **Runtime-generált / nem-verifikált kód futtatása TILOS** — nincs aláírás → nincs bizalom. ⚠️ Ennek viszonya a [6. döntéshez](#kod-adat-szetvalasztas) (»DDR5 elsődlegesen adat«) és a cache-elt kód integritás-mechanizmusa (módosítás-védelem post-verifikáció) **NYITOTT kérdés** — külön döntést igényel.
 
 **Tárolás:** **per core, QRAM-ban (Quench-RAM)**, SEAL invariáns alatt.
 
@@ -305,6 +324,35 @@ A DDR5 Controller szekvenciálisan olvas/ír nagy blokkokat, és a NoC-on **push
 
 ---
 
+## Címzési modell: capability-szegmentálás és a >4 GB adat
+
+> **Státusz:** a capability slot szélesítése (2.b) és a low-level primitívek (`ddr5_load`/stream) rögzítettek; a magas szintű programozói lowering (streaming-absztrakció → chunk-stream) **tervezési szándék** (CFPU toolchain, F2/F3), nem kész funkció.
+
+### A mechanizmus: capability-alapú szegmentálás
+
+A `slot_id + offset` címzés strukturálisan a **szegmentálás** (DS/CS) leszármazottja: a slot egy bázist (`region_base`) ad, az offset hozzáadódik. A választás indoka **nem a programozói kényelem** — egy managed runtime (.NET) **bármely** memória-modellt elrejt, laposat és szegmentáltat egyaránt (a .NET tiltja a nyers cross-object pointer-aritmetikát, ami felfedné). A valódi indok kettő:
+
+1. **HW-kényszerített izoláció.** A capability nem puszta bázis, hanem `base + size + perms + valid`, QRAM-védett, HW-attached, nem hamisítható → ez az aktorok közti hardveres elszigetelés alapja, amit a runtime önmagában egy kompromittált aktor ellen nem garantálna.
+2. **Terület.** A védelemnek laknia kell valahol: az x86-nak volt szegmentálása ÉS paging-je — a paging-et tartotta meg (lapos + per-lap) és a szegmentálást eldobta. A CFPU fordítva: **eldobja az MMU/paging-et** (egy teljes MMU + TLB + page-walk × több ezer mag = túl sok terület), és **capability-szegmentálással** ad izolációt — ez olcsóbb magonként → több mag fér el (lásd [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md): TLP > ILP).
+
+### A >4 GB adat: descriptor, nem pointer
+
+A core ISA **32-bit marad**. A >4 GB adatot nem flat pointerrel éri el senki:
+
+- A széles fizikai cím (`region_base`) egy **descriptor (adat)**, amit a szoftver kiszámol és továbbad — nem pointer, amit dereferál. Egy 32-bites mag tud 40-bites descriptorral számolni (multi-word), mert sosem dereferálja; a tényleges hozzáférést a **controller** végzi.
+- Az **OS/runtime** (`kernel_io_sup`) ismeri a teljes dataset helyét/méretét (TB-skála), és **chunkokra bontva** stream-eli/particionálja. Így TB-t menedzsel 32-bites magokon.
+- Az **aktor** csak a saját ≤256 MB ablakát látja (`region_size[16]`, 4 KB-lapokban), 32-bites korlátos offsettel, ~256 KB-onként a lokális SRAM-ban.
+
+### Programozói modell (tervezési szándék)
+
+A programozó **streaming/ablakos absztrakciót** ír (idiomatikus .NET — `foreach`, `Span`, LINQ), a chunk-váltást (új grant, `region_base` léptetés) a toolchain/runtime generálja — nem a forráskód juggle-öli a „szegmenst". Ez a különbség a DOS-kori `far`-pointer modelltől, ahol a szegmens-kezelés a forrásba szivárgott. (A managed runtime amúgy a klasszikus DS/CS-t is elrejtené — a megkülönböztetés tehát nem ergonómiai, lásd fent.)
+
+### Az irreducibilis korlát
+
+Egy esetet **semmilyen runtime nem rejt el**: random hozzáférés egyetlen >4 GB lapos struktúrán (pl. 10 GB hash-tábla szétszórt eléréssel). Itt a flat-64 HW valódian nyer; a capability/streaming modell chunk-váltásonként grant-fordulót fizet. A CFPU ezt a workload-osztályt **tudatosan elengedi** — a particionálható/streamelhető terhelésre optimalizál (rendszer-throughput a mérce, nem single-thread random latency).
+
+---
+
 ## 5. döntés: Hol éljen a capability tábla?
 
 Ez a v1.3 fő architektúrális kérdése. Öt alternatívát értékeltünk:
@@ -476,7 +524,9 @@ Futás:
   Core SRAM CODE <-- SealRAM (NoC read, bárki olvashat)
 ```
 
-**A DDR5-ben soha nem tárolódik kód.** Ezzel a DDR5 kompromittálása kizárólag adatot érinthet, kódot nem — a támadási felület architektúrálisan csökkent.
+**A DDR5-ben alapesetben nem tárolódik kód.** Ezzel a DDR5 kompromittálása kizárólag adatot érinthet, kódot nem — a támadási felület architektúrálisan csökkent.
+
+> ⚠️ **Nyitott kérdés (v1.5):** a capability slot `perms` X bitje fenntart egy jövőbeli esetet, amikor **Seal-verifikált kód DRAM-ba cache-elhető** (a lassú flash gyorsítására). Ez feszül a fenti „alapesetben nem kód" elvvel. A reconciliation — és a cache-elt kód **integritás-mechanizmusa** (módosítás-védelem post-verifikáció, pl. W⊕X) — még **nincs eldöntve**. Amíg nincs, a DDR5 **csak adatot** tárol; a runtime-generált / nem-verifikált kód futtatása **minden esetben TILOS**.
 
 ### Három memória típus összefoglalása
 
@@ -494,6 +544,8 @@ Futás:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.5 | 2026-06-02 | **Capability slot teljes page-granularitás + perms X pontosítás.** A `region_size` is **bájt → 4 KB page-granuláris** (most 16-bit → 256 MB max régió), a base mellett **`reserved[8]`** a jövőbeli 40-bit page (4 PB) bővítéshez. Indok: mivel **két aktor sosem oszt meg lapot** (felhasználói döntés), az izoláció page-szintű → a byte-pontos size felesleges (intra-actor bug-fogó lett volna, nem izoláció). Új layout: `region_base[32] + reserved[8] + region_size[16] + valid[1] + perms[3] + reserved[4]`. **`perms` X bit:** kizárólag **Seal-verifikált kódra** (DRAM-mint-flash-cache); **runtime-generált kód TILOS** (nem hitelesíthető). ⚠️ Az X viszonya a 6. döntéshez (»DDR5 = adat«) + a cache-elt kód integritás-mechanizmusa **NYITOTT**. Bit-formátum csak ebben + quench-ram-hu.md-ben él (sweep igazolva). |
+| 1.4 | 2026-06-01 | **Capability slot: `region_base` 36-bit byte-cím → 32-bit page-aligned (4 KB) → 16 TB.** A korábbi 36-bit (64 GB) alulméretezett a mai kapacitásokhoz (128 GB fogyasztói RAM, 1+ TB szerver/akcelerátor horizont). A page-igazítás 16 TB-ot ad ugyanabban a 8-byte slotban (32+24+1+3=60 bit). Döntés-trail: byte-36 (alul) / byte-40 (nagyobb slot) / **page-32 (választott)**. **Új „Címzési modell" szakasz:** (1) a `slot_id + offset` capability-alapú **szegmentálás** — a valódi indok HW-izoláció + terület (NEM ergonómia, mert a managed runtime bármely modellt elrejt, a klasszikus DS/CS-t is); (2) a >4 GB adat **descriptor (adat), nem pointer** — a core ISA 32-bit marad, a széles cím a controllerben/capability-ben él, az OS chunkolva stream-eli; (3) programozói modell = streaming-lowering (**tervezési szándék**, F2/F3); (4) irreducibilis korlát: random hozzáférés >4 GB lapos struktúrán — itt flat-64 nyer, a CFPU tudatosan elengedi. Core ISA változatlanul 32-bit. |
 | 1.3 | 2026-04-28 | **CAM tábla → HW Capability Slot (QRAM-ban).** Az 5.b-ben elvetett 21 MB-os központi CAM helyett: minden core QRAM-jában 8 KB capability slot tábla (256 actor × 4 slot × 8 byte), Seal Core SEAL/RELEASE-szel kezelve. Új `flags.DDR5_CAP` HW-only header bit a cellán (csak a forrás core HW request assembler állíthatja, az aktor SW nem). Az 5.c capability token + HMAC alternatíva is elvetve (a HMAC redundáns, ha a Quench-RAM SEAL gate-keep elegendő). Új döntés-trail: 5.a–5.e (szoftveres / CAM / HMAC token / per-core CAM / **HW Capability Slot**). Revocation = QRAM RELEASE (atomi, 1 ciklus). Memória összefoglaló tábla DDR5 sora frissítve. **Indoklás:** central CAM nem skálázódik on-chip, a Quench-RAM és a v3.0 CST modell mintát ad egy stateless, HW-only capability mechanizmushoz |
 | 1.2 | 2026-04-24 | src_actor mező 16→8 bitre szűkítve (max 256 actor/core), összhangban a CST modellel és az interconnect spec-kel. |
 | 1.1 | 2026-04-22 | SealRAM / SealFlash bevezetése kód-tárolásra, DDR5 = csak adat. Három memória típus összefoglaló tábla. |

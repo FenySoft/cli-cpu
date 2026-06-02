@@ -72,3 +72,5 @@ cfgmem.log
 # Claude
 .claude
 .claude-telegram-bot
+# Sky130 PDK liberty (F2.6 tile-becslés, ~12.8 MB, nem commitoljuk)
+rtl/fpga/tt/pdk/

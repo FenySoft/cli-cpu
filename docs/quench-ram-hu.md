@@ -6,7 +6,7 @@ status: vision
 
 > English version: [quench-ram-en.md](quench-ram-en.md)
 
-> Version: 1.5
+> Version: 1.7
 
 Ez a dokumentum a **Quench-RAM** memóriacella **architektúráját és ISA-illesztését** írja le: a per-blokk státuszbit szemantikáját, a két hardveres állapotgép-műveletet (`SEAL`, `RELEASE`), a NAND-flash-szel rokon „erase-on-release" mintát, és a kapcsolatot az ECMA-335 default-initialization szemantikával, az aktor-modell capability-rendszerével és a per-core garbage collector-ral.
 
@@ -336,15 +336,20 @@ A linker (`cli-cpu-link`) build-time eldönti minden mezőről, hogy melyik rég
 
 ### DDR5 capability slot — ugyanaz a minta, más use case
 
-A `ddr5-architecture-hu.md` v1.3-ban bevezetett **DDR5 capability slot tábla** a QSRAM ugyanezen SEAL invariánsára épül. Felépítés:
+A `ddr5-architecture-hu.md`-ban bevezetett **DDR5 capability slot tábla** a QSRAM ugyanezen SEAL invariánsára épül. Felépítés (v1.4, page-aligned base):
 
 ```
 DDR5 capability slot (per core, QRAM-ban, SEAL alatt):
 
 slot_table[actor_id][slot_id] (8 byte / slot):
-+------------------+----------------+--------+-----+
-| region_base[36]  | region_size[24]| valid  | RWX |
-+------------------+----------------+--------+-----+
++----------------+--------+----------------+-------+-----+
+| region_base[32]| rsvd[8]| region_size[16]| valid | RWX |
+| (4 KB-lap,      |(base   | (4 KB-lapokban,| [1]   | [3] |
+|  16 TB)         | 40b→4PB)|  max 256 MB)  |       |     |
++----------------+--------+----------------+-------+-----+
+
+(teljes page-granularitás: base + size 4 KB-ban — nincs lap-megosztás;
+ RWX X-jog kizárólag Seal-verifikált kódra, runtime-generált TILOS)
 
 Allokáció:  256 actor × 4 slot × 8 byte = 8 KB / core
 Írhat:      KIZÁRÓLAG Seal Core (RELEASE+SEAL atomi szekvencia)
@@ -489,6 +494,8 @@ A Quench-RAM **nem feltétel** az F0-F4 fázisokhoz; ezek a meglévő SRAM-model
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.7 | 2026-06-02 | **DDR5 capability slot formátum szinkron a ddr5-architecture v1.5-tel:** `region_size` bájt → **4 KB page-granuláris** (16-bit → 256 MB), `reserved[8]` a base mellett (40-bit → 4 PB bővítés), `perms` X bit kizárólag Seal-verifikált kódra (runtime-gen TILOS). Teljes layout: `region_base[32] + reserved[8] + region_size[16] + valid[1] + perms[3] + reserved[4]`. Kaszkád a ddr5-architecture v1.5-ből. |
+| 1.6 | 2026-06-01 | **DDR5 capability slot formátum szinkron a ddr5-architecture v1.4-gyel:** `region_base[36]` byte-cím → `region_base[32]` page-aligned (4 KB) → 16 TB. Kaszkád-átvezetés; az indoklás (TB-skálás kapacitás, descriptor-nem-pointer) a ddr5-architecture-hu.md 2.b/Címzési modell szakaszában. |
 | 1.5 | 2026-04-28 | **DDR5 capability slot use case hozzáadva.** A `ddr5-architecture-hu.md` v1.3-ban bevezetett DDR5 capability slot tábla a QSRAM SEAL invariánsára épül — ugyanaz a minta, mint a CST: HW-managed, atomi RELEASE-szel visszavonható. Új szekció a "Szinergia az aktor-modell capability-rendszerével" alatt: per-core 8 KB capability slot tábla (256 actor × 4 slot × 8 byte), Seal Core kezeli. |
 | 1.4 | 2026-04-24 | HMAC/SipHash hivatkozások törölve — capability védelem CST (Capability Slot Table) modellre cserélve: QSRAM SEAL-védett, fizikailag hamisíthatatlan. Szoftver csak 32-bit CST indexet lát, nyers ActorRef-et nem. CST entry: dst[24]+actor[8]+perm[8]+reserved[24]. Delegation: supervisor-to-supervisor VN0, UNSEAL→write→RESEAL atomi HW FSM. |
 | 1.3 | 2026-04-19 | SEAL triggerek pontosítása: Core-on belül csak CODE régióra kell SEAL (adatot a CIL típusrendszer védi). Swap-out SEAL és swap-in RELEASE hozzáadva. Elsődleges motiváció átírva (CODE immutability + külső QRAM védelem). |
