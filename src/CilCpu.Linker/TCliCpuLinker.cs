@@ -65,10 +65,32 @@ public static class TCliCpuLinker
         var methodSet = new HashSet<MethodDefinitionHandle>();
         DiscoverMethods(metadata, peReader, entryHandle, methodOrder, methodSet, AIsaLevel);
 
+        // hu: 1.5 Inline candidate discovery — rövid, elágazásmentes,
+        //     szekvenciális ldarg-prefixű metódusok törzse cache-elve.
+        // en: 1.5 Inline candidate discovery — bodies of short, branch-free,
+        //     sequentially-prefixed methods are cached for substitution.
+        var inlineBodies = new Dictionary<MethodDefinitionHandle, byte[]>();
+
+        foreach (var handle in methodOrder)
+        {
+            var mdef = metadata.GetMethodDefinition(handle);
+
+            if (mdef.RelativeVirtualAddress == 0)
+                continue;
+
+            var il = ReadMethodIL(peReader, mdef);
+            var argCount = CountParameters(mdef);
+
+            if (IsInlineCandidate(il, argCount))
+                inlineBodies[handle] = il[argCount..^1];
+        }
+
         // hu: 2. Layout — kiszámítjuk minden metódus header RVA-ját.
         //     Extern metódusok (RVA=0) dispatch RVA-t kapnak.
+        //     Az IL-ek inline-bővítés után kerülnek layoutba.
         // en: 2. Layout — compute header RVA for each method.
         //     Extern methods (RVA=0) get dispatch RVAs.
+        //     ILs are laid out after inline expansion.
         var methodIL = new Dictionary<MethodDefinitionHandle, byte[]>();
         var methodRva = new Dictionary<MethodDefinitionHandle, int>();
         var externMethods = new HashSet<MethodDefinitionHandle>();
@@ -91,9 +113,10 @@ public static class TCliCpuLinker
             }
 
             var il = ReadMethodIL(peReader, mdef);
-            methodIL[handle] = il;
+            var expandedIl = ExpandInlines(il, inlineBodies, AIsaLevel);
+            methodIL[handle] = expandedIl;
             methodRva[handle] = offset;
-            offset += MethodHeaderSize + il.Length;
+            offset += MethodHeaderSize + expandedIl.Length;
         }
 
         // hu: 3. Call token feloldás + output generálás.
@@ -379,6 +402,103 @@ public static class TCliCpuLinker
         ABytes[AOffset + 1] = (byte)((AValue >> 8) & 0xFF);
         ABytes[AOffset + 2] = (byte)((AValue >> 16) & 0xFF);
         ABytes[AOffset + 3] = (byte)((AValue >> 24) & 0xFF);
+    }
+
+    /// <summary>
+    /// hu: Megvizsgálja, hogy egy metódus IL-törzse inline-képes-e.
+    /// Kritériumok: ≤16 byte, ret-tel végződik, nincs call/branch/ldloc/stloc
+    /// a törzsben, és pontosan ldarg.0…ldarg.(argCount-1) sorrend az elején.
+    /// <br />
+    /// en: Checks whether a method's IL body is eligible for inlining.
+    /// Criteria: ≤16 bytes, ends with ret, no call/branch/ldloc/stloc in
+    /// the body, and exactly ldarg.0…ldarg.(argCount-1) at the start.
+    /// </summary>
+    internal static bool IsInlineCandidate(byte[] AIl, int AArgCount)
+    {
+        if (AArgCount is < 0 or > 4) return false;
+        if (AIl.Length == 0 || AIl.Length > 16) return false;
+        if (AIl[^1] != 0x2A) return false;
+
+        // hu: Legalább 1 törzsbájt + ret kell az arg-prefix után
+        // en: Need at least 1 body byte + ret after the arg prefix
+        if (AIl.Length <= AArgCount) return false;
+
+        for (var i = 0; i < AArgCount; i++)
+            if (AIl[i] != (byte)(0x02 + i)) return false;
+
+        for (var i = AArgCount; i < AIl.Length - 1; i++)
+        {
+            var op = AIl[i];
+            if (op == 0x28) return false;                // call
+            if (op is >= 0x2B and <= 0x33) return false; // branch
+            if (op is >= 0x02 and <= 0x05) return false; // ldarg.0..3
+            if (op == 0x0E) return false;                // ldarg.s
+            if (op is >= 0x06 and <= 0x0D) return false; // ldloc/stloc 0..3
+            if (op is 0x11 or 0x13) return false;        // ldloc.s / stloc.s
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// hu: Egy metódus IL-jében minden inline-képes callee-ra mutató call
+    /// utasítást a callee törzsével helyettesít. Az inline testek még
+    /// metaadat-tokeneket tartalmaznak — a ResolveCallTokens lépés a
+    /// maradék (nem inline-olt) call-okat oldja fel RVA-ra.
+    /// <br />
+    /// en: Replaces every call instruction targeting an inline-eligible
+    /// callee with its body. Inline bodies still contain metadata tokens —
+    /// the ResolveCallTokens step resolves remaining (non-inlined) calls
+    /// to RVAs.
+    /// </summary>
+    private static byte[] ExpandInlines(
+        byte[] AIl,
+        Dictionary<MethodDefinitionHandle, byte[]> AInlineBodies,
+        TIsaLevel AIsaLevel)
+    {
+        if (AInlineBodies.Count == 0) return AIl;
+
+        var hasCall = false;
+
+        for (var i = 0; i < AIl.Length; i++)
+            if (AIl[i] == 0x28) { hasCall = true; break; }
+
+        if (!hasCall) return AIl;
+
+        var result = new List<byte>(AIl.Length);
+        var pc = 0;
+
+        while (pc < AIl.Length)
+        {
+            var opcode = AIl[pc];
+            var length = OpcodeLength(opcode, AIl, pc, AIsaLevel);
+
+            if (opcode == 0x28)
+            {
+                var token = ReadUInt32LE(AIl, pc + 1);
+                var tableType = (token >> 24) & 0xFF;
+                var rowIndex = (int)(token & 0x00FFFFFF);
+
+                if (tableType == 0x06)
+                {
+                    var targetHandle = MetadataTokens.MethodDefinitionHandle(rowIndex);
+
+                    if (AInlineBodies.TryGetValue(targetHandle, out var body))
+                    {
+                        result.AddRange(body);
+                        pc += length;
+                        continue;
+                    }
+                }
+            }
+
+            for (var i = 0; i < length; i++)
+                result.Add(AIl[pc + i]);
+
+            pc += length;
+        }
+
+        return result.ToArray();
     }
 
     /// <summary>
