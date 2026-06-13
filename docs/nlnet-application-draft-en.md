@@ -175,4 +175,4 @@ PDF attachment:
 
 ---
 
-> **Submission confirmation (2026-04-14 evening):** Archived privately in a GDPR-controlled location (not in the public repo, per GDPR Article 5 data minimisation). Public metadata recorded in [`nlnet-submission-record.md`](nlnet-submission-record.md). Internal-review corrections and known errors in the submitted text catalogued in [`nlnet-corrections-en.md`](nlnet-corrections-en.md).
+> **Submission confirmation (2026-04-14 evening):** Archived privately in a GDPR-controlled location (not in the public repo, per GDPR Article 5 data minimisation). Internal-review corrections and known errors in the submitted text catalogued in [`nlnet-corrections-en.md`](nlnet-corrections-en.md).

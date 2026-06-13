@@ -227,4 +227,4 @@ A pályázathoz csatolandó PDF:
 
 ---
 
-> **Beadási visszaigazolás (2026-04-14 este):** GDPR-kontrollált privát archívumban (nem a public repóban, a GDPR 5. cikk adat-minimalizálás elvét követve). Nyilvános metaadatok: [`nlnet-submission-record-hu.md`](nlnet-submission-record-hu.md). A belső review korrekciók és a beadott szövegben lévő ismert hibák katalógusa: [`nlnet-corrections-hu.md`](nlnet-corrections-hu.md).
+> **Beadási visszaigazolás (2026-04-14 este):** GDPR-kontrollált privát archívumban (nem a public repóban, a GDPR 5. cikk adat-minimalizálás elvét követve). A belső review korrekciók és a beadott szövegben lévő ismert hibák katalógusa: [`nlnet-corrections-hu.md`](nlnet-corrections-hu.md).

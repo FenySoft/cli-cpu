@@ -106,7 +106,6 @@ Last audit: **2026-05-03**
 |---|---|
 | `nlnet-application-draft-{hu,en}.md` | NLnet application material. |
 | `nlnet-corrections-{hu,en}.md` | Post-submission corrections. |
-| `nlnet-submission-record(-hu).md` | Submission record. |
 | `symphact-{hu,en}.md` | Moved to `FenySoft/Symphact` repo. |
 
 ### `reference` (2 files, 1 pair)
