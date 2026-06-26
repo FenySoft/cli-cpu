@@ -1309,7 +1309,7 @@ SRAM (on-chip, QRAM-védett)
 | **Izoláció** | Per-core kulcs (core ID + PUF-ból származtatva) | A core nem tudja B core eviktált állapotát dekódolni |
 | **Replay-védelem** | Monoton számláló evikciónként | Régi titkosított szöveg visszajátszása detektálható |
 
-**Hardver költség:** AES-128 + CMAC engine core-onként ≈ 15 000–25 000 GE (~0,004–0,006 mm²). Actor Core-nál (0,036 mm²) ez ~11–17% overhead; Rich Core-nál (0,083 mm²) ~5–7%. Nano Core-nál (0,014 mm²) a crypto engine dominálna (~30–40%) — a korlátozott SRAM-ú (4 KB) Nano core-ok kimaradhatnak, ha multi-actor nem szükséges.
+**Hardver költség:** AES-128 + CMAC engine core-onként ≈ 15 000–25 000 GE (~0,004–0,006 mm²). Actor Core-nál (0,023 mm² @ 5nm TSMC) ez ~17–26% overhead; Rich Core-nál (0,059 mm² @ 5nm) ~7–10%. Nano Core-nál (0,008 mm² @ 5nm) a crypto engine dominálna (~50–75%) — a korlátozott SRAM-ú (4 KB) Nano core-ok kimaradhatnak, ha multi-actor nem szükséges. **(Megjegyzés: 5nm számok a `core-types-hu.md` v2.1+ szerint; régi 7nm szám korrigálva 2026-06-26.)**
 
 **Kapcsolat az on-chip QRAM-mal:** az on-chip QRAM SEAL/RELEASE invariánsok változatlanok maradnak. A külső kiterjesztés egy **transport titkosítási réteget** ad hozzá — az adat SEAL-elve van a QRAM-ban, titkosítva a PSRAM tranzithoz, és visszatöltéskor újra SEAL-elve. A két mechanizmus komplementer:
 

@@ -73,11 +73,14 @@ Utolsó audit: **2026-05-03**
 | `ISA-CIL-Seal-{hu,en}.md` | Önmagát "v0.1 (draft)"-nak jelöli. F5+ ISA. |
 | `certification/CFPU-SEC-v1-{hu,en}.md` | Tanúsítási keret. "v1" név spec-szerűséget sugall, de F5+ tartalom. |
 
-### `decision` (2 fájl, 1 pár) — formális ADR
+### `decision` (8 fájl, 4 pár) — formális ADR
 
 | Fájl pár | Megjegyzés |
 |---|---|
 | `decision-bus-rollback-{hu,en}.md` | L0 256→128 bit visszaléptetés. **Mintaként megőrzendő.** |
+| `2026-06-26-crypto-hardware-placement.md` | Per-core AES+CMAC (Actor/Rich) vs Seal core crypto; **proposed**, ütközés feloldás. |
+| `2026-06-26-puf-timeline.md` | PUF F5+ infra vs F6.5+ Secure Core use; **proposed**. |
+| `2026-06-26-sleeping-actor-inbox-buffering.md` | Multi-cell mailbox FIFO spec; **proposed**. |
 
 ### `spec-candidate` (2 fájl, 1 pár) — promote-olandó
 
@@ -127,16 +130,13 @@ Utolsó audit: **2026-05-03**
 | `osreq-from-os/osreq-005-mailbox-interrupt-{hu,en}.md` | Mailbox interrupt vs polling. |
 | `osreq-from-os/osreq-006-interchip-link-{hu,en}.md` | Inter-chip link protokoll. |
 
-## Ismert ütközések
+## Ismert ütközések — ADR megoldás alatt (2026-06-26)
 
 A 2026-05-03 audit során feltárt belső inkonzisztenciák — feloldásuk ADR vagy promote útján:
 
-| Ütközés | Érintett doksik |
-|---|---|
-| **AES/CMAC engine van/nincs Actor és Rich core-on** | `architecture-{hu,en}.md` (per-core AES F5+) ⚡ `core-types-{hu,en}.md` (Crypto: Nincs) |
-| **Actor core terület: 0,023 mm² vagy 0,036 mm²** | `core-types-{hu,en}.md` (5nm átszámolás) ⚡ `architecture-{hu,en}.md` 1308. sor (régi 7nm szám) |
-| **Rich core terület: 0,059 mm² vagy 0,083 mm²** | ugyanaz, mint fent |
-| **PUF elérhetősége F5+ vagy F6.5+** | `architecture-{hu,en}.md` 1305 (per-core kulcs PUF-ról, F5+) ⚡ `architecture-{hu,en}.md` 384 (Crypto Actor + PUF F6.5) |
-| **Multi-cell üzenet bufferelése alvó aktor inbox-ában — nincs spec** | `architecture-{hu,en}.md` Actor Scheduling Pipeline (csak egycellás eset le van írva) |
-
-Ezek feloldása **NEM** részfeladat ennek az audit-commit-nak; csak rögzítés. Külön ADR-ekben kell eldönteni.
+| Ütközés | Érintett doksik | ADR / Megoldás | Státusz |
+|---|---|---|---|
+| **AES/CMAC engine van/nincs Actor és Rich core-on** | `architecture-{hu,en}.md` (per-core AES F5+) ⚡ `core-types-{hu,en}.md` (Crypto: Nincs) | [[2026-06-26-crypto-hardware-placement]] | **proposed** |
+| **Actor/Rich core terület (7nm → 5nm számok)** | `core-types-{hu,en}.md` (5nm) ⚡ `architecture-{hu,en}.md` 1312. sor (régi 7nm) | Szoftver-fix: 0,036→0,023 (Actor), 0,083→0,059 (Rich), 0,014→0,008 (Nano) | **kész** |
+| **PUF elérhetősége F5+ vagy F6.5+** | `architecture-{hu,en}.md` 1309 (F5+), 388 (F6.5+) | [[2026-06-26-puf-timeline]] | **proposed** |
+| **Multi-cell üzenet bufferelése alvó aktor inbox-ában** | `architecture-{hu,en}.md` Actor Scheduling Pipeline (csak egycellás) | [[2026-06-26-sleeping-actor-inbox-buffering]] | **proposed** |
