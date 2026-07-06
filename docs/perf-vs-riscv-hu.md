@@ -6,7 +6,7 @@ status: vision
 
 > English version: [perf-vs-riscv-en.md](perf-vs-riscv-en.md)
 
-> Version: 1.1
+> Version: 1.2
 
 > **⚠️ Vízió-szintű dokumentum.** A számszerű becslések irodalmi precedensek (picoJava-2 perf paper, Jazelle DBX measurement, Krall & Probst 1998, Azul Vega) extrapolációi. **Nem RTL-szintű mérés, nem szilikon-mérés.** A pontos arányok csak F1.5 dynamic instruction count baseline + F2.7 FPGA cycle-accurate prototípus + F4 multi-core RTL + F6 szilícium után validálhatók. A dokumentum célja a **methodológia rögzítése** és a felmért becslések reprodukálható alapra hozása, nem a végleges számok deklarálása.
 
@@ -138,6 +138,29 @@ Ahogy a `microarch-philosophy-hu.md` rögzíti: a CFPU érve nem a single-thread
 
 Ezt a perspektívát **minden összehasonlító kommunikációban explicit fenntartani** — nem azért fontos a per-mag mérés, hogy versenyezzünk az RV-vel, hanem azért, hogy a Rich core ne legyen szégyenletesen lassú a baseline-on és a legacy C# kódon.
 
+## Biztonsággal-korrigált összehasonlítás
+
+A fenti lassulás-becslések (F4 ~1,3–1,5×, F5 ~1,1–1,3×) **védtelen kódot mérnek védtelen kód ellen**: a RV-referencia nem kényszeríti ki a CIL-T0 futásidejű safety-garanciáit. Amint a workload **azonos biztonsági garanciát** követel, az összehasonlítás eltolódik — mert azt a garanciát a RV oldalon *valamiből ki kell fizetni*.
+
+**Az alapelv: a CFPU területet vált időre.** A biztonsági ellenőrzést a visszatérő, opkódonkénti *utasítás-költségből* párhuzamos hardverbe teszi — a HW-mag a bounds/stack/trap ellenőrzést a datapath mellett, ~0 marginális ciklusért végzi, míg egy stock RV-nek guard-utasításokat kell beszúrnia. Ez ugyanaz az idő→szilícium konverzió, mint a [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) TLP>ILP tézise, csak a biztonsági tengelyen.
+
+Három esetet külön kell választani — a naiv „biztonságnál a CFPU gyorsabb" túlállítás lenne:
+
+| Biztonsági tulajdonság | Stock RV32 költsége | CFPU költsége | Verdikt azonos garanciánál |
+|---|---|---|---|
+| **Szemantikus safety** (bounds-check `ldind`/`stind`-nél, stack-depth trap, `div`-by-zero + `INT_MIN/−1`) | szoftver-guard: +1–3 utasítás / védett op (a RV `div` **nem trap-el** — 0-osztás definiált értéket ad; a bounds/stack-et is szoftver vagy guard-lap adja) | HW párhuzamos, ~0 marginális ciklus | **CFPU gyorsabb** — a garanciát a HW időben ingyen adja |
+| **Durva régió-izoláció** (R/W/X régió-szinten) | **PMP** (Physical Memory Protection): HW, ~0 ciklus | HW, ~0 ciklus | **döntetlen** — a CFPU éle itt a finomabb granularitás, NEM a sebesség |
+| **HW-gyökerű capability + kód-attesztáció** | szoftveres check = **megkerülhető** → gyengébb garancia | HW-kikényszerített, load-time verify, futásidőben 0 overhead (lásd [`authcode-hu.md`](authcode-hu.md)) | **más liga** — a szoftver nem éri el a szintet |
+
+**Hatás a fenti táblákra.** A ~1,3–1,5× lassulás *védtelen* futást feltételez. Safety-nehéz kódon (sok memória-indexelés, osztás, mély hívási lánc) a RV-referenciának guard-overhead-et kell fizetnie, ami a rést **szűkíti, safety-domináns hot path-on akár meg is fordíthatja**. Ez nem azt jelenti, hogy a CFPU „gyorsabb" — a saját per-mag overhead-je megmarad —, hanem hogy **a nyers-sebesség táblák a CFPU-t alulmérik minden olyan workloadon, ahol a biztonság nem opció.**
+
+Két kikötés, hogy ne legyen túlállítás:
+
+- **Nem ingyen, csak időben.** A „~0 ciklus" a *throughputra* igaz; a komparátorok + trap-FSM + Seal-logika **területet és energiát** fogyaszt. A HW egy visszatérő idő-költséget egyszeri terület-költséggé alakít.
+- **Nem mindenhol.** Durva izolációnál a PMP behozza; biztonság-mentes általános compute-nál a nyers-sebesség táblák (fentebb) az irányadók. A biztonsággal-korrigált él **csak a biztonság-kritikus + finomszemcsés + attesztált** végrehajtáson jelentkezik.
+
+**Mérés.** Mint minden szám ebben a dokumentumban, a +1–3 guard-utasítás/op **irodalmi becslés, nem RTL-mérés**. Validálása: Módszer 1-ben a Spike-referenciát a CIL-T0 trap-szemantikáját utánzó guard-okkal fordítjuk (nem nyers RV32), és a dynamic instruction count arányt így is felvesszük — ez adja a „biztonsággal-korrigált" oszlopot a baseline-táblában.
+
 ## Kapcsolódó dokumentumok
 
 - [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) — TLP > ILP, miért nem a single-thread perf a fő érv
@@ -145,10 +168,12 @@ Ezt a perspektívát **minden összehasonlító kommunikációban explicit fennt
 - [`core-types-hu.md`](core-types-hu.md) — Rich core spec
 - [`ISA-CIL-T0-hu.md`](ISA-CIL-T0-hu.md) — utasítás-készlet, ami a count alapja
 - [`roadmap-hu.md`](roadmap-hu.md) — F2.7 / F4 / F6 fázisok, ahol a validálás megtörténik
+- [`authcode-hu.md`](authcode-hu.md) — HW-gyökerű kód-attesztáció, futásidőben 0 overhead (a biztonsággal-korrigált összehasonlítás 3. esete)
 
 ## Changelog
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.2 | 2026-07-06 | **Biztonsággal-korrigált összehasonlítás** szekció hozzáadva — a nyers-sebesség táblák védtelen kódot mérnek; azonos biztonsági garancia mellett a CFPU területet vált időre (bounds/stack/trap HW-ben ~0 ciklus vs. szoftver-guard a RV-n). 3 eset: szemantikus safety → CFPU gyorsabb; durva izoláció → PMP-döntetlen; HW-attesztáció → szoftver el sem éri. Kaszkád: kereszthivatkozás `authcode`-hoz (reciprok back-ref az `authcode` v1.1-ben). |
 | 1.1 | 2026-05-17 | **Módszer 3.5: 22FDX szilícium mérés** hozzáadva — a roadmap F6.7 opcionális de-risk lépcső adja az első valós (nem irodalmi) sűrű-node perf/energia pontot a 130nm (Módszer 3) és 5nm termék-vízió közötti ~10× szakadékban. Módszer 3-hoz a 130nm-korlát figyelmeztetés. Kaszkád: `roadmap` v1.8, `chiplet-packaging` v1.1. |
 | 1.0 | 2026-04-25 | Kezdeti verzió — methodológia (dynamic instruction count, FPGA, szilikon), in-order vs in-order összehasonlítás, OoO-feltételezés visszavonva, F1.5 baseline-mérés terv |

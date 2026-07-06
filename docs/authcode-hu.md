@@ -6,7 +6,7 @@ status: vision
 
 > English version: [authcode-en.md](authcode-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 Ez a dokumentum a **CFPU kódbetöltési biztonsági modelljét** írja le: hogyan garantálja a hardver, hogy **csak hiteles kód** kerülhet végrehajtásra, és hogy **adat soha nem lehet kód**. A mechanizmus két komplementer komponensből áll: **AuthCode** (aláírás-ellenőrzés kódbetöltéskor) és **CodeLock** (runtime W⊕X szeparáció). A kettő együtt a trust-lánc alapja — az eFuse-ba égetett root hash-től a fejlesztő kezében lévő Symphact HSM Card-ig.
 
@@ -582,6 +582,7 @@ Ezek a kérdések **nem blokkolják** az alsóbb fázisokat — a v1.0 modell ko
 - [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) — a `hot_code_loader` aktor és a capability-modell
 - `docs/architecture-hu.md` — a CFPU Harvard-architektúra, amire a CodeLock épül
 - `docs/secure-element-hu.md` — a Secure Edition (F6.5) potenciálisan ezt a mechanizmust használja a TEE-jéhez
+- [`perf-vs-riscv-hu.md`](perf-vs-riscv-hu.md) — a biztonsággal-korrigált teljesítmény-összehasonlítás; a load-time verify futásidejű 0 overhead-je a 3. eset (HW-attesztáció, amit a szoftver nem ér el)
 
 ### Külső hivatkozások
 
@@ -596,4 +597,5 @@ Ezek a kérdések **nem blokkolják** az alsóbb fázisokat — a v1.0 modell ko
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-07-06 | Reciprok kereszthivatkozás a [`perf-vs-riscv-hu.md`](perf-vs-riscv-hu.md) v1.2 „Biztonsággal-korrigált összehasonlítás" szekciójához — a load-time verify futásidejű 0 overhead-je adja ott a 3. esetet (HW-gyökerű attesztáció, amit a szoftver nem ér el). Tartalmi változás nincs. |
 | 1.0 | 2026-04-16 | Kezdeti vízió-szintű kiadás. AuthCode (load-time verify) + CodeLock (W⊕X hardveres) + BitIce WOTS+/LMS integráció + Symphact HSM Card (dedikált JavaCard applet). A részletes paraméterek (AID, form factor, HSS mélység, PIN policy, revocation, CI/CD HSM) F-fázis-függő nyitott kérdések. |

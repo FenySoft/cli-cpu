@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [authcode-hu.md](authcode-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 This document describes the **CFPU code-loading security model**: how the hardware guarantees that **only authentic code** can execute, and that **data can never become code**. The mechanism consists of two complementary components: **AuthCode** (signature verification at code load) and **CodeLock** (runtime W⊕X separation). Together they form the foundation of the trust chain — from the CA root hash burned into the eFuse to the Symphact HSM Card in the developer's hand.
 
@@ -582,6 +582,7 @@ These questions **do not block** earlier phases — the v1.0 model allows consis
 - [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) — the `hot_code_loader` actor and the capability model
 - `docs/architecture-en.md` — the CFPU Harvard architecture on which CodeLock builds
 - `docs/secure-element-en.md` — the Secure Edition (F6.5) may use this mechanism for its TEE
+- [`perf-vs-riscv-en.md`](perf-vs-riscv-en.md) — the security-adjusted performance comparison; the zero runtime overhead of load-time verify is case 3 (HW attestation, unreachable by software)
 
 ### External references
 
@@ -596,4 +597,5 @@ These questions **do not block** earlier phases — the v1.0 model allows consis
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-07-06 | Reciprocal cross-reference to the [`perf-vs-riscv-en.md`](perf-vs-riscv-en.md) v1.2 "Security-adjusted comparison" section — the zero runtime overhead of load-time verify is case 3 there (HW-rooted attestation, unreachable by software). No content change. |
 | 1.0 | 2026-04-16 | Initial vision-level release. AuthCode (load-time verify) + CodeLock (W⊕X hardware) + BitIce WOTS+/LMS integration + Symphact HSM Card (dedicated JavaCard applet). Detailed parameters (AID, form factor, HSS depth, PIN policy, revocation, CI/CD HSM) are F-phase-dependent open questions. |
