@@ -6,13 +6,13 @@ status: educational
 
 > Magyar verzió: [8bit-cil-t0-hu.md](8bit-cil-t0-hu.md)
 
-> **⚠️ Educational / demonstration document.** This is a **breadboard-level, discrete 74HC logic chip** build of an 8-bit CIL-T0 processor — a Ben Eater-style "build it yourself" project. It is NOT part of the CFPU silicon roadmap; its purpose is to teach the ISA, support education, and build community. The main simulator and FPGA implementation (F1.5–F2.8) realize the 32-bit CIL-T0; this 8-bit variant is a didactic descendant.
+> **⚠️ Educational / demonstration document.** This is a **breadboard-level, discrete 74HC logic chip** build of an 8-bit CIL-T0 processor — a step-by-step "build it yourself" project. It is NOT part of the CFPU silicon roadmap; its purpose is to teach the ISA, support education, and build community. The main simulator and FPGA implementation (F1.5–F2.8) realize the 32-bit CIL-T0; this 8-bit variant is a didactic descendant.
 
 This document summarizes how the CIL-T0 ISA can be built as an **8-bit, discrete-component** version in tangible hardware, and how it can be programmed. The finished kit and the educational content around it are released under the name **OctaCIL**.
 
 ## Motivation
 
-The CLI-CPU project lacks an accessible, physically tangible entry point. There is no Ben Eater-level, component-level CPU-building content on Hungarian YouTube (see the research in the [Background](#background) section). A discrete 8-bit CIL-T0 is:
+The CLI-CPU project lacks an accessible, physically tangible entry point. There is no component-level, from-scratch CPU-building content on Hungarian YouTube (see the research in the [Background](#background) section). A discrete 8-bit CIL-T0 is:
 
 - **Tangible**: the data bus is visible on LEDs, the clock can be single-stepped
 - **Educational**: every step of stack-based execution can be followed
@@ -80,13 +80,13 @@ Because there are no named registers, there is no "register size" problem either
 | **Stack memory** | 62256 SRAM | 32 KB — full 32K used (16-bit address) |
 | **Program store** | AT28C64 | 8 KB EEPROM |
 | **Microcode ROM** | AT28C64 ×3 | control signals per opcode |
-| **Clock (Ben Eater)** | 3× NE555 + 1 MΩ pot | astable (run) + monostable (step) + bistable (debounce) |
+| **Clock** | 3× NE555 + 1 MΩ pot | astable (run) + monostable (step) + bistable (debounce) |
 
-The total chip count is **~37 ICs** — with 16-bit addressing (full 32K memory) and the **2× 74LS181** ALU. The 74LS181 cuts the discrete ALU (~15 chips) down to 2. Comparable to Ben Eater's 8-bit CPU project.
+The total chip count is **~37 ICs** — with 16-bit addressing (full 32K memory) and the **2× 74LS181** ALU. The 74LS181 cuts the discrete ALU (~15 chips) down to 2.
 
 ## Microcode is the key
 
-The 48 opcodes would be unmanageable with discrete control logic. The solution is a **microcode ROM**: the opcode + state-machine phase forms the ROM address input, and the output drives all chip `enable`/`direction` lines. This is exactly Ben Eater's approach. 3× AT28C64 store the full control-signal map.
+The 48 opcodes would be unmanageable with discrete control logic. The solution is a **microcode ROM**: the opcode + state-machine phase forms the ROM address input, and the output drives all chip `enable`/`direction` lines. This is the well-established microcode approach. 3× AT28C64 store the full control-signal map.
 
 ## Programming and power
 
@@ -134,7 +134,7 @@ The 8-bit variant demonstrates the same **ISA philosophy** (stack-based, int-onl
 
 ## Background
 
-There is currently **no** Ben Eater-level, component-level CPU-building channel on Hungarian YouTube. The existing Hungarian tech channels (Kernel Pánik, Neonity, TECHWorldhu) focus on hardware reviews and IT news, not deep architectural education. The OctaCIL kit + documentation targets exactly this unfilled gap.
+There is currently **no** component-level, from-scratch CPU-building channel on Hungarian YouTube. The existing Hungarian tech channels (Kernel Pánik, Neonity, TECHWorldhu) focus on hardware reviews and IT news, not deep architectural education. The OctaCIL kit + documentation targets exactly this unfilled gap.
 
 ## Changelog
 
@@ -143,3 +143,4 @@ There is currently **no** Ben Eater-level, component-level CPU-building channel 
 | 1.0 | 2026-06-08 | Initial version — 8-bit discrete CIL-T0 build (block diagram, functional units ~37 ICs, microcode ROM, programming, BOM, relationship to the main project) |
 | 1.1 | 2026-06-09 | Introduced the OctaCIL brand (title + intro + motivation) and a product tiers section (Digital / Core / Full) |
 | 1.2 | 2026-06-10 | AT28C256 → AT28C64 (8 KB is enough for program + microcode); fixed the "EEPROM dominates cost" claim (breadboard + memory dominate) |
+| 1.3 | 2026-06-25 | Removed external personal-name references — wording switched to generic, tool-independent phrasing ("step-by-step build", "from-scratch", "well-established microcode approach") |

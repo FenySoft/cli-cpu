@@ -6,13 +6,13 @@ status: educational
 
 > English version: [8bit-cil-t0-en.md](8bit-cil-t0-en.md)
 
-> **⚠️ Oktatási / demonstrációs dokumentum.** Ez egy **breadboard-szintű, diszkrét 74HC logikai chipekből** felépíthető 8-bites CIL-T0 processzor terve — Ben Eater stílusú "építsd meg magad" projekt. NEM a CFPU szilícium-roadmap része; célja az ISA megértetése, oktatás és közösségépítés. A fő szimulátor és FPGA-implementáció (F1.5–F2.8) a 32-bites CIL-T0-t valósítja meg; ez a 8-bites változat egy didaktikus leszármazott.
+> **⚠️ Oktatási / demonstrációs dokumentum.** Ez egy **breadboard-szintű, diszkrét 74HC logikai chipekből** felépíthető 8-bites CIL-T0 processzor terve — lépésről lépésre felépíthető "építsd meg magad" projekt. NEM a CFPU szilícium-roadmap része; célja az ISA megértetése, oktatás és közösségépítés. A fő szimulátor és FPGA-implementáció (F1.5–F2.8) a 32-bites CIL-T0-t valósítja meg; ez a 8-bites változat egy didaktikus leszármazott.
 
 Ez a dokumentum összefoglalja, hogyan építhető meg a CIL-T0 ISA egy **8-bites, diszkrét alkatrészes** változata kézzelfogható hardverben, és hogyan programozható. A kész kit és a köré épülő oktatótartalom **OctaCIL** néven jelenik meg.
 
 ## Motiváció
 
-A CLI-CPU projektben hiányzik egy közérthető, fizikailag megfogható belépő. A magyar YouTube-on nincs Ben Eater-szintű, alkatrész-szintű CPU-építő tartalom (lásd a kutatást a [Háttér](#háttér) szakaszban). Egy diszkrét 8-bites CIL-T0:
+A CLI-CPU projektben hiányzik egy közérthető, fizikailag megfogható belépő. A magyar YouTube-on nincs alkatrész-szintű, a nulláról építő CPU-tartalom (lásd a kutatást a [Háttér](#háttér) szakaszban). Egy diszkrét 8-bites CIL-T0:
 
 - **Megfogható**: az adatbusz LED-eken látszik, az órajel léptethető
 - **Oktató**: a stack-alapú végrehajtás minden lépése követhető
@@ -80,13 +80,13 @@ A nevesített regiszterek hiánya miatt nincs "regiszter-méret" probléma sem: 
 | **Stack memória** | 62256 SRAM | 32 KB — teljes 32K használt (16-bit cím) |
 | **Program tár** | AT28C64 | 8 KB EEPROM |
 | **Mikrokód ROM** | AT28C64 ×3 | vezérlőjelek opkódonként |
-| **Órajel (Ben Eater)** | 3× NE555 + 1 MΩ potméter | astabil (run) + monostabil (step) + bistabil (debounce) |
+| **Órajel** | 3× NE555 + 1 MΩ potméter | astabil (run) + monostabil (step) + bistabil (debounce) |
 
-A teljes chip-szám **~37 IC** — 16-bit címzéssel (teljes 32K memória) és a **2× 74LS181** ALU-val. A 74LS181 a diszkrét ALU-t (~15 chip) 2 chipre csökkenti. Összemérhető Ben Eater 8-bites CPU projektjével.
+A teljes chip-szám **~37 IC** — 16-bit címzéssel (teljes 32K memória) és a **2× 74LS181** ALU-val. A 74LS181 a diszkrét ALU-t (~15 chip) 2 chipre csökkenti.
 
 ## A mikrokód a kulcs
 
-A 48 opkód diszkrét vezérlőlogikával kezelhetetlen lenne. A megoldás **mikrokód ROM**: az opkód + állapotgép-fázis adja a ROM-cím bemenetet, a kimenet vezérli az összes chip `enable`/`direction` vonalát. Pontosan Ben Eater megközelítése. 3× AT28C64 tárolja a teljes vezérlőjel-térképet.
+A 48 opkód diszkrét vezérlőlogikával kezelhetetlen lenne. A megoldás **mikrokód ROM**: az opkód + állapotgép-fázis adja a ROM-cím bemenetet, a kimenet vezérli az összes chip `enable`/`direction` vonalát. Ez a bevett mikrokódos megközelítés. 3× AT28C64 tárolja a teljes vezérlőjel-térképet.
 
 ## Programozás és tápellátás
 
@@ -134,7 +134,7 @@ A 8-bites változat ugyanazt az **ISA-filozófiát** (stack-alapú, int-only, ob
 
 ## Háttér
 
-A magyar YouTube-on jelenleg **nincs** Ben Eater-szintű, alkatrész-szintű CPU-építő csatorna. A meglévő magyar tech-csatornák (Kernel Pánik, Neonity, TECHWorldhu) hardver-teszt és IT-hír fókuszúak, nem mélyarchitekturális oktatás. Az OctaCIL kit + dokumentáció pontosan ezt a betöltetlen rést célozza meg.
+A magyar YouTube-on jelenleg **nincs** alkatrész-szintű, a nulláról építő CPU-építő csatorna. A meglévő magyar tech-csatornák (Kernel Pánik, Neonity, TECHWorldhu) hardver-teszt és IT-hír fókuszúak, nem mélyarchitekturális oktatás. Az OctaCIL kit + dokumentáció pontosan ezt a betöltetlen rést célozza meg.
 
 ## Changelog
 
@@ -143,3 +143,4 @@ A magyar YouTube-on jelenleg **nincs** Ben Eater-szintű, alkatrész-szintű CPU
 | 1.0 | 2026-06-08 | Kezdeti verzió — 8-bites diszkrét CIL-T0 építés (blokk-vázlat, funkcionális egységek ~37 IC, mikrokód ROM, programozás, BOM, kapcsolat a fő projekthez) |
 | 1.1 | 2026-06-09 | OctaCIL brand bevezetése (cím + bevezető + motiváció) és termékszintek (Digital / Core / Full) szekció |
 | 1.2 | 2026-06-10 | AT28C256 → AT28C64 (8 KB elég a program + mikrokódhoz); az „EEPROM dominálja a költséget" állítás javítva (a breadboard + memória dominál) |
+| 1.3 | 2026-06-25 | Külső személynév-hivatkozások eltávolítása — a leírás generikus, eszközfüggetlen megfogalmazásra váltva („lépésről lépésre felépíthető", „a nulláról építő", „bevett mikrokódos megközelítés") |
