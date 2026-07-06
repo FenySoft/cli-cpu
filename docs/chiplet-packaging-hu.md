@@ -6,7 +6,7 @@ status: vision
 
 > English version: [chiplet-packaging-en.md](chiplet-packaging-en.md)
 
-> Version: 1.1
+> Version: 1.2
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architektúráját** specifikálja: a chiplet típusokat, a multi-chiplet elrendezéseket, a technológiai skálázást és a Symphact-re gyakorolt hatást.
 
@@ -298,10 +298,12 @@ Ha a hűtés technológia megengedi, a chiplet-ek két rétegben stackelhetők S
 - [DDR5 architektúra](ddr5-architecture-hu.md) — DDR5 controller, capability grant, CAM ACL
 - [CFPU-ML-Max](cfpu-ml-max-hu.md) — ML inference chiplet architektúra
 - [Architektúra](architecture-hu.md) — teljes CFPU áttekintés
+- [3D Stack architektúra](3d-stack-architecture-hu.md) — **3D vertikális kiegészítő**: memória-mesh + per-csempe SRAM stack, MI300-összevetés
 
 ## Changelog
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.2 | 2026-07-02 | Kereszthivatkozás hozzáadva a [`3d-stack-architecture-hu.md`](3d-stack-architecture-hu.md) vertikális (3D) kiegészítő dokumentumhoz (memória-mesh + per-csempe SRAM stack, MI300-összevetés). |
 | 1.1 | 2026-05-17 | **22FDX kalibrációs pont (F6.7)** szekció hozzáadva a Technológiai skálázáshoz — a roadmap F6.7 opcionális de-risk lépcső köti a 130nm szilícium-proof és az 5nm termék-vízió közötti ~10× sűrűség-szakadékot egy valós mért ponthoz; a pontos arányok F6.7 mérésig „mérendő". Kaszkád: `roadmap` v1.8, `perf-vs-riscv`. |
 | 1.0 | 2026-04-23 | Kezdeti verzió — C/R chiplet típusok, 1+1..8 termékváltozatok, kombinált mesh+csillag topológia, 256-bit 500 MHz link, DDR5 a C chipletben, technológiai skálázás (SRAM fal, 3D SRAM, chiplet méret növekedés), Symphact scheduler hatás |

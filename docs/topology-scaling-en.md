@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [topology-scaling-hu.md](topology-scaling-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 > **⚠️ Vision-level background document.** The area, BW, and latency figures presented here are working hypotheses extrapolated from documented sources (academic NoC measurements, ARM CoreLink CMN, Synopsys/Cadence NoC IP, Adapteva Epiphany, Tenstorrent Tensix) for a 5 nm node. General background, decoupled from CFPU specifics — for the actual CFPU parameterization see [`interconnect-en.md`](interconnect-en.md) and [`internal-bus-en.md`](internal-bus-en.md).
 
@@ -441,10 +441,12 @@ The hierarchical topology is therefore also the **CFPU choice** (see `interconne
 - [`architecture-en.md`](architecture-en.md) — F4 shared bus → F6 mesh transition (16-core boundary)
 - [`microarch-philosophy-en.md`](microarch-philosophy-en.md) — TLP > ILP philosophy (many small cores due to linear scaling)
 - [`osreq-from-os/osreq-001-tree-interconnect-en.md`](osreq-from-os/osreq-001-tree-interconnect-en.md) — Symphact OS hardware requirement on topology
+- [`3d-stack-architecture-en.md`](3d-stack-architecture-en.md) — 3D resolution of the bisection wall: per-tile SRAM + separate memory-mesh plane
 
 ## Changelog
 
 | Version | Date | Summary |
 |---------|------|--------|
+| 1.2 | 2026-07-02 | Cross-reference added to [`3d-stack-architecture-en.md`](3d-stack-architecture-en.md) — 3D resolution of the bisection wall (per-tile SRAM + separate memory-mesh plane). |
 | 1.1 | 2026-05-03 | **New section: "Traffic pattern — aggregate vs per-core BW"**. v1.0 only showed uniform random traffic (worst case); v1.1 adds the aggregate BW formula (mesh: 2N · B), concrete aggregate numbers (16-core mesh 384 GB/s, 1024-core mesh 31.7 TB/s), traffic locality factor table (40× difference neighbour vs uniform), and a direct crossbar-vs-mesh comparison at equal N. Key conclusion: under local traffic, mesh per-core BW ≈ B (like crossbar), while mesh aggregate > crossbar aggregate. The earlier 1/√N scaling only applies in the bisection-limited (uniform random) case |
 | 1.0 | 2026-05-03 | Initial version — general NoC topology scaling decoupled from CFPU. Bus/Ring/Mesh/Torus/Crossbar/Fat-tree/Hierarchical comparison with the 144-byte message unit. Per-core BW, bisection BW, area (5 nm), latency formulas and concrete numbers for N = 16, 64, 256, 1024, 10240 cores. Topology selection algorithm. Mathematical justification for the hierarchical choice from N ≥ 64 |

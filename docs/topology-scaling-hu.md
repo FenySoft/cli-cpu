@@ -6,7 +6,7 @@ status: vision
 
 > English version: [topology-scaling-en.md](topology-scaling-en.md)
 
-> Version: 1.1
+> Version: 1.2
 
 > **⚠️ Vízió-szintű háttérdokumentum.** Az itt szereplő area-, BW- és latencia-becslések irodalmi adatokból (akadémiai NoC mérések, ARM CoreLink CMN, Synopsys/Cadence NoC IP, Adapteva Epiphany, Tenstorrent Tensix) extrapolált munkahipotézisek 5 nm node-ra. Általános háttéranyag a CFPU-tól elvonatkoztatva — a tényleges CFPU paraméterezést lásd [`interconnect-hu.md`](interconnect-hu.md) és [`internal-bus-hu.md`](internal-bus-hu.md).
 
@@ -441,10 +441,12 @@ A hierarchikus topológia ezért a **CFPU választása** is (lásd `interconnect
 - [`architecture-hu.md`](architecture-hu.md) — F4 shared bus → F6 mesh átmenet (16 core határ)
 - [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) — TLP > ILP filozófia (sok kis core a lineáris skálázódás miatt)
 - [`osreq-from-os/osreq-001-tree-interconnect-hu.md`](osreq-from-os/osreq-001-tree-interconnect-hu.md) — Symphact OS hardware requirement a topológiára
+- [`3d-stack-architecture-hu.md`](3d-stack-architecture-hu.md) — a bisection-fal 3D-feloldása: per-csempe SRAM + külön memória-mesh sík
 
 ## Changelog
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.2 | 2026-07-02 | Kereszthivatkozás hozzáadva a [`3d-stack-architecture-hu.md`](3d-stack-architecture-hu.md) dokumentumhoz — a bisection-fal 3D-feloldása (per-csempe SRAM + külön memória-mesh sík). |
 | 1.1 | 2026-05-03 | **Új szekció: "Forgalom-mintázat — aggregát vs per-core BW"**. A v1.0 csak uniform random forgalmat mutatott (worst case); a v1.1 hozzáadja az aggregát BW képletet (mesh: 2N · B), konkrét aggregát számokat (16-core mesh 384 GB/s, 1024-core mesh 31,7 TB/s), forgalom-lokalitás faktor táblát (40× különbség szomszéd vs uniform), és a crossbar vs mesh közvetlen összehasonlítást azonos N-en. Kulcs konklúzió: lokális forgalom esetén a mesh per-core BW ≈ B (mint a crossbar), miközben a mesh aggregát > crossbar aggregát. A korábbi 1/√N skálázás csak a bisection-limited (uniform random) esetben érvényes |
 | 1.0 | 2026-05-03 | Kezdeti verzió — általános NoC topológia skálázás CFPU-tól elvonatkoztatva. Bus/Ring/Mesh/Torus/Crossbar/Fat-tree/Hierarchikus összehasonlítás 144 byte üzenetegységgel. Per-core BW, bisection BW, area (5 nm), latencia képletek és konkrét számok N = 16, 64, 256, 1024, 10240 core-ra. Topológia választás algoritmus. A hierarchikus választás matematikai indoklása N ≥ 64-től |

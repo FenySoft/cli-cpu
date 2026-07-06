@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [chiplet-packaging-hu.md](chiplet-packaging-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 This document specifies the Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architecture**: chiplet types, multi-chiplet configurations, technology scaling, and the impact on Symphact.
 
@@ -298,10 +298,12 @@ If cooling technology permits, chiplets can be stacked in two layers via SoIC:
 - [DDR5 Architecture](ddr5-architecture-hu.md) — DDR5 controller, capability grant, CAM ACL
 - [CFPU-ML-Max](cfpu-ml-max-en.md) — ML inference chiplet architecture
 - [Architecture](architecture-en.md) — full CFPU overview
+- [3D Stack Architecture](3d-stack-architecture-en.md) — **3D vertical complement**: memory-mesh + per-tile SRAM stack, MI300 comparison
 
 ## Changelog
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2 | 2026-07-02 | Cross-reference added to the [`3d-stack-architecture-en.md`](3d-stack-architecture-en.md) vertical (3D) complement document (memory-mesh + per-tile SRAM stack, MI300 comparison). |
 | 1.1 | 2026-05-17 | **22FDX Calibration Point (F6.7)** section added to Technology Scaling — the roadmap F6.7 optional de-risk step ties the ~10× density gap between the 130nm silicon proof and the 5nm product vision to a real measured point; exact ratios are "to be measured" until F6.7. Cascade: `roadmap` v1.8, `perf-vs-riscv`. |
 | 1.0 | 2026-04-23 | Initial version — C/R chiplet types, 1+1..8 product variants, combined mesh+star topology, 256-bit 500 MHz link, DDR5 in C chiplet, technology scaling (SRAM wall, 3D SRAM, chiplet size growth), Symphact scheduler impact |
