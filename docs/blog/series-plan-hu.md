@@ -8,7 +8,7 @@ status: policy
 
 > English version: [series-plan.md](series-plan.md)
 
-> Version: 1.0
+> Version: 1.1
 
 ## Stratégia
 
@@ -23,7 +23,7 @@ status: policy
 |---|-----|-------------|---------|
 | **1** | Miért építek CPU-t, ami natívan futtatja a .NET-et | Mindenki — a nagy kép | Publikált |
 | **2** | 24 Core, nulla cache koherencia: hogyan veri a Shared-Nothing a multi-threadinget | CPU architektúra rajongók | Tervezett |
-| **3** | 250+ teszttől a szilíciumig: tesztvezérelt hardverfejlesztés | .NET / szoftverfejlesztők | Tervezett |
+| **3** | 187 teszttől a szilíciumig: tesztvezérelt hardverfejlesztés | .NET / szoftverfejlesztők | Tervezett |
 | **4** | Hardverszintű biztonság mitigációk nélkül: miért nem tud hozzáérni a Spectre | Biztonsági közönség | Tervezett |
 | **5** | A Symphact vízió: miért kell utód a Linux 1970-es évekbeli architektúrájának | OS / rendszerprogramozók | Tervezett |
 | **6** | 8 millió .NET fejlesztő, egy hardverplatform: minden nyelv, natív szilícium | .NET közösség | Tervezett |
@@ -41,10 +41,10 @@ status: policy
 
 ## 3. cikk — Vázlat
 
-**Cím:** 250+ teszttől a szilíciumig: tesztvezérelt hardverfejlesztés
+**Cím:** 187 teszttől a szilíciumig: tesztvezérelt hardverfejlesztés
 
 - A TDD a szoftverben normális — hardverben ritka
-- Hogyan írtunk 250+ C# tesztet MIELŐTT bármilyen Verilog-ot írtunk volna
+- Hogyan írtunk 187 C# tesztet MIELŐTT bármilyen Verilog-ot írtunk volna
 - Az arany vektor megközelítés: cocotb tesztek vs C# szimulátor
 - Miért számít: bizalom, hogy az RTL megfelel a specnek
 - A Fibonacci(20) = 6765 végponttól végpontig teszt
@@ -107,4 +107,5 @@ Használd ezeket a címkéket minden cikkhez:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-07-17 | Tesztszám frissítve a tényleges CI-eredményre: 187 |
 | 1.0 | 2026-04-15 | Kezdeti kiadás |

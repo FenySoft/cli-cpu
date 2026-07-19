@@ -6,7 +6,7 @@ status: policy
 
 > Magyar verzió: [brand-hu.md](brand-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 This document is the **canonical reference** for the three names that appear together throughout this project: **Cognitive Fabric**, **CFPU**, and **CLI-CPU**. They are not synonyms. Each refers to a different layer (architecture family, processor category, reference implementation), and the wrong choice in a sentence quietly distorts the meaning.
 
@@ -137,7 +137,7 @@ If we collapse the three into one name, every public-facing surface — academic
 >
 > *"Clone: `git clone https://github.com/FenySoft/CLI-CPU`"*
 >
-> *"The CLI-CPU reference simulator has 250+ tests."*
+> *"The CLI-CPU reference simulator has 187 tests."*
 >
 > *"CLI-CPU is licensed under CERN-OHL-S (hardware) and Apache-2.0 (software)."*
 
@@ -227,4 +227,5 @@ Some sentences legitimately span two layers. The rule of thumb is: **lead with t
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-07-17 | Test count updated to the actual CI result: 187 |
 | 1.0 | 2026-04-26 | Initial release |

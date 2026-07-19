@@ -86,7 +86,7 @@ The total chip count is **~37 ICs** — with 16-bit addressing (full 32K memory)
 
 ## Microcode is the key
 
-The 48 opcodes would be unmanageable with discrete control logic. The solution is a **microcode ROM**: the opcode + state-machine phase forms the ROM address input, and the output drives all chip `enable`/`direction` lines. This is the well-established microcode approach. 3× AT28C64 store the full control-signal map.
+The 64 opcodes would be unmanageable with discrete control logic. The solution is a **microcode ROM**: the opcode + state-machine phase forms the ROM address input, and the output drives all chip `enable`/`direction` lines. This is the well-established microcode approach. 3× AT28C64 store the full control-signal map.
 
 ## Programming and power
 
@@ -127,7 +127,7 @@ The **Digital** tier is the entry point (maximum reach, education); the **Core**
 | Goal | Education, demo, community | Reference + silicon path |
 | Width | 8-bit | 32-bit |
 | Implementation | 74HC breadboard | C# sim + Verilog FPGA |
-| ISA | CIL-T0 subset | Full CIL-T0 (48 opcodes) |
+| ISA | CIL-T0 subset | Full CIL-T0 (64 opcodes) |
 | Phase | Standalone didactic branch | F1.5 DONE → F2.8 |
 
 The 8-bit variant demonstrates the same **ISA philosophy** (stack-based, int-only, object-free) in tangible hardware that the 32-bit reference simulator and the FPGA implementation realize in full depth.
@@ -140,6 +140,7 @@ There is currently **no** component-level, from-scratch CPU-building channel on 
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-07-17 | Opcode count corrected: 48 → 64 (per the actual F1.5 implementation, `src/CilCpu.Sim/TOpcode.cs`) |
 | 1.0 | 2026-06-08 | Initial version — 8-bit discrete CIL-T0 build (block diagram, functional units ~37 ICs, microcode ROM, programming, BOM, relationship to the main project) |
 | 1.1 | 2026-06-09 | Introduced the OctaCIL brand (title + intro + motivation) and a product tiers section (Digital / Core / Full) |
 | 1.2 | 2026-06-10 | AT28C256 → AT28C64 (8 KB is enough for program + microcode); fixed the "EEPROM dominates cost" claim (breadboard + memory dominate) |

@@ -6,7 +6,7 @@ status: spec-candidate
 
 > Magyar verzió: [ISA-CIL-T0-hu.md](ISA-CIL-T0-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 This document specifies the **CIL-T0** subset, which is the first implemented instruction set of CLI-CPU, targeted for **Tiny Tapeout (F3)** fabrication.
 
@@ -69,7 +69,7 @@ The CLI-CPU includes a **32-bit mailbox interface already on the F3 Tiny Tapeout
 
 ### Design principles
 
-1. **No new opcodes.** The mailbox lives in the MMIO region and is accessed via the existing `ldind.i4` (load indirect) and `stind.i4` (store indirect) opcodes. This keeps the CIL-T0 opcode set at **48 opcodes** and strictly ECMA-335 compatible.
+1. **No new opcodes.** The mailbox lives in the MMIO region and is accessed via the existing `ldind.i4` (load indirect) and `stind.i4` (store indirect) opcodes. This keeps the CIL-T0 opcode set at **64 opcodes** and strictly ECMA-335 compatible.
 2. **Symmetric inbox and outbox.** Both FIFOs are **8 deep** with 32-bit wide entries. This can buffer 8 "spike" bursts in each direction without message loss.
 3. **External bridge in F3** (UART/FTDI) relays messages between host and chip. **In F4** the same registers connect to the hardware router, and the `target` field gains meaning (destination core index).
 4. **Trap support.** If the program attempts to read from an empty inbox or write to a full outbox, the hardware signals this via the `STATUS` register; optionally an **interrupt/wake-from-sleep** can also be generated (F4+).
@@ -132,7 +132,7 @@ An optional trap is added to the current trap list (see above) in F3:
 
 | Trap # | Name | Description |
 |--------|------|-------------|
-| 0x0C | `MAILBOX_OVERFLOW` | Fired when the program attempts to write to a full outbox and `MB_CTRL` does not enable drop behavior (configurable in F4+) |
+| 0x12 | `MAILBOX_OVERFLOW` | Fired when the program attempts to write to a full outbox and `MB_CTRL` does not enable drop behavior (configurable in F4+) |
 
 In F3, by default **overflow only sets a sticky bit** and does not trap — the sample code can handle this via `MB_STATUS` polling.
 
@@ -182,7 +182,7 @@ Every stack element is of type **`I4` (32-bit signed integer)**. There are no ot
 
 ## Opcode catalog
 
-The following 48 opcodes constitute the complete CIL-T0 instruction set. Every opcode uses the **standard ECMA-335 byte encoding**.
+The following 64 opcodes constitute the complete CIL-T0 instruction set (the v1.0 spec listed 48; the F1.5 implementation grew to 64). Every opcode uses the **standard ECMA-335 byte encoding**.
 
 ### Legend
 
@@ -633,7 +633,7 @@ The execution time of CIL-T0 instructions is determined by three factors:
 
 **Formula:** `Total cycles = μstep + ALU latency + pipeline flush + memory latency`
 
-### Summary table (48 opcodes)
+### Summary table (64 opcodes)
 
 | Category | Opcodes | μstep | Cycles | Notes |
 |----------|---------|-------|--------|-------|
@@ -662,5 +662,7 @@ The execution time of CIL-T0 instructions is determined by three factors:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2 | 2026-07-17 | Trap code collision fixed: MAILBOX_OVERFLOW 0x0C → 0x12, because 0x0C is already reserved as INVALID_MEMORY_ACCESS (the 0x0D–0x11 range is used by the CIL-Seal traps) |
+| 1.2 | 2026-07-17 | Opcode count corrected: 48 → 64 (per the actual F1.5 implementation, `src/CilCpu.Sim/TOpcode.cs`) |
 | 1.1 | 2026-04-17 | F2.2b μstep + clock cycle documentation for all opcodes |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

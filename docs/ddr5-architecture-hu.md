@@ -6,7 +6,7 @@ status: vision
 
 > English version: [ddr5-architecture-en.md](ddr5-architecture-en.md)
 
-> Version: 1.5
+> Version: 1.6
 
 Ez a dokumentum a CFPU és a külső DDR5 memória közötti interfész **hardveres architektúráját** rögzíti. Nem csak a végeredményt, hanem az **érvelési utat** is dokumentálja: milyen alternatívákat vizsgáltunk, miért vetettük el őket, és milyen trade-off-ok vezettek a végső döntésekhez.
 
@@ -101,7 +101,7 @@ Ez a shared-nothing modell kritikus kérdése. Ha bármelyik core tetszőleges D
 
 ### 2.a) A küldő azonosítása — NoC header src + src_actor
 
-A NoC router **hardveresen tölti ki** a flit header `src` (24 bit) és `src_actor` (8 bit) mezőit a küldő core fizikai azonosítójával és aktív aktor context regiszteréből. Ezt a küldő core szoftvere **nem tudja felülírni** (lásd `interconnect-hu.md` v3.2 + `cell-format-hu.md` v2.1).
+A NoC router **hardveresen tölti ki** a flit header `src` (24 bit) és `src_actor` (8 bit) mezőit a küldő core fizikai azonosítójával és aktív aktor context regiszteréből. Ezt a küldő core szoftvere **nem tudja felülírni** (lásd `interconnect-hu.md` v3.2 + `cell-format-hu.md` v2.4).
 
 ```
 NoC cella --> DDR5 Controller port
@@ -544,6 +544,7 @@ Futás:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.6 | 2026-07-17 | **Elavult cell-format hivatkozás frissítve:** `cell-format-hu.md` v2.1 → **v2.4** (kaszkád a hatályos spec-ből). |
 | 1.5 | 2026-06-02 | **Capability slot teljes page-granularitás + perms X pontosítás.** A `region_size` is **bájt → 4 KB page-granuláris** (most 16-bit → 256 MB max régió), a base mellett **`reserved[8]`** a jövőbeli 40-bit page (4 PB) bővítéshez. Indok: mivel **két aktor sosem oszt meg lapot** (felhasználói döntés), az izoláció page-szintű → a byte-pontos size felesleges (intra-actor bug-fogó lett volna, nem izoláció). Új layout: `region_base[32] + reserved[8] + region_size[16] + valid[1] + perms[3] + reserved[4]`. **`perms` X bit:** kizárólag **Seal-verifikált kódra** (DRAM-mint-flash-cache); **runtime-generált kód TILOS** (nem hitelesíthető). ⚠️ Az X viszonya a 6. döntéshez (»DDR5 = adat«) + a cache-elt kód integritás-mechanizmusa **NYITOTT**. Bit-formátum csak ebben + quench-ram-hu.md-ben él (sweep igazolva). |
 | 1.4 | 2026-06-01 | **Capability slot: `region_base` 36-bit byte-cím → 32-bit page-aligned (4 KB) → 16 TB.** A korábbi 36-bit (64 GB) alulméretezett a mai kapacitásokhoz (128 GB fogyasztói RAM, 1+ TB szerver/akcelerátor horizont). A page-igazítás 16 TB-ot ad ugyanabban a 8-byte slotban (32+24+1+3=60 bit). Döntés-trail: byte-36 (alul) / byte-40 (nagyobb slot) / **page-32 (választott)**. **Új „Címzési modell" szakasz:** (1) a `slot_id + offset` capability-alapú **szegmentálás** — a valódi indok HW-izoláció + terület (NEM ergonómia, mert a managed runtime bármely modellt elrejt, a klasszikus DS/CS-t is); (2) a >4 GB adat **descriptor (adat), nem pointer** — a core ISA 32-bit marad, a széles cím a controllerben/capability-ben él, az OS chunkolva stream-eli; (3) programozói modell = streaming-lowering (**tervezési szándék**, F2/F3); (4) irreducibilis korlát: random hozzáférés >4 GB lapos struktúrán — itt flat-64 nyer, a CFPU tudatosan elengedi. Core ISA változatlanul 32-bit. |
 | 1.3 | 2026-04-28 | **CAM tábla → HW Capability Slot (QRAM-ban).** Az 5.b-ben elvetett 21 MB-os központi CAM helyett: minden core QRAM-jában 8 KB capability slot tábla (256 actor × 4 slot × 8 byte), Seal Core SEAL/RELEASE-szel kezelve. Új `flags.DDR5_CAP` HW-only header bit a cellán (csak a forrás core HW request assembler állíthatja, az aktor SW nem). Az 5.c capability token + HMAC alternatíva is elvetve (a HMAC redundáns, ha a Quench-RAM SEAL gate-keep elegendő). Új döntés-trail: 5.a–5.e (szoftveres / CAM / HMAC token / per-core CAM / **HW Capability Slot**). Revocation = QRAM RELEASE (atomi, 1 ciklus). Memória összefoglaló tábla DDR5 sora frissítve. **Indoklás:** central CAM nem skálázódik on-chip, a Quench-RAM és a v3.0 CST modell mintát ad egy stateless, HW-only capability mechanizmushoz |

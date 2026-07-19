@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [microarch-philosophy-hu.md](microarch-philosophy-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vision-level document.** This analysis records the theoretical architectural direction formulated during the F1.5 phase (reference simulator + linker). Numerical estimates are extrapolations from documented precedents (picoJava-2, Cerebras WSE, Adapteva Epiphany, Tilera, Groq, SpiNNaker), **not RTL-level measurements**. Actual performance, area, and power figures can only be validated after F4 RTL and F6 silicon (Cognitive Fabric One MPW) — until then every number is a working hypothesis subject to revision at each roadmap phase.
 
@@ -87,7 +87,7 @@ The difference is not gradual but categorical: on the CFPU, single-core *efficie
 - Ideal for specialized workloads (ML inference, neuron simulation)
 - Not suitable for general-purpose execution
 
-**Partially adopted.** The Nano core embodies this spirit (48 opcodes, int32, 0.005 mm² at 5nm); but Rich/Actor cores are retained for general .NET code so the CFPU runs **both** profiles on a single substrate.
+**Partially adopted.** The Nano core embodies this spirit (64 opcodes, int32, 0.005 mm² at 5nm); but Rich/Actor cores are retained for general .NET code so the CFPU runs **both** profiles on a single substrate.
 
 ## What we do not build
 
@@ -156,4 +156,5 @@ The thesis **can only be conclusively proven with F6 silicon.** Until then every
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-07-17 | Opcode count corrected: 48 → 64 (per the actual F1.5 implementation, `src/CilCpu.Sim/TOpcode.cs`) |
 | 1.0 | 2026-04-25 | Initial version — TLP > ILP thesis, decision trail (few-OoO vs many-in-order vs minimal), 4,300-thread iMac data point, static ILP components, validation plan F1.5 → F6 |

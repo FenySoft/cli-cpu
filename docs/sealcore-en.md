@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [sealcore-hu.md](sealcore-hu.md)
 
-> Version: 1.5
+> Version: 1.6
 
 This document describes the **Seal Core** component: a dedicated, simple, hardware-burned-firmware core that ensures **code-loading authenticity** on the CFPU chip. The Seal Core operates via two distinct mechanisms depending on CFPU phase — **pre-QRAM era** (F3-F5) through physical WE-pin routing, **QRAM era** (F5+) as an AuthCode verification gatekeeper. These are **two distinct mechanisms**, which this document treats in deliberately separated sections.
 
@@ -496,7 +496,7 @@ The OS root actor (or a delegate holding appropriate capability) sends a message
 
 The concrete message opcodes and payload formats are an **F4-F5 RTL decision** — to be defined by the `CIL-Seal ISA` (see [Open questions](#open) #1).
 
-The requester's identity is **not forgeable**: in header v3.1, the `src_actor` field originates from the core HW context register (see `specs/cell-format-en.md` v2.2, "Decision 3"), and the `src` field is filled by the NoC router HW from the physical origin. The Seal Core firmware compares this (HW-attested) `(src, src_actor)` pair against the request's `parent` / `target_actor` fields — **no crypto, only HW-attributed origin**.
+The requester's identity is **not forgeable**: in header v3.1, the `src_actor` field originates from the core HW context register (see `specs/cell-format-en.md` v2.4, "Decision 3"), and the `src` field is filled by the NoC router HW from the physical origin. The Seal Core firmware compares this (HW-attested) `(src, src_actor)` pair against the request's `parent` / `target_actor` fields — **no crypto, only HW-attributed origin**.
 
 ### Validation algorithm (Seal Core firmware)
 
@@ -554,7 +554,7 @@ Therefore, the Seal Core firmware implements **only the mechanism** (CST write, 
 |--------|---------|
 | Malicious actor tries to write its own core's CST QSRAM directly | The CST QSRAM is writable only by the core's **QGate** (write-port strictly FSM-controlled). The actor's SW has no instruction in its address space targeting the CST QSRAM. |
 | Malicious actor tries to send a forged `SEAL_CST_INSTALL` to a target core | **Physically impossible.** Sending requires a CST entry for the `(target_core, 0)` destination, and capability for the QGate target is grantable only by the Seal Core / authority delegate. A non-authority actor has no CST entry → its own core HW rejects the send. The QGate only ever receives messages from authority sources. |
-| Actor sends a forged `src_actor` field to request capability | The sending core's HW fills the `src_actor` field from a context register; not forgeable (see `cell-format-en.md` v2.2 Decision 3). |
+| Actor sends a forged `src_actor` field to request capability | The sending core's HW fills the `src_actor` field from a context register; not forgeable (see `cell-format-en.md` v2.4 Decision 3). |
 | Bit-flip / SEU during NoC transit | CRC-8 (header) and CRC-16 (payload) — the QGate handles via silent drop. |
 | Malicious actor delegates capability as a parent to a non-child | The Seal Core firmware validates the `supervisor_link[target] == src` invariant at every delegation (against its firmware-internal supervisor tree). |
 | Actor tries to grant capability to itself | The actor's own `src_actor` cannot simultaneously be the request's `parent` and `target` — the Seal Core firmware excludes this. |
@@ -719,6 +719,7 @@ This v1.0 document captures the vision-level architecture. Details are to be res
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.6 | 2026-07-17 | **Stale cell-format reference updated:** `cell-format-en.md` v2.2 → **v2.4** (2 references, cascade from the current spec). |
 | 1.5 | 2026-05-02 | **QGate single-layer trust principle — drastic simplification.** The v1.4 QGate spec carried redundant logical validation (`src` authority comparator, payload range check, op validity, trap-flit) — these are unnecessary under the **CFPU single-layer trust principle**: the CST router-level filter already guarantees that only authority can send to the QGate, and the Seal Core firmware is immutable (mask ROM), hence correct by construction. The QGate v1.5 performs **only CRC-8 + CRC-16 checks**; CRC mismatch → silent drop. Estimated area 500–2000 → **600–800 gates**. New subsection: "Why no logical validation — CFPU single-layer trust principle". Threat model updated: the "malicious actor sends a forged SEAL_CST_INSTALL" row is **not a realistic threat** (excluded at CST router level); replaced with "bit-flip / SEU during NoC transit" (CRC handles). Consistent with the header v3.0 HMAC-removal rationale. |
 | 1.4 | 2026-05-02 | **QGate brand name introduced** for the per-core local Quench-RAM gate FSM. Previously called "local SEAL FSM" / "target core's local SEAL FSM" / "MailBox SEAL trigger" — these all refer to the same component, now uniformly **QGate**. The brand-family diagram (section 3) gained a new row, and the new ["The QGate component"](#seal-points) subsection records component properties (1 / core, ~500–2000 gates, NoC inbox input, CST QSRAM + DDR5 cap-slot QRAM output). QGate's brand position: per-core gate at **Quench-RAM**-based capability tables, complementing the Seal Core's chip-wide AuthCode-gatekeeper role. References propagated throughout. |
 | 1.3 | 2026-05-02 | **"The three SEAL touchpoints" section added** (1. CODE region SEAL — local Seal Core HW; 2. per-core CST/cap-slot SEAL/RELEASE — NoC mailbox + target core's local SEAL FSM; 3. single-instance peripheral config — hardwired config port). **Corrected v1.1–v1.2 misformulation:** earlier we described per-core CST writes as happening "via a dedicated hardwired config port"; this is **WRONG**, because the CST QSRAM lives per-core and is written via NoC mailbox messages handled by the target core's local SEAL FSM. The hardwired config port belongs only to single-instance peripherals (DDR5 Controller, etc.). Boot step 2e and the validation algorithm rewritten with NoC mailbox semantics (`SEAL_CST_INSTALL`, `SEAL_CST_UPDATE`, `RELEASE_CST_ENTRY` messages). Threat model updated: protection comes from the target core's local SEAL FSM `src` field check, not from the absence of a hardwired wire. |

@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [interconnect-hu.md](interconnect-hu.md)
 
-> Version: 3.5
+> Version: 3.8
 
 This document specifies the **on-chip interconnect network** of the Cognitive Fabric Processing Unit (CFPU): the topology, switching model, router internals, physical layout, core family, and node-scaling strategy.
 
@@ -98,7 +98,7 @@ Payload (1-128 bytes) — stored in Payload SRAM:
 | `src` | 24 bits | **NoC router HW** | Source HW address — hardware-filled, cannot be spoofed |
 | `src_actor` | 8 bits | **Core HW** | Sending actor identifier — from the active actor context register, cannot be spoofed |
 | `seq` | 16 bits | Sender | Sequence number (ordering for fragmented messages, max 65,536 fragments) |
-| `flags` | 8 bits | Sender SW + HW | `[VN:1][relay:1][Pri:2][zero_len:1][ddr5_cap:1][reserved:2]` — VN0/VN1, relay flag, message priority (4 levels), zero-payload signal, **DDR5 capability flag (settable only by core HW, see `ddr5-architecture-hu.md` v1.3)**. Detailed bit allocation: [`specs/cell-format-en.md`](../specs/cell-format-en.md) v2.2 |
+| `flags` | 8 bits | Sender SW + HW | `[VN:1][relay:1][Pri:2][zero_len:1][ddr5_cap:1][reserved:2]` — VN0/VN1, relay flag, message priority (4 levels), zero-payload signal, **DDR5 capability flag (settable only by core HW, see `ddr5-architecture-hu.md` v1.3)**. Detailed bit allocation: [`specs/cell-format-en.md`](../specs/cell-format-en.md) v2.4 |
 | `len` | 8 bits | Sender | Payload size: value + 1 byte (v3.1: max 128 bytes; the 8-bit field is reserved for future upscale, see `decision-bus-rollback-en.md`). Zero-byte payload does not exist, signaled via flags |
 | `CRC-16` | 16 bits | HW | Payload integrity check (stored in header, computed over the payload) |
 | `CRC-8` | 8 bits | HW | Header integrity check (last field, computed over the entire header including CRC-16) |
@@ -590,6 +590,18 @@ The relay adds 2 extra crossbar traversals for the affected region pair. At typi
 - **Runtime watchdog:** if a cell granted to a crosspoint does not produce an output-side acknowledgment within 4 cycles, the crosspoint is marked faulty and future cells are relayed
 - **Seal Core notification:** crosspoint faults are reported to the Seal Core as a diagnostic event (logged, optionally forwarded off-chip via management interface)
 
+### NoC-Wide Link-Failure and Backpressure Semantics
+
+The relay mechanism above addresses a **specific, permanent hardware fault** (a persistently faulty L3 crosspoint, detected via BIST/watchdog). Beyond that, the **general fault policy** of the entire NoC (from the L0 mesh to the L3 crossbar) is as follows:
+
+- **Best-effort delivery — no guarantee at the network layer.** The NoC does not guarantee delivery of any single cell; reliability is provided by the **actor protocol** (supervision, "let it crash"), not by the network.
+- **Deterministic DOR — no adaptive rerouting.** The L0 mesh's XY dimension-order routing (DOR) remains **deterministic** even under runtime congestion or a transient link failure — there is no adaptive path selection. Rationale: (1) adaptive rerouting would break the deadlock-freedom that follows from the XY ordering (see "Deadlock Freedom" above), (2) it would duplicate fault-recovery logic that already exists at the actor-supervision level.
+- **Detection:** credit-timeout (the sender does not receive a credit acknowledgment within the expected window) and CRC-8/16 integrity checking on the cell header/payload.
+- **Timeout-drop.** If a cell remains stuck beyond the timeout window due to congestion or an in-flight link failure, the router **drops** it — this deliberately prevents a backpressure cascade from spreading through the fabric, instead of letting a single stuck cell chain-react and stall the VOQs behind it, and with them the entire region.
+- **Recovery via actor supervision.** The missing response/acknowledgment caused by a dropped cell is resolved through the sender-side actor supervision hierarchy: the supervisor detects the timeout and, per its strategy, resends, restarts the sending/receiving actor, or escalates (see [Symphact vision-en.md](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md), "Let it crash -- structured fault tolerance").
+
+This policy **complements**, rather than replaces, the L3 crosspoint relay above: the relay is a static structural response to a **permanent** fault detected at boot-time/via watchdog, routed around using a precomputed relay table, whereas timeout-drop is the runtime response to normal operational congestion and **transient** link problems.
+
 ## Code Loading over the Network
 
 The communication network does not only carry actor messages — **program code** also reaches core SRAM through the same network. Three scenarios:
@@ -727,7 +739,7 @@ Latencies are for the **reference configuration** (500 MHz, `SERDES_RATIO`=10, `
 | Cross-tile, same region (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~63 cycles | ~109 cycles | 126 ns |
 | Cross-region (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~93 cycles | ~171 cycles | 186 ns |
 
-> **Context:** typical ~186 ns on-chip (48B payload) is competitive with software actor message delivery on conventional CPUs (Erlang/BEAM: ~0.5–2 µs), while the CFPU runs thousands of independent hardware cores in parallel. The worst-case 171 cycles (342 ns) applies to rare 128B payloads — variable link occupancy means ~80% of messages travel at typical latency. **In v3.2 the L1 link upgrade from 84-bit to 128-bit yields an additional ~12 cc / ~20 cc gain in typical / worst case (105→93, 191→171), since L1 now sends the header in 1 flit and serializes cells in 4 / 9 flits (vs 7 / 14 flits on the old 84-bit).**
+> **Context:** typical ~186 ns on-chip (48B payload) is competitive with software actor message delivery on conventional CPUs (Erlang/BEAM: ~0.5–2 µs), while the CFPU runs thousands of independent hardware cores in parallel. The worst-case 171 cycles (342 ns) applies to rare 128B payloads — variable link occupancy means ~80% of messages travel at typical latency. **The v3.2 L1 link upgrade from 84-bit to 128-bit yielded an additional ~12 cc / ~20 cc gain in typical / worst case (105→93, 191→171): L1 now sends the header in 1 flit and serializes cells in 4 / 9 flits (vs 7 / 14 flits on the old 84-bit).**
 
 <details>
 <summary>Cross-region latency breakdown (18 hops, typical 48B payload)</summary>
@@ -886,7 +898,7 @@ This document addresses the following Symphact hardware requirements:
 
 | OSREQ | Topic | Status |
 |-------|-------|--------|
-| [OSREQ-001](osreq-from-os/osreq-001-tree-interconnect-hu.md) | Interconnect topology | **Closed**: 4-level hierarchical mesh + crossbar |
+| [OSREQ-001](osreq-from-os/osreq-001-tree-interconnect-hu.md) | Interconnect topology | **Resolved**: 4-level hierarchical mesh + crossbar |
 | [OSREQ-004](osreq-from-os/osreq-004-dma-engine-hu.md) | DMA engine | Required from F4 onwards (large messages, actor state transfer) |
 | [OSREQ-005](osreq-from-os/osreq-005-mailbox-interrupt-hu.md) | Mailbox interrupt | HW interrupt, triggered by cell arrival |
 
@@ -903,6 +915,9 @@ This document addresses the following Symphact hardware requirements:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 3.8 | 2026-07-19 | **Terminology consistency:** in the OSREQ cross-reference table, "Closed" → **"Resolved"**, to match the status wording now set in `osreq-001-tree-interconnect-en.md` v1.2 (Symphact OSREQ documents use English status keywords — "Draft"/"Obsolete"/"Resolved" — even in Hungarian-language docs). No content change — the OSREQ-001 topology decision (4-level hierarchical mesh + crossbar, pure fat tree explicitly excluded) was already recorded earlier. |
+| 3.7 | 2026-07-19 | **New "NoC-Wide Link-Failure and Backpressure Semantics" section** (under L3 Crosspoint Fault Tolerance). The previous fault-handling description covered only the permanent L3 crosspoint fault (relay mitigation), which could implicitly suggest blocking-FIFO behavior for the NoC in general. Codified: best-effort delivery (no network-layer guarantee), deterministic DOR without adaptive rerouting, credit-timeout + CRC-8/16 detection, timeout-drop to prevent backpressure cascades, recovery via actor supervision. Cascaded from the 2026-07-07 NoC fault-policy decision; synchronized with Symphact's `vision-en.md` Backpressure section and the hu/en pairs. |
+| 3.6 | 2026-07-17 | **Cascade + future-tense fix:** the `cell-format-en.md` bit-allocation reference v2.2 → **v2.4**; the latency-context sentence "In v3.2 … the L1 link upgrade … yields …" rewritten from **future to past tense** (the v3.2 L1 128-bit upgrade has already happened; the latency tables already show the post-v3.2 values). |
 | 3.5 | 2026-06-01 | **HBM3 tier capability clarification.** The "capability reuse" point extended: TB-scale multi-stack HBM3 uses the **page-aligned 32-bit `region_base` (16 TB)** model (ddr5-architecture v1.4), not the earlier 36-bit byte base (only 64 GB / 1 stack). Cascade from the ddr5-architecture v1.4 capability-slot revision. |
 | 3.4 | 2026-06-01 | **New "Memory Tier (HBM3)" section.** HBM3 (819 GB/s/stack, 16 channels / 32 pseudo-channels, JEDEC JESD238) requires a separate, wide memory NoC plane, because the compute L0 128-bit link would need ~102 ports/stack (unrealistic). Decision trail: reuse L0 (rejected) / shared VN (rejected) / separate memory tier (chosen). Edge-concentrated topology (2.5D interposer edge), 32 pseudo-channel interleaving, HW RTL HBM3 controller, capability reuse (DDR5_CAP/QRAM). Derived port table @ 500 MHz: 1024-bit → ~13 ports/stack. DDR5, by contrast, fits on the existing NoC (10 × 128-bit). **Status: proposal/extrapolation** — HBM3 spec verified, the CFPU tier design to be validated in F4/F5 RTL. Cascade: ddr5-architecture-en.md added to Related Documents. |
 | 3.3 | 2026-06-01 | **The "~80% ≤48 byte" actor-message distribution marked as an explicit design assumption (not measured data).** `decision-bus-rollback` previously cited a non-existent "interconnect v2.4 analysis" — a circular self-reference. The figure now appears as "estimated ~80%" with a "not measured, based on Akka/Erlang workloads, real measurement scheduled for a future phase" note. Annotation clarification only; sizing decisions unchanged. |

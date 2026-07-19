@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [chiplet-packaging-hu.md](chiplet-packaging-hu.md)
 
-> Version: 1.2
+> Version: 1.3
 
 This document specifies the Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architecture**: chiplet types, multi-chiplet configurations, technology scaling, and the impact on Symphact.
 
@@ -127,13 +127,13 @@ Core (R chiplet)                C chiplet
 
 ### On-Chip Links (CMesh 16:1)
 
-Within each cluster, 16 cores share one router. Inter-router mesh links are **256 bits wide at 500 MHz**:
+Within each cluster, 16 cores share one router. Inter-router mesh links are **128 bits wide at 500 MHz**:
 
 | Parameter | Value |
 |-----------|-------|
-| Link width | 256 bit |
+| Link width | 128 bit |
 | Clock | 500 MHz |
-| Per-link bandwidth | 16 GB/s |
+| Per-link bandwidth | 8 GB/s |
 | Hop latency (128B cell max) | ~4 ns |
 
 > The 500 MHz NoC clock is a power optimization: ~68% lower dynamic power compared to ~1 GHz (f × V² scaling), while the wider link compensates bandwidth.
@@ -172,7 +172,7 @@ Multiple CFPU packages in a system connect via **2D torus** topology:
 
 | Level | Per Link | Latency |
 |-------|----------|---------|
-| On-chip (mesh, 256-bit, 500 MHz) | 16 GB/s | ~4 ns/hop |
+| On-chip (mesh, 128-bit, 500 MHz) | 8 GB/s | ~4 ns/hop |
 | Chiplet boundary (UCIe) | 200–500 GB/s | ~2–5 ns |
 | Inter-package (±X/±Y, PCB) | 25–100 GB/s | ~50–100 ns |
 
@@ -247,7 +247,7 @@ Combined impact of density improvement and chiplet size growth:
 |---------|-------|-----------|
 | Cores / cluster (CMesh 16:1) | 16 | Router port count — HW decision |
 | Mailbox message size | 32 bit | Part of CIL ISA |
-| Cell size | max 80 bytes (16B header + 64B payload) | Network protocol |
+| Cell size | max 144 bytes (16B header + 128B payload) | Network protocol |
 | Chiplet types | C + R | Functional separation |
 
 ### What Changes
@@ -295,7 +295,7 @@ If cooling technology permits, chiplets can be stacked in two layers via SoIC:
 
 - [Core Types](core-types-en.md) — Nano/Actor/Rich/Seal specification, SRAM sizing
 - [Interconnect](interconnect-en.md) — 4-level on-chip network, switching model, router variants
-- [DDR5 Architecture](ddr5-architecture-hu.md) — DDR5 controller, capability grant, CAM ACL
+- [DDR5 Architecture](ddr5-architecture-hu.md) — DDR5 controller, HW Capability Slot
 - [CFPU-ML-Max](cfpu-ml-max-en.md) — ML inference chiplet architecture
 - [Architecture](architecture-en.md) — full CFPU overview
 - [3D Stack Architecture](3d-stack-architecture-en.md) — **3D vertical complement**: memory-mesh + per-tile SRAM stack, MI300 comparison
@@ -304,6 +304,7 @@ If cooling technology permits, chiplets can be stacked in two layers via SoIC:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.3 | 2026-07-17 | **Cascade propagation from `specs/cell-format-en.md` v2.4:** cell size max 80 bytes (16B+64B) → **max 144 bytes (16B header + 128B payload)**; on-chip mesh link 256-bit / 16 GB/s → **128-bit / 8 GB/s** (v3.1 L0 rollback); DDR5 cross-reference "capability grant, CAM ACL" → **HW Capability Slot**. |
 | 1.2 | 2026-07-02 | Cross-reference added to the [`3d-stack-architecture-en.md`](3d-stack-architecture-en.md) vertical (3D) complement document (memory-mesh + per-tile SRAM stack, MI300 comparison). |
 | 1.1 | 2026-05-17 | **22FDX Calibration Point (F6.7)** section added to Technology Scaling — the roadmap F6.7 optional de-risk step ties the ~10× density gap between the 130nm silicon proof and the 5nm product vision to a real measured point; exact ratios are "to be measured" until F6.7. Cascade: `roadmap` v1.8, `perf-vs-riscv`. |
 | 1.0 | 2026-04-23 | Initial version — C/R chiplet types, 1+1..8 product variants, combined mesh+star topology, 256-bit 500 MHz link, DDR5 in C chiplet, technology scaling (SRAM wall, 3D SRAM, chiplet size growth), Symphact scheduler impact |

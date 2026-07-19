@@ -6,7 +6,7 @@ status: vision
 
 > English version: [interconnect-en.md](interconnect-en.md)
 
-> Version: 3.5
+> Version: 3.8
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **on-chip interconnect hálózatát** specifikálja: a topológiát, a switching modellt, a router belső felépítését, a fizikai elrendezést, a core családot és a node-skálázási stratégiát.
 
@@ -98,7 +98,7 @@ Payload (1-128 byte) — Payload SRAM-ban tárolva:
 | `src` | 24 bit | **NoC router HW** | Forrás HW cím — hardveresen kitöltve, nem hamisítható |
 | `src_actor` | 8 bit | **Core HW** | Küldő aktor azonosítója — az aktív actor context regiszterből, nem hamisítható |
 | `seq` | 16 bit | Küldő | Sorszám (fragmentált üzenetek sorrendje, max 65 536 fragment) |
-| `flags` | 8 bit | Küldő SW + HW | `[VN:1][relay:1][Pri:2][zero_len:1][ddr5_cap:1][reserved:2]` — VN0/VN1, relay flag, üzenet prioritás (4 szint), zero-payload jelzés, **DDR5 capability flag (csak core HW állíthatja, lásd `ddr5-architecture-hu.md` v1.3)**. A részletes bit-allokáció: [`specs/cell-format-hu.md`](../specs/cell-format-hu.md) v2.2 |
+| `flags` | 8 bit | Küldő SW + HW | `[VN:1][relay:1][Pri:2][zero_len:1][ddr5_cap:1][reserved:2]` — VN0/VN1, relay flag, üzenet prioritás (4 szint), zero-payload jelzés, **DDR5 capability flag (csak core HW állíthatja, lásd `ddr5-architecture-hu.md` v1.3)**. A részletes bit-allokáció: [`specs/cell-format-hu.md`](../specs/cell-format-hu.md) v2.4 |
 | `len` | 8 bit | Küldő | Payload méret: érték + 1 byte (v3.1: max 128 byte; a 8 bit jövőbeli upscale-re fenntartva, lásd `decision-bus-rollback-hu.md`). 0 byte-os payload nincs, azt flags jelzi |
 | `CRC-16` | 16 bit | HW | Payload integritás ellenőrzés (a header-ben van, a payload fölött számolva) |
 | `CRC-8` | 8 bit | HW | Header integritás ellenőrzés (az utolsó mező, az egész header fölött számolva, beleértve CRC-16-ot) |
@@ -590,6 +590,18 @@ A relay 2 extra crossbar-áthaladást ad az érintett régiópárnak. Tipikus cr
 - **Runtime watchdog:** ha egy crosspoint-nak kiosztott cella 4 cikluson belül nem produkál kimenet-oldali nyugtát, a crosspoint hibásnak jelölődik és a jövőbeli cellák relay-ződnek
 - **Seal Core értesítés:** crosspoint hibákat diagnosztikai eseményként jelenti a Seal Core-nak (naplózva, opcionálisan chip-en kívülre továbbítva management interfészen)
 
+### NoC-szintű link-hiba és backpressure szemantika
+
+A fenti crosspoint relay egy **specifikus, permanens hardver-hiba** (BIST/watchdog által detektált, tartósan hibás L3 crosspoint) elhárítására szolgál. Ezen felül a teljes NoC (L0 mesh-től L3 crossbar-ig) **általános hibapolitikája** a következő:
+
+- **Best-effort kézbesítés — nincs garancia a hálózati rétegen.** A NoC egyetlen cella kézbesítését sem garantálja; a megbízhatóságot az **actor-protokoll** biztosítja (supervision, „let it crash"), nem a hálózat.
+- **Determinisztikus DOR — nincs adaptív rerouting.** Az L0 mesh XY dimension-order routing-ja (DOR) futásidejű torlódás vagy tranziens link-hiba esetén is **determinisztikus marad** — nincs adaptív útvonalválasztás. Ok: (1) az adaptív rerouting megtörné az XY-rendezésből következő deadlock-mentességet (lásd „Deadlock-mentesség" fent), (2) duplikálná az actor-supervision szintjén már meglévő hiba-helyreállítási logikát.
+- **Detekció:** credit-timeout (a küldő a várt ablakon belül nem kap credit-visszajelzést) és CRC-8/16 integritás-ellenőrzés a cella header/payload részén.
+- **Timeout-drop.** Ha egy cella torlódás vagy útközbeni link-hiba miatt a timeout-ablakon túl is beragad, a router **eldobja** — ez szándékosan előzi meg a backpressure-kaszkád szétterjedését a fabricban, ahelyett hogy egyetlen beragadt cella lánc-reakcióban megbénítaná a mögötte lévő VOQ-kat és így a teljes régiót.
+- **Helyreállítás actor-supervisionon keresztül.** Az eldobott cella miatt elmaradó válasz/nyugta a küldő oldali actor supervision hierarchiáján keresztül old fel: a supervisor timeout-ot észlel, és a stratégiájának megfelelően újraküld, újraindítja a küldő/fogadó actort, vagy eszkalál (lásd [Symphact vision-hu.md](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md), „Let it crash — strukturált fault tolerance").
+
+Ez a policy **kiegészíti**, nem helyettesíti a fenti L3 crosspoint relay-t: a relay egy statikus, előre kiszámolt relay-táblával megkerült, boot-time/watchdog-detektált **permanens** hibára adott strukturális válasz, míg a timeout-drop a normál üzemi torlódásra és **tranziens** link-problémákra adott futásidejű válasz.
+
 ## Kód betöltés a hálózaton
 
 A kommunikációs hálózat nem csak aktor-üzeneteket visz — a **program kód** is ezen az úton jut el a core SRAM-ba. Három szcenárió:
@@ -727,7 +739,7 @@ A latenciák a **referencia konfigurációra** vonatkoznak (500 MHz, `SERDES_RAT
 | Cross tile, azonos régió (L0+L1+L2+L1+L0) | 6+1+1+1+6 = 15 | ~63 ciklus | ~109 ciklus | 126 ns |
 | Cross régió (L0+L1+L2+L3+L2+L1+L0) | 6+1+1+2+1+1+6 = 18 | ~93 ciklus | ~171 ciklus | 186 ns |
 
-> **Kontextus:** a tipikus ~186 ns on-chip (48B payload) versenyképes a hagyományos CPU-kon futó szoftver aktor üzenetküldéssel (Erlang/BEAM: ~0.5–2 µs), miközben a CFPU-ban több ezer független hardver core dolgozik párhuzamosan. A worst-case 171 ciklus (342 ns) a ritka 128B payload-ra vonatkozik — a változó link foglalás miatt az üzenetek ~80%-a a tipikus latenciával halad. **A v3.2-ben a 84-bit L1 link 128-bit-re emelése további ~12 cc / ~20 cc nyereséget hoz a tipikus / worst case esetén** (105→93, 191→171), mert az L1 most 1 flit a header-nek, és a cellák 4 / 9 flit alatt szerializálódnak (vs 7 / 14 flit a régi 84-bit-en).
+> **Kontextus:** a tipikus ~186 ns on-chip (48B payload) versenyképes a hagyományos CPU-kon futó szoftver aktor üzenetküldéssel (Erlang/BEAM: ~0.5–2 µs), miközben a CFPU-ban több ezer független hardver core dolgozik párhuzamosan. A worst-case 171 ciklus (342 ns) a ritka 128B payload-ra vonatkozik — a változó link foglalás miatt az üzenetek ~80%-a a tipikus latenciával halad. **A v3.2 a 84-bit L1 linket 128-bit-re emelte, ami további ~12 cc / ~20 cc nyereséget hozott a tipikus / worst case esetén** (105→93, 191→171): az L1 most 1 flit a header-nek, és a cellák 4 / 9 flit alatt szerializálódnak (vs 7 / 14 flit a régi 84-bit-en).
 
 <details>
 <summary>Cross-régió latencia részletezés (18 hop, tipikus 48B payload)</summary>
@@ -886,7 +898,7 @@ Ez a dokumentum az alábbi Symphact hardware requirement-ekre válaszol:
 
 | OSREQ | Téma | Státusz |
 |-------|------|---------|
-| [OSREQ-001](osreq-from-os/osreq-001-tree-interconnect-hu.md) | Interconnect topológia | **Lezárva**: 4-szintű hierarchikus mesh + crossbar |
+| [OSREQ-001](osreq-from-os/osreq-001-tree-interconnect-hu.md) | Interconnect topológia | **Resolved**: 4-szintű hierarchikus mesh + crossbar |
 | [OSREQ-004](osreq-from-os/osreq-004-dma-engine-hu.md) | DMA engine | Kötelező F4-től (nagy üzenetek, actor state transfer) |
 | [OSREQ-005](osreq-from-os/osreq-005-mailbox-interrupt-hu.md) | Mailbox interrupt | HW interrupt, a cella-érkezés triggereli |
 
@@ -903,6 +915,9 @@ Ez a dokumentum az alábbi Symphact hardware requirement-ekre válaszol:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 3.8 | 2026-07-19 | **Terminológiai konzisztencia:** az OSREQ kereszthivatkozás táblázatban „Lezárva" → **„Resolved"**, hogy egyezzen az `osreq-001-tree-interconnect-hu.md` v1.2-ben most beállított állapot-szóhasználattal (a Symphact OSREQ-dokumentumok „Draft"/„Obsolete"/„Resolved" angol státusz-kulcsszavakat használnak, hu szövegben is). Tartalmi változás nincs — az OSREQ-001 topológia-döntés (4-szintű hierarchikus mesh + crossbar, fat tree explicit kizárva) már korábban rögzítve volt. |
+| 3.7 | 2026-07-19 | **Új „NoC-szintű link-hiba és backpressure szemantika" szakasz** (L3 Crosspoint hibatűrés alatt). A korábbi hibakezelési leírás csak a permanens L3 crosspoint-hibát (relay-mitigáció) fedte le; ez implicit blokkoló-FIFO benyomást kelthetett a NoC általános viselkedéséről. Rögzítve: best-effort kézbesítés (nincs hálózati-rétegű garancia), determinisztikus DOR adaptív rerouting nélkül, credit-timeout + CRC-8/16 detekció, timeout-drop a backpressure-kaszkád megelőzésére, helyreállítás actor-supervisionon keresztül. Kaszkád a 2026-07-07-i NoC fault-policy döntésből; a Symphact `vision-hu.md` Backpressure szekciójával és a hu/en párokkal szinkronizálva. |
+| 3.6 | 2026-07-17 | **Kaszkád + jövő-idő javítás:** a `cell-format-hu.md` bit-allokáció hivatkozás v2.2 → **v2.4**; a latencia-kontextus „A v3.2-ben … emelése … hoz" **jövő idejű** mondata **múlt időre** javítva (a v3.2 L1 128-bit upgrade már megtörtént, a latencia-táblák már a post-v3.2 értékeket mutatják). |
 | 3.5 | 2026-06-01 | **HBM3 tier capability-pontosítás.** A „capability újrahasználat" pont kiegészítve: a TB-skálás multi-stack HBM3 a **page-aligned 32-bit `region_base` (16 TB)** modellt használja (ddr5-architecture v1.4), nem a korábbi 36-bit byte-base-t (csak 64 GB / 1 stack). Kaszkád a ddr5-architecture v1.4 capability-slot revízióból. |
 | 3.4 | 2026-06-01 | **Új „Memória-tier (HBM3)" szakasz.** A HBM3 (819 GB/s/stack, 16 channel / 32 pseudo-channel, JEDEC JESD238) külön, széles memória-NoC síkot igényel, mert a compute L0 128-bit linken ~102 port/stack kellene (irreális). Döntés-trail: L0-újrahasználat (elvetve) / megosztott VN (elvetve) / külön memória-tier (választott). Él-koncentrált topológia (2.5D interposer-perem), 32 pseudo-channel interleaving, HW RTL HBM3 controller, capability-újrahasználat (DDR5_CAP/QRAM). Származtatott port-tábla @ 500 MHz: 1024-bit → ~13 port/stack. A DDR5 ezzel szemben elfér a meglévő NoC-on (10 × 128-bit). **Státusz: javaslat/extrapoláció** — HBM3 spec verifikált, a CFPU tier-felépítés F4/F5 RTL-ben validálandó. Kaszkád: ddr5-architecture-hu.md hozzáadva a kapcsolódó dokumentumokhoz. |
 | 3.3 | 2026-06-01 | **A „~80% ≤48 byte" actor-üzenet eloszlás explicit tervezési feltételezésként jelölve (nem mért adat).** A `decision-bus-rollback` korábban egy nemlétező „interconnect v2.4 elemzésre" hivatkozott — körkörös önhivatkozás. A szám most „becsült ~80%" formában, „nem mért, Akka/Erlang-workload alapján, valódi mérés későbbi fázisra ütemezve" megjegyzéssel szerepel. Csak jelölés-pontosítás; a méretezési döntések változatlanok. |

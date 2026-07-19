@@ -6,7 +6,7 @@ status: vision
 
 > English version: [hw-boot-en.md](hw-boot-en.md)
 
-> Version: 1.5
+> Version: 1.6
 
 A CFPU chip bekapcsolásától a Rich core indulásáig tartó **tisztán hardveres** folyamat. Ez a szekvencia az operációs rendszer (Symphact) indulása **előtt** történik — szoftver nem vesz részt benne.
 
@@ -270,7 +270,7 @@ Boot-releváns regiszterek. A teljes MMIO térképet lásd: [osreq-002 — MMIO 
 | QSPI config | `0xF0001000` | R/W | 4 byte | Enable, SPI mode, clock divider |
 | QSPI flash addr | `0xF0001004` | R/W | 4 byte | Flash olvasási cím |
 | QSPI binary size | `0xF0001008` | R/O | 4 byte | Binary méret (flash header-ből) |
-| QSPI data | `0xF000100C` | R/O | 128 byte | Következő 128 byte-os chunk a flash-ről (= v3.1 cella payload méret, lásd `specs/cell-format-hu.md` v2.3) |
+| QSPI data | `0xF000100C` | R/O | 128 byte | Következő 128 byte-os chunk a flash-ről (= v3.1 cella payload méret, lásd `specs/cell-format-hu.md` v2.4) |
 
 ### UART boot controller (boot forrás #1)
 
@@ -352,6 +352,7 @@ Részletes core leírás: [core-types-hu.md](core-types-hu.md)
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.6 | 2026-07-17 | **Elavult cell-format hivatkozás frissítve:** `cell-format-hu.md` v2.3 → **v2.4** (kaszkád a hatályos spec-ből; a 128 byte chunk-méret változatlan). |
 | 1.5 | 2026-05-02 | **2e. lépés QGate logika egyszerűsítve a CFPU single-layer trust elv szerint.** A korábbi "ha nem OK (auth fail): trap, írás megtagadva" pont törölve — az authority szűrés a CST router-szinten történik, nem a QGate-en. A QGate kizárólag CRC-8 + CRC-16 ellenőrzést végez; CRC fail → silent drop (SEU ellen). HW követelmény lista frissítve. Lásd: `sealcore-hu.md` v1.5 "A QGate komponens" + "Miért nincs logikai validáció". |
 | 1.4 | 2026-05-02 | **QGate brand-név átvezetve.** A 2e. lépésben a "Rich core lokális SEAL FSM" megnevezés **QGate**-re cserélve, az új brand-név a `sealcore-hu.md` v1.4 "A QGate komponens" alszekciójában került bevezetésre. A flow szemantikai változás nélkül, csak elnevezés. |
 | 1.3 | 2026-05-02 | **2e. lépés átírva NoC mailbox szemantikára** (SEAL érintési pontok szétválasztása). Korábbi v1.2 megfogalmazás "HW config port write" pontatlan volt — a per-core CST QSRAM-ot **a célcore lokális SEAL FSM-je** írja, NoC mailbox `SEAL_CST_INSTALL` üzenetre. A "hardwired config port" csak a single-instance peripheria config-jához tartozik (lásd `sealcore-hu.md` v1.3 "A három SEAL érintési pont"). HW követelmény lista frissítve. |

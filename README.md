@@ -5,7 +5,7 @@
 
 > Magyar verzió: [README-hu.md](README-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 [clicpu.org](https://clicpu.org) *(coming soon)*
 
@@ -89,7 +89,7 @@ C# programs use **`[RunsOn(CoreType.Nano)]`** or **`[RunsOn(CoreType.Rich)]`** a
 
 ## Status
 
-**F1.5 -- DONE.** The C# reference simulator (48/48 CIL-T0 opcodes, 250+ green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
+**F1.5 -- DONE.** The C# reference simulator (48/48 CIL-T0 opcodes, 187 green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
 
 See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 
@@ -124,7 +124,9 @@ See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 
 ## License
 
-[CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENSE)
+Dual license:
+- **Hardware, RTL, ISA spec, and documentation** — [CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENSE)
+- **Software** (C# simulator, linker, runner, tests, samples) — [Apache License 2.0](src/LICENSE) (also under [`samples/`](samples/LICENSE))
 
 ---
 
@@ -132,4 +134,5 @@ See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-07-17 | Test count updated to the actual CI result: 187 |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

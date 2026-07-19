@@ -6,7 +6,7 @@ status: vision
 
 > English version: [architecture-en.md](architecture-en.md)
 
-> Version: 1.4
+> Version: 1.6
 
 Ez a dokumentum a **Cognitive Fabric Processing Unit (CFPU)** **mikroarchitektúráját** írja le magas szinten: a stack-gép modellt, a pipeline-t, a memória térképet, a dekódolási stratégiát, a GC és kivételkezelés hardveres támogatását, valamint az elődprojektek (picoJava, Jazelle, Transmeta) közül átvett technikákat.
 
@@ -222,7 +222,7 @@ Egyetlen chipen **háromféle elem** él együtt — kettő számítási, egy bi
 
 | | **Nano core** | **Rich core** |
 |-|---------------|---------------|
-| **ISA** | CIL-T0 subset (~48 opkód, integer-only, static calls) | Teljes ECMA-335 CIL (~220 opkód) |
+| **ISA** | CIL-T0 subset (64 opkód, integer-only, static calls) | Teljes ECMA-335 CIL (~220 opkód) |
 | **Méret** | ~10 000 std cell | ~80 000 std cell |
 | **Funkciók** | Integer ALU, stack cache, mailbox, mikrokód (mul/div/call/ret) | Nano + objektum modell + GC + metadata walker + vtable cache + FPU (R4/R8) + 64-bit + kivételkezelés + generikusok |
 | **Órajel** | ~50–200 MHz | ~50–150 MHz (több pipeline stage miatt kissé lassabb) |
@@ -1326,7 +1326,7 @@ Actor ID (dst_actor):                                  8 bit  (Word 0 alsó)
                                                   Összesen: 32 bit (1 szó)
 ```
 
-A részletes header layoutot lásd: [`specs/cell-format-hu.md`](../specs/cell-format-hu.md) v2.3.
+A részletes header layoutot lásd: [`specs/cell-format-hu.md`](../specs/cell-format-hu.md) v2.4.
 
 **Indoklás:**
 - A `dst_actor[8]` mező 256 aktor/core-t fed le, ami a warm-context cache (4–8 aktív + 248 alvó) számára bőven elegendő
@@ -1400,7 +1400,7 @@ Rövid összefoglaló (a részletes táblázat a [`docs/security-hu.md`](securit
 
 ### Formális verifikáció lehetősége
 
-A CFPU **Nano core** 48 opkódos ISA-ja **gyakorlatilag kisebb, mint a seL4 microkernel** (~10 000 sor C), amit a UNSW csapata 15+ év munka alatt **formálisan bizonyított** Coq + Isabelle eszközökkel.
+A CFPU **Nano core** 64 opkódos ISA-ja **gyakorlatilag kisebb, mint a seL4 microkernel** (~10 000 sor C), amit a UNSW csapata 15+ év munka alatt **formálisan bizonyított** Coq + Isabelle eszközökkel.
 
 Ez azt jelenti, hogy a CFPU **formális verifikációja megvalósítható** — nem egyszerű, nem olcsó, de **nem is lehetetlen**, és **sem az x86, sem az ARM, sem a RISC-V teljes extension-készletével nem megvalósítható**.
 
@@ -1432,8 +1432,10 @@ A `ISA-CIL-T0-hu.md` dokumentum adja a konkrét CIL-T0 subset teljes opkód-spec
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.6 | 2026-07-17 | **Elavult cell-format hivatkozás frissítve:** `cell-format-hu.md` v2.3 → **v2.4** (kaszkád a hatályos spec-ből). |
 | 1.4 | 2026-04-25 | Stratégiai-pozícionálás, mikroarchitektúra, Cognitive Fabric One összehasonlítás, blokk diagram, pipeline, address-space, frame layout, dispatch, metadata walker, kapcsolódó projektek, power domain és security szekciók CLI-CPU → CFPU átnevezés a [brand-hu.md](brand-hu.md) szerint. CLI-CPU megmarad a projekt-szintű hivatkozásoknál (F4/F5 roadmap fázisok, Roslyn toolchain, „first real silicon" mérföldkő, callout). |
 | 1.3 | 2026-04-19 | Actor Scheduling Pipeline szekció — hot context, DMA double-buffer, üzenet-triggerelt prefetch, QRAM External Extension (AES+CMAC külső PSRAM-hoz), kódmegosztás, szoftveres actor dispatch, timing budget |
 | 1.2 | 2026-04-19 | Pipeline hazard kezelés szekció — TOS cache bypass, forwarding, mikrokód vs. picoJava stack folding, stall katalógus, determinizmus garancia |
 | 1.1 | 2026-04-16 | Core típusok, interconnect, Cognitive Fabric One |
+| 1.5 | 2026-07-17 | Opkód-szám javítva: ~48 → 64 (tényleges F1.5 implementáció szerint, `src/CilCpu.Sim/TOpcode.cs`) |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

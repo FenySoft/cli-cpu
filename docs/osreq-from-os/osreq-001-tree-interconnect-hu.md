@@ -6,11 +6,23 @@ status: mirror
 
 > **Forrás:** [FenySoft/Symphact — osreq-001](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-hu.md)
 >
-> **Állapot:** Draft — hardveres visszajelzésre vár
+> **Állapot:** Resolved — lásd a lenti banner
 >
 > **Érintett CFPU fázis:** F4 (multi-core FPGA), F5 (heterogén), F6 (silicon)
 
-> Version: 1.0
+> Version: 1.1
+
+---
+
+> ## ✅ RESOLVED
+>
+> Ezt a topológia-igényt **eldöntötték** — de nem a lentebb javasolt tiszta fa (fat tree) topológiával, hanem a repo saját [`interconnect-hu.md`](../interconnect-hu.md) v3.8-ban specifikált **4-szintű hierarchikus mesh + crossbar** architektúrával, amely ugyanazt a mögöttes igényt (lokalitás-tudatos, hierarchikus, a supervisor tree-hez illeszkedő, O(1) routing-döntésű interconnect) elégíti ki. A tiszta fat tree-t az `interconnect-hu.md` explicit kizárta ("Kizárt alternatívák" táblázat): gyökér bottleneck és SPOF, ami horizontális linkekkel kiegészítve úgyis a hierarchikus mesh-hez konvergál.
+>
+> **Megjegyzés erről a tükörmásolatról:** ez a pillanatkép a jelenlegi Symphact forrás előtti állapotot tükrözi, és szerkezetében/tartalmában már nem egyezik vele (a forrás azóta jelentősen bővült). Az OS-oldali igény naprakész, aktuális formájáért és saját resolved-bannerjéért lásd a [Symphact forrást](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-hu.md).
+>
+> A dokumentum alább **eredeti, Draft állapotában** marad archívumként.
+
+---
 
 ## OS-oldali igény
 
@@ -112,4 +124,5 @@ Az „F6-ra skálázódás" szekció frissítendő: a **mesh** helyett **fat tre
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-07-19 | **Állapot Draft → Resolved.** A CLI-CPU a tiszta fat tree topológia-igényt elvetette (gyökér bottleneck + SPOF), helyette 4-szintű hierarchikus mesh + crossbar architektúrát fogadott el (`interconnect-hu.md` v3.8). Banner hozzáadva, jelezve a lezárást és azt is, hogy ez a tükörmásolat a jelenlegi Symphact forrás előtti állapotot tükrözi; a törzs változatlanul archívumként marad |
 | 1.0 | 2026-04-20 | Kezdeti kiadás |

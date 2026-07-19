@@ -6,7 +6,7 @@ status: vision
 
 > English version: [faq-en.md](faq-en.md)
 
-> Version: 1.0
+> Version: 1.3
 
 Ez a dokumentum olyan koncepcionális kérdéseket gyűjt, amelyek a projekt megértéséhez szükségesek, de nem férnek bele a részletes spec dokumentumokba (`architecture-hu.md`, `ISA-CIL-T0-hu.md`, `security-hu.md`, [`Symphact/docs/vision-hu.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md), `secure-element-hu.md`).
 
@@ -77,7 +77,7 @@ A CFPU **MIMD aktor-natív** — minden core **más-más** CIL programot futtat 
 - **CLI-CPU** — ha a **projektről**, a repóról, a konkrét implementációról beszélünk
   - *„A CLI-CPU projekt állapota F1.5 KÉSZ"*
   - *„Klónozd: `git clone https://github.com/FenySoft/CLI-CPU`"*
-  - *„A CLI-CPU referencia szimulátor 250+ teszttel"*
+  - *„A CLI-CPU referencia szimulátor 187 teszttel"*
 - **Cognitive Fabric** — ha az **architektúra család / marketing narratíváról** beszélünk
   - *„A Cognitive Fabric + Symphact a Linux utódja"*
 
@@ -673,7 +673,7 @@ A **változó utasításhossz** drága: a pre-decode-nak ki kell találnia, hol 
 |---|---|---|---|---|---|
 | **Születés** | 1978 (8086) | 1985 (ARM1) | 2010 (Berkeley) | 2025 | 2025 (F5 cél) |
 | **Filozófia** | CISC → belül RISC | RISC, pragmatikus | RISC, minimalista | Stack gép, actor fabric | Stack gép, teljes CIL |
-| **Licenc** | Intel/AMD zárt | ARM Ltd. ~$1-5M | Nyílt (BSD) | Nyílt (MIT/Apache) | Nyílt (MIT/Apache) |
+| **Licenc** | Intel/AMD zárt | ARM Ltd. ~$1-5M | Nyílt (BSD) | Nyílt (MIT/Apache) | Nyílt (CERN-OHL-S + Apache-2.0) |
 | **Utasítás hossz** | 1-15 byte | Fix 4 byte | 2 vagy 4 byte | 1-5 byte | 1-5 byte |
 | **Regiszterek** | 16 GP + 32 SIMD | 31 GP + 32 NEON | 31 GP + 32 FP | **0** (stack) | **0** (stack + TOS cache) |
 | **Operandus** | Regiszter + memória | Regiszter-regiszter | Regiszter-regiszter | **Stack (implicit)** | **Stack (implicit)** |
@@ -1246,5 +1246,7 @@ A FAQ **konceptuális horgonyokat** ad, nem dokumentáció-duplikációt.
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.3 | 2026-07-18 | §8 licenc-sor pontosítva: CERN-OHL-S + Apache-2.0 kettős licenc (a korábbi generikus "MIT/Apache" helyett) |
+| 1.2 | 2026-07-17 | Tesztszám frissítve a tényleges CI-eredményre: 187 |
 | 1.1 | 2026-04-15 | FAQ 8-10: AMD összehasonlítás, fogyasztás, órajel stratégia |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

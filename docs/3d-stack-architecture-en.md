@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [3d-stack-architecture-hu.md](3d-stack-architecture-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vision-level positioning document.** The CFPU-side layering is a vision-level plan; the exact parameters (layer count, TSV density, per-tile SRAM size, memory-mesh granularity) are fixed in the detailed design (RTL/implementation) phases. The real-chip data (AMD MI300, Intel Ponte Vecchio, CEA-Leti IntAct, Cerebras WSE, Tenstorrent) come from public sources — see the [External sources](#external-sources-real-chips) section.
 
@@ -167,7 +167,7 @@ MI300 proves that the stacked layout (**compute on top + active-interposer memor
 - [`chiplet-packaging-en.md`](chiplet-packaging-en.md) — 2.5D **horizontal** chiplet layout (this doc's counterpart); already includes a "3D SRAM" and "3D package" section
 - [`topology-scaling-en.md`](topology-scaling-en.md) — bisection math, 1/√N scaling, mesh vs crossbar vs hierarchical
 - [`interconnect-en.md`](interconnect-en.md) — CFPU NoC, 2VN, XY routing, router variants
-- [`ddr5-architecture-en.md`](ddr5-architecture-en.md) — capability grant, cold memory tier, CAM ACL
+- [`ddr5-architecture-en.md`](ddr5-architecture-en.md) — HW Capability Slot, cold memory tier
 - [`core-types-en.md`](core-types-en.md) — SRAM sizing (per-core comfort 100–300 KB)
 - [`architecture-en.md`](architecture-en.md) — full CFPU overview
 
@@ -176,6 +176,7 @@ MI300 proves that the stacked layout (**compute on top + active-interposer memor
 | Version | Date | Summary |
 |---------|------|---------|
 | 1.0 | 2026-07-02 | Initial version — the CFPU 3D vertical stacking vision for large meshes: the flat 2D mesh memory wall (1/√N, concrete 256×256 numbers), decision trail (A edge-only / B diamond / C 3D-DRAM / **D 3D-SRAM + memory mesh — chosen**), the layered stack (core mesh / per-tile SRAM / memory mesh / edge DRAM), two physical NoC planes (vs 2VN), thermal orientation (compute on top, V-Cache evidence), SRAM as a bandwidth filter. Real-silicon positioning (MI300/PV/IntAct/Cerebras/Tenstorrent) + MI300 layer comparison + "where the CFPU novelty begins". The vertical complement of [`chiplet-packaging`](chiplet-packaging-en.md). |
+| 1.1 | 2026-07-17 | **DDR5 cross-reference terminology:** the stale "CAM ACL" corrected to the current **HW Capability Slot** model (ddr5-architecture v1.3). |
 
 ## External sources (real chips)
 

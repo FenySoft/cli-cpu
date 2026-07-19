@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [hw-boot-hu.md](hw-boot-hu.md)
 
-> Version: 1.5
+> Version: 1.6
 
 The purely **hardware-driven** process from CFPU chip power-on to Rich core start. This sequence occurs **before** the operating system (Symphact) — no software is involved.
 
@@ -270,7 +270,7 @@ Boot-relevant registers. For the full MMIO map, see: [osreq-002 — MMIO Memory 
 | QSPI config | `0xF0001000` | R/W | 4 bytes | Enable, SPI mode, clock divider |
 | QSPI flash addr | `0xF0001004` | R/W | 4 bytes | Flash read address |
 | QSPI binary size | `0xF0001008` | R/O | 4 bytes | Binary size (from flash header) |
-| QSPI data | `0xF000100C` | R/O | 128 bytes | Next 128-byte chunk from flash (= v3.1 cell payload size, see `specs/cell-format-en.md` v2.3) |
+| QSPI data | `0xF000100C` | R/O | 128 bytes | Next 128-byte chunk from flash (= v3.1 cell payload size, see `specs/cell-format-en.md` v2.4) |
 
 ### UART boot controller (boot source #1)
 
@@ -352,6 +352,7 @@ Detailed core description: [core-types-en.md](core-types-en.md)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.6 | 2026-07-17 | **Stale cell-format reference updated:** `cell-format-en.md` v2.3 → **v2.4** (cascade from the current spec; the 128-byte chunk size is unchanged). |
 | 1.5 | 2026-05-02 | **Step 2e QGate logic simplified per the CFPU single-layer trust principle.** The earlier "if not OK (auth fail): trap, write rejected" point removed — authority filtering happens at the CST router level, not at the QGate. The QGate performs only CRC-8 + CRC-16 checks; CRC fail → silent drop (SEU defense). HW requirement list updated. See: `sealcore-en.md` v1.5 "The QGate component" + "Why no logical validation". |
 | 1.4 | 2026-05-02 | **QGate brand name propagated.** In step 2e, the term "Rich core local SEAL FSM" is replaced by **QGate**; the new brand name is introduced in `sealcore-en.md` v1.4 "The QGate component" subsection. Semantics unchanged — naming only. |
 | 1.3 | 2026-05-02 | **Step 2e rewritten with NoC mailbox semantics** (SEAL touchpoints separated). The earlier v1.2 phrasing "HW config port write" was inaccurate — the per-core CST QSRAM is written by **the target core's local SEAL FSM** in response to a NoC mailbox `SEAL_CST_INSTALL` message. The "hardwired config port" applies only to single-instance peripheral config (see `sealcore-en.md` v1.3 "The three SEAL touchpoints"). HW requirement list updated. |

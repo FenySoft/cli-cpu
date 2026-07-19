@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [quench-ram-hu.md](quench-ram-hu.md)
 
-> Version: 1.7
+> Version: 1.8
 
 This document describes the **architecture and ISA integration of the Quench-RAM** memory cell: per-block status-bit semantics, the two hardware state-machine operations (`SEAL`, `RELEASE`), the NAND-flash-derived "erase-on-release" pattern, and its relationship to ECMA-335 default-initialization semantics, the actor-model capability system, and the per-core garbage collector.
 
@@ -443,7 +443,7 @@ A single F6 Rich core may support **multiple granularities** simultaneously acro
 | `DATA-fine` | 16 byte | capability registry, ActorRef pool |
 | `DATA-medium` | 256 byte | actor state objects |
 | `STACK` | n/a | no Quench-RAM (per-frame allocation is fast) |
-| `MAILBOX` | 128 byte | sealed message payloads (= v3.1 cell payload size, see `specs/cell-format-en.md` v2.3) |
+| `MAILBOX` | 128 byte | sealed message payloads (= v3.1 cell payload size, see `specs/cell-format-en.md` v2.4) |
 
 The Nano core (F4) is simpler: only **256 byte block** granularity, designed for simplicity.
 
@@ -494,6 +494,7 @@ Quench-RAM is **not a prerequisite** for F0-F4; these continue to operate on the
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.8 | 2026-07-17 | **Stale cell-format reference updated:** `cell-format-en.md` v2.3 → **v2.4** (cascade from the current spec; the 128-byte MAILBOX payload size is unchanged). |
 | 1.7 | 2026-06-02 | **DDR5 capability slot format synced with ddr5-architecture v1.5:** `region_size` byte → **4 KB page-granular** (16-bit → 256 MB), `reserved[8]` next to the base (40-bit → 4 PB extension), `perms` X bit for Seal-verified code only (runtime-gen FORBIDDEN). Full layout: `region_base[32] + reserved[8] + region_size[16] + valid[1] + perms[3] + reserved[4]`. Cascade from ddr5-architecture v1.5. |
 | 1.6 | 2026-06-01 | **DDR5 capability slot format synced with ddr5-architecture v1.4:** `region_base[36]` byte address → `region_base[32]` page-aligned (4 KB) → 16 TB. Cascade update; the rationale (TB-scale capacity, descriptor-not-pointer) is in ddr5-architecture-en.md 2.b / Addressing Model section. |
 | 1.5 | 2026-04-28 | **DDR5 capability slot use case added.** The DDR5 capability slot table introduced in `ddr5-architecture-hu.md` v1.3 builds on the same QSRAM SEAL invariant — same pattern as CST: HW-managed, atomically revocable via RELEASE. New section under "Synergy with the actor-model capability system": per-core 8 KB capability slot table (256 actors × 4 slots × 8 bytes), managed by the Seal Core. |

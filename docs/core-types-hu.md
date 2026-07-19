@@ -6,7 +6,7 @@ status: vision
 
 > English version: [core-types-en.md](core-types-en.md)
 
-> Version: 2.4
+> Version: 2.5
 
 > **⚠️ Vízió-szintű dokumentum.** Az itt szereplő terület-, core-szám- és SRAM-becslések irodalmi adatokból (TSMC 5nm SRAM macro datasheet, ISSCC referenciák) extrapolált munkahipotézisek az F1.5 fázisban. A pontos értékek csak F4 RTL és F6 szilícium (Cognitive Fabric One MPW) után validálhatók — addig minden szám munkabecslés, ami a roadmap minden fázisában felülvizsgálandó. Az itt rögzített mikroarchitektúrális filozófia (in-order, statikus ILP, no OoO) viszont **architekturális elv**, ami a [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) dokumentumban kerül részletes indoklásra.
 
@@ -35,7 +35,7 @@ Ez a kettős specializáció a CFPU egyedi vonása: egyetlen más processzor-csa
 
 | Tulajdonság | **Nano** | **Actor** | **Rich** | **Seal** |
 |------------|---------|----------|---------|---------|
-| **ISA** | CIL-T0 (48 opkód, int32) | Teljes CIL (obj, GC, generikusok) | Teljes CIL + FPU opkódok | CIL-Seal (CIL-T0 subset + crypto) |
+| **ISA** | CIL-T0 (64 opkód, int32) | Teljes CIL (obj, GC, generikusok) | Teljes CIL + FPU opkódok | CIL-Seal (CIL-T0 subset + crypto) |
 | **FPU** | Nincs | Nincs | IEEE-754 R4+R8, power-gated | Crypto HW (AES, ECC) |
 | **GC + Objektum modell** | Nincs | **Van** (bump alloc, mark-sweep) | **Van** | Nincs |
 | **Kivételkezelés** | Trap only | Teljes (throw/catch/finally) | Teljes | Trap only |
@@ -48,7 +48,7 @@ Ez a kettős specializáció a CFPU egyedi vonása: egyetlen más processzor-csa
 
 ### Nano Core
 
-A legkisebb végrehajtó egység — 48 CIL-T0 opkód, integer-only. Minimális méret → maximális core szám.
+A legkisebb végrehajtó egység — 64 CIL-T0 opkód, integer-only. Minimális méret → maximális core szám.
 
 **Mikor:** SNN spike-ok, IoT szenzor aktorok, nagyszámú egyszerű worker pipeline.
 
@@ -188,6 +188,7 @@ A single-thread teljesítmény-becslés és összehasonlítási módszertan: [`p
 
 | Verzió | Dátum | Összefoglaló |
 |--------|------------|----------------------------------------------|
+| 2.5 | 2026-07-17 | Opkód-szám javítva: 48 → 64 (tényleges F1.5 implementáció szerint, `src/CilCpu.Sim/TOpcode.cs`) |
 | 2.4 | 2026-04-28 | **QRAM régiók szekció hozzáadva.** Minden Nano/Actor/Rich core SRAM-jában ~10 KB QRAM régió a HW-managed capability tárolásra: CST (~2 KB) és DDR5 capability slot (~8 KB). A Seal Core kezeli (SEAL/RELEASE), a software nem írhat. <5% a core SRAM-ból. Részletek: [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) v1.3, [`quench-ram-hu.md`](quench-ram-hu.md) v1.5. |
 | 2.3 | 2026-04-25 | Vízió-szintű disclaimer hozzáadva. Új „Mikroarchitektúra alapelvek" szekció (in-order, no OoO, TLP > ILP, statikus ILP, TOS reg stack, wide bus, warm-context cache) hivatkozással a `microarch-philosophy-hu.md` és `internal-bus-hu.md` dokumentumokra. Tervezési megkülönböztetők bővítve. |
 | 2.2 | 2026-04-21 | Core számok átszámolva monolitikus 800 mm²-ről a referencia chiplet konfigurációra (18 tine × 83 mm² = 1 494 mm²). SRAM skálázás szekció: 512 KB és 1 MB per core variánsok core számmal és chip SRAM-mal |

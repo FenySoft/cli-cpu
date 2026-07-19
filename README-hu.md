@@ -5,7 +5,7 @@
 
 > English version: [README.md](README.md)
 
-> Version: 1.0
+> Version: 1.1
 
 🌐 [clicpu.org](https://clicpu.org) *(hamarosan)*
 
@@ -89,7 +89,7 @@ A C# programok **`[RunsOn(CoreType.Nano)]`** vagy **`[RunsOn(CoreType.Rich)]`** 
 
 ## Státusz
 
-**F1.5 — KÉSZ.** A C# referencia szimulátor (48/48 CIL-T0 opkód, 250+ zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
+**F1.5 — KÉSZ.** A C# referencia szimulátor (48/48 CIL-T0 opkód, 187 zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
 
 Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 
@@ -124,7 +124,9 @@ Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 
 ## Licenc
 
-[CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENSE)
+Kettős licenc:
+- **Hardver, RTL, ISA-spec és dokumentáció** — [CERN Open Hardware Licence Version 2 — Strongly Reciprocal (CERN-OHL-S v2)](LICENSE)
+- **Szoftver** (C# szimulátor, linker, runner, tesztek, minták) — [Apache License 2.0](src/LICENSE) ([`samples/`](samples/LICENSE) alatt is)
 
 ---
 
@@ -132,4 +134,5 @@ Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-07-17 | Tesztszám frissítve a tényleges CI-eredményre: 187 |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

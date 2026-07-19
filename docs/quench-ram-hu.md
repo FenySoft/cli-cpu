@@ -6,7 +6,7 @@ status: vision
 
 > English version: [quench-ram-en.md](quench-ram-en.md)
 
-> Version: 1.7
+> Version: 1.8
 
 Ez a dokumentum a **Quench-RAM** memóriacella **architektúráját és ISA-illesztését** írja le: a per-blokk státuszbit szemantikáját, a két hardveres állapotgép-műveletet (`SEAL`, `RELEASE`), a NAND-flash-szel rokon „erase-on-release" mintát, és a kapcsolatot az ECMA-335 default-initialization szemantikával, az aktor-modell capability-rendszerével és a per-core garbage collector-ral.
 
@@ -443,7 +443,7 @@ Egy F6 Rich core **több granularitást** támogathat egyidejűleg, különböz�
 | `DATA-fine` | 16 byte | capability registry, ActorRef pool |
 | `DATA-medium` | 256 byte | aktor state objektumok |
 | `STACK` | n/a | nincs Quench-RAM (per-frame allokáció gyors) |
-| `MAILBOX` | 128 byte | sealed üzenet-payload-ok (= v3.1 cella payload méret, lásd `specs/cell-format-hu.md` v2.3) |
+| `MAILBOX` | 128 byte | sealed üzenet-payload-ok (= v3.1 cella payload méret, lásd `specs/cell-format-hu.md` v2.4) |
 
 A Nano core (F4) egyszerűbb: csak **256 byte blokk** granularitás, mert az egyszerűségre tervezve.
 
@@ -494,6 +494,7 @@ A Quench-RAM **nem feltétel** az F0-F4 fázisokhoz; ezek a meglévő SRAM-model
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.8 | 2026-07-17 | **Elavult cell-format hivatkozás frissítve:** `cell-format-hu.md` v2.3 → **v2.4** (kaszkád a hatályos spec-ből; a 128 byte MAILBOX payload-méret változatlan). |
 | 1.7 | 2026-06-02 | **DDR5 capability slot formátum szinkron a ddr5-architecture v1.5-tel:** `region_size` bájt → **4 KB page-granuláris** (16-bit → 256 MB), `reserved[8]` a base mellett (40-bit → 4 PB bővítés), `perms` X bit kizárólag Seal-verifikált kódra (runtime-gen TILOS). Teljes layout: `region_base[32] + reserved[8] + region_size[16] + valid[1] + perms[3] + reserved[4]`. Kaszkád a ddr5-architecture v1.5-ből. |
 | 1.6 | 2026-06-01 | **DDR5 capability slot formátum szinkron a ddr5-architecture v1.4-gyel:** `region_base[36]` byte-cím → `region_base[32]` page-aligned (4 KB) → 16 TB. Kaszkád-átvezetés; az indoklás (TB-skálás kapacitás, descriptor-nem-pointer) a ddr5-architecture-hu.md 2.b/Címzési modell szakaszában. |
 | 1.5 | 2026-04-28 | **DDR5 capability slot use case hozzáadva.** A `ddr5-architecture-hu.md` v1.3-ban bevezetett DDR5 capability slot tábla a QSRAM SEAL invariánsára épül — ugyanaz a minta, mint a CST: HW-managed, atomi RELEASE-szel visszavonható. Új szekció a "Szinergia az aktor-modell capability-rendszerével" alatt: per-core 8 KB capability slot tábla (256 actor × 4 slot × 8 byte), Seal Core kezeli. |

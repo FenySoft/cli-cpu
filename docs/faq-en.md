@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzio: [faq-hu.md](faq-hu.md)
 
-> Version: 1.0
+> Version: 1.2
 
 This document collects conceptual questions that are essential for understanding the project but do not fit neatly into the detailed spec documents (`architecture-en.md`, `ISA-CIL-T0-en.md`, `security-en.md`, [`Symphact/docs/vision-en.md`](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md), `secure-element-en.md`).
 
@@ -74,7 +74,7 @@ The CFPU is **MIMD actor-native** -- every core runs a **different** CIL program
 - **CLI-CPU** -- when talking about the **project**, repo, or concrete implementation
   - *"The CLI-CPU project status is F1.5 DONE"*
   - *"Clone: `git clone https://github.com/FenySoft/CLI-CPU`"*
-  - *"The CLI-CPU reference simulator has 250+ tests"*
+  - *"The CLI-CPU reference simulator has 187 tests"*
 - **Cognitive Fabric** -- when talking about the **architecture family / marketing narrative**
   - *"Cognitive Fabric + Symphact is the successor to Linux"*
 
@@ -670,7 +670,7 @@ The **variable instruction length** is expensive: the pre-decoder must figure ou
 |---|---|---|---|---|---|
 | **Year of origin** | 1978 (8086) | 1985 (ARM1) | 2010 (Berkeley) | 2025 | 2025 (F5 target) |
 | **Philosophy** | CISC -> internally RISC | RISC, pragmatic | RISC, minimalist | Stack machine, actor fabric | Stack machine, full CIL |
-| **License** | Intel/AMD closed | ARM Ltd. ~$1-5M | Open (BSD) | Open (MIT/Apache) | Open (MIT/Apache) |
+| **License** | Intel/AMD closed | ARM Ltd. ~$1-5M | Open (BSD) | Open (MIT/Apache) | Open (CERN-OHL-S + Apache-2.0) |
 | **Instruction length** | 1-15 bytes | Fixed 4 bytes | 2 or 4 bytes | 1-5 bytes | 1-5 bytes |
 | **Registers** | 16 GP + 32 SIMD | 31 GP + 32 NEON | 31 GP + 32 FP | **0** (stack) | **0** (stack + TOS cache) |
 | **Operands** | Register + memory | Register-register | Register-register | **Stack (implicit)** | **Stack (implicit)** |
@@ -1022,4 +1022,6 @@ The FAQ provides **conceptual anchors**, not documentation duplication.
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2 | 2026-07-18 | §8 license row clarified: CERN-OHL-S + Apache-2.0 dual license (replacing the earlier generic "MIT/Apache") |
+| 1.1 | 2026-07-17 | Test count updated to the actual CI result: 187 |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

@@ -86,7 +86,7 @@ A teljes chip-szám **~37 IC** — 16-bit címzéssel (teljes 32K memória) és 
 
 ## A mikrokód a kulcs
 
-A 48 opkód diszkrét vezérlőlogikával kezelhetetlen lenne. A megoldás **mikrokód ROM**: az opkód + állapotgép-fázis adja a ROM-cím bemenetet, a kimenet vezérli az összes chip `enable`/`direction` vonalát. Ez a bevett mikrokódos megközelítés. 3× AT28C64 tárolja a teljes vezérlőjel-térképet.
+A 64 opkód diszkrét vezérlőlogikával kezelhetetlen lenne. A megoldás **mikrokód ROM**: az opkód + állapotgép-fázis adja a ROM-cím bemenetet, a kimenet vezérli az összes chip `enable`/`direction` vonalát. Ez a bevett mikrokódos megközelítés. 3× AT28C64 tárolja a teljes vezérlőjel-térképet.
 
 ## Programozás és tápellátás
 
@@ -127,7 +127,7 @@ A **Digital** szint a belépő (maximális elérés, oktatás); a **Core** és *
 | Cél | Oktatás, demó, közösség | Referencia + szilícium-út |
 | Szélesség | 8-bit | 32-bit |
 | Megvalósítás | 74HC breadboard | C# sim + Verilog FPGA |
-| ISA | CIL-T0 részhalmaz | Teljes CIL-T0 (48 opkód) |
+| ISA | CIL-T0 részhalmaz | Teljes CIL-T0 (64 opkód) |
 | Fázis | Önálló didaktikus ág | F1.5 KÉSZ → F2.8 |
 
 A 8-bites változat ugyanazt az **ISA-filozófiát** (stack-alapú, int-only, objektum nélküli) demonstrálja kézzelfogható hardverben, amit a 32-bites referencia-szimulátor és az FPGA-implementáció teljes mélységében megvalósít.
@@ -140,6 +140,7 @@ A magyar YouTube-on jelenleg **nincs** alkatrész-szintű, a nulláról építő
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.1 | 2026-07-17 | Opkód-szám javítva: 48 → 64 (tényleges F1.5 implementáció szerint, `src/CilCpu.Sim/TOpcode.cs`) |
 | 1.0 | 2026-06-08 | Kezdeti verzió — 8-bites diszkrét CIL-T0 építés (blokk-vázlat, funkcionális egységek ~37 IC, mikrokód ROM, programozás, BOM, kapcsolat a fő projekthez) |
 | 1.1 | 2026-06-09 | OctaCIL brand bevezetése (cím + bevezető + motiváció) és termékszintek (Digital / Core / Full) szekció |
 | 1.2 | 2026-06-10 | AT28C256 → AT28C64 (8 KB elég a program + mikrokódhoz); az „EEPROM dominálja a költséget" állítás javítva (a breadboard + memória dominál) |

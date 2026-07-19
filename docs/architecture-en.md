@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [architecture-hu.md](architecture-hu.md)
 
-> Version: 1.4
+> Version: 1.6
 
 This document describes the **Cognitive Fabric Processing Unit (CFPU)** **microarchitecture** at a high level: the stack machine model, the pipeline, the memory map, the decoding strategy, hardware support for GC and exception handling, and the techniques adopted from predecessor projects (picoJava, Jazelle, Transmeta).
 
@@ -222,7 +222,7 @@ A single chip contains **three element types** — two computational, one securi
 
 | | **Nano core** | **Rich core** |
 |-|---------------|---------------|
-| **ISA** | CIL-T0 subset (~48 opcodes, integer-only, static calls) | Full ECMA-335 CIL (~220 opcodes) |
+| **ISA** | CIL-T0 subset (64 opcodes, integer-only, static calls) | Full ECMA-335 CIL (~220 opcodes) |
 | **Size** | ~10,000 std cells | ~80,000 std cells |
 | **Features** | Integer ALU, stack cache, mailbox, microcode (mul/div/call/ret) | Nano + object model + GC + metadata walker + vtable cache + FPU (R4/R8) + 64-bit + exception handling + generics |
 | **Clock** | ~50-200 MHz | ~50-150 MHz (slightly slower due to more pipeline stages) |
@@ -1326,7 +1326,7 @@ Actor ID (dst_actor):                                       8 bits (Word 0 lower
                                                        Total: 32 bits (1 word)
 ```
 
-For the detailed header layout see [`specs/cell-format-en.md`](../specs/cell-format-en.md) v2.3.
+For the detailed header layout see [`specs/cell-format-en.md`](../specs/cell-format-en.md) v2.4.
 
 **Rationale:**
 - The `dst_actor[8]` field covers 256 actors/core, plenty for the warm-context cache (4–8 active + 248 sleeping)
@@ -1400,7 +1400,7 @@ Brief summary (the detailed table is in [`docs/security-en.md`](security-en.md))
 
 ### Formal verification feasibility
 
-The CFPU **Nano core's** 48-opcode ISA is **practically smaller than the seL4 microkernel** (~10,000 lines of C), which the UNSW team **formally proved** using Coq + Isabelle tools over 15+ years of work.
+The CFPU **Nano core's** 64-opcode ISA is **practically smaller than the seL4 microkernel** (~10,000 lines of C), which the UNSW team **formally proved** using Coq + Isabelle tools over 15+ years of work.
 
 This means that **formal verification of the CFPU is feasible** — not simple, not cheap, but **not impossible either**, and **not achievable for x86, ARM, or RISC-V with their full extension sets**.
 
@@ -1432,8 +1432,10 @@ The `ISA-CIL-T0.md` document provides the complete opcode specification for the 
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.6 | 2026-07-17 | **Stale cell-format reference updated:** `cell-format-en.md` v2.3 → **v2.4** (cascade from the current spec). |
 | 1.4 | 2026-04-25 | Strategic-positioning, microarchitecture, Cognitive Fabric One comparison, block diagram, pipeline, address-space, frame layout, dispatch, metadata walker, related projects, power domains, and security sections renamed CLI-CPU → CFPU per [brand-en.md](brand-en.md). CLI-CPU is retained for project-level references (roadmap phases F4/F5, Roslyn toolchain, "first real silicon" milestone, callout). |
 | 1.3 | 2026-04-19 | Actor Scheduling Pipeline section — hot context, DMA double-buffer, message-triggered prefetch, QRAM External Extension (AES+CMAC for off-chip PSRAM), code sharing, software actor dispatch, timing budget |
 | 1.2 | 2026-04-19 | Pipeline hazard management section — TOS cache bypass, forwarding, microcode vs. picoJava stack folding, stall catalogue, determinism guarantee |
 | 1.1 | 2026-04-16 | Core types, interconnect, Cognitive Fabric One |
+| 1.5 | 2026-07-17 | Opcode count corrected: ~48 → 64 (per the actual F1.5 implementation, `src/CilCpu.Sim/TOpcode.cs`) |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

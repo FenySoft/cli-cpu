@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [core-types-hu.md](core-types-hu.md)
 
-> Version: 2.4
+> Version: 2.5
 
 > **⚠️ Vision-level document.** The area, core-count, and SRAM figures presented here are working hypotheses extrapolated from documented sources (TSMC 5nm SRAM macro datasheets, ISSCC references) during the F1.5 phase. Precise values can only be validated after F4 RTL and F6 silicon (Cognitive Fabric One MPW) — until then every number is a working estimate subject to revision at each roadmap phase. The microarchitectural philosophy recorded here (in-order, static ILP, no OoO) is, however, an **architectural principle** detailed in [`microarch-philosophy-en.md`](microarch-philosophy-en.md).
 
@@ -35,7 +35,7 @@ This dual specialization is the unique characteristic of the CFPU: no other proc
 
 | Property | **Nano** | **Actor** | **Rich** | **Seal** |
 |----------|---------|----------|---------|---------|
-| **ISA** | CIL-T0 (48 opcodes, int32) | Full CIL (obj, GC, generics) | Full CIL + FPU opcodes | CIL-Seal (CIL-T0 subset + crypto) |
+| **ISA** | CIL-T0 (64 opcodes, int32) | Full CIL (obj, GC, generics) | Full CIL + FPU opcodes | CIL-Seal (CIL-T0 subset + crypto) |
 | **FPU** | None | None | IEEE-754 R4+R8, power-gated | Crypto HW (AES, ECC) |
 | **GC + Object model** | None | **Present** (bump alloc, mark-sweep) | **Present** | None |
 | **Exception handling** | Trap only | Full (throw/catch/finally) | Full | Trap only |
@@ -48,7 +48,7 @@ This dual specialization is the unique characteristic of the CFPU: no other proc
 
 ### Nano Core
 
-The smallest execution unit — 48 CIL-T0 opcodes, integer-only. Minimal size → maximum core count.
+The smallest execution unit — 64 CIL-T0 opcodes, integer-only. Minimal size → maximum core count.
 
 **When:** SNN spikes, IoT sensor actors, large numbers of simple workers in a pipeline.
 
@@ -188,6 +188,7 @@ Single-thread perf estimate and comparison methodology: [`perf-vs-riscv-en.md`](
 
 | Version | Date | Summary |
 |---------|------------|----------------------------------------------|
+| 2.5 | 2026-07-17 | Opcode count corrected: 48 → 64 (per the actual F1.5 implementation, `src/CilCpu.Sim/TOpcode.cs`) |
 | 2.4 | 2026-04-28 | **QRAM regions section added.** Every Nano/Actor/Rich core has ~10 KB QRAM in its SRAM for HW-managed capability storage: CST (~2 KB) and DDR5 capability slot (~8 KB). Managed by the Seal Core (SEAL/RELEASE), software cannot write. <5% of core SRAM. Details: [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) v1.3, [`quench-ram-en.md`](quench-ram-en.md) v1.5. |
 | 2.3 | 2026-04-25 | Vision-level disclaimer added. New "Microarchitectural Principles" section (in-order, no OoO, TLP > ILP, static ILP, TOS reg stack, wide bus, warm-context cache) cross-referencing `microarch-philosophy-en.md` and `internal-bus-en.md`. Design Differentiators extended. |
 | 2.2 | 2026-04-21 | Core counts recalculated from monolithic 800 mm² to reference chiplet configuration (18 tines × 83 mm² = 1,494 mm²). SRAM scaling section: 512 KB and 1 MB per core variants with core counts and chip SRAM |

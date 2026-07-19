@@ -6,7 +6,7 @@ status: decision
 
 > English version: [decision-bus-rollback-en.md](decision-bus-rollback-en.md)
 
-> Version: 1.1
+> Version: 1.2
 
 > Státusz: Architektúra döntés, hatályos 2026-04-28-tól. Érinti az `interconnect-hu.md` v3.1-et, a `specs/cell-format-hu.md` v2.1-et és az `internal-bus-hu.md` v1.1-et.
 
@@ -55,7 +55,7 @@ A header layout v3.0-ban már 128 bit (4 × 32 bit word, lásd `interconnect-hu.
 
 ### DDR5 burst alignment
 
-A 128 byte payload **DDR5 BL32** (Burst Length 32, ×4 byte = 128 byte) natív burst egységének felel meg. A 64 byte (BL16) is támogatott. A `ddr5-architecture-hu.md` capability grant + CAM ACL modell változatlan, csak a fragment méret változik.
+A 128 byte payload **DDR5 BL32** (Burst Length 32, ×4 byte = 128 byte) natív burst egységének felel meg. A 64 byte (BL16) is támogatott. A `ddr5-architecture-hu.md` HW Capability Slot modellje változatlan, csak a fragment méret változik.
 
 ### Wire-budget a hop-on belül
 
@@ -139,7 +139,7 @@ Az RTL paraméterezés (jövőbeli F4 fázis) bevezeti a `BUS_WIDTH` RTL paramé
 - [`internal-bus-hu.md`](internal-bus-hu.md) — core-on belüli busz méretezés (Nano/Actor 256, Rich 512, ML 1024, Seal 64 — független a NoC busztól)
 - [`specs/cell-format-hu.md`](../specs/cell-format-hu.md) — header és payload bit-szintű elrendezés
 - [`microarch-philosophy-hu.md`](microarch-philosophy-hu.md) — TLP > ILP filozófia, statikus ILP, in-order pipeline
-- [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) — DDR5 controller, capability grant, CAM ACL
+- [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) — DDR5 controller, HW Capability Slot
 
 ## Changelog
 
@@ -147,3 +147,4 @@ Az RTL paraméterezés (jövőbeli F4 fázis) bevezeti a `BUS_WIDTH` RTL paramé
 |--------|-------|--------------|
 | 1.0 | 2026-04-28 | Kezdeti verzió — L0 busz visszaléptetés 256→128 bit indoklása, skálázási elv (header = 1 flit, payload = 8 flit), alternatívák A/B/C/D, felfelé skálázás kritériumai |
 | 1.1 | 2026-06-01 | **A „~80% ≤48 byte" eloszlás hamis forrás-attribúciója javítva.** A v1.0 egy nemlétező „interconnect-hu.md v2.4 elemzésre" hivatkozott; valójában ez sosem volt mérés. A szám most explicit **tervezési feltételezésként (nem mért)** szerepel, Akka/Erlang-workload alapú indoklással. A tartalmi döntés (256→128 bit rollback) változatlan. |
+| 1.2 | 2026-07-17 | **DDR5-modell terminológia frissítve:** az elavult „capability grant + CAM ACL" hivatkozás a hatályos **HW Capability Slot** modellre (ddr5-architecture v1.3 óta: központi CAM → per-core QRAM capability slot). A cell-format v2.0→v2.1 történeti hivatkozások (a döntés hatálya) változatlanok. |

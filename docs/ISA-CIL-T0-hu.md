@@ -6,7 +6,7 @@ status: spec-candidate
 
 > English version: [ISA-CIL-T0-en.md](ISA-CIL-T0-en.md)
 
-> Version: 1.0
+> Version: 1.3
 
 Ez a dokumentum a **CIL-T0** subset-et specifikálja, amely a CLI-CPU első megvalósított utasításkészlete, és amely **Tiny Tapeout-on (F3)** gyártásra kerül.
 
@@ -69,7 +69,7 @@ A CLI-CPU **már az F3 Tiny Tapeout chipen** tartalmaz egy **32-bites mailbox in
 
 ### Tervezési elvek
 
-1. **Nincs új opkód.** A mailbox az MMIO régióban él, a meglévő `ldind.i4` (load indirect) és `stind.i4` (store indirect) opkódokkal érhető el. Ezzel a CIL-T0 opkód-készlet **48 opkódon marad**, és szigorúan ECMA-335 kompatibilis.
+1. **Nincs új opkód.** A mailbox az MMIO régióban él, a meglévő `ldind.i4` (load indirect) és `stind.i4` (store indirect) opkódokkal érhető el. Ezzel a CIL-T0 opkód-készlet **64 opkódon marad**, és szigorúan ECMA-335 kompatibilis.
 2. **Szimmetrikus inbox és outbox.** Mindkét FIFO **8 mélységű**, 32-bit széles bejegyzésekkel. Ez 8 „spike" burst-öt tud buffer-elni mindkét irányban üzenetvesztés nélkül.
 3. **F3-ban külső bridge** (UART/FTDI) közvetíti az üzeneteket a host és a chip között. **F4-ben** ugyanezek a regiszterek a hardveres router-re csatlakoznak, és a `target` mező kap értelmet (cél core index).
 4. **Trap támogatás.** Ha a program megpróbál üres inbox-ról olvasni vagy tele outbox-ra írni, a hardver `STATUS` regiszter-en jelzi; opcionálisan **interrupt/wake-from-sleep** is generálható (F4+).
@@ -132,7 +132,7 @@ A jelenlegi trap-listához (lásd fentebb) F3-ban hozzáadódik egy opcionális 
 
 | Trap # | Név | Leírás |
 |--------|-----|--------|
-| 0x0C | `MAILBOX_OVERFLOW` | Akkor, ha a program írást próbál tele outbox-ra és a `MB_CTRL` nem engedélyezi a drop viselkedést (F4+ beállítható) |
+| 0x12 | `MAILBOX_OVERFLOW` | Akkor, ha a program írást próbál tele outbox-ra és a `MB_CTRL` nem engedélyezi a drop viselkedést (F4+ beállítható) |
 
 F3-ban alapértelmezésben **a túlcsordulás csak sticky bit-et állít**, nem trap-el — a mintakód ezt `MB_STATUS` polling-gal kezelheti.
 
@@ -182,7 +182,7 @@ Minden stack elem típusa **`I4` (32-bit signed integer)**. A CIL-T0-ban nincs m
 
 ## Opkód katalógus
 
-Az alábbi 48 opkód képezi a CIL-T0 teljes utasításkészletét. Minden opkód a **standard ECMA-335 bájt-kódolást** használja.
+Az alábbi 64 opkód képezi a CIL-T0 teljes utasításkészletét (a v1.0 spec 48-at jelölt; az F1.5 implementáció 64-re bővült). Minden opkód a **standard ECMA-335 bájt-kódolást** használja.
 
 ### Jelölések
 
@@ -635,7 +635,7 @@ A CIL-T0 utasítások végrehajtási idejét három tényező határozza meg:
 
 **Képlet:** `Σ ciklus = μstep + ALU latencia + pipeline flush + memória latencia`
 
-### Összefoglaló táblázat (48 opkód)
+### Összefoglaló táblázat (64 opkód)
 
 | Kategória | Opkódok | μstep | Σ ciklus | Megjegyzés |
 |-----------|---------|-------|----------|------------|
@@ -662,5 +662,7 @@ A CIL-T0 utasítások végrehajtási idejét három tényező határozza meg:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.3 | 2026-07-17 | Opkód-szám javítva: 48 → 64 (tényleges F1.5 implementáció szerint, `src/CilCpu.Sim/TOpcode.cs`) |
+| 1.2 | 2026-07-17 | Trap-kód ütközés javítva: MAILBOX_OVERFLOW 0x0C → 0x12, mert 0x0C már INVALID_MEMORY_ACCESS-ként foglalt (a 0x0D–0x11 tartományt a CIL-Seal trapek használják) |
 | 1.1 | 2026-04-17 | F2.2b μstep + órajelciklus dokumentáció minden opkódhoz |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

@@ -6,11 +6,23 @@ status: mirror
 
 > **Source:** [FenySoft/Symphact — osreq-001](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-en.md)
 >
-> **Status:** Draft — awaiting hardware feedback
+> **Status:** Resolved — see banner below
 >
 > **Affected CFPU phase:** F4 (multi-core FPGA), F5 (heterogeneous), F6 (silicon)
 
-> Version: 1.0
+> Version: 1.1
+
+---
+
+> ## ✅ RESOLVED
+>
+> This topology request has been **decided** — not with the pure tree (fat tree) topology proposed below, but with the **4-level hierarchical mesh + crossbar** architecture specified in this repo's own [`interconnect-en.md`](../interconnect-en.md) v3.8, which satisfies the same underlying need (locality-aware, hierarchical, O(1)-routing interconnect aligned with the supervisor tree). The pure fat tree was explicitly excluded ("Excluded alternatives" table in `interconnect-en.md`): root bottleneck and SPOF, converging to the hierarchical mesh once horizontal links are added.
+>
+> **Note on this mirror:** this snapshot predates the current Symphact source and no longer matches its structure or content (the source has since been substantially expanded). For the historical OS-side request in its up-to-date form, and its own resolution banner, see the [Symphact source](https://github.com/FenySoft/Symphact/blob/main/docs/osreq-to-cfpu/osreq-001-tree-interconnect-en.md).
+>
+> The document below remains in its **original, Draft-era** state as an archive.
+
+---
 
 ## OS-side requirement
 
@@ -112,4 +124,5 @@ The "Scaling to F6" section needs updating: **fat tree** topology instead of **m
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-07-19 | **Status Draft → Resolved.** CLI-CPU rejected the pure fat tree topology request (root bottleneck + SPOF), adopting the 4-level hierarchical mesh + crossbar architecture instead (`interconnect-en.md` v3.8). Banner added noting both the resolution and that this mirror predates the current Symphact source; body unchanged as archive |
 | 1.0 | 2026-04-20 | Initial release |

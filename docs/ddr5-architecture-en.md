@@ -6,7 +6,7 @@ status: vision
 
 > Magyar verzió: [ddr5-architecture-hu.md](ddr5-architecture-hu.md)
 
-> Version: 1.5
+> Version: 1.6
 
 This document records the **hardware architecture** of the interface between the CFPU and external DDR5 memory. It documents not only the final result, but also the **reasoning trail**: what alternatives were evaluated, why they were rejected, and what trade-offs led to the final decisions.
 
@@ -101,7 +101,7 @@ This is the critical question for the shared-nothing model. If any core can read
 
 ### 2.a) Identifying the Sender — NoC Header src + src_actor
 
-The NoC router **fills in the flit header `src` (24 bit) and `src_actor` (8 bit) fields in hardware** with the sending core's physical identifier and active actor context register. The sending core's software **cannot override this** (see `interconnect-hu.md` v3.2 + `cell-format-hu.md` v2.1).
+The NoC router **fills in the flit header `src` (24 bit) and `src_actor` (8 bit) fields in hardware** with the sending core's physical identifier and active actor context register. The sending core's software **cannot override this** (see `interconnect-hu.md` v3.2 + `cell-format-hu.md` v2.4).
 
 ```
 NoC cell --> DDR5 Controller port
@@ -544,6 +544,7 @@ Runtime:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.6 | 2026-07-17 | **Stale cell-format reference updated:** `cell-format-hu.md` v2.1 → **v2.4** (cascade from the current spec). |
 | 1.5 | 2026-06-02 | **Capability slot full page granularity + perms X clarification.** `region_size` is now also **byte → 4 KB page-granular** (16-bit → 256 MB max region), with **`reserved[8]`** next to the base for a future 40-bit page (4 PB) extension. Rationale: since **two actors never share a page** (user decision), isolation is page-level → byte-precise size is unnecessary (it would have been an intra-actor bug-catcher, not isolation). New layout: `region_base[32] + reserved[8] + region_size[16] + valid[1] + perms[3] + reserved[4]`. **`perms` X bit:** for **Seal-verified code only** (DRAM-as-flash-cache); **runtime-generated code FORBIDDEN** (not authenticatable). ⚠️ The X bit's relationship to decision 6 (»DDR5 = data«) + the cached-code integrity mechanism is **OPEN**. The bit format lives only here + in quench-ram-en.md (sweep confirmed). |
 | 1.4 | 2026-06-01 | **Capability slot: `region_base` 36-bit byte address → 32-bit page-aligned (4 KB) → 16 TB.** The earlier 36-bit (64 GB) is under-provisioned for today's capacities (128 GB consumer RAM, 1+ TB server/accelerator horizon). Page alignment yields 16 TB in the same 8-byte slot (32+24+1+3=60 bits). Decision trail: byte-36 (under) / byte-40 (larger slot) / **page-32 (chosen)**. **New "Addressing Model" section:** (1) the `slot_id + offset` is capability-based **segmentation** — the real justification is HW isolation + area (NOT ergonomics, since a managed runtime hides any model, including classic DS/CS); (2) >4 GB data is a **descriptor (data), not a pointer** — the core ISA stays 32-bit, the wide address lives in the controller/capability, the OS chunks and streams it; (3) programmer model = streaming lowering (**design intent**, F2/F3); (4) irreducible limit: random access over a >4 GB flat structure — flat-64 wins here, the CFPU deliberately concedes it. Core ISA stays 32-bit. |
 | 1.3 | 2026-04-28 | **CAM table → HW Capability Slot (in QRAM).** Instead of the 21 MB central CAM rejected in 5.b: each core's QRAM holds an 8 KB capability slot table (256 actors × 4 slots × 8 bytes), managed by Seal Core SEAL/RELEASE. New `flags.DDR5_CAP` HW-only header bit on the cell (only the source core's HW request assembler can set it, actor SW cannot). The 5.c capability token + HMAC alternative also rejected (HMAC is redundant when Quench-RAM SEAL gate-keep is sufficient). New decision trail: 5.a–5.e (software / CAM / HMAC token / per-core CAM / **HW Capability Slot**). Revocation = QRAM RELEASE (atomic, 1 cycle). Memory summary table DDR5 row updated. **Rationale:** central CAM doesn't scale on-chip, Quench-RAM and the v3.0 CST model provide a pattern for a stateless, HW-only capability mechanism |

@@ -8,7 +8,7 @@ status: policy
 
 > Magyar verzió: [series-plan-hu.md](series-plan-hu.md)
 
-> Version: 1.0
+> Version: 1.1
 
 ## Strategy
 
@@ -23,7 +23,7 @@ status: policy
 |---|-------|----------------|--------|
 | **1** | Why I'm Building a CPU That Runs .NET Natively | Everyone — the big picture | Published |
 | **2** | 24 Cores, Zero Cache Coherency: How Shared-Nothing Beats Multi-Threading | CPU architecture enthusiasts | Planned |
-| **3** | From 250+ Tests to Silicon: Test-Driven Hardware Development | .NET / software developers | Planned |
+| **3** | From 187 Tests to Silicon: Test-Driven Hardware Development | .NET / software developers | Planned |
 | **4** | Hardware-Level Security Without Mitigations: Why Spectre Can't Touch This | Security audience | Planned |
 | **5** | The Symphact Vision: Why Linux's 1970s Architecture Needs a Successor | OS / systems programmers | Planned |
 | **6** | 8 Million .NET Developers, One Hardware Platform: Every Language, Native Silicon | .NET community | Planned |
@@ -41,10 +41,10 @@ status: policy
 
 ## Article #3 — Outline
 
-**Title:** From 250+ Tests to Silicon: Test-Driven Hardware Development
+**Title:** From 187 Tests to Silicon: Test-Driven Hardware Development
 
 - TDD in software is normal — TDD in hardware is rare
-- How we wrote 250+ C# tests BEFORE writing any Verilog
+- How we wrote 187 C# tests BEFORE writing any Verilog
 - The golden vector approach: cocotb tests vs C# simulator
 - Why this matters: confidence that the RTL matches the spec
 - The Fibonacci(20) = 6,765 end-to-end test
@@ -107,4 +107,5 @@ Use these tags for all articles:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1 | 2026-07-17 | Test count updated to the actual CI result: 187 |
 | 1.0 | 2026-04-15 | Initial release |

@@ -6,7 +6,7 @@ status: vision
 
 > English version: [chiplet-packaging-en.md](chiplet-packaging-en.md)
 
-> Version: 1.2
+> Version: 1.3
 
 Ez a dokumentum a Cognitive Fabric Processing Unit (CFPU) **chiplet packaging architektúráját** specifikálja: a chiplet típusokat, a multi-chiplet elrendezéseket, a technológiai skálázást és a Symphact-re gyakorolt hatást.
 
@@ -127,13 +127,13 @@ Core (R chiplet)                C chiplet
 
 ### Chipen belüli linkek (CMesh 16:1)
 
-A cluster-en belül 16 core osztozik egy routeren. A routerek közti mesh link **256 bit széles, 500 MHz**:
+A cluster-en belül 16 core osztozik egy routeren. A routerek közti mesh link **128 bit széles, 500 MHz**:
 
 | Paraméter | Érték |
 |-----------|-------|
-| Link szélesség | 256 bit |
+| Link szélesség | 128 bit |
 | Órajel | 500 MHz |
-| Egy link sávszélesség | 16 GB/s |
+| Egy link sávszélesség | 8 GB/s |
 | Hop latencia (128B cella max) | ~4 ns |
 
 > Az 500 MHz-es NoC órajel a fogyasztás-optimalizálás eredménye: ~1 GHz-hez képest ~68%-kal alacsonyabb dinamikus fogyasztás (f × V² skálázás), miközben a szélesebb link kompenzálja a sávszélességet.
@@ -172,7 +172,7 @@ Több CFPU package egy rendszerben **2D torus** topológiával kapcsolható öss
 
 | Szint | Egy link | Latencia |
 |-------|----------|----------|
-| Chipen belül (mesh, 256-bit, 500 MHz) | 16 GB/s | ~4 ns/hop |
+| Chipen belül (mesh, 128-bit, 500 MHz) | 8 GB/s | ~4 ns/hop |
 | Chiplet határ (UCIe) | 200–500 GB/s | ~2–5 ns |
 | Package közt (±X/±Y, PCB) | 25–100 GB/s | ~50–100 ns |
 
@@ -247,7 +247,7 @@ A sűrűség javulás és a chiplet méret növekedés együttes hatása:
 |------|-------|-----------|
 | Core / cluster (CMesh 16:1) | 16 | Router port szám — HW döntés |
 | Mailbox üzenet méret | 32 bit | CIL ISA része |
-| Cella méret | max 80 byte (16B header + 64B payload) | Hálózati protokoll |
+| Cella méret | max 144 byte (16B header + 128B payload) | Hálózati protokoll |
 | Chiplet típusok | C + R | Funkcionális szétválasztás |
 
 ### Ami változik
@@ -295,7 +295,7 @@ Ha a hűtés technológia megengedi, a chiplet-ek két rétegben stackelhetők S
 
 - [Core típusok](core-types-hu.md) — Nano/Actor/Rich/Seal specifikáció, SRAM méretezés
 - [Interconnect](interconnect-hu.md) — 4-szintű on-chip hálózat, switching modell, router variánsok
-- [DDR5 architektúra](ddr5-architecture-hu.md) — DDR5 controller, capability grant, CAM ACL
+- [DDR5 architektúra](ddr5-architecture-hu.md) — DDR5 controller, HW Capability Slot
 - [CFPU-ML-Max](cfpu-ml-max-hu.md) — ML inference chiplet architektúra
 - [Architektúra](architecture-hu.md) — teljes CFPU áttekintés
 - [3D Stack architektúra](3d-stack-architecture-hu.md) — **3D vertikális kiegészítő**: memória-mesh + per-csempe SRAM stack, MI300-összevetés
@@ -304,6 +304,7 @@ Ha a hűtés technológia megengedi, a chiplet-ek két rétegben stackelhetők S
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.3 | 2026-07-17 | **Kaszkád-átvezetés a `specs/cell-format-hu.md` v2.4-ből:** cella-méret max 80 byte (16B+64B) → **max 144 byte (16B header + 128B payload)**; on-chip mesh link 256-bit / 16 GB/s → **128-bit / 8 GB/s** (v3.1 L0 rollback); DDR5 kereszthivatkozás „capability grant, CAM ACL" → **HW Capability Slot**. |
 | 1.2 | 2026-07-02 | Kereszthivatkozás hozzáadva a [`3d-stack-architecture-hu.md`](3d-stack-architecture-hu.md) vertikális (3D) kiegészítő dokumentumhoz (memória-mesh + per-csempe SRAM stack, MI300-összevetés). |
 | 1.1 | 2026-05-17 | **22FDX kalibrációs pont (F6.7)** szekció hozzáadva a Technológiai skálázáshoz — a roadmap F6.7 opcionális de-risk lépcső köti a 130nm szilícium-proof és az 5nm termék-vízió közötti ~10× sűrűség-szakadékot egy valós mért ponthoz; a pontos arányok F6.7 mérésig „mérendő". Kaszkád: `roadmap` v1.8, `perf-vs-riscv`. |
 | 1.0 | 2026-04-23 | Kezdeti verzió — C/R chiplet típusok, 1+1..8 termékváltozatok, kombinált mesh+csillag topológia, 256-bit 500 MHz link, DDR5 a C chipletben, technológiai skálázás (SRAM fal, 3D SRAM, chiplet méret növekedés), Symphact scheduler hatás |

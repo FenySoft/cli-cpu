@@ -6,7 +6,7 @@ status: policy
 
 > English version: [tool-openness-en.md](tool-openness-en.md)
 >
-> Version: 1.0
+> Version: 1.2
 
 Ez a dokumentum a CLI-CPU projekt fejlesztéséhez használt eszközök **licencelési státuszát** és a **nyitottsági stratégiát** rögzíti. Az NLnet NGI Zero Commons Fund pályázat explicit módon említi a „libre silicon"-t mint támogatási kritériumot, és ezért fontos, hogy a projekt filozófiája ebben a kérdésben átlátható és konzisztens legyen.
 
@@ -26,15 +26,15 @@ Ez a stratégia megfelel az iparági gyakorlatnak: a **SpinalHDL, NaxRiscv, Libr
 | Output | Licenc | Hol található |
 |--------|--------|---------------|
 | CLI-CPU ISA specifikáció | CC-BY-SA 4.0 | `docs/ISA-CIL-T0-hu.md` |
-| C# referencia szimulátor | MIT | `src/CilCpu.Sim/` |
-| C# linker és runner | MIT | `src/CilCpu.Linker/`, `src/CilCpu.Sim.Runner/` |
-| xUnit tesztek (160) | MIT | `src/CilCpu.Sim.Tests/` |
-| Verilog RTL (ALU, decoder, microcode) | Apache 2.0 | `rtl/src/` |
+| C# referencia szimulátor | Apache 2.0 | `src/CilCpu.Sim/` |
+| C# linker és runner | Apache 2.0 | `src/CilCpu.Linker/`, `src/CilCpu.Sim.Runner/` |
+| xUnit tesztek (187) | Apache 2.0 | `src/CilCpu.Sim.Tests/` |
+| Verilog RTL (ALU, decoder, microcode) | CERN-OHL-S v2 | `rtl/src/` |
 | cocotb tesztbench | Apache 2.0 | `rtl/tb/` |
 | FPGA bring-up smoke teszt | Apache 2.0 | `rtl/fpga/smoke_test/` |
 | Roadmap, architektúra, biztonsági modell | CC-BY-SA 4.0 | `docs/` |
-| Symphact víziódokumentum és SDK (F7) | MIT + Apache 2.0 | `Symphact/` |
-| Silicon GDSII (F3, F6-Silicon) | Apache 2.0 | `tt/`, `mpw/` |
+| Symphact víziódokumentum és SDK (F7) | Apache 2.0 | `Symphact/` |
+| Silicon GDSII (F3, F6-Silicon) | CERN-OHL-S v2 | `tt/`, `mpw/` |
 
 **Mindegyik a projekt GitHub repójában publikus, pull request-ekre nyitott, közösségi hozzájárulás fogadott.**
 
@@ -210,4 +210,6 @@ A projekt dokumentált szándéka, hogy **amint az OpenXC7 érettsége engedi** 
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.2 | 2026-07-18 | Licenc-tábla javítva a kettős licenc-döntés szerint: C# szoftver (szimulátor/linker/runner/tesztek) Apache-2.0, RTL és GDSII CERN-OHL-S v2 |
+| 1.1 | 2026-07-17 | Tesztszám frissítve a tényleges CI-eredményre: 187 |
 | 1.0 | 2026-04-24 | Kezdeti verzió — az FPGA bring-up (F2.7 smoke teszt) alkalmából írva, amikor a Vivado először került be a dev flow-ba. Az OpenXC7 érettség-felmérés a repó közvetlen vizsgálata alapján (xc7a200tfbg484 a prjxray-db-ben, MMCM/PLL/IDDR/ODDR/IDELAY/DSP48/SerDes/GTP primitívek támogatva, aktív karbantartás). |

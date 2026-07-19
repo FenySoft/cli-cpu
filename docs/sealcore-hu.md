@@ -6,7 +6,7 @@ status: vision
 
 > English version: [sealcore-en.md](sealcore-en.md)
 
-> Version: 1.5
+> Version: 1.6
 
 Ez a dokumentum a **Seal Core** komponenst írja le: egy dedikált, egyszerű, hardware-burned firmware-rel működő core-t, ami a CFPU chipen a **kódbetöltés hitelességét** biztosítja. A Seal Core két különböző mechanizmussal működik a CFPU fejlesztési fázisától függően — **pre-QRAM érában** (F3-F5) fizikai WE-pin routing révén, **QRAM érában** (F5+) AuthCode verifikációs gatekeeper szerepben. Ez a két megközelítés **külön mechanizmus**, amelyeket ez a doksi tudatosan szétválasztva tárgyal.
 
@@ -496,7 +496,7 @@ Az OS root aktor (vagy egy delegáltja, akinek megfelelő capability-je van) üz
 
 A konkrét üzenet-opcode-ok és payload-formátumok **F4-F5 RTL döntés** — ezt a `CIL-Seal ISA` definiálja majd (lásd [Nyitott kérdések](#nyitott) #1).
 
-A kérelmező identitása **nem hamisítható**: a `src_actor` mező a header v3.1-ben a core HW context regiszteréből származik (lásd `specs/cell-format-hu.md` v2.2, "3. döntés"), a `src` mezőt pedig a NoC router HW tölti a fizikai eredet alapján. A Seal Core firmware ezt a (HW-attested) `(src, src_actor)` párost veti össze a kérelem `parent` / `target_actor` mezőivel — **nincs kripto, csak HW-attribuált eredet**.
+A kérelmező identitása **nem hamisítható**: a `src_actor` mező a header v3.1-ben a core HW context regiszteréből származik (lásd `specs/cell-format-hu.md` v2.4, "3. döntés"), a `src` mezőt pedig a NoC router HW tölti a fizikai eredet alapján. A Seal Core firmware ezt a (HW-attested) `(src, src_actor)` párost veti össze a kérelem `parent` / `target_actor` mezőivel — **nincs kripto, csak HW-attribuált eredet**.
 
 ### Validációs algoritmus (Seal Core firmware)
 
@@ -554,7 +554,7 @@ Ezért a Seal Core firmware-e **csak a mechanizmust** implementálja (CST írás
 |---------|---------|
 | Rosszindulatú aktor próbál közvetlenül a saját core CST QSRAM-jába írni | A CST QSRAM-ot csak a core **QGate**-je írhatja (write-port szigorúan FSM-vezérelt). Az aktor SW-jének nincs címterhez illeszkedő utasítása a CST QSRAM-ra. |
 | Rosszindulatú aktor a célcore-nak hamis `SEAL_CST_INSTALL` üzenetet próbál küldeni | **Fizikailag nem lehetséges.** A küldéshez szükség van CST entry-re a `(target_core, 0)` célhoz, és a QGate-célt csak Seal Core / authority delegate adhat capability-ként. A nem-authority aktornak nincs CST entry-je → a saját core HW-ja küldéskor elutasítja. A QGate-hez csak authority-tól érkezhet üzenet. |
-| Aktor hamis `src_actor` mezővel kér capability-t | A küldő core HW tölti a `src_actor` mezőt context regiszterből, nem hamisítható (lásd `cell-format-hu.md` v2.2 3. döntés). |
+| Aktor hamis `src_actor` mezővel kér capability-t | A küldő core HW tölti a `src_actor` mezőt context regiszterből, nem hamisítható (lásd `cell-format-hu.md` v2.4 3. döntés). |
 | Bit-flip / SEU a NoC tranzit során | CRC-8 (header) és CRC-16 (payload) — a QGate silent drop-pal kezeli. |
 | Rosszindulatú aktor szülőként ad capability-t nem-gyermeknek | A Seal Core firmware ellenőrzi a `supervisor_link[target] == src` invariánst minden delegálásnál (a saját firmware-belső supervisor tree alapján). |
 | Aktor próbál önmagának capability-t adni | Az aktor saját `src_actor`-ja nem lehet egyidejűleg a kérelem `parent` mezője és a `target` is — a Seal Core firmware kizárja. |
@@ -719,6 +719,7 @@ Ez a v1.0 doksi a vízió-szintű architektúrát rögzíti. A részletek a megf
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.6 | 2026-07-17 | **Elavult cell-format hivatkozás frissítve:** `cell-format-hu.md` v2.2 → **v2.4** (2 hivatkozás, kaszkád a hatályos spec-ből). |
 | 1.5 | 2026-05-02 | **QGate single-layer trust elv — drasztikus egyszerűsítés.** A v1.4-es QGate spec redundáns logikai validációt tartalmazott (`src` authority komparátor, payload range check, op-validitás, trap-flit) — ezek **CFPU single-layer trust elv** szerint feleslegesek: a CST router-szintű filter már garantálja, hogy csak authority küldhet a QGate-nek, és a Seal Core firmware immutable (mask ROM), ezért definíció szerint korrekt. A QGate v1.5-ben **kizárólag CRC-8 + CRC-16 ellenőrzést végez**; CRC mismatch → silent drop. Becsült terület 500–2000 gate → **600–800 gate**. Új alszekció: "Miért nincs logikai validáció — CFPU single-layer trust elv". Threat model frissítve: a "rosszindulatú aktor hamis SEAL_CST_INSTALL üzenete" sor **nem reális fenyegetés** (CST router-szinten kizárt), helyette "bit-flip / SEU NoC tranzit" sor (CRC fogja). Konzisztens a header v3.0 HMAC-törlés indoklásával. |
 | 1.4 | 2026-05-02 | **QGate brand-név bevezetve** a per-core lokális Quench-RAM kapuőr FSM-re. Korábban "lokális SEAL FSM" / "célcore lokális SEAL FSM" / "MailBox SEAL trigger" néven futott — ezek mind ugyanazt a komponenst jelölik, és most egységesen **QGate**. A brand-családi diagram (3. szekció) bővült új sorral, az új ["A QGate komponens"](#seal-points) alszekció a komponens tulajdonságait rögzíti (1 / core, ~500–2000 gate, NoC inbox bemenet, CST QSRAM + DDR5 cap-slot QRAM kimenet). A QGate brand-pozíciója: per-core kapuőr a **Quench-RAM** alapú capability tábláknál, szemben a Seal Core globális AuthCode-gatekeeper szerepével. Hivatkozások végig átvezetve. |
 | 1.3 | 2026-05-02 | **"A három SEAL érintési pont" szekció hozzáadva** (1. CODE régió SEAL — lokális Seal Core HW; 2. per-core CST/cap slot SEAL/RELEASE — NoC mailbox + célcore lokális SEAL FSM; 3. single-instance peripheria config — hardwired config port). **Korrigálva a v1.1–v1.2 hibás megfogalmazás:** korábban a per-core CST írást "dedikált hardwired config porton"-ként írtuk le; ez **HIBÁS**, mert a CST QSRAM per core él, és NoC mailbox üzenettel + célcore lokális SEAL FSM-mel íródik. A hardwired config port csak a single-instance peripheriához (DDR5 Controller stb.) tartozik. Boot 2e. lépés és validációs algoritmus átírva NoC mailbox-os szemantikára (`SEAL_CST_INSTALL`, `SEAL_CST_UPDATE`, `RELEASE_CST_ENTRY` üzenetek). Threat model frissítve: a védelem a célcore lokális SEAL FSM `src` mező ellenőrzéséből jön, nem hardwired vezeték hiányából. |

@@ -6,7 +6,7 @@ status: policy
 
 > English version: [brand-en.md](brand-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 Ez a dokumentum a **kanonikus referencia** arra a három névre, amelyek együtt szerepelnek a projektben: **Cognitive Fabric**, **CFPU**, és **CLI-CPU**. Nem szinonimák. Mindegyik más réteget jelöl (architektúra-család, processzor-kategória, referencia-implementáció), és a rossz választás egy mondaton belül észrevétlenül torzítja a jelentést.
 
@@ -137,7 +137,7 @@ Ha a hármat egy névbe olvasztjuk, minden külső felület — tudományos cikk
 >
 > *„Klónozás: `git clone https://github.com/FenySoft/CLI-CPU`"*
 >
-> *„A CLI-CPU referencia szimulátorhoz 250+ teszt tartozik."*
+> *„A CLI-CPU referencia szimulátorhoz 187 teszt tartozik."*
 >
 > *„A CLI-CPU CERN-OHL-S (hardver) és Apache-2.0 (szoftver) alatt licencelt."*
 
@@ -227,4 +227,5 @@ Néhány mondat jogosan ível át két rétegen. Az ökölszabály: **a fő neve
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.1 | 2026-07-17 | Tesztszám frissítve a tényleges CI-eredményre: 187 |
 | 1.0 | 2026-04-26 | Kezdeti kiadás |

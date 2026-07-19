@@ -6,7 +6,7 @@ status: decision
 
 > Magyar verzió: [decision-bus-rollback-hu.md](decision-bus-rollback-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 > Status: Architecture decision, effective 2026-04-28. Affects `interconnect-en.md` v3.1, `specs/cell-format-en.md` v2.1, and `internal-bus-en.md` v1.1.
 
@@ -55,7 +55,7 @@ The header layout is already 128 bit in v3.0 (4 × 32 bit words, see `interconne
 
 ### DDR5 burst alignment
 
-The 128-byte payload matches **DDR5 BL32** (Burst Length 32, ×4 byte = 128 byte) native burst unit. 64 byte (BL16) is also supported. The `ddr5-architecture-hu.md` capability grant + CAM ACL model is unchanged, only the fragment size shifts.
+The 128-byte payload matches **DDR5 BL32** (Burst Length 32, ×4 byte = 128 byte) native burst unit. 64 byte (BL16) is also supported. The `ddr5-architecture-hu.md` HW Capability Slot model is unchanged, only the fragment size shifts.
 
 ### Wire budget within a hop
 
@@ -139,7 +139,7 @@ The RTL parameterization (future F4 phase) introduces the `BUS_WIDTH` RTL parame
 - [`internal-bus-en.md`](internal-bus-en.md) — intra-core bus sizing (Nano/Actor 256, Rich 512, ML 1024, Seal 64 — independent of NoC bus)
 - [`specs/cell-format-en.md`](../specs/cell-format-en.md) — header and payload bit-level layout
 - [`microarch-philosophy-en.md`](microarch-philosophy-en.md) — TLP > ILP philosophy, static ILP, in-order pipeline
-- [`ddr5-architecture-en.md`](ddr5-architecture-en.md) — DDR5 controller, capability grant, CAM ACL
+- [`ddr5-architecture-en.md`](ddr5-architecture-en.md) — DDR5 controller, HW Capability Slot
 
 ## Changelog
 
@@ -147,3 +147,4 @@ The RTL parameterization (future F4 phase) introduces the `BUS_WIDTH` RTL parame
 |---------|------|---------|
 | 1.0 | 2026-04-28 | Initial version — rationale for L0 bus rollback 256→128 bit, scaling rule (header = 1 flit, payload = 8 flits), alternatives A/B/C/D, upscale criteria |
 | 1.1 | 2026-06-01 | **Fixed the false source attribution of the "~80% ≤48 byte" distribution.** v1.0 cited a non-existent "interconnect-hu.md v2.4 analysis"; this was never a measurement. The figure now appears as an explicit **design assumption (not measured)**, with an Akka/Erlang-workload rationale. The substantive decision (256→128 bit rollback) is unchanged. |
+| 1.2 | 2026-07-17 | **DDR5 model terminology updated:** the stale "capability grant + CAM ACL" reference replaced with the current **HW Capability Slot** model (since ddr5-architecture v1.3: central CAM → per-core QRAM capability slot). The cell-format v2.0→v2.1 historical references (the decision's scope) are unchanged. |

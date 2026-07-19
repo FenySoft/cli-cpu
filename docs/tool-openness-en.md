@@ -6,7 +6,7 @@ status: policy
 
 > Magyar verzió: [tool-openness-hu.md](tool-openness-hu.md)
 >
-> Version: 1.0
+> Version: 1.2
 
 This document records the **licensing status** of tools used in CLI-CPU development and the project's **openness strategy**. The NLnet NGI Zero Commons Fund application explicitly mentions "libre silicon" as a funding criterion, making it important that the project's philosophy here is transparent and consistent.
 
@@ -26,15 +26,15 @@ This strategy matches industry practice: **SpinalHDL, NaxRiscv, LibreCores**, an
 | Output | License | Location |
 |--------|---------|----------|
 | CLI-CPU ISA specification | CC-BY-SA 4.0 | `docs/ISA-CIL-T0-en.md` |
-| C# reference simulator | MIT | `src/CilCpu.Sim/` |
-| C# linker and runner | MIT | `src/CilCpu.Linker/`, `src/CilCpu.Sim.Runner/` |
-| xUnit tests (160) | MIT | `src/CilCpu.Sim.Tests/` |
-| Verilog RTL (ALU, decoder, microcode) | Apache 2.0 | `rtl/src/` |
+| C# reference simulator | Apache 2.0 | `src/CilCpu.Sim/` |
+| C# linker and runner | Apache 2.0 | `src/CilCpu.Linker/`, `src/CilCpu.Sim.Runner/` |
+| xUnit tests (187) | Apache 2.0 | `src/CilCpu.Sim.Tests/` |
+| Verilog RTL (ALU, decoder, microcode) | CERN-OHL-S v2 | `rtl/src/` |
 | cocotb testbench | Apache 2.0 | `rtl/tb/` |
 | FPGA bring-up smoke test | Apache 2.0 | `rtl/fpga/smoke_test/` |
 | Roadmap, architecture, security model | CC-BY-SA 4.0 | `docs/` |
-| Symphact vision and SDK (F7) | MIT + Apache 2.0 | `Symphact/` |
-| Silicon GDSII (F3, F6-Silicon) | Apache 2.0 | `tt/`, `mpw/` |
+| Symphact vision and SDK (F7) | Apache 2.0 | `Symphact/` |
+| Silicon GDSII (F3, F6-Silicon) | CERN-OHL-S v2 | `tt/`, `mpw/` |
 
 **All of these are in the project's public GitHub repository, open for pull requests and community contributions.**
 
@@ -210,4 +210,6 @@ The project's documented intent is that **as soon as OpenXC7 maturity allows** (
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2 | 2026-07-18 | License table fixed per the dual-license decision: C# software (simulator/linker/runner/tests) Apache-2.0, RTL and GDSII CERN-OHL-S v2 |
+| 1.1 | 2026-07-17 | Test count updated to the actual CI result: 187 |
 | 1.0 | 2026-04-24 | Initial version — written on the occasion of the first FPGA bring-up (F2.7 smoke test), when Vivado first entered the dev flow. OpenXC7 maturity assessment based on direct repo inspection (xc7a200tfbg484 in prjxray-db, MMCM/PLL/IDDR/ODDR/IDELAY/DSP48/SerDes/GTP primitives supported, active maintenance). |

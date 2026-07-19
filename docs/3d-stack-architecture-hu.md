@@ -6,7 +6,7 @@ status: vision
 
 > English version: [3d-stack-architecture-en.md](3d-stack-architecture-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vízió-szintű pozicionáló dokumentum.** A CFPU-oldali rétegződés vízió-szintű terv; a pontos paraméterek (rétegszám, TSV-sűrűség, per-csempe SRAM méret, memória-mesh szemcsézet) a részletes tervezési (RTL/implementációs) fázisokban rögzülnek. A valós-chip adatok (AMD MI300, Intel Ponte Vecchio, CEA-Leti IntAct, Cerebras WSE, Tenstorrent) nyilvános forrásokból származnak — lásd a [Külső források](#külső-források-valós-chipek) szekciót.
 
@@ -167,7 +167,7 @@ Az MI300 igazolja, hogy a stacked elrendezés (**compute felül + aktív-interpo
 - [`chiplet-packaging-hu.md`](chiplet-packaging-hu.md) — 2.5D **vízszintes** chiplet-elrendezés (ennek a doksinak a párja); már tartalmaz „3D SRAM" és „3D package" szekciót
 - [`topology-scaling-hu.md`](topology-scaling-hu.md) — bisection matematika, 1/√N skálázás, mesh vs crossbar vs hierarchikus
 - [`interconnect-hu.md`](interconnect-hu.md) — CFPU NoC, 2VN, XY routing, router variánsok
-- [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) — capability grant, hideg memória-tier, CAM ACL
+- [`ddr5-architecture-hu.md`](ddr5-architecture-hu.md) — HW Capability Slot, hideg memória-tier
 - [`core-types-hu.md`](core-types-hu.md) — SRAM méretezés (per-core komfort 100–300 KB)
 - [`architecture-hu.md`](architecture-hu.md) — teljes CFPU áttekintés
 
@@ -176,6 +176,7 @@ Az MI300 igazolja, hogy a stacked elrendezés (**compute felül + aktív-interpo
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
 | 1.0 | 2026-07-02 | Kezdeti verzió — a CFPU 3D vertikális rétegződési víziója nagy mesh-ekre: a lapos 2D mesh memória-fala (1/√N, 256×256 konkrét számok), döntési nyom (A peremvédelem / B diamond / C 3D-DRAM / **D 3D-SRAM + memória-mesh — választott**), a rétegzett stack (core-mesh / per-csempe SRAM / memória-mesh / perem-DRAM), két fizikai NoC-sík (vs 2VN), termikus orientáció (compute felül, V-Cache-bizonyíték), SRAM mint sávszél-szűrő. Valós-szilícium pozicionálás (MI300/PV/IntAct/Cerebras/Tenstorrent) + MI300 réteg-összevetés + „hol kezdődik a CFPU-újdonság". A [`chiplet-packaging`](chiplet-packaging-hu.md) vertikális kiegészítője. |
+| 1.1 | 2026-07-17 | **DDR5 kereszthivatkozás terminológia:** az elavult „CAM ACL" a hatályos **HW Capability Slot** modellre javítva (ddr5-architecture v1.3). |
 
 ## Külső források (valós chipek)
 

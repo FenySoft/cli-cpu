@@ -6,7 +6,7 @@ status: vision
 
 > English version: [microarch-philosophy-en.md](microarch-philosophy-en.md)
 
-> Version: 1.0
+> Version: 1.1
 
 > **⚠️ Vízió-szintű dokumentum.** Ez az elemzés az F1.5 fázisban (referencia szimulátor + linker) megfogalmazott elméleti architekturális irányt rögzíti. A számszerű becslések irodalmi precedensek (picoJava-2, Cerebras WSE, Adapteva Epiphany, Tilera, Groq, SpiNNaker) extrapolációi, **nem RTL-szintű mérések**. A tényleges teljesítmény-, terület- és fogyasztási adatok csak az F4 RTL és F6 szilícium (Cognitive Fabric One MPW) után validálhatók — addig minden szám munkahipotézis, ami a roadmap minden fázisában felülvizsgálandó.
 
@@ -87,7 +87,7 @@ A különbség nem fokozati, hanem kategorikus: a CFPU-n a single-mag *hatékony
 - Speciális workload-ra (ML inference, neuron-szimuláció) ideális
 - Általános futtatáshoz nem alkalmas
 
-**Részben átvéve.** A Nano core ezt a szellemiséget képviseli (48 opkód, int32, 0,005 mm² 5nm-en); de a Rich/Actor megtartjuk az általános .NET kódhoz, hogy a CFPU egyetlen szubsztrátumon futtasson **mindkét** profilt.
+**Részben átvéve.** A Nano core ezt a szellemiséget képviseli (64 opkód, int32, 0,005 mm² 5nm-en); de a Rich/Actor megtartjuk az általános .NET kódhoz, hogy a CFPU egyetlen szubsztrátumon futtasson **mindkét** profilt.
 
 ## Mit nem építünk
 
@@ -156,4 +156,5 @@ A tézis **csak az F6 szilíciummal igazolható maradéktalanul.** Addig minden 
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|--------------|
+| 1.1 | 2026-07-17 | Opkód-szám javítva: 48 → 64 (tényleges F1.5 implementáció szerint, `src/CilCpu.Sim/TOpcode.cs`) |
 | 1.0 | 2026-04-25 | Kezdeti verzió — TLP > ILP tézis, döntés-trail (few-OoO vs many-in-order vs minimal), 4 300-szál iMac adatpont, statikus ILP komponensek, validálási terv F1.5 → F6 |
