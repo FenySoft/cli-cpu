@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>From 187 Tests to Silicon — CLI-CPU Blog</title>
+  <meta name="description" content="Test-driven hardware development: 187 xUnit tests written before a single line of Verilog, a golden-vector harness comparing RTL signals against the C# reference simulator cycle by cycle, and Fibonacci(20) = 6765 verified in three layers.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.8; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 24px; width: 100%; }
+    header { padding: 48px 0 32px; border-bottom: 1px solid var(--border); }
+    header .nav { font-family: var(--mono); font-size: 0.85rem; margin-bottom: 24px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: #f0f6fc; line-height: 1.25; }
+    header .subtitle { font-family: var(--mono); font-size: 1rem; color: var(--green); margin-top: 12px; }
+    header .meta { font-size: 0.85rem; color: var(--text-dim); margin-top: 16px; font-family: var(--mono); }
+    article { flex: 1; padding: 48px 0; }
+    article h2 { font-family: var(--mono); font-size: 1.3rem; color: #f0f6fc; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    article h2:first-child { margin-top: 0; }
+    article h3 { font-size: 1.1rem; color: #f0f6fc; margin-top: 32px; margin-bottom: 12px; }
+    article p { margin-bottom: 16px; font-size: 1.02rem; }
+    article blockquote { border-left: 3px solid var(--green); padding: 12px 20px; margin: 24px 0; background: var(--bg-card); border-radius: 0 6px 6px 0; font-style: italic; }
+    article ul, article ol { margin: 16px 0; padding-left: 24px; }
+    article li { margin-bottom: 8px; font-size: 1.02rem; }
+    article strong { color: #f0f6fc; }
+    article code { font-family: var(--mono); background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 24px 0; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.6; }
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.9rem; }
+    .comparison-table th, .comparison-table td { padding: 10px 14px; border: 1px solid var(--border); text-align: left; }
+    .comparison-table th { background: var(--bg-card); font-family: var(--mono); font-size: 0.85rem; color: #f0f6fc; }
+    .comparison-table td { color: var(--text-dim); }
+    .highlight-box { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 16px 20px; margin: 24px 0; border-radius: 0 6px 6px 0; }
+    .highlight-box strong { color: var(--accent); }
+    .cta { background: var(--bg-card); border: 1px solid var(--green); border-radius: 8px; padding: 28px; margin-top: 48px; text-align: center; }
+    .cta h3 { font-family: var(--mono); color: var(--green); margin-bottom: 12px; }
+    .cta p { margin-bottom: 16px; font-size: 0.95rem; }
+    .cta-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-family: var(--mono); font-size: 0.9rem; }
+    footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; font-size: 0.85rem; color: var(--text-dim); }
+    footer a { color: var(--text-dim); } footer a:hover { color: var(--accent); }
+    .footer-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+    @media (max-width: 600px) { header h1 { font-size: 1.5rem; } header { padding: 32px 0 24px; } article h2 { font-size: 1.1rem; } .comparison-table { font-size: 0.8rem; } .comparison-table th, .comparison-table td { padding: 6px 8px; } }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <a href="../../hu/blog/tdd-hardware.html" style="color:var(--text-dim);padding:4px 12px;">Magyar</a>
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;margin-left:4px;">English</span>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>From 187 Tests to Silicon</h1>
+    <div class="subtitle">Test-driven hardware development</div>
+    <div class="meta">August 24, 2026 &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <p>
+      In software, test-driven development is unremarkable. Write the failing test, write the code that makes it pass, refactor. Millions of developers do it every day.
+    </p>
+
+    <p>
+      In hardware it is rare, and the reason is structural: the feedback loop is long and the last iteration is expensive. A compile error costs seconds. A synthesis error costs minutes. A bug found on a fabricated chip costs a shuttle slot and several months. So the discipline that software gets to treat as a style preference is, in silicon, the only affordable way to work.
+    </p>
+
+    <p>
+      The CLI-CPU is a processor that runs .NET CIL bytecode natively, with no JIT and no interpreter. It was built test-first from the beginning. Here is what that actually looks like, measured on the repository as it stands today.
+    </p>
+
+    <blockquote>
+      A test suite is not a quality ritual. On a chip project it is the only mechanism that tells you the RTL still means what the specification meant.
+    </blockquote>
+
+    <h2>The specification is an executable program</h2>
+
+    <p>
+      Before a single line of Verilog existed, the CIL-T0 instruction set had a reference implementation: <code>CilCpu.Sim</code>, a C# simulator of the Nano core. It is not a documentation artifact. It is the canonical definition of what every opcode does to the evaluation stack, the frame pointer, the call depth, and the trap conditions.
+    </p>
+
+    <p>
+      That simulator carries <strong>187 green xUnit tests</strong> today, across the simulator core, the CIL-T0 linker, the runner, the tracer, and the trap semantics:
+    </p>
+
+    <pre>$ dotnet test src/CilCpu.Sim.Tests/CilCpu.Sim.Tests.csproj
+
+Passed!  - Failed: 0, Passed: 187, Skipped: 0, Total: 187</pre>
+
+    <p>
+      The proportions are worth a look. The simulator is <strong>3,684 lines</strong> of C#; its test suite is <strong>3,391 lines</strong>. Roughly one line of test for every line of implementation, written first.
+    </p>
+
+    <div class="highlight-box">
+      <strong>One rule shaped these tests more than any other:</strong> test programs are compiled from real C# source through Roslyn, never hand-assembled as bytecode literals. A hand-written opcode sequence tests what I believed the compiler emits. A Roslyn-compiled one tests what it actually emits &mdash; including the cases I would not have thought to write by hand.
+    </div>
+
+    <h2>The golden vector: how the RTL is held to the simulator</h2>
+
+    <p>
+      Once the Verilog exists, the interesting question is not "do the RTL tests pass". It is "does the RTL mean the same thing as the reference". Those are different claims, and only the second one matters when the design goes to fabrication.
+    </p>
+
+    <p>
+      The golden-vector harness answers it directly. The C# simulator emits a JSONL execution trace &mdash; one entry per instruction, recorded <em>before</em> the instruction executes. The cocotb testbench then runs the same program on the Verilog core under Verilator, and on <strong>every <code>ST_DECODE</code> cycle</strong> it compares six architectural signals against the corresponding trace step:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>RTL signal</th><th>Meaning</th></tr>
+      <tr><td><code>r_pc</code></td><td>program counter</td></tr>
+      <tr><td><code>r_sp</code></td><td>stack pointer (normalized to the frame-end convention)</td></tr>
+      <tr><td><code>r_fp</code></td><td>frame pointer</td></tr>
+      <tr><td><code>r_call_depth</code></td><td>call nesting depth</td></tr>
+      <tr><td><code>r_arg_count</code></td><td>argument count of the active frame</td></tr>
+      <tr><td><code>r_local_count</code></td><td>local count of the active frame</td></tr>
+    </table>
+
+    <p>
+      A mismatch fails the test with both sides printed &mdash; trace <code>pc/sp/fp/cd/ac/lc</code> against RTL <code>pc/sp/fp/cd/ac/lc</code>, at a named step and cycle. There is no interpretation step, no "looks about right". Either the hardware walked the same path as the reference, or the test names the exact instruction where they diverged.
+    </p>
+
+    <p>
+      This is the mechanism that turns a simulator into a specification with teeth. The <code>CALL</code>/<code>RET</code> golden test, for example, follows a call depth transition of 1 &rarr; 2 &rarr; 1 with an argument count of 0 &rarr; 2 &rarr; 0 across eight steps. Any RTL change that quietly breaks frame bookkeeping fails there, immediately, with the failing step identified.
+    </p>
+
+    <h2>What the hardware suite measures today</h2>
+
+    <p>
+      The RTL side is verified by cocotb against Verilator: <strong>322 test functions</strong> across <strong>24 testbench modules</strong>, covering the ALU, the decoder, the microcode sequencer, the stack cache, the multiplier, the divider, the QSPI controller, the mailbox, GPIO, the trace MUX, the UART transmitter and receiver, the boot controller, the decimal printer, and the assembled SoC.
+    </p>
+
+    <p>
+      The size ratio is the part that surprises people coming from software:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Layer</th><th>Lines</th></tr>
+      <tr><td>Verilog RTL (<code>rtl/src/*.v</code>)</td><td>6,480</td></tr>
+      <tr><td>cocotb testbenches (<code>rtl/tb/*.py</code>)</td><td>10,457</td></tr>
+      <tr><td>C# reference simulator</td><td>3,684</td></tr>
+      <tr><td>C# test suite</td><td>3,391</td></tr>
+    </table>
+
+    <p>
+      There is <strong>1.6 times more testbench code than RTL</strong>. That ratio is not an accident of over-testing; it is what it costs to state, in executable form, what a piece of hardware is supposed to do in every cycle of every corner case.
+    </p>
+
+    <h2>The same function, three layers deep</h2>
+
+    <p>
+      The end-to-end test is deliberately unglamorous: a Fibonacci function, written in ordinary C#, in <code>samples/PureMath</code>. What makes it useful is that one source file feeds three independent verification layers, each one closer to physical reality than the last.
+    </p>
+
+    <pre>C# source (samples/PureMath, Math.cs)
+    &darr; Roslyn
+.dll (CIL bytecode)
+    &darr; TCliCpuLinker
+CIL-T0 binary
+    &darr;
+&#9474; layer 1  C# reference simulator     Assert.Equal(6765, result.Result)
+&#9474; layer 2  Verilog core / Verilator    return_value == 55  (recursive Fib(10))
+&#9492; layer 3  XC7A200T FPGA, real UART    36 37 36 35 0D 0A  =  "6765\r\n"</pre>
+
+    <p>
+      <strong>Layer 1</strong> is <code>RunBinary_Fibonacci20_Returns6765</code> in the xUnit suite: the iterative Fibonacci binary run through the reference simulator, asserting 6765 for n = 20.
+    </p>
+
+    <p>
+      <strong>Layer 2</strong> takes the <em>recursive</em> variant, links it with the same toolchain, and boots it on the Verilog core under Verilator, asserting a return value of 55 for n = 10. The recursive form is the deliberate choice here: it is the case that stresses frame bookkeeping hardest &mdash; caller evaluation depth preserved across nested <code>CALL</code>/<code>RET</code>, stack cache spill and refill, header reserved fields. A core that handles iteration fine can still be quietly wrong about recursion, and this test is where that shows.
+    </p>
+
+    <p>
+      <strong>Layer 3</strong> is the physical board: the same class of binary in config flash, printing to a real serial port. The decimal conversion itself has its own RTL test &mdash; the printer module turns 6765 into the byte sequence <code>"6765\r\n"</code>, verified in cocotb independently of everything above it.
+    </p>
+
+    <p>
+      One function, three layers. When a change breaks the semantics, it breaks the cheapest layer first &mdash; which is exactly the point.
+    </p>
+
+    <h2>Why the discipline pays for itself</h2>
+
+    <p>
+      The economics of a hardware bug are not linear. They are stepwise, and each step is roughly an order of magnitude:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Where the bug surfaces</th><th>Cost</th><th>Iteration time</th></tr>
+      <tr><td>C# reference simulator</td><td>~&euro;0</td><td>~1 second</td></tr>
+      <tr><td>cocotb / Verilator</td><td>~&euro;0</td><td>seconds to minutes</td></tr>
+      <tr><td>FPGA</td><td>~&euro;0 (board already owned)</td><td>minutes (resynthesis + reflash)</td></tr>
+      <tr><td>ASIC tape-out</td><td>&euro;1,500&ndash;3,000 (Tiny Tapeout shuttle)</td><td>months</td></tr>
+    </table>
+
+    <p>
+      This is why the project's execution order puts FPGA validation (F2.7) <em>before</em> the silicon synthesis flow, and why the rule is stated plainly in the roadmap: <strong>no silicon tape-out with a design that hasn't run on FPGA</strong>. Bugs found on an FPGA are free. The same bug on a fabricated die is a dead chip and a lost shuttle slot.
+    </p>
+
+    <p>
+      The first FPGA run made this concrete: three bugs that every simulation had passed cleanly surfaced within hours on real hardware &mdash; a synthesis-only part-select issue, a timing constraint, and a flash chip whose Quad Enable bit ships as zero from the factory. None of them were logic errors. All of them were assumptions. Simulation checks your logic; hardware checks your assumptions; and the test suite is what lets you tell the two apart.
+    </p>
+
+    <h2>What TDD does and does not buy you</h2>
+
+    <p>
+      It does not prove the design is correct. No test suite does. What it buys is narrower and more useful: <strong>when something breaks, you know within seconds which layer broke it</strong>. A failing xUnit test means the specification changed. A failing golden-vector test means the RTL drifted from the specification. A failing FPGA run means an assumption about the physical world was wrong.
+    </p>
+
+    <p>
+      For a small team building a processor with an open toolchain and a modest budget, that separation is not a luxury. It is the difference between a design that can be changed and a design that can only be admired.
+    </p>
+
+    <div class="cta">
+      <h3>Open source</h3>
+      <p>The RTL, the reference simulator, the linker, and the complete test suite are public. Every number in this article can be reproduced from the repository.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="first-fpga.html">Blog &rarr; Our first FPGA run</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+  </div>
+</article>
+
+<nav style="max-width:720px;width:100%;margin:0 auto;padding:0 24px 48px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;font-family:var(--mono);font-size:0.9rem;border-top:1px solid var(--border);padding-top:24px;">
+  <a href="first-fpga.html">&larr; From Simulation to Real Hardware</a>
+  <a href="why-cli-cpu.html">Why I'm building this CPU &rarr;</a>
+</nav>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

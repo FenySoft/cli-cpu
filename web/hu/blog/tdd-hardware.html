@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>187 teszttől a szilíciumig — CLI-CPU Blog</title>
+  <meta name="description" content="Tesztvezérelt hardverfejlesztés: 187 xUnit teszt még az első Verilog sor előtt, arany vektor harness, ami ciklusról ciklusra veti össze az RTL jeleit a C# referencia-szimulátorral, és a Fibonacci három rétegben ellenőrizve.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --bg-card: #161b22;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-dim: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --green: #3fb950;
+      --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.8; min-height: 100vh; display: flex; flex-direction: column; }
+    a { color: var(--accent); text-decoration: none; transition: color 0.15s; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+    .container { max-width: 720px; margin: 0 auto; padding: 0 24px; width: 100%; }
+    header { padding: 48px 0 32px; border-bottom: 1px solid var(--border); }
+    header .nav { font-family: var(--mono); font-size: 0.85rem; margin-bottom: 24px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: #f0f6fc; line-height: 1.25; }
+    header .subtitle { font-family: var(--mono); font-size: 1rem; color: var(--green); margin-top: 12px; }
+    header .meta { font-size: 0.85rem; color: var(--text-dim); margin-top: 16px; font-family: var(--mono); }
+    article { flex: 1; padding: 48px 0; }
+    article h2 { font-family: var(--mono); font-size: 1.3rem; color: #f0f6fc; margin-top: 48px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    article h2:first-child { margin-top: 0; }
+    article h3 { font-size: 1.1rem; color: #f0f6fc; margin-top: 32px; margin-bottom: 12px; }
+    article p { margin-bottom: 16px; font-size: 1.02rem; }
+    article blockquote { border-left: 3px solid var(--green); padding: 12px 20px; margin: 24px 0; background: var(--bg-card); border-radius: 0 6px 6px 0; font-style: italic; }
+    article ul, article ol { margin: 16px 0; padding-left: 24px; }
+    article li { margin-bottom: 8px; font-size: 1.02rem; }
+    article strong { color: #f0f6fc; }
+    article code { font-family: var(--mono); background: var(--bg-card); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin: 24px 0; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.6; }
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 24px 0; font-size: 0.9rem; }
+    .comparison-table th, .comparison-table td { padding: 10px 14px; border: 1px solid var(--border); text-align: left; }
+    .comparison-table th { background: var(--bg-card); font-family: var(--mono); font-size: 0.85rem; color: #f0f6fc; }
+    .comparison-table td { color: var(--text-dim); }
+    .highlight-box { background: var(--bg-card); border-left: 3px solid var(--accent); padding: 16px 20px; margin: 24px 0; border-radius: 0 6px 6px 0; }
+    .highlight-box strong { color: var(--accent); }
+    .cta { background: var(--bg-card); border: 1px solid var(--green); border-radius: 8px; padding: 28px; margin-top: 48px; text-align: center; }
+    .cta h3 { font-family: var(--mono); color: var(--green); margin-bottom: 12px; }
+    .cta p { margin-bottom: 16px; font-size: 0.95rem; }
+    .cta-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; font-family: var(--mono); font-size: 0.9rem; }
+    footer { border-top: 1px solid var(--border); padding: 32px 0; text-align: center; font-size: 0.85rem; color: var(--text-dim); }
+    footer a { color: var(--text-dim); } footer a:hover { color: var(--accent); }
+    .footer-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+    @media (max-width: 600px) { header h1 { font-size: 1.5rem; } header { padding: 32px 0 24px; } article h2 { font-size: 1.1rem; } .comparison-table { font-size: 0.8rem; } .comparison-table th, .comparison-table td { padding: 6px 8px; } }
+  </style>
+</head>
+<body>
+
+<div style="position:fixed;top:0;right:0;padding:12px 20px;z-index:100;font-family:var(--sans);font-size:14px;">
+  <span style="color:var(--accent);padding:4px 12px;border:1px solid var(--accent);border-radius:4px;">Magyar</span>
+  <a href="../../en/blog/tdd-hardware.html" style="color:var(--text-dim);padding:4px 12px;margin-left:4px;">English</a>
+</div>
+
+<header>
+  <div class="container">
+    <div class="nav"><a href="../">CLI-CPU</a> / <a href="./">blog</a></div>
+    <h1>187 teszttől a szilíciumig</h1>
+    <div class="subtitle">Tesztvezérelt hardverfejlesztés</div>
+    <div class="meta">2026. augusztus 24. &middot; Hocza J&oacute;zsef Szabolcs</div>
+  </div>
+</header>
+
+<article>
+  <div class="container">
+
+    <p>
+      A szoftverben a tesztvezérelt fejlesztés hétköznapi dolog. Megírod a bukó tesztet, megírod a kódot, ami zöldre fordítja, aztán refaktorálsz. Fejlesztők milliói csinálják nap mint nap.
+    </p>
+
+    <p>
+      A hardverben ritka, és ennek szerkezeti oka van: a visszacsatolási hurok hosszú, az utolsó iteráció pedig drága. Egy fordítási hiba másodpercekbe kerül. Egy szintézis-hiba percekbe. Egy legyártott chipen talált hiba egy shuttle-helybe és több hónapba. Vagyis amit a szoftverben stílus-kérdésként lehet kezelni, az a szilíciumban az egyetlen megfizethető munkamódszer.
+    </p>
+
+    <p>
+      A CLI-CPU egy processzor, ami a .NET CIL bájtkódot natívan futtatja, JIT és interpreter nélkül. Kezdettől teszt-előbb épült. Így néz ki ez a gyakorlatban, a repó mai állapotán mérve.
+    </p>
+
+    <blockquote>
+      A teszt-készlet nem minőségi szertartás. Egy chip-projektben ez az egyetlen mechanizmus, ami megmondja, hogy az RTL még mindig azt jelenti-e, amit a specifikáció jelentett.
+    </blockquote>
+
+    <h2>A specifikáció egy futtatható program</h2>
+
+    <p>
+      Még mielőtt egyetlen sor Verilog létezett volna, a CIL-T0 utasításkészletnek volt egy referencia-implementációja: a <code>CilCpu.Sim</code>, a Nano core C# szimulátora. Ez nem dokumentációs melléktermék. Ez a kanonikus definíciója annak, hogy melyik opkód mit csinál a kiértékelő veremmel, a keret-mutatóval, a hívási mélységgel és a trap-feltételekkel.
+    </p>
+
+    <p>
+      A szimulátor mögött ma <strong>187 zöld xUnit teszt</strong> áll, a szimulátor-magra, a CIL-T0 linkerre, a futtatóra, a tracerre és a trap-szemantikára:
+    </p>
+
+    <pre>$ dotnet test src/CilCpu.Sim.Tests/CilCpu.Sim.Tests.csproj
+
+Passed!  - Failed: 0, Passed: 187, Skipped: 0, Total: 187</pre>
+
+    <p>
+      Az arányok érdekesek. A szimulátor <strong>3 684 sor</strong> C#; a teszt-készlete <strong>3 391 sor</strong>. Nagyjából egy sor teszt minden sor implementációra &mdash; és a teszt volt előbb.
+    </p>
+
+    <div class="highlight-box">
+      <strong>Egy szabály formálta ezeket a teszteket minden másnál jobban:</strong> a tesztprogramok valódi C# forrásból, Roslynnal fordulnak, sosem kézzel összerakott bájtkód-literálként. Egy kézzel írt opkód-sorozat azt teszteli, amit én hiszek a fordítóról. Egy Roslynnal fordított azt teszteli, amit a fordító ténylegesen kibocsát &mdash; beleértve azokat az eseteket is, amiket kézzel eszembe sem jutott volna leírni.
+    </div>
+
+    <h2>Az arany vektor: mihez van kötve az RTL</h2>
+
+    <p>
+      Amikor a Verilog már létezik, az érdekes kérdés nem az, hogy „átmennek-e az RTL tesztek". Hanem az, hogy „ugyanazt jelenti-e az RTL, mint a referencia". Ez két különböző állítás, és gyártás előtt csak a második számít.
+    </p>
+
+    <p>
+      Az arany vektor harness közvetlenül erre válaszol. A C# szimulátor egy JSONL végrehajtási nyomvonalat állít elő &mdash; utasításonként egy bejegyzést, még az utasítás végrehajtása <em>előtt</em> rögzítve. A cocotb testbench ugyanazt a programot lefuttatja a Verilog magon Verilator alatt, és <strong>minden <code>ST_DECODE</code> ciklusban</strong> hat architekturális jelet vet össze a nyomvonal megfelelő lépésével:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>RTL jel</th><th>Jelentés</th></tr>
+      <tr><td><code>r_pc</code></td><td>utasításszámláló</td></tr>
+      <tr><td><code>r_sp</code></td><td>veremmutató (a frame-end konvencióra normalizálva)</td></tr>
+      <tr><td><code>r_fp</code></td><td>keret-mutató</td></tr>
+      <tr><td><code>r_call_depth</code></td><td>hívási mélység</td></tr>
+      <tr><td><code>r_arg_count</code></td><td>az aktív keret argumentum-száma</td></tr>
+      <tr><td><code>r_local_count</code></td><td>az aktív keret lokális-száma</td></tr>
+    </table>
+
+    <p>
+      Eltérés esetén a teszt mindkét oldalt kiírja &mdash; a nyomvonal <code>pc/sp/fp/cd/ac/lc</code> értékeit az RTL <code>pc/sp/fp/cd/ac/lc</code> értékeivel szemben, megnevezett lépésnél és ciklusnál. Nincs értelmezési lépés, nincs „nagyjából stimmel". Vagy ugyanazon az úton ment végig a hardver, mint a referencia, vagy a teszt megnevezi a pontos utasítást, ahol elváltak.
+    </p>
+
+    <p>
+      Ez az a mechanizmus, amitől a szimulátorból foggal-körömmel érvényesített specifikáció lesz. A <code>CALL</code>/<code>RET</code> arany teszt például egy 1 &rarr; 2 &rarr; 1 hívásmélység-átmenetet követ 0 &rarr; 2 &rarr; 0 argumentum-számmal, nyolc lépésen át. Bármelyik RTL-módosítás, ami csendben elrontja a keret-könyvelést, ott bukik el, azonnal, a hibás lépés megnevezésével.
+    </p>
+
+    <h2>Amit a hardveres készlet ma mér</h2>
+
+    <p>
+      Az RTL oldalt a cocotb verifikálja Verilator felett: <strong>322 tesztfüggvény 24 testbench modulban</strong>, lefedve az ALU-t, a dekódert, a mikrokód-szekvenszert, a stack cache-t, a szorzót, az osztót, a QSPI vezérlőt, a mailboxot, a GPIO-t, a trace MUX-ot, az UART adót és vevőt, a boot vezérlőt, a decimális printert és az összeállított SoC-ot.
+    </p>
+
+    <p>
+      A méretarány az, ami a szoftver felől érkezőket meglepi:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Réteg</th><th>Sor</th></tr>
+      <tr><td>Verilog RTL (<code>rtl/src/*.v</code>)</td><td>6 480</td></tr>
+      <tr><td>cocotb testbench-ek (<code>rtl/tb/*.py</code>)</td><td>10 457</td></tr>
+      <tr><td>C# referencia-szimulátor</td><td>3 684</td></tr>
+      <tr><td>C# teszt-készlet</td><td>3 391</td></tr>
+    </table>
+
+    <p>
+      <strong>1,6-szor több testbench-kód van, mint RTL.</strong> Ez az arány nem a túltesztelés mellékterméke; ennyibe kerül futtatható formában kimondani, hogy egy hardver-darabnak mit kell csinálnia minden határeset minden ciklusában.
+    </p>
+
+    <h2>Ugyanaz a függvény, három rétegen át</h2>
+
+    <p>
+      A végponttól végpontig teszt szándékosan unalmas: egy Fibonacci függvény, hétköznapi C#-ban, a <code>samples/PureMath</code>-ban. Attól hasznos, hogy egyetlen forrásfájl táplál három független verifikációs réteget, mindegyik közelebb a fizikai valósághoz, mint az előző.
+    </p>
+
+    <pre>C# forrás (samples/PureMath, Math.cs)
+    &darr; Roslyn
+.dll (CIL bájtkód)
+    &darr; TCliCpuLinker
+CIL-T0 bináris
+    &darr;
+&#9474; 1. réteg  C# referencia-szimulátor    Assert.Equal(6765, result.Result)
+&#9474; 2. réteg  Verilog core / Verilator     return_value == 55  (rekurzív Fib(10))
+&#9492; 3. réteg  XC7A200T FPGA, valódi UART   36 37 36 35 0D 0A  =  "6765\r\n"</pre>
+
+    <p>
+      Az <strong>1. réteg</strong> a <code>RunBinary_Fibonacci20_Returns6765</code> az xUnit készletben: az iteratív Fibonacci bináris a referencia-szimulátoron, 6765-öt állítva n = 20-ra.
+    </p>
+
+    <p>
+      A <strong>2. réteg</strong> a <em>rekurzív</em> változatot veszi, ugyanazzal a toolchainnel linkeli, és a Verilog magon bootolja Verilator alatt, 55-ös visszatérési értéket követelve n = 10-re. A rekurzív alak itt szándékos választás: ez terheli legjobban a keret-könyvelést &mdash; a hívó kiértékelési mélységének megőrzése egymásba ágyazott <code>CALL</code>/<code>RET</code> között, a stack cache kiürítése és újratöltése, a fejléc fenntartott mezői. Egy mag, ami az iterációt hibátlanul kezeli, a rekurzióban még lehet csendben rossz &mdash; és ez a teszt az, ahol ez kiderül.
+    </p>
+
+    <p>
+      A <strong>3. réteg</strong> a fizikai kártya: ugyanabból az osztályból származó bináris a konfigurációs flashben, valódi soros portra írva. Maga a decimális átalakítás külön RTL-tesztet kap &mdash; a printer modul a 6765-ből a <code>"6765\r\n"</code> bájtsorozatot állítja elő, cocotb-ban verifikálva, a fölötte lévő rétegektől függetlenül.
+    </p>
+
+    <p>
+      Egy függvény, három réteg. Ha egy változtatás elrontja a szemantikát, a legolcsóbb rétegben romlik el először &mdash; pontosan ez a lényeg.
+    </p>
+
+    <h2>Miért fizetődik ki a fegyelem</h2>
+
+    <p>
+      Egy hardveres hiba költsége nem lineáris. Lépcsős, és minden lépcső nagyjából egy nagyságrend:
+    </p>
+
+    <table class="comparison-table">
+      <tr><th>Hol bukkan fel a hiba</th><th>Költség</th><th>Iterációs idő</th></tr>
+      <tr><td>C# referencia-szimulátor</td><td>~0 &euro;</td><td>~1 másodperc</td></tr>
+      <tr><td>cocotb / Verilator</td><td>~0 &euro;</td><td>másodpercek-percek</td></tr>
+      <tr><td>FPGA</td><td>~0 &euro; (a kártya megvan)</td><td>percek (újraszintézis + újraflashelés)</td></tr>
+      <tr><td>ASIC tape-out</td><td>1 500&ndash;3 000 &euro; (Tiny Tapeout shuttle)</td><td>hónapok</td></tr>
+    </table>
+
+    <p>
+      Ezért teszi a projekt végrehajtási sorrendje az FPGA-validációt (F2.7) a szilícium-szintézis elé, és ezért mondja ki a roadmap nyíltan a szabályt: <strong>nincs szilícium tape-out olyan tervvel, ami nem futott FPGA-n</strong>. Az FPGA-n talált hiba ingyen van. Ugyanaz a hiba egy legyártott lapkán egy halott chip és egy elvesztett shuttle-hely.
+    </p>
+
+    <p>
+      Az első FPGA futás ezt kézzelfoghatóvá tette: három hiba, amin minden szimuláció tisztán átment, órákon belül felszínre került valódi hardveren &mdash; egy csak szintézisben számító part-select, egy időzítési kényszer, és egy flash chip, aminek a Quad Enable bitje gyárilag nulla. Egyik sem logikai hiba volt. Mindegyik feltételezés volt. A szimuláció a logikádat ellenőrzi, a hardver a feltételezéseidet &mdash; és a teszt-készlet az, amitől a kettőt meg tudod különböztetni.
+    </p>
+
+    <h2>Mit ad a TDD, és mit nem</h2>
+
+    <p>
+      Nem bizonyítja, hogy a terv helyes. Ezt egyetlen teszt-készlet sem teszi. Amit ad, az szűkebb és hasznosabb: <strong>ha valami elromlik, másodperceken belül tudod, melyik réteg rontotta el</strong>. Egy bukó xUnit teszt azt jelenti, hogy a specifikáció változott. Egy bukó arany vektor teszt azt, hogy az RTL elcsúszott a specifikációtól. Egy bukó FPGA futás azt, hogy a fizikai világról alkotott feltételezés volt hibás.
+    </p>
+
+    <p>
+      Egy kis csapatnak, ami nyílt toolchainnel és szerény büdzsével épít processzort, ez a szétválasztás nem luxus. Ez a különbség egy olyan terv között, amit még lehet változtatni, és egy olyan között, amit már csak csodálni lehet.
+    </p>
+
+    <div class="cta">
+      <h3>Nyílt forráskód</h3>
+      <p>Az RTL, a referencia-szimulátor, a linker és a teljes teszt-készlet nyilvános. A cikkben szereplő minden szám reprodukálható a repóból.</p>
+      <div class="cta-links">
+        <a href="https://github.com/FenySoft/CLI-CPU">GitHub &rarr; CLI-CPU</a>
+        <a href="first-fpga.html">Blog &rarr; Az első FPGA futásunk</a>
+        <a href="https://clicpu.org">clicpu.org</a>
+      </div>
+    </div>
+
+  </div>
+</article>
+
+<nav style="max-width:720px;width:100%;margin:0 auto;padding:0 24px 48px;display:flex;justify-content:space-between;align-items:center;box-sizing:border-box;font-family:var(--mono);font-size:0.9rem;border-top:1px solid var(--border);padding-top:24px;">
+  <a href="first-fpga.html">&larr; Szimulációtól a valódi hardverig</a>
+  <a href="why-cli-cpu.html">Miért építek CPU-t &rarr;</a>
+</nav>
+
+<footer>
+  <div class="container">
+    <div class="footer-links">
+      <a href="https://github.com/FenySoft/CLI-CPU">GitHub</a>
+      <a href="https://clicpu.org">clicpu.org</a>
+      <a href="../">CLI-CPU</a>
+    </div>
+    <p style="margin-top:12px;">CERN-OHL-S v2 &middot; FenySoft 2026</p>
+  </div>
+</footer>
+
+</body>
+</html>

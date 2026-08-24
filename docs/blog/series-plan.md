@@ -8,7 +8,7 @@ status: policy
 
 > Magyar verzió: [series-plan-hu.md](series-plan-hu.md)
 
-> Version: 1.1
+> Version: 1.2
 
 ## Strategy
 
@@ -23,7 +23,7 @@ status: policy
 |---|-------|----------------|--------|
 | **1** | Why I'm Building a CPU That Runs .NET Natively | Everyone — the big picture | Published |
 | **2** | 24 Cores, Zero Cache Coherency: How Shared-Nothing Beats Multi-Threading | CPU architecture enthusiasts | Planned |
-| **3** | From 187 Tests to Silicon: Test-Driven Hardware Development | .NET / software developers | Planned |
+| **3** | From 187 Tests to Silicon: Test-Driven Hardware Development | .NET / software developers | Published |
 | **4** | Hardware-Level Security Without Mitigations: Why Spectre Can't Touch This | Security audience | Planned |
 | **5** | The Symphact Vision: Why Linux's 1970s Architecture Needs a Successor | OS / systems programmers | Planned |
 | **6** | 8 Million .NET Developers, One Hardware Platform: Every Language, Native Silicon | .NET community | Planned |
@@ -39,9 +39,10 @@ status: policy
 - Linear scaling: why it matters for actor workloads
 - Benchmarks we plan to measure (actor msg/sec, context switch, SNN throughput)
 
-## Article #3 — Outline
+## Article #3 — Published (2026-08-24)
 
 **Title:** From 187 Tests to Silicon: Test-Driven Hardware Development
+**URL:** `web/{hu,en}/blog/tdd-hardware.html`
 
 - TDD in software is normal — TDD in hardware is rare
 - How we wrote 187 C# tests BEFORE writing any Verilog
@@ -107,5 +108,6 @@ Use these tags for all articles:
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.2 | 2026-08-24 | Article #3 published (`tdd-hardware.html`), status and URL recorded |
 | 1.1 | 2026-07-17 | Test count updated to the actual CI result: 187 |
 | 1.0 | 2026-04-15 | Initial release |

@@ -8,7 +8,7 @@ status: policy
 
 > English version: [series-plan.md](series-plan.md)
 
-> Version: 1.1
+> Version: 1.2
 
 ## Stratégia
 
@@ -23,7 +23,7 @@ status: policy
 |---|-----|-------------|---------|
 | **1** | Miért építek CPU-t, ami natívan futtatja a .NET-et | Mindenki — a nagy kép | Publikált |
 | **2** | 24 Core, nulla cache koherencia: hogyan veri a Shared-Nothing a multi-threadinget | CPU architektúra rajongók | Tervezett |
-| **3** | 187 teszttől a szilíciumig: tesztvezérelt hardverfejlesztés | .NET / szoftverfejlesztők | Tervezett |
+| **3** | 187 teszttől a szilíciumig: tesztvezérelt hardverfejlesztés | .NET / szoftverfejlesztők | Publikált |
 | **4** | Hardverszintű biztonság mitigációk nélkül: miért nem tud hozzáérni a Spectre | Biztonsági közönség | Tervezett |
 | **5** | A Symphact vízió: miért kell utód a Linux 1970-es évekbeli architektúrájának | OS / rendszerprogramozók | Tervezett |
 | **6** | 8 millió .NET fejlesztő, egy hardverplatform: minden nyelv, natív szilícium | .NET közösség | Tervezett |
@@ -39,9 +39,10 @@ status: policy
 - Lineáris skálázás: miért fontos az aktor workload-oknál
 - Tervezett mérések (aktor msg/sec, context switch, SNN throughput)
 
-## 3. cikk — Vázlat
+## 3. cikk — Publikált (2026-08-24)
 
 **Cím:** 187 teszttől a szilíciumig: tesztvezérelt hardverfejlesztés
+**URL:** `web/{hu,en}/blog/tdd-hardware.html`
 
 - A TDD a szoftverben normális — hardverben ritka
 - Hogyan írtunk 187 C# tesztet MIELŐTT bármilyen Verilog-ot írtunk volna
@@ -107,5 +108,6 @@ Használd ezeket a címkéket minden cikkhez:
 
 | Verzió | Dátum | Összefoglaló |
 |--------|-------|-------------|
+| 1.2 | 2026-08-24 | 3. cikk publikálva (`tdd-hardware.html`), státusz és URL felvéve |
 | 1.1 | 2026-07-17 | Tesztszám frissítve a tényleges CI-eredményre: 187 |
 | 1.0 | 2026-04-15 | Kezdeti kiadás |
