@@ -255,7 +255,7 @@ public static class MerklePath
 
 ## Related Documents
 
-- `docs/ISA-CIL-T0-hu.md` — the CIL-T0 base ISA (48 opcodes)
+- `docs/ISA-CIL-T0-hu.md` — the CIL-T0 base ISA (64 opcodes)
 - `docs/sealcore-hu.md` — the Seal Core architecture and role
 - `docs/authcode-hu.md` — the AuthCode mechanism executed by the firmware
 - `docs/quench-ram-hu.md` — the QRAM memory cell (SEAL/RELEASE trigger)

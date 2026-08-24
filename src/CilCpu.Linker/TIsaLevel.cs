@@ -10,9 +10,9 @@ namespace CilCpu.Linker;
 public enum TIsaLevel
 {
     /// <summary>
-    /// hu: CIL-T0 — 48 opkód, int32-only, no arrays, no objects.
+    /// hu: CIL-T0 — 64 opkód, int32-only, no arrays, no objects.
     /// <br />
-    /// en: CIL-T0 — 48 opcodes, int32-only, no arrays, no objects.
+    /// en: CIL-T0 — 64 opcodes, int32-only, no arrays, no objects.
     /// </summary>
     CilT0,
 

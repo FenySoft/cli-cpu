@@ -83,7 +83,7 @@ Last audit: **2026-05-03**
 
 | File pair | Note |
 |---|---|
-| `ISA-CIL-T0-{hu,en}.md` | The 48 opcodes are implemented in the simulator, 259+ tests. **Promote to:** `specs/isa-cil-t0-{hu,en}.md`, `Version: 1.0`. |
+| `ISA-CIL-T0-{hu,en}.md` | The 64 opcodes are implemented in the simulator, 187 tests. **Promote to:** `specs/isa-cil-t0-{hu,en}.md`, `Version: 1.0`. |
 
 ### `policy` (6 files, 3 pairs)
 

@@ -79,7 +79,7 @@ Starting from phase F5, the CFPU employs a **heterogeneous multi-core** architec
 
 | | **CFPU Nano** | **CFPU Rich** |
 |-|---------------|---------------|
-| ISA | CIL-T0 (48 opcodes, integer-only) | Full ECMA-335 CIL (~220 opcodes) |
+| ISA | CIL-T0 (64 opcodes, integer-only) | Full ECMA-335 CIL (~220 opcodes) |
 | Size | ~10k std cells | ~80k std cells |
 | Features | Integer, stack cache, mailbox | Nano + object model + GC + FPU + exceptions + generics |
 | Role | Worker / neuron / filter / simple actor | Supervisor / orchestrator / complex domain logic |
@@ -89,7 +89,7 @@ C# programs use **`[RunsOn(CoreType.Nano)]`** or **`[RunsOn(CoreType.Rich)]`** a
 
 ## Status
 
-**F1.5 -- DONE.** The C# reference simulator (48/48 CIL-T0 opcodes, 187 green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
+**F1.5 -- DONE.** The C# reference simulator (64/64 CIL-T0 opcodes, 187 green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
 
 See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 
@@ -101,7 +101,7 @@ See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
 
 - [docs/roadmap-en.md](docs/roadmap-en.md) -- Seven-phase roadmap from F0 to F7, with the Cognitive Fabric pivot at F4 and the F6.5 Secure Edition variant
 - [docs/architecture-en.md](docs/architecture-en.md) -- CLI-CPU microarchitecture, Cognitive Fabric positioning, prior art analysis (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogeneous Nano + Rich multi-core
-- [docs/ISA-CIL-T0-en.md](docs/ISA-CIL-T0-en.md) -- CIL-T0 subset specification (48 opcodes), mailbox MMIO interface
+- [docs/ISA-CIL-T0-en.md](docs/ISA-CIL-T0-en.md) -- CIL-T0 subset specification (64 opcodes), mailbox MMIO interface
 - [docs/security-en.md](docs/security-en.md) -- Threat model, architectural security guarantees, attack immunity table, formal verification plan, certification paths (IEC 61508, ISO 26262, DO-178C, IEC 62304)
 - [Symphact vision](https://github.com/FenySoft/Symphact/blob/main/docs/vision-en.md) -- an actor-based operating system for the CFPU, "Erlang in silicon". **Implementation:** [github.com/FenySoft/Symphact](https://github.com/FenySoft/Symphact) (the vision document also lives there; local redirect stub: [`docs/symphact-en.md`](docs/symphact-en.md))
 - [docs/secure-element-en.md](docs/secure-element-en.md) -- Secure Edition: JavaCard / TEE / Secure Element market, detailed TROPIC01 analysis, multi-SE hardware isolation, F6.5 parallel tape-out plan

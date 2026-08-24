@@ -255,7 +255,7 @@ public static class MerklePath
 
 ## Kapcsolódó dokumentumok
 
-- `docs/ISA-CIL-T0-hu.md` — a CIL-T0 alap ISA (48 opkód)
+- `docs/ISA-CIL-T0-hu.md` — a CIL-T0 alap ISA (64 opkód)
 - `docs/sealcore-hu.md` — a Seal Core architektúra és szerepe
 - `docs/authcode-hu.md` — az AuthCode mechanizmus, amit a firmware futtat
 - `docs/quench-ram-hu.md` — a QRAM memóriacella (SEAL/RELEASE trigger)

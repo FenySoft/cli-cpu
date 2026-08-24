@@ -296,7 +296,7 @@ According to the "Strategic positioning: Cognitive Fabric" section in `docs/arch
 
 **CLI-CPU is exactly this path.** The `docs/architecture-en.md` articulates this clearly, and the seven phases (F0-F7) walk through the steps of this victory path:
 
-- **F3 Tiny Tapeout:** the CIL-T0 48 opcodes in hardware --> proof that it works
+- **F3 Tiny Tapeout:** the CIL-T0 64 opcodes in hardware --> proof that it works
 - **F4 Multi-core FPGA:** the shared-nothing model --> proof that it scales
 - **F5 Rich core:** full CLI --> proof that it is feasible
 - **F6-FPGA:** FPGA-verified distributed heterogeneous fabric (3x A7-200T) --> proof that it is production-ready

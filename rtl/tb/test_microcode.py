@@ -214,10 +214,10 @@ async def get_nsteps(dut, opcode):
 
 
 # ============================================================
-# 1. Érvényesség / Validity — mind a 48 opkód ismert
+# 1. Érvényesség / Validity — minden opkód ismert
 # ============================================================
 
-ALL_48_OPCODES = [
+ALL_OPCODES = [
     OP_NOP,
     OP_LDARG_0, OP_LDARG_1, OP_LDARG_2, OP_LDARG_3, OP_LDARG_S,
     OP_STARG_S,
@@ -246,7 +246,7 @@ async def test_all_48_opcodes_valid(dut):
     hu: Mind a 48 CIL-T0 opkód step=0-ra o_valid==1.
     en: All 48 CIL-T0 opcodes yield o_valid==1 at step=0.
     """
-    for op in ALL_48_OPCODES:
+    for op in ALL_OPCODES:
         await check_valid(dut, op, msg=f"opcode {op:#06x}")
 
 
@@ -273,7 +273,7 @@ async def test_done_bit_on_last_step(dut):
     en: For every opcode: done==1 at step==nsteps-1,
         and also at step==0 when nsteps==1.
     """
-    for op in ALL_48_OPCODES:
+    for op in ALL_OPCODES:
         nsteps = await get_nsteps(dut, op)
         assert nsteps >= 1, f"opcode {op:#06x}: nsteps must be >= 1, got {nsteps}"
 
@@ -289,7 +289,7 @@ async def test_done_bit_not_premature(dut):
     hu: Több-lépéses opkódoknál: done==0 a köztes lépésekben.
     en: For multi-step opcodes: done==0 at intermediate steps.
     """
-    for op in ALL_48_OPCODES:
+    for op in ALL_OPCODES:
         nsteps = await get_nsteps(dut, op)
 
         if nsteps > 1:
@@ -807,7 +807,7 @@ async def test_no_simultaneous_sram_rd_wr(dut):
     hu: Egyetlen (opkód, lépés) pár sem állíthat egyszerre sram_rd=1 és sram_wr=1.
     en: No (opcode, step) pair may assert both sram_rd=1 and sram_wr=1.
     """
-    for op in ALL_48_OPCODES:
+    for op in ALL_OPCODES:
         nsteps = await get_nsteps(dut, op)
 
         for s in range(nsteps):

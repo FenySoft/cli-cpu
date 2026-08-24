@@ -250,7 +250,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Miért „Rich core" és nem csak „teljes CIL"?** A `docs/architecture-hu.md` **„Heterogén multi-core: Nano + Rich"** szekciója részletezi: a CLI-CPU heterogén (big.LITTLE-szerű) architektúrát fog használni az F6-tól, **kétféle core típussal**. A Nano (CIL-T0) F3-ban született meg, a Rich (teljes CIL) itt, F5-ben. Ez a terminológia-egységesítés csak átnevezés — a technikai tartalom az, ami eddig is „teljes CIL" volt a roadmap-ben.
 
-**Új opkódok a Rich core-on (a Nano 48 opkódon felül):**
+**Új opkódok a Rich core-on (a Nano 64 opkódon felül):**
 - Objektum modell: `newobj`, `newarr`, `ldfld`, `stfld`, `ldelem.*`, `stelem.*`, `ldlen`, `initobj`
 - Virtuális hívás és metadata: `callvirt`, `ldtoken`, `ldftn`, `ldvirtftn`
 - Típusellenőrzés: `isinst`, `castclass`, `box`, `unbox`
@@ -704,7 +704,7 @@ A **korábbi** F6 egyetlen nagy FPGA-t célzott (K7-480T, majd K7-325T). A **mos
 
 **F0 koncepcionálisan készen van.** Hét dokumentum a `docs/` és a `README.md` alatt együtt ~3500+ sor, belsőleg konzisztens projekt-terv a **hárompályás pozicionálással** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), a heterogén Nano+Rich multi-core modellel, a silicon-grade security pozicionálással, a Symphact vízióval, és a Secure Element stratégiai tervvel (F6.5 parallel tape-out).
 
-**F1 — C# referencia szimulátor lezárva.** Az `src/CilCpu.Sim` és `src/CilCpu.Sim.Tests` projektek minden CIL-T0 spec által rögzített **48 opkódot** implementálják, minden hardveres trap tesztelt. Az **F1 aranypélda**: `Fibonacci(20) = 6765` zöld. A fejlesztés **4 iterációban** zajlott szigorú TDD-vel, minden iterációhoz Devil's Advocate review.
+**F1 — C# referencia szimulátor lezárva.** Az `src/CilCpu.Sim` és `src/CilCpu.Sim.Tests` projektek minden CIL-T0 spec által rögzített **64 opkódot** implementálják, minden hardveres trap tesztelt. Az **F1 aranypélda**: `Fibonacci(20) = 6765` zöld. A fejlesztés **4 iterációban** zajlott szigorú TDD-vel, minden iterációhoz Devil's Advocate review.
 
 **F1.5 — Linker, Runner, Samples lezárva.** A `CilCpu.Linker` Roslyn .dll → CIL-T0 pipeline, a `CilCpu.Sim.Runner` CLI futtatóeszköz (`run` / `link` parancsok), és a `samples/PureMath` példaprogram kész. **259 zöld xUnit teszt**, **0 warning, 0 error**. A teljes pipeline (C# → Roslyn → linker → szimulátor) end-to-end tesztelve, TDD-vel fejlesztve, Devil's Advocate review-val.
 

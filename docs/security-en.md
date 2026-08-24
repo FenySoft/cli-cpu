@@ -181,7 +181,7 @@ Formal verification is **practically impossible** for modern OoO x86/ARM cores b
 - Variable cache states
 
 The **CFPU Nano core**, by contrast:
-- **48 opcodes**
+- **64 opcodes**
 - **5-stage in-order pipeline** with simple state
 - **No speculation**
 - **Stack machine semantics**, which map directly to a mathematical model

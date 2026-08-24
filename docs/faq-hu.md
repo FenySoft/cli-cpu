@@ -299,7 +299,7 @@ A `docs/architecture-hu.md` „Stratégiai pozicionálás: Cognitive Fabric" sze
 
 **A CLI-CPU pontosan ez az útvonal.** A `docs/architecture-hu.md` ezt világosan megfogalmazza, és a hét fázis (F0–F7) ennek a victory path-nak a lépéseit járja be:
 
-- **F3 Tiny Tapeout:** a CIL-T0 48 opkód hardverben → bizonyíték, hogy működik
+- **F3 Tiny Tapeout:** a CIL-T0 64 opkód hardverben → bizonyíték, hogy működik
 - **F4 Multi-core FPGA:** a shared-nothing modell → bizonyíték, hogy skálázódik
 - **F5 Rich core:** a teljes CLI → bizonyíték, hogy kivitelezhető
 - **F6-FPGA:** FPGA-verifikált elosztott heterogén fabric (3× A7-Lite 200T) → bizonyíték, hogy production-ready

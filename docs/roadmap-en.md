@@ -250,7 +250,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Why "Rich core" and not just "full CIL"?** The `docs/architecture.md` **"Heterogeneous multi-core: Nano + Rich"** section explains: the CLI-CPU will use a heterogeneous (big.LITTLE-style) architecture from F6 onwards, **with two core types**. The Nano (CIL-T0) was born in F3, the Rich (full CIL) here in F5. This terminology unification is just a rename — the technical content is what was previously called "full CIL" in the roadmap.
 
-**New opcodes on the Rich core (in addition to the Nano's 48 opcodes):**
+**New opcodes on the Rich core (in addition to the Nano's 64 opcodes):**
 - Object model: `newobj`, `newarr`, `ldfld`, `stfld`, `ldelem.*`, `stelem.*`, `ldlen`, `initobj`
 - Virtual calls and metadata: `callvirt`, `ldtoken`, `ldftn`, `ldvirtftn`
 - Type checking: `isinst`, `castclass`, `box`, `unbox`
@@ -702,7 +702,7 @@ The **previous** F6 targeted a single large FPGA (K7-480T, then K7-325T). The **
 
 **F0 is conceptually complete.** Seven documents under `docs/` and `README.md` together amount to ~3500+ lines, forming an internally consistent project plan with the **three-track positioning** (Cognitive Fabric + Trustworthy Silicon + Secure Edition), the heterogeneous Nano+Rich multi-core model, silicon-grade security positioning, the Symphact vision, and the Secure Element strategic plan (F6.5 parallel tape-out).
 
-**F1 — C# reference simulator closed.** The `src/CilCpu.Sim` and `src/CilCpu.Sim.Tests` projects implement all **48 opcodes** specified by the CIL-T0 spec, with every hardware trap tested. The **F1 golden reference**: `Fibonacci(20) = 6765` green. Development took place across **4 iterations** with strict TDD, each iteration followed by a Devil's Advocate review.
+**F1 — C# reference simulator closed.** The `src/CilCpu.Sim` and `src/CilCpu.Sim.Tests` projects implement all **64 opcodes** specified by the CIL-T0 spec, with every hardware trap tested. The **F1 golden reference**: `Fibonacci(20) = 6765` green. Development took place across **4 iterations** with strict TDD, each iteration followed by a Devil's Advocate review.
 
 **F1.5 — Linker, Runner, Samples closed.** The `CilCpu.Linker` Roslyn .dll -> CIL-T0 pipeline, the `CilCpu.Sim.Runner` CLI runner tool (`run` / `link` commands), and the `samples/PureMath` sample program are done. **259 green xUnit tests**, **0 warnings, 0 errors**. The full pipeline (C# -> Roslyn -> linker -> simulator) is end-to-end tested, developed via TDD, with Devil's Advocate review.
 

@@ -96,7 +96,7 @@ Ezt **a következő lépésként javasoljuk implementálni** a `CilCpu.Sim` proj
 
 1. **Instruction counter** a `TCpu`-ban
    - Minden `TExecutor` `Step()` hívásnál +1
-   - Per-opcode bontás (48 opkód külön számlálóval)
+   - Per-opcode bontás (64 opkód külön számlálóval)
    - Method header read, branch taken/not-taken bontás
    - TDD: új `TCpuInstructionCountTests`, baseline-érték minden `samples/PureMath` benchmark-ra
 

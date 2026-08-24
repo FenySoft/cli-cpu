@@ -86,7 +86,7 @@ Utolsó audit: **2026-05-03**
 
 | Fájl pár | Megjegyzés |
 |---|---|
-| `ISA-CIL-T0-{hu,en}.md` | A 48 opkód a szimulátorban implementált, 259+ teszt. **Promote ide:** `specs/isa-cil-t0-{hu,en}.md`, `Version: 1.0`. |
+| `ISA-CIL-T0-{hu,en}.md` | A 64 opkód a szimulátorban implementált, 187 teszt. **Promote ide:** `specs/isa-cil-t0-{hu,en}.md`, `Version: 1.0`. |
 
 ### `policy` (6 fájl, 3 pár)
 

@@ -79,7 +79,7 @@ Az F5 fázistól a CFPU **heterogén multi-core** architektúrát használ, anal
 
 | | **CFPU Nano** | **CFPU Rich** |
 |-|---------------|---------------|
-| ISA | CIL-T0 (48 opkód, integer-only) | Teljes ECMA-335 CIL (~220 opkód) |
+| ISA | CIL-T0 (64 opkód, integer-only) | Teljes ECMA-335 CIL (~220 opkód) |
 | Méret | ~10k std cell | ~80k std cell |
 | Funkciók | Integer, stack cache, mailbox | Nano + objektum modell + GC + FPU + kivételek + generikusok |
 | Szerep | Worker / neuron / filter / egyszerű actor | Supervisor / orchestrator / komplex domain logika |
@@ -89,7 +89,7 @@ A C# programok **`[RunsOn(CoreType.Nano)]`** vagy **`[RunsOn(CoreType.Rich)]`** 
 
 ## Státusz
 
-**F1.5 — KÉSZ.** A C# referencia szimulátor (48/48 CIL-T0 opkód, 187 zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
+**F1.5 — KÉSZ.** A C# referencia szimulátor (64/64 CIL-T0 opkód, 187 zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
 
 Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 
@@ -101,7 +101,7 @@ Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
 
 - [docs/roadmap-hu.md](docs/roadmap-hu.md) — Hétfázisú ütemterv F0-tól F7-ig, a Cognitive Fabric pivottal F4-ben, F6.5 Secure Edition variánssal
 - [docs/architecture-hu.md](docs/architecture-hu.md) — CLI-CPU mikroarchitektúra, Cognitive Fabric pozicionálás, prior art elemzés (picoJava, Jazelle, Transmeta, Loihi, SpiNNaker), heterogén Nano + Rich multi-core
-- [docs/ISA-CIL-T0-hu.md](docs/ISA-CIL-T0-hu.md) — CIL-T0 subset specifikáció (48 opkód), mailbox MMIO interfész
+- [docs/ISA-CIL-T0-hu.md](docs/ISA-CIL-T0-hu.md) — CIL-T0 subset specifikáció (64 opkód), mailbox MMIO interfész
 - [docs/security-hu.md](docs/security-hu.md) — Threat model, architekturális biztonsági garanciák, támadás-immunitási táblázat, formális verifikáció terv, tanúsítási útvonalak (IEC 61508, ISO 26262, DO-178C, IEC 62304)
 - [Symphact vízió](https://github.com/FenySoft/Symphact/blob/main/docs/vision-hu.md) — aktor-alapú operációs rendszer a CFPU-ra, „Erlang in silicon". **Implementáció:** [github.com/FenySoft/Symphact](https://github.com/FenySoft/Symphact/blob/main/README-hu.md) (a vízió dokumentum is ott él, hivatkozási stub: [`docs/symphact-hu.md`](docs/symphact-hu.md))
 - [docs/secure-element-hu.md](docs/secure-element-hu.md) — Secure Edition: JavaCard / TEE / Secure Element piac, TROPIC01 részletes elemzés, multi-SE hardveres isolation, F6.5 parallel tape-out terv

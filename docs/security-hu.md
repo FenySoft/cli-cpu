@@ -182,7 +182,7 @@ A formális verifikáció **gyakorlatilag lehetetlen** a modern OoO x86/ARM mago
 - Változó cache állapotok
 
 A **CFPU Nano core** ezzel szemben:
-- **48 opkód**
+- **64 opkód**
 - **5-stage in-order pipeline**, egyszerű állapottal
 - **Nincs spekuláció**
 - **Stack-gép szemantika**, ami közvetlen matematikai modell

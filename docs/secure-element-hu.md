@@ -291,7 +291,7 @@ A `docs/architecture-hu.md`, `docs/security-hu.md` és `docs/ISA-CIL-T0-hu.md` m
 | **Determinizmus** | ✓ | F3 |
 | **Kis lapka méret** | ✓ (~8700 std cell / Nano core) | F3 |
 | **Alacsony fogyasztás (event-driven)** | ✓ | F3 |
-| **Formálisan verifikálható ISA** | ✓ (48 opkód) | F5 |
+| **Formálisan verifikálható ISA** | ✓ (64 opkód) | F5 |
 | **Auditálható (nyílt HDL)** | ✓ | F3 |
 | **Multi-application isolation** | **✓ (hardveres)** | **F4** |
 | **Immunitás Spectre/Meltdown/ROP/JOP** | ✓ | F3-F5 |

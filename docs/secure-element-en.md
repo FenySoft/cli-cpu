@@ -291,7 +291,7 @@ The `docs/architecture-hu.md`, `docs/security-hu.md`, and `docs/ISA-CIL-T0-hu.md
 | **Determinism** | included | F3 |
 | **Small die size** | included (~8700 std cell / Nano core) | F3 |
 | **Low power (event-driven)** | included | F3 |
-| **Formally verifiable ISA** | included (48 opcodes) | F5 |
+| **Formally verifiable ISA** | included (64 opcodes) | F5 |
 | **Auditable (open HDL)** | included | F3 |
 | **Multi-application isolation** | **included (hardware)** | **F4** |
 | **Immunity to Spectre/Meltdown/ROP/JOP** | included | F3-F5 |
