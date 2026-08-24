@@ -237,7 +237,7 @@
     </p>
 
     <p>
-      This is not a thought experiment. I have been building exactly this for the past months, and the reference implementation is already done: 64 opcodes, 187 green xUnit tests, 322 cocotb tests, a working linker, a CLI runner, a single-core Nano RTL in Verilog (ALU + decoder + microcode + stack cache + QSPI controller + frame manager), a board-level top wrapper for the MicroPhase A7-Lite XC7A200T (STARTUPE2 + IOBUF), and a Fibonacci(20) = 6765 end-to-end demo over UART in cocotb simulation. The project is called <strong>CLI-CPU</strong>, and it is fully open source under CERN-OHL-S v2.
+      This is not a thought experiment. I have been building exactly this for the past months, and the reference implementation is already done: 48 opcodes, 160 green xUnit tests, 249 green cocotb tests, a working linker, a CLI runner, a single-core Nano RTL in Verilog (ALU + decoder + microcode + stack cache + QSPI controller + frame manager), a board-level top wrapper for the MicroPhase A7-Lite XC7A200T (STARTUPE2 + IOBUF), and a Fibonacci(20) = 6765 end-to-end demo over UART in cocotb simulation. The project is called <strong>CLI-CPU</strong>, and it is fully open source under CERN-OHL-S v2.
     </p>
 
     <p>
@@ -349,7 +349,7 @@
       <li>A <strong>golden-vector harness</strong> (F2.5b) that compares cocotb execution step-by-step against the C# reference simulator's JSONL trace.</li>
       <li>A <strong>board-level top wrapper for the MicroPhase A7-Lite XC7A200T</strong> (F2.7 Sub1..Sub4): clock + KEY debouncer + boot sequencer FSM, UART TX + decimal printer, IS25L128F QSPI flash wiring with the Xilinx STARTUPE2 + 4× IOBUF primitives in <code>cilcpu_a7lite_board.v</code>.</li>
       <li>A <strong>Fibonacci(20) = 6765 end-to-end demo over UART</strong>, in cocotb simulation through the board.v — from the Roslyn compiler through the CIL-T0 binary to the board-level UART output.</li>
-      <li><strong>322 cocotb tests</strong> + <strong>187 green xUnit tests</strong> covering every opcode, every trap condition, every edge case. Strict TDD — every test was written before its implementation.</li>
+      <li><strong>249 green cocotb tests</strong> + <strong>160 green xUnit tests</strong> covering every opcode, every trap condition, every edge case. Strict TDD — every test was written before its implementation.</li>
     </ul>
 
     <p>

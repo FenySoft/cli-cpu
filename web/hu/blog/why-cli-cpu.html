@@ -237,7 +237,7 @@
     </p>
 
     <p>
-      Ez nem gondolatkísérlet. Pontosan ezt építem az elmúlt hónapokban, és a referencia-implementáció már kész: 64 opkód, 187 zöld xUnit teszt, 322 cocotb teszt, működő linker, CLI futtatóeszköz, egymagos Nano core RTL Verilogban (ALU + decoder + microcode + stack cache + QSPI controller + frame manager), MicroPhase A7-Lite XC7A200T board-szintű top wrapper (STARTUPE2 + IOBUF), és cocotb szimulációban Fibonacci(20) = 6765 end-to-end demó UART-on. A projekt neve <strong>CLI-CPU</strong>, és teljes egészében nyílt forráskódú, CERN-OHL-S v2 licenc alatt.
+      Ez nem gondolatkísérlet. Pontosan ezt építem az elmúlt hónapokban, és a referencia-implementáció már kész: 48 opkód, 160 zöld xUnit teszt, 249 zöld cocotb teszt, működő linker, CLI futtatóeszköz, egymagos Nano core RTL Verilogban (ALU + decoder + microcode + stack cache + QSPI controller + frame manager), MicroPhase A7-Lite XC7A200T board-szintű top wrapper (STARTUPE2 + IOBUF), és cocotb szimulációban Fibonacci(20) = 6765 end-to-end demó UART-on. A projekt neve <strong>CLI-CPU</strong>, és teljes egészében nyílt forráskódú, CERN-OHL-S v2 licenc alatt.
     </p>
 
     <p>
@@ -349,7 +349,7 @@
       <li>Egy <strong>golden vector harness</strong> (F2.5b), ami a cocotb futást lépésről lépésre összehasonlítja a C# referencia szimulátor JSONL trace-ével.</li>
       <li>A <strong>MicroPhase A7-Lite XC7A200T board-szintű top wrapper</strong> (F2.7 Sub1..Sub4): clock + KEY debouncer + boot szekvenszer FSM, UART TX + decimális printer, IS25L128F QSPI flash bekötés a Xilinx STARTUPE2 + 4× IOBUF primitívvel a <code>cilcpu_a7lite_board.v</code>-ben.</li>
       <li>Egy <strong>Fibonacci(20) = 6765 end-to-end demó UART-on</strong>, cocotb szimulációban a board.v-n keresztül — a Roslyn fordítótól a CIL-T0 binárison át a board-szintű UART kimenetig.</li>
-      <li><strong>322 cocotb teszt</strong> + <strong>187 zöld xUnit teszt</strong>, ami lefedi az összes opkódot, minden trap-feltételt, minden szélsőséges esetet. Szigorú TDD — minden teszt az implementáció előtt készült.</li>
+      <li><strong>249 zöld cocotb teszt</strong> + <strong>160 zöld xUnit teszt</strong>, ami lefedi az összes opkódot, minden trap-feltételt, minden szélsőséges esetet. Szigorú TDD — minden teszt az implementáció előtt készült.</li>
     </ul>
 
     <p>
