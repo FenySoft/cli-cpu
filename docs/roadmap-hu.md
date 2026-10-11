@@ -117,7 +117,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 > **⚠️ Végrehajtási sorrend ≠ számozás.** Az alszakasz-számok **stabil azonosítók**, nem lépés-sorrend (a git commit-history is ezekre hivatkozik). A 2026-05-08-i sorrend-pivot óta a tényleges végrehajtási sorrend:
 > **F2.5 → F2.7 (egymagos core FPGA) → F2.8 (TT-perifériák FPGA) → F2.6 (teljes chip IHP-szintézis) → F3 (Tiny Tapeout).**
 > **Mérnöki indok:** *„nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n"* — előbb FPGA-n verifikálunk, csak utána szintetizálunk Sky130-ra; az FPGA-n talált hibák olcsók, a Tiny Tapeout chipen nem.
-> **Pályázati vonatkozás:** az **F2.6 Sky130 szintézis az NLnet M1 mérföldkő MoU-utáni horgonya**. A befejezett FPGA-validáció (F2.7) erős M1-előbizonyíték a 2026-06-01 beadáshoz, de a finanszírozott, a MoU-időszakra eső, igazolható deliverable a Sky130 area/timing report — ezért az F2.6-ot tudatosan a MoU utánra időzítjük.
+> **Ütemezési indoklás (frissítve a pályázati döntés után):** az F2.6-ot eredetileg a FPGA-validáció után helyeztük, mert a Sky130 area/timing report volt az NLnet M1 mérföldkő deliverable, a MoU-időszakra tervezve. A támogatás nem lett odaítélve (elutasítva 2026-10-09, nincs MoU), tehát ez a megkötés megszűnt. Az F2.6 a saját technikai indoklása miatt marad F2.7 után: a teljes chip szintézis csak azon a core-on érdemes futtatni, amely az egymagos FPGA-validáción már átment — ez a projekt „nincs szintézis FPGA-futtás nélkül" elve.
 
 **Kész kritérium:**
 - Verilator szimuláció minden F1 teszten zöld
@@ -371,7 +371,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 #### F6-Silicon Zero — „Cognitive Fabric Zero" (IHP 3 mm², első heterogén szilícium)
 
-**Cél:** Az első **heterogén Cognitive Fabric szilícium** — **1 Rich + 8 Nano core, 48 KB on-chip SRAM, 3 mm² IHP SG13G2**. Ez a lépcsőfok az F3 egymagos Tiny Tapeout és a teljes „Cognitive Fabric One" (15 mm²) között. **Potenciálisan €0 költséggel** elérhető az IHP FMD-QNC ingyenes kutatási MPW programján.
+**Cél:** Az első **heterogén Cognitive Fabric szilícium** — **1 Rich + 8 Nano core, 48 KB on-chip SRAM, 3 mm² IHP SG13G2**. Ez a lépcsőfok az F3 egymagos Tiny Tapeout és a teljes „Cognitive Fabric One" (15 mm²) között. **A költség nem nulla:** az IHP Open Silicon MPW nyílt forráskódú ára 2800 EUR/mm², tehát 3 mm²-ért ~8400 EUR, és a kör csak akkor indul el, ha az összes résztvevő összesített területe eléri a 90 mm²-t — lásd a Pályázati lehetőségek szekciót.
 
 **Miért önálló mérföldkő:**
 - Az **F3** (TT, 1 Nano) bizonyítja, hogy a core működik szilíciumon
@@ -398,7 +398,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Függőség:** F5 kész (Rich core RTL tesztelve FPGA-n), F6-FPGA legalább single-board verifikáció kész.
 
-**Költség:** **€0** (IHP FMD-QNC ingyenes kutatási MPW) vagy ~€4,500 (IHP standard ár, 3 mm²). **Ütemezés:** IHP shuttle-ök 2026: március, október, november.
+**Költség:** **~8400 EUR** az IHP nyílt forráskódú SG13G2 árral (2800 EUR/mm² × 3 mm²), vagy ~4500 EUR standard árral — **nem €0**. Plusz 320 EUR maszkdíj bonding diagramonként, plusz csomagolás (QFN 24/10 db 690 EUR-tól QFN 64/40 db 1900 EUR-ig). **Ütemezés:** a következő nyílt forráskódú CMOS5L kör regisztrációs határideje **2026-10-26**; a kör csak a 90 mm² összesített küszöb elérésekor indul el.
 
 **Megjegyzés:** A Cognitive Fabric Zero **nem helyettesíti** a Cognitive Fabric One-t — kiegészíti. A Zero a „működik szilíciumon" bizonyíték, a One a „jobb, mint a hagyományos" bizonyíték benchmarkokkal.
 
@@ -417,9 +417,9 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Platform-döntés (F6-Silicon indulása előtt):**
 - **Sky130 @ eFabless ChipIgnite** — a **Caravel** harness 10 mm² user area, 38 GPIO; az **OpenFrame** harness **15 mm²**, 44 GPIO. ~$14,950 (2026 ár), 100 QFN chip + eval board, ~5 hónap átfutás. **A referencia konfiguráció (6R+16N+1S) az OpenFrame-re épül.**
-- **IHP SG13G2 MPW** — európai, ~€1,500/mm² (standard) vagy **€0** (FMD-QNC ingyenes kutatási program, nyílt forráskódú designre). 3 mm²-ért ~€4,500; ütemezés: 2026 március, október, november.
-- **Google Open MPW** — ingyenes shuttle (ha nyílik), Sky130, Caravel harness. Nem rendszeres, de a CLI-CPU nyílt forráskódú státusza erős jelölt.
-- **Finanszírozás:** NLnet NGI Zero Commons Fund (€5K–€50K, következő deadline: 2026. június 1.), közösségi crowdfunding, ipari partner.
+- **IHP Open Silicon MPW** — európai, SG13G2 nyílt forráskódú ár **2800 EUR/mm²** (standard 7300 EUR/mm²), CMOS5L nyílt forráskódú ár 1500 EUR/mm². 3 mm²-ért ~8400 EUR a nyílt forráskódú árral. **Nincs ingyenes IHP program:** a korábbi roadmap-verziókban szereplő FMD-QNC név egy külön német kutatási modulra utalt, nem IHP MPW programra. A kör csak akkor indul el, ha az összesített terület eléri a 90 mm²-t.
+- **Google Open MPW** — ingyenes shuttle (ha nyílik), Sky130, Caravel harness. Nincs megerősítés 2026-ra nyitott körre; a Google-finanszírozású OpenMPW program kb. 2018–2024 között futott.
+- **Finanszírozás:** közösségi crowdfunding (Crowd Supply, GitHub Sponsors, Open Collective), ipari partner, EU programok. Az NLnet NGI Zero Commons Fund **lezárt** — a 2026. júniusi kör volt az utolsó NGI Zero kör, a CLI-CPU és a Symphact pályázatát is 2026-10-09-én utasították el.
 
 **Új funkciók az F6-FPGA-hoz képest (silicon-specifikus):**
 - **Floorplan optimalizáció** — a Rich core-ok központi helyen, a Nano core-ok köré csoportosítva
@@ -452,7 +452,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Függőség:** **F6-FPGA kész** (minden kész kritérium teljesül), sweet spot kiválasztva, multi-konfiguráció riport elérhető.
 
-**Költség-nagyságrend:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chip + eval board), vagy ~€4,500 (IHP SG13G2 3 mm², kisebb konfiguráció: 1R+8N), vagy **€0** (IHP ingyenes kutatási MPW / Google Open MPW, ha elérhető). **NLnet NGI Zero Commons Fund** pályázattal akár a teljes F6-Silicon fedezhető (€5K–€50K).
+**Költség-nagyságrend:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chip + eval board), vagy ~8400 EUR (IHP SG13G2 3 mm² a 2800 EUR/mm² nyílt forráskódú árral, kisebb konfiguráció: 1R+8N), vagy ~4500 EUR standard IHP árral. Nincs megerősített ingyenes opció: jelenleg nincs ingyenes IHP program, és 2026-ra nincs megerősítve nyitott Google Open MPW kör.
 
 ---
 
@@ -518,7 +518,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Függőség:** **F6-Silicon One kész** (130nm referencia legyártva, demók verifikálva). Indulási feltétel — opcionális, ezért csak ha **legalább egy** igaz: a projekt finanszírozást/ipari partnert kapott a tape-out fedezésére **vagy** a >500 MHz / valós energia mérés kritikus a következő mérföldkőhöz (F7 demó HW, F6.5 Secure Edition).
 
-**Költség-nagyságrend:** GF 22FDX **Europractice MPW** shuttle-n — **nem ingyenes** (ellentétben az IHP FMD-QNC programmal), MPW-áron a néhány mm²-es die nagyságrendileg **tízezres €** tartomány (a teljes maszk-szett milliós nagyságrendje helyett). **A pontos ár az Europractice aktuális árlistájából igazolandó a fázis indulása előtt — itt nem becsüljük.** Plusz tervezési munka az F6-Si One-on felül: std-cell remap + SRAM compiler csere + CTS + sign-off ≈ **~2-3 mérnökhónap** (hasonló az F6-Si One floorplan/sign-off munkájához).
+**Költség-nagyságrend:** GF 22FDX **Europractice MPW** shuttle-n — **nem ingyenes**, MPW-áron a néhány mm²-es die nagyságrendileg **tízezres €** tartomány (a teljes maszk-szett milliós nagyságrendje helyett). **A pontos ár az Europractice aktuális árlistájából igazolandó a fázis indulása előtt — itt nem becsüljük.** Plusz tervezési munka az F6-Si One-on felül: std-cell remap + SRAM compiler csere + CTS + sign-off ≈ **~2-3 mérnökhónap** (hasonló az F6-Si One floorplan/sign-off munkájához).
 
 **Kimenet:**
 - `mpw/22fdx/` — Europractice/GF submission könyvtár
@@ -611,9 +611,13 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 - Az F6.7 (Cognitive Fabric Dense, 22FDX) **opcionális de-risk lépcső** — az F6.5-höz hasonlóan **nem szerepel** a „F6.5 nélkül" összesenben; csak akkor indul, ha finanszírozás van vagy a sűrű-node mérés kritikus a következő mérföldkőhöz
 - A becslések **tiszta mérnöki munkaidőt** tartalmaznak — a gyártási átfutás (TT ~5 hó, ChipIgnite ~5 hó, IHP ~4 hó), szállítás és bring-up várakozás nincs benne
 
-### NLnet NGI Zero Commons Fund összehangolás
+### NLnet NGI Zero Commons Fund összehangolás (ARCHIVÁLT — a támogatás nem lett odaítélve)
 
-Az [NLnet pályázat](nlnet-application-draft-en.md) (v1.1, beadva 2026-04-14) **€35 000**-t kért **18 hónapra**, ~900 óra part-time munkát feltételezve (~€36/h, ebből ~€2 440 hardver).
+> **Státusz: ELUTASÍTVA.** A CLI-CPU pályázat (`2026-06-08c`, beadás-visszaigazolás 2026-04-14) elutasításra került **2026-10-09-én**, Michiel Leenaars Strategy Director aláírásával. Az NLnet közölte, hogy a 2026. júniusi kör az **utolsó NGI Zero kör** volt (>1200 pályázat). A párhuzamos Symphact pályázat (`2026-06-262`) ugyanazon a napon, két perccel később kapott elutasítást. **Nincs MoU, támogatási összeg nem lett kifizetve.**
+>
+> Az alábbi anyag megmarad rekordként arról, mit kértünk és hogyan illeszkedett a roadmapre. **Nem finanszírozási terv** — a jelenlegi lehetőségek a Pályázati lehetőségek szekcióban vannak. Mivel mérföldkönként nem volt finanszírozott, MoU-időszakos deliverable, az az érv, amely az F2.6-ot az FPGA-validáció után helyezte, nem érvényes; az F2.6 ott van, ahova a saját technikai függőségei teszik.
+
+A pályázat **€35 000**-t kért **18 hónapra**, ~900 óra part-time munkát feltételezve (~€36/h, ebből ~€2 440 hardver).
 
 **Mérföldkő-megfeleltetés:**
 
@@ -628,12 +632,12 @@ Az [NLnet pályázat](nlnet-application-draft-en.md) (v1.1, beadva 2026-04-14) *
 
 † Személyi óra = (budget − hardverköltség) ÷ €36/h
 
-**Eltérés magyarázata:** A roadmap teljes becslése (~1 230 h az NLnet scope-ra) **~330 órával meghaladja** a pályázatban vállalt ~900 órát. Ez normális nyílt forráskódú pályázatoknál — a támogatás a **költségek fedezését** szolgálja, nem az összes ráfordított idő 100%-os kompenzálását. A különbség (~27%) a fejlesztő **saját hozzájárulása** a projekthez (unfunded own contribution), ami az open-source fejlesztés szokásos modellje.
+**Lefedettségi rés (történeti tény):** a roadmap teljes becslése (~1 230 h az NLnet-nek javasolt scope-ra) **~330 órával meghaladta** a kért ~900 órát. Támogatás nélkül ez a teljes ~1 230 h a fejlesztő **saját, finanszírozatlan hozzájárulása**.
 
-**A pályázat vállalásai teljesíthetők**, mert:
-1. Az F0–F2.2b tényleges tempó (~260 h / ~2 hét intenzív sprint) **meghaladja** a pályázat ütemezését
+**A tempó-bizonyíték, ami azért marad meg, mert a scope teljesíthetőségét jelzi, pályázattól függetlenül**, mert:
+1. Az F0–F2.2b tényleges tempó (~260 h / ~2 hét intenzív sprint) **meghaladja** a javasolt 12–18 hónapos ablakot
 2. Az AI-asszisztált fejlesztés (Claude Code) a KÉSZ fázisoknál bizonyítottan ~30–40%-os gyorsulást ad a kódgenerálás, teszt és dokumentáció területén
-3. Az F2 RTL alapjai (ALU, decoder, microcode ROM) már **készen vannak** — a pályázat indulása előtt
+3. Az F2 RTL alapjai (ALU, decoder, microcode ROM) már **készen vannak**
 4. Az F4 core-instanciálás az F2/F3 RTL közvetlen újrafelhasználása — az érdemi új munka (router, sleep/wake) jól körülhatárolt
 
 ---
@@ -657,7 +661,7 @@ F0 ──► F1 ──► F2 ──► F3 ──┘──► F4 ──►──�
                                                        „Cognitive        │
                                                         Fabric Zero"     │
                                                        (IHP 3mm²,        │
-                                                        1R+8N, €0?)      │
+                                                        1R+8N, ~€8.4K)   │
                                                               │          │
                                                               ▼          │
                                                        F6-Silicon One ───┘
@@ -744,12 +748,13 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 ### Pályázati lehetőségek
 
-| Forrás | Összeg | Deadline | Illeszkedés | Prioritás |
-|--------|--------|----------|-------------|-----------|
-| **NLnet NGI Zero Commons Fund** | €5K–€50K | **2026. június 1.** (13. kör) | Kifejezetten „libre silicon"-t említ, nyílt forráskódú projekt | **#1 — azonnal beadni** |
-| **IHP FMD-QNC ingyenes MPW** | €0 (kutatási) | 2026: okt, nov; 2027: márc | Nyílt forráskódú, nem-kereskedelmi design | **#2 — regisztrálni** |
-| **Google Open MPW** | $0 (szponzorált) | Nem rendszeres, figyelni | Sky130, Caravel harness, nyílt design | **#3 — figyelni** |
-| **EU CHIPS Act** pályázatok | Változó | Folyamatos | Európai nyílt hardver | Hosszú táv |
+| Forrás | Összeg | Deadline | Illeszkedés | Állapot |
+|--------|--------|----------|-------------|---------|
+| **NLnet NGI Zero Commons Fund** | — | — | Kifejezetten „libre silicon"-t említ, nyílt forráskódú projekt | ❌ **Lezárt.** A 2026. júniusi körben a CLI-CPU (`2026-06-08c`) és a Symphact (`2026-06-262`) pályázatát is elutasították 2026-10-09-én. Az NLnet szerint ez volt az **utolsó NGI Zero kör**, újabb kör nincs. |
+| **Tiny Tapeout** | **50–70 USD/tile** (IHP 50, Sky130 70) | Folyamatos, befogadás-alapon | Nyílt forráskódú design, nem kell hozzá pályázat | ✅ **Az egyetlen pályázatfüggetlen út az F3 szilíciumhoz.** |
+| **IHP Open Silicon MPW** | **1500 EUR/mm² (CMOS5L)** vagy **2800 EUR/mm² (SG13G2)** | **2026-10-26** (CMOS5L kör) | Nyílt forráskódú design, Apache-2.0 licenc kötelező | ⚠️ **Nem ingyenes.** A kör csak akkor indul el, ha az összes vevő összesített területe eléri a **90 mm²**-t; a 900 EUR/mm² küszöbárnál egyetlen kérelmező, aki önmagban rendeli meg a minimumot, **81 000 EUR**-ral szembesül, és szilícium akkor sem lesz, ha a küszöb mások nélkül nem teljesül. Maszkdíj 320 EUR/bonding diagram + csomagolás. |
+| **Google Open MPW** | $0 (szponzorált) | — | Sky130, Caravel harness, nyílt design | ⚠️ Nincs megerősítés 2026-ra nyitott körre; a Google-finanszírozású OpenMPW program kb. 2018–2024 között futott. |
+| **EU CHIPS Act** pályázatok | Változó | Folyamatos | Európai nyílt hardver | Hosszú táv, konzorciumi méret |
 
 ### Közösségi finanszírozás
 
@@ -761,21 +766,20 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 ### Költségvetés-szcenáriók
 
-| Szcenárió | Összeg | Mit fedez |
-|-----------|--------|-----------|
-| **A: Saját zseb** | ~€2,400 | 3× A7-Lite 200T (F4–F6 FPGA) + 1× TT 16 tile (F3) + bring-up |
-| **B: NLnet €15K** | ~€15K | A szcenárió + IHP „Cognitive Fabric Zero" (1R+8N, 3 mm²) + mérnöki eszközök |
-| **C: NLnet €30K** | ~€30K | B szcenárió + ChipIgnite „Cognitive Fabric One" (6R+16N+1S, 15 mm²) |
-| **D: NLnet €50K** | ~€50K | C szcenárió + 2. tape-out iteráció + konferencia/publikáció + alvállalkozói mérnöki munka |
+> Az NLnet-alapú B/C/D szcenáriók **érvénytelenek** — nem lett támogatás. Az alábbi E/F az alternatíva.
+
+| Szcenárió | Összeg | Mit fedez | Állapot |
+|-----------|--------|-----------|---------|
+| **A: Saját zseb** | ~€2,400 | 3× A7-Lite 200T (F4–F6 FPGA) + 1× TT 16 tile (F3) + bring-up | ✅ Az egyetlen jelenleg fedezett szcenárió. A TT tile-ok 50–70 USD/db, pályázatfüggetlenek. |
+| **E: IHP Open Silicon MPW (közösen)** | A 90 mm² küszöb valamelyik hányada × 1500–2800 EUR/mm², plusz 320 EUR maszkdíj + csomagolás | IHP „Cognitive Fabric Zero" (1R+8N, 3 mm²) | ⚠️ A 90 mm² körküszöb eléréséhez ≥10–30 társ kérelmező kell. **Nem nulla kockázat: küszöb nélkül a kör nem indul, tehát a díj szilícium nélkül is elkölthető.** |
+| **F: ChipIgnite OpenFrame** | ~$14,950 (2026-os ár), 15 mm², 100 QFN + eval board | „Cognitive Fabric One" (6R+16N+1S) | ⚠️ Egyedi vásárlás, nincs közös küszöb. Crowdfunding kampány szükséges. |
+| **~~B: NLnet €15K~~ / ~~C: NLnet €30K~~ / ~~D: NLnet €50K~~** | — | — | ❌ **Érvénytelen.** A támogatást 2026-10-09-én utasították el. |
 
 ### Ütemezés
 
 ```
-2026 ápr     ─── NLnet pályázat előkészítése (47 nap!)
-2026 jún 1   ─── NLnet NGI Zero Commons Fund deadline
+2026 okt     ─── IHP Open Silicon MPW CMOS5L regisztrációs deadline (2026-10-26)
 2026 jún-szept── F2 RTL fejlesztés + FPGA bring-up
-2026 okt     ─── IHP ingyenes MPW regisztrációs deadline
-2026 nov     ─── IHP shuttle (ha elfogadták)
 2027 Q1      ─── F3 Tiny Tapeout submission (TTSKY26a vagy későbbi)
 2027 Q2-Q3   ─── F4–F5 FPGA fejlesztés (3× A7-Lite 200T)
 2027 Q4      ─── F6-FPGA verifikáció kész
@@ -783,7 +787,7 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 2028 Q3      ─── Első szilícium a kézben
 ```
 
-**A legfontosabb azonnali akció:** NLnet NGI Zero Commons Fund pályázat előkészítése — **47 nap van a 2026. június 1-i deadline-ig**. A CLI-CPU projekt profilja (nyílt forráskódú libre silicon, újszerű Cognitive Fabric architektúra, actor-natív processzor, Symphact vízió) **kifejezetten erős jelölt**.
+**A legfontosabb azonnali akció:** az F2.8 HW bring-up lezárása az A7-Lite-on, majd a beadás Tiny Tapeoutra az F3-hoz. A TT az egyetlen pályázatfüggetlen út az első szilíciumhoz (50–70 USD/tile). Az IHP CMOS5L regisztrációs határidő (2026-10-26) **közösen megosztott küszöbön alapuló** döntés, nem egyedi vásárlás — lásd a Pályázati lehetőségek szekciót, mielőtt bármilyen díjat befizetsz.
 
 ---
 

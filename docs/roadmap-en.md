@@ -117,7 +117,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 > **⚠️ Execution order ≠ numbering.** The subsection numbers are **stable identifiers**, not a step sequence (the git commit history also references them). Since the 2026-05-08 order pivot, the actual execution order is:
 > **F2.5 → F2.7 (single-core FPGA) → F2.8 (TT peripherals FPGA) → F2.6 (full-chip IHP synthesis) → F3 (Tiny Tapeout).**
 > **Engineering rationale:** *"No silicon tape-out with a design that hasn't run on FPGA."* — verify on FPGA first, synthesize to Sky130 only afterwards; bugs found on FPGA are cheap, bugs on the Tiny Tapeout chip are not.
-> **Grant implication:** the **F2.6 Sky130 synthesis is the post-MoU anchor of the NLnet M1 milestone**. The completed FPGA validation (F2.7) is strong M1 pre-evidence for the 2026-06-01 submission, but the funded, in-MoU-period, verifiable deliverable is the Sky130 area/timing report — hence F2.6 is deliberately timed after the MoU.
+> **Scheduling rationale (updated after the grant decision):** F2.6 was originally placed after the FPGA validation because the Sky130 area/timing report was the NLnet M1 milestone deliverable, to be produced in the MoU period. The grant was not awarded (rejected 2026-10-09, no MoU), so that constraint no longer exists. F2.6 stays after F2.7 on its own technical merits: a full-chip synthesis is worth running on a core that has already passed single-core FPGA validation, which is the project's "no tape-out without FPGA" principle applied to synthesis.
 
 **Done criteria:**
 - Verilator simulation passes on all F1 tests
@@ -371,7 +371,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 #### F6-Silicon Zero — "Cognitive Fabric Zero" (IHP 3 mm², first heterogeneous silicon)
 
-**Goal:** The first **heterogeneous Cognitive Fabric silicon** — **1 Rich + 8 Nano cores, 48 KB on-chip SRAM, 3 mm² IHP SG13G2**. This is the stepping stone between the F3 single-core Tiny Tapeout and the full "Cognitive Fabric One" (15 mm²). **Potentially achievable at EUR0 cost** via the IHP FMD-QNC free research MPW program.
+**Goal:** The first **heterogeneous Cognitive Fabric silicon** — **1 Rich + 8 Nano cores, 48 KB on-chip SRAM, 3 mm² IHP SG13G2**. This is the stepping stone between the F3 single-core Tiny Tapeout and the full "Cognitive Fabric One" (15 mm²). **Cost is not zero:** the IHP Open Silicon MPW open-source rate is 2800 EUR/mm², so 3 mm² is ~EUR8,400, and the run only starts once the total ordered area across all participants reaches 90 mm² — see the Funding Action Plan.
 
 **Why a standalone milestone:**
 - **F3** (TT, 1 Nano) proves the core works in silicon
@@ -398,7 +398,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Dependency:** F5 done (Rich core RTL tested on FPGA), F6-FPGA at least single-board verification done.
 
-**Cost:** **EUR0** (IHP FMD-QNC free research MPW) or ~EUR4,500 (IHP standard price, 3 mm²). **Schedule:** IHP shuttles 2026: March, October, November.
+**Cost:** **~EUR8,400** at the IHP open-source rate for SG13G2 (2800 EUR/mm² × 3 mm²), or ~EUR4,500 at the standard rate — **not EUR0**. Plus a 320 EUR mask fee per bonding diagram, plus packaging (QFN 24/10 pcs EUR690 up to QFN 64/40 pcs EUR1,900). **Schedule:** the next open-source CMOS5L run has a **2026-10-26** registration deadline; the run starts only when the 90 mm² aggregate threshold is reached.
 
 **Note:** Cognitive Fabric Zero **does not replace** Cognitive Fabric One — it complements it. Zero is the "it works in silicon" proof, One is the "it outperforms traditional approaches" proof with benchmarks.
 
@@ -417,9 +417,9 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Platform decision (before F6-Silicon starts):**
 - **Sky130 @ eFabless ChipIgnite** — the **Caravel** harness offers 10 mm² user area, 38 GPIO; the **OpenFrame** harness offers **15 mm²**, 44 GPIO. ~$14,950 (2026 price), 100 QFN chips + eval board, ~5-month turnaround. **The reference configuration (6R+16N+1S) targets OpenFrame.**
-- **IHP SG13G2 MPW** — European, ~EUR1,500/mm² (standard) or **EUR0** (FMD-QNC free research program, for open-source designs). EUR4,500 for 3 mm²; schedule: 2026 March, October, November.
-- **Google Open MPW** — free shuttle (when available), Sky130, Caravel harness. Not regular, but CLI-CPU's open-source status makes it a strong candidate.
-- **Funding:** NLnet NGI Zero Commons Fund (EUR5K–EUR50K, next deadline: June 1, 2026), community crowdfunding, industry partner.
+- **IHP Open Silicon MPW** — European, SG13G2 open-source rate **2800 EUR/mm²** (standard 7300 EUR/mm²), CMOS5L open-source rate 1500 EUR/mm². EUR8,400 for 3 mm² at the open-source rate. **There is no free IHP programme:** the FMD-QNC name in earlier roadmap revisions referred to a separate German research module, not to an IHP MPW programme. The run starts only if the aggregate ordered area reaches 90 mm².
+- **Google Open MPW** — free shuttle (when available), Sky130, Caravel harness. No currently-open 2026 run is confirmed; the Google-funded OpenMPW programme ran roughly 2018–2024.
+- **Funding:** community crowdfunding (Crowd Supply, GitHub Sponsors, Open Collective), industry partner, EU programmes. NLnet NGI Zero Commons Fund is **closed** — the June 2026 round was the last NGI Zero call and both CLI-CPU and Symphact were rejected on 2026-10-09.
 
 **New features beyond F6-FPGA (silicon-specific):**
 - **Floorplan optimization** — Rich cores placed centrally, Nano cores grouped around them
@@ -452,7 +452,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Dependency:** **F6-FPGA done** (all done criteria met), sweet spot selected, multi-configuration report available.
 
-**Cost estimate:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chips + eval board), or ~EUR4,500 (IHP SG13G2 3 mm², smaller configuration: 1R+8N), or **EUR0** (IHP free research MPW / Google Open MPW, if available). **NLnet NGI Zero Commons Fund** grant could cover the entire F6-Silicon (EUR5K–EUR50K).
+**Cost estimate:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chips + eval board), or ~EUR8,400 (IHP SG13G2 3 mm² at the open-source rate of 2800 EUR/mm², smaller configuration: 1R+8N), or ~EUR4,500 at the standard IHP rate. No free option is confirmed: there is no current free IHP programme, and no open Google Open MPW run is confirmed for 2026.
 
 ---
 
@@ -518,7 +518,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Dependency:** **F6-Silicon One done** (130nm reference manufactured, demos verified). Start condition — optional, therefore only if **at least one** is true: the project has obtained funding/an industrial partner to cover the tape-out **or** the >500 MHz / real energy measurement is critical for the next milestone (F7 demo HW, F6.5 Secure Edition).
 
-**Cost estimate:** GF 22FDX via **Europractice MPW** shuttle — **not free** (unlike the IHP FMD-QNC program); at MPW pricing a few-mm² die is in the **tens-of-thousands EUR** range (versus the millions for a full mask set). **The exact price must be confirmed from the current Europractice price list before the phase starts — not estimated here.** Additional design work on top of F6-Si One: std-cell remap + SRAM compiler swap + CTS + sign-off ≈ **~2-3 engineer-months** (similar to the F6-Si One floorplan/sign-off effort).
+**Cost estimate:** GF 22FDX via **Europractice MPW** shuttle — **not free**; at MPW pricing a few-mm² die is in the **tens-of-thousands EUR** range (versus the millions for a full mask set). **The exact price must be confirmed from the current Europractice price list before the phase starts — not estimated here.** Additional design work on top of F6-Si One: std-cell remap + SRAM compiler swap + CTS + sign-off ≈ **~2-3 engineer-months** (similar to the F6-Si One floorplan/sign-off effort).
 
 **Output:**
 - `mpw/22fdx/` — Europractice/GF submission directory
@@ -611,9 +611,13 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 - F6.7 (Cognitive Fabric Dense, 22FDX) is an **optional de-risk step** — like F6.5 it is **not included** in the "without F6.5" total; it only starts if funding is available or the dense-node measurement is critical for the next milestone
 - Estimates cover **pure engineering time** only — manufacturing lead times (TT ~5 months, ChipIgnite ~5 months, IHP ~4 months), shipping, and bring-up waiting are not included
 
-### NLnet NGI Zero Commons Fund Alignment
+### NLnet NGI Zero Commons Fund Alignment (ARCHIVED — grant not awarded)
 
-The [NLnet application](nlnet-application-draft-en.md) (v1.1, submitted 2026-04-14) requested **€35,000** for **18 months**, assuming ~900 hours of part-time work (~€36/h, of which ~€2,440 is hardware).
+> **Status: REJECTED.** The CLI-CPU application (`2026-06-08c`, acknowledgement 2026-04-14) was rejected on **2026-10-09** by Michiel Leenaars, Strategy Director. NLnet stated the June 2026 round was **the last NGI Zero call** (>1,200 applications). The parallel Symphact application (`2026-06-262`) was rejected the same day, two minutes later. **No MoU exists; no grant money was awarded.**
+>
+> The material below is kept as a record of what was requested and how it mapped onto the roadmap. It is **not** a funding plan — see the Funding Action Plan for the current options. Per milestone there was never a funded/in-MoU-period deliverable, so the "post-MoU anchor" reasoning that placed F2.6 after the FPGA validation does not apply; F2.6 is scheduled where its own technical dependencies put it.
+
+The application requested **€35,000** for **18 months**, assuming ~900 hours of part-time work (~€36/h, of which ~€2,440 is hardware).
 
 **Milestone mapping:**
 
@@ -628,12 +632,12 @@ The [NLnet application](nlnet-application-draft-en.md) (v1.1, submitted 2026-04-
 
 † Personnel hours = (budget − hardware cost) ÷ €36/h
 
-**Gap explanation:** The roadmap's full estimate (~1,230 h for the NLnet scope) **exceeds the grant's ~900 hours by ~330 h**. This is normal for open-source grant projects — the grant covers **costs**, not 100% of effort. The difference (~27%) represents the developer's **unfunded own contribution** to the project, which is the standard open-source development model.
+**Coverage gap (historical):** the roadmap's full estimate (~1,230 h for the scope that was proposed to NLnet) **exceeded the requested ~900 hours by ~330 h**. With no grant awarded, this entire ~1,230 h is the developer's **own unfunded contribution**.
 
-**The grant commitments are achievable**, because:
-1. Actual pace on F0–F2.2b (~260 h / ~2 weeks of intensive sprints) **exceeds** the grant's timeline
+**What the pace evidence showed**, kept because it bears on whether the scope is deliverable at all, grant or no grant:
+1. Actual pace on F0–F2.2b (~260 h / ~2 weeks of intensive sprints) **exceeds** the 12–18 month window that was proposed
 2. AI-assisted development (Claude Code) delivers a proven ~30–40% speedup on code generation, testing, and documentation as demonstrated in DONE phases
-3. F2 RTL foundations (ALU, decoder, microcode ROM) are **already complete** — before the grant period starts
+3. F2 RTL foundations (ALU, decoder, microcode ROM) are **already complete**
 4. F4 core instantiation directly reuses F2/F3 RTL — the substantive new work (router, sleep/wake) is well-scoped
 
 ---
@@ -657,7 +661,7 @@ F0 ──► F1 ──► F2 ──► F3 ──┘──► F4 ──►──�
                                                         "Cognitive        │
                                                          Fabric Zero"     │
                                                         (IHP 3mm²,        │
-                                                         1R+8N, €0?)      │
+                                                         1R+8N, ~€8.4K)   │
                                                                │          │
                                                                ▼          │
                                                         F6-Silicon One ───┘
@@ -736,12 +740,13 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 ### Grant Opportunities
 
-| Source | Amount | Deadline | Fit | Priority |
-|--------|--------|----------|-----|----------|
-| **NLnet NGI Zero Commons Fund** | EUR5K–EUR50K | **June 1, 2026** (round 13) | Explicitly mentions "libre silicon", open-source project | **#1 — submit immediately** |
-| **IHP FMD-QNC free MPW** | EUR0 (research) | 2026: Oct, Nov; 2027: Mar | Open-source, non-commercial design | **#2 — register** |
-| **Google Open MPW** | $0 (sponsored) | Not regular, monitor | Sky130, Caravel harness, open design | **#3 — monitor** |
-| **EU CHIPS Act** grants | Varies | Ongoing | European open hardware | Long-term |
+| Source | Amount | Deadline | Fit | Status |
+|--------|--------|----------|-----|--------|
+| **NLnet NGI Zero Commons Fund** | — | — | Was an explicit fit for "libre silicon", open-source projects | ❌ **Closed.** June 2026 round rejected both CLI-CPU (2026-06-08c) and Symphact (2026-06-262) on 2026-10-09. NLnet stated this was the **last NGI Zero call**; no further rounds. |
+| **Tiny Tapeout** | **$50–70/tile** (IHP $50, Sky130 $70) | Rolling, acceptance-based | Open-source design, no grant needed | ✅ **The only grant-independent route to F3 silicon.** |
+| **IHP Open Silicon MPW** | **1500 EUR/mm² (CMOS5L)** or **2800 EUR/mm² (SG13G2)** | **2026-10-26** (CMOS5L run) | Open-source design, Apache-2.0 required | ⚠️ **Not free.** Run starts only if total ordered area reaches **90 mm²**; at the 900 EUR/mm² threshold price a single applicant ordering the minimum alone faces **81 000 EUR** and still gets no silicon unless the threshold is met by others. Mask fee 320 EUR/bonding diagram + packaging. |
+| **Google Open MPW** | $0 (sponsored) | — | Sky130, Caravel harness, open design | ⚠️ No confirmation of any currently-open 2026 run; the Google-funded OpenMPW programme ran roughly 2018–2024. |
+| **EU CHIPS Act** grants | Varies | Ongoing | European open hardware | Long-term, consortium-scale |
 
 ### Community Funding
 
@@ -753,21 +758,20 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 ### Budget Scenarios
 
-| Scenario | Amount | Covers |
-|----------|--------|--------|
-| **A: Out of pocket** | ~EUR2,400 | 3x A7-Lite 200T (F4–F6 FPGA) + 1x TT 16 tiles (F3) + bring-up |
-| **B: NLnet EUR15K** | ~EUR15K | Scenario A + IHP "Cognitive Fabric Zero" (1R+8N, 3 mm²) + engineering tools |
-| **C: NLnet EUR30K** | ~EUR30K | Scenario B + ChipIgnite "Cognitive Fabric One" (6R+16N+1S, 15 mm²) |
-| **D: NLnet EUR50K** | ~EUR50K | Scenario C + 2nd tape-out iteration + conference/publication + subcontracted engineering work |
+> The NLnet-based scenarios B/C/D are **void** — no grant was awarded. Scenarios E/F below are the actual alternatives.
+
+| Scenario | Amount | Covers | Status |
+|----------|--------|--------|--------|
+| **A: Out of pocket** | ~EUR2,400 | 3x A7-Lite 200T (F4–F6 FPGA) + 1x TT 16 tiles (F3) + bring-up | ✅ The only currently funded-in-kind scenario. TT tiles are $50–70 each, grant-independent. |
+| **E: IHP Open Silicon MPW (crowd-shared)** | Share of 90 mm² threshold × 1500–2800 EUR/mm², plus 320 EUR mask fee + packaging | IHP "Cognitive Fabric Zero" (1R+8N, 3 mm²) | ⚠️ Requires ≥10–30 co-applicants to reach the 90 mm² run threshold. **Non-zero risk: the run does not start without the threshold, so the fee can be spent without silicon.** |
+| **F: ChipIgnite OpenFrame** | ~$14,950 (2026 price), 15 mm², 100 QFN + eval board | "Cognitive Fabric One" (6R+16N+1S) | ⚠️ Single-applicant purchase, no shared threshold. Crowdfunding campaign required. |
+| **~~B: NLnet EUR15K~~ / ~~C: NLnet EUR30K~~ / ~~D: NLnet EUR50K~~** | — | — | ❌ **Void.** Grant rejected 2026-10-09. |
 
 ### Schedule
 
 ```
-2026 Apr     --- NLnet grant preparation (47 days!)
-2026 Jun 1   --- NLnet NGI Zero Commons Fund deadline
+2026 Oct     --- IHP Open Silicon MPW CMOS5L registration deadline (2026-10-26)
 2026 Jun-Sep --- F2 RTL development + FPGA bring-up
-2026 Oct     --- IHP free MPW registration deadline
-2026 Nov     --- IHP shuttle (if accepted)
 2027 Q1      --- F3 Tiny Tapeout submission (TTSKY26a or later)
 2027 Q2-Q3   --- F4-F5 FPGA development (3x A7-Lite 200T)
 2027 Q4      --- F6-FPGA verification done
@@ -775,7 +779,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 2028 Q3      --- First silicon in hand
 ```
 
-**The most important immediate action:** NLnet NGI Zero Commons Fund grant preparation — **47 days until the June 1, 2026 deadline**. The CLI-CPU project profile (open-source libre silicon, novel Cognitive Fabric architecture, actor-native processor, Symphact vision) **makes it a particularly strong candidate**.
+**The most important immediate action:** close out F2.8 HW bring-up on the A7-Lite, then submit to Tiny Tapeout for F3. TT is the only grant-independent path to first silicon ($50–70/tile). The IHP CMOS5L registration deadline (2026-10-26) is a **crowd-shared-threshold** decision, not a solo purchase — see the Funding Action Plan before committing any fee.
 
 ---
 
