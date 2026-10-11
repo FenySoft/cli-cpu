@@ -398,7 +398,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Dependency:** F5 done (Rich core RTL tested on FPGA), F6-FPGA at least single-board verification done.
 
-**Cost:** **~EUR8,400** at the IHP open-source rate for SG13G2 (2800 EUR/mm² × 3 mm²), or ~EUR4,500 at the standard rate — **not EUR0**. Plus a 320 EUR mask fee per bonding diagram, plus packaging (QFN 24/10 pcs EUR690 up to QFN 64/40 pcs EUR1,900). **Schedule:** the next open-source CMOS5L run has a **2026-10-26** registration deadline; the run starts only when the 90 mm² aggregate threshold is reached.
+**Cost:** **~EUR8,400** at the IHP open-source SG13G2 rate (2800 EUR/mm² × 3 mm²) — **not EUR0**. Plus a 320 EUR mask fee per bonding diagram, plus packaging (QFN 24/10 pcs EUR690 up to QFN 64/40 pcs EUR1,900). *Prices retrieved 2026-10-11 from `https://dk.ihp-microelectronics.com/OpenSourceRequest.php`.* **Schedule:** the open-source **SG13G2** run's registration deadline was **2026-09-21 and has passed**; the next open run is **CMOS5L** with a **2026-10-26** registration deadline — but CMOS5L is a different technology (no isolated NMOS, no MIM capacitors, PDK under development), so it is **not a drop-in** for this G2 design. The run starts only when the 90 mm² aggregate threshold is reached.
 
 **Note:** Cognitive Fabric Zero **does not replace** Cognitive Fabric One — it complements it. Zero is the "it works in silicon" proof, One is the "it outperforms traditional approaches" proof with benchmarks.
 
@@ -417,7 +417,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Platform decision (before F6-Silicon starts):**
 - **Sky130 @ eFabless ChipIgnite** — the **Caravel** harness offers 10 mm² user area, 38 GPIO; the **OpenFrame** harness offers **15 mm²**, 44 GPIO. ~$14,950 (2026 price), 100 QFN chips + eval board, ~5-month turnaround. **The reference configuration (6R+16N+1S) targets OpenFrame.**
-- **IHP Open Silicon MPW** — European, SG13G2 open-source rate **2800 EUR/mm²** (standard 7300 EUR/mm²), CMOS5L open-source rate 1500 EUR/mm². EUR8,400 for 3 mm² at the open-source rate. **There is no free IHP programme:** the FMD-QNC name in earlier roadmap revisions referred to a separate German research module, not to an IHP MPW programme. The run starts only if the aggregate ordered area reaches 90 mm².
+- **IHP Open Silicon MPW** — European, SG13G2 open-source rate **2800 EUR/mm²** (standard 7300 EUR/mm²), CMOS5L open-source rate 1500 EUR/mm². EUR8,400 for 3 mm² at the open-source rate. **There is no free IHP programme:** the FMD-QNC name in earlier roadmap revisions referred to a separate German research module, not to an IHP MPW programme. The run starts only if the aggregate ordered area reaches 90 mm². *Prices retrieved 2026-10-11 from `https://dk.ihp-microelectronics.com/OpenSourceRequest.php`.*
 - **Google Open MPW** — free shuttle (when available), Sky130, Caravel harness. No currently-open 2026 run is confirmed; the Google-funded OpenMPW programme ran roughly 2018–2024.
 - **Funding:** community crowdfunding (Crowd Supply, GitHub Sponsors, Open Collective), industry partner, EU programmes. NLnet NGI Zero Commons Fund is **closed** — the June 2026 round was the last NGI Zero call and both CLI-CPU and Symphact were rejected on 2026-10-09.
 
@@ -452,7 +452,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Dependency:** **F6-FPGA done** (all done criteria met), sweet spot selected, multi-configuration report available.
 
-**Cost estimate:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chips + eval board), or ~EUR8,400 (IHP SG13G2 3 mm² at the open-source rate of 2800 EUR/mm², smaller configuration: 1R+8N), or ~EUR4,500 at the standard IHP rate. No free option is confirmed: there is no current free IHP programme, and no open Google Open MPW run is confirmed for 2026.
+**Cost estimate:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chips + eval board), or ~EUR8,400 (IHP SG13G2 3 mm² at the open-source rate of 2800 EUR/mm², smaller configuration: 1R+8N). No free option is confirmed: there is no current free IHP programme, and no open Google Open MPW run is confirmed for 2026. *IHP prices retrieved 2026-10-11 from `https://dk.ihp-microelectronics.com/OpenSourceRequest.php`.*
 
 ---
 
@@ -744,7 +744,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 |--------|--------|----------|-----|--------|
 | **NLnet NGI Zero Commons Fund** | — | — | Was an explicit fit for "libre silicon", open-source projects | ❌ **Closed.** June 2026 round rejected both CLI-CPU (2026-06-08c) and Symphact (2026-06-262) on 2026-10-09. NLnet stated this was the **last NGI Zero call**; no further rounds. |
 | **Tiny Tapeout** | **$50–70/tile** (IHP $50, Sky130 $70) | Rolling, acceptance-based | Open-source design, no grant needed | ✅ **The only grant-independent route to F3 silicon.** |
-| **IHP Open Silicon MPW** | **1500 EUR/mm² (CMOS5L)** or **2800 EUR/mm² (SG13G2)** | **2026-10-26** (CMOS5L run) | Open-source design, Apache-2.0 required | ⚠️ **Not free.** Run starts only if total ordered area reaches **90 mm²**; at the 900 EUR/mm² threshold price a single applicant ordering the minimum alone faces **81 000 EUR** and still gets no silicon unless the threshold is met by others. Mask fee 320 EUR/bonding diagram + packaging. |
+| **IHP Open Silicon MPW** | **1500 EUR/mm² (CMOS5L)** or **2800 EUR/mm² (SG13G2)** | SG13G2: **2026-09-21, expired** · CMOS5L: **2026-10-26** | Open-source design, Apache-2.0 required | ⚠️ **Not free.** Run starts only if total ordered area reaches **90 mm²**; at the 900 EUR/mm² threshold price a single applicant ordering the minimum alone faces **81 000 EUR** and still gets no silicon unless the threshold is met by others. Mask fee 320 EUR/bonding diagram + packaging. **CMOS5L is a different technology** (no isolated NMOS, no MIM caps, PDK under development), not a drop-in for a G2 design. *Prices retrieved 2026-10-11.* |
 | **Google Open MPW** | $0 (sponsored) | — | Sky130, Caravel harness, open design | ⚠️ No confirmation of any currently-open 2026 run; the Google-funded OpenMPW programme ran roughly 2018–2024. |
 | **EU CHIPS Act** grants | Varies | Ongoing | European open hardware | Long-term, consortium-scale |
 
@@ -770,7 +770,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 ### Schedule
 
 ```
-2026 Oct     --- IHP Open Silicon MPW CMOS5L registration deadline (2026-10-26)
+2026 Oct     --- IHP Open Silicon MPW CMOS5L registration deadline (2026-10-26) -- CMOS5L only; the G2 open run closed 2026-09-21
 2026 Jun-Sep --- F2 RTL development + FPGA bring-up
 2027 Q1      --- F3 Tiny Tapeout submission (TTSKY26a or later)
 2027 Q2-Q3   --- F4-F5 FPGA development (3x A7-Lite 200T)
@@ -779,7 +779,7 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 2028 Q3      --- First silicon in hand
 ```
 
-**The most important immediate action:** close out F2.8 HW bring-up on the A7-Lite, then submit to Tiny Tapeout for F3. TT is the only grant-independent path to first silicon ($50–70/tile). The IHP CMOS5L registration deadline (2026-10-26) is a **crowd-shared-threshold** decision, not a solo purchase — see the Funding Action Plan before committing any fee.
+**The most important immediate action:** close out F2.8 HW bring-up on the A7-Lite, then submit to Tiny Tapeout for F3. TT is the only grant-independent path to first silicon ($50–70/tile). The IHP CMOS5L registration deadline (2026-10-26) is a **crowd-shared-threshold** decision, not a solo purchase, and CMOS5L is a different technology from the G2 designs in this roadmap — see the Funding Action Plan before committing any fee.
 
 ---
 

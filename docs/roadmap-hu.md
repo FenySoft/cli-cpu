@@ -398,7 +398,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Függőség:** F5 kész (Rich core RTL tesztelve FPGA-n), F6-FPGA legalább single-board verifikáció kész.
 
-**Költség:** **~8400 EUR** az IHP nyílt forráskódú SG13G2 árral (2800 EUR/mm² × 3 mm²), vagy ~4500 EUR standard árral — **nem €0**. Plusz 320 EUR maszkdíj bonding diagramonként, plusz csomagolás (QFN 24/10 db 690 EUR-tól QFN 64/40 db 1900 EUR-ig). **Ütemezés:** a következő nyílt forráskódú CMOS5L kör regisztrációs határideje **2026-10-26**; a kör csak a 90 mm² összesített küszöb elérésekor indul el.
+**Költség:** **~8400 EUR** az IHP nyílt forráskódú SG13G2 árral (2800 EUR/mm² × 3 mm²) — **nem €0**. Plusz 320 EUR maszkdíj bonding diagramonként, plusz csomagolás (QFN 24/10 db 690 EUR-tól QFN 64/40 db 1900 EUR-ig). *Árak lekérve 2026-10-11-én innen: `https://dk.ihp-microelectronics.com/OpenSourceRequest.php`.* **Ütemezés:** a nyílt forráskódú **SG13G2** kör regisztrációs határideje **2026-09-21 volt és lejárt**; a következő nyílt kör a **CMOS5L**, **2026-10-26**-i határidővel — de a CMOS5L más technológia (nincs izolált NMOS, nincs MIM kapacitás, a PDK fejlesztés alatt), tehát nem közvetlenül cserélhető erre a G2 designra. A kör csak a 90 mm² összesített küszöb elérésekor indul el.
 
 **Megjegyzés:** A Cognitive Fabric Zero **nem helyettesíti** a Cognitive Fabric One-t — kiegészíti. A Zero a „működik szilíciumon" bizonyíték, a One a „jobb, mint a hagyományos" bizonyíték benchmarkokkal.
 
@@ -417,7 +417,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Platform-döntés (F6-Silicon indulása előtt):**
 - **Sky130 @ eFabless ChipIgnite** — a **Caravel** harness 10 mm² user area, 38 GPIO; az **OpenFrame** harness **15 mm²**, 44 GPIO. ~$14,950 (2026 ár), 100 QFN chip + eval board, ~5 hónap átfutás. **A referencia konfiguráció (6R+16N+1S) az OpenFrame-re épül.**
-- **IHP Open Silicon MPW** — európai, SG13G2 nyílt forráskódú ár **2800 EUR/mm²** (standard 7300 EUR/mm²), CMOS5L nyílt forráskódú ár 1500 EUR/mm². 3 mm²-ért ~8400 EUR a nyílt forráskódú árral. **Nincs ingyenes IHP program:** a korábbi roadmap-verziókban szereplő FMD-QNC név egy külön német kutatási modulra utalt, nem IHP MPW programra. A kör csak akkor indul el, ha az összesített terület eléri a 90 mm²-t.
+- **IHP Open Silicon MPW** — európai, SG13G2 nyílt forráskódú ár **2800 EUR/mm²** (standard 7300 EUR/mm²), CMOS5L nyílt forráskódú ár 1500 EUR/mm². 3 mm²-ért ~8400 EUR a nyílt forráskódú árral. **Nincs ingyenes IHP program:** a korábbi roadmap-verziókban szereplő FMD-QNC név egy külön német kutatási modulra utalt, nem IHP MPW programra. A kör csak akkor indul el, ha az összesített terület eléri a 90 mm²-t. *Árak lekérve 2026-10-11-én innen: `https://dk.ihp-microelectronics.com/OpenSourceRequest.php`.*
 - **Google Open MPW** — ingyenes shuttle (ha nyílik), Sky130, Caravel harness. Nincs megerősítés 2026-ra nyitott körre; a Google-finanszírozású OpenMPW program kb. 2018–2024 között futott.
 - **Finanszírozás:** közösségi crowdfunding (Crowd Supply, GitHub Sponsors, Open Collective), ipari partner, EU programok. Az NLnet NGI Zero Commons Fund **lezárt** — a 2026. júniusi kör volt az utolsó NGI Zero kör, a CLI-CPU és a Symphact pályázatát is 2026-10-09-én utasították el.
 
@@ -452,7 +452,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 
 **Függőség:** **F6-FPGA kész** (minden kész kritérium teljesül), sweet spot kiválasztva, multi-konfiguráció riport elérhető.
 
-**Költség-nagyságrend:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chip + eval board), vagy ~8400 EUR (IHP SG13G2 3 mm² a 2800 EUR/mm² nyílt forráskódú árral, kisebb konfiguráció: 1R+8N), vagy ~4500 EUR standard IHP árral. Nincs megerősített ingyenes opció: jelenleg nincs ingyenes IHP program, és 2026-ra nincs megerősítve nyitott Google Open MPW kör.
+**Költség-nagyságrend:** ~$14,950 (eFabless ChipIgnite OpenFrame, 15 mm², 100 QFN chip + eval board), vagy ~8400 EUR (IHP SG13G2 3 mm² a 2800 EUR/mm² nyílt forráskódú árral, kisebb konfiguráció: 1R+8N). Nincs megerősített ingyenes opció: jelenleg nincs ingyenes IHP program, és 2026-ra nincs megerősítve nyitott Google Open MPW kör. *IHP árak lekérve 2026-10-11-én innen: `https://dk.ihp-microelectronics.com/OpenSourceRequest.php`.*
 
 ---
 
@@ -752,7 +752,7 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 |--------|--------|----------|-------------|---------|
 | **NLnet NGI Zero Commons Fund** | — | — | Kifejezetten „libre silicon"-t említ, nyílt forráskódú projekt | ❌ **Lezárt.** A 2026. júniusi körben a CLI-CPU (`2026-06-08c`) és a Symphact (`2026-06-262`) pályázatát is elutasították 2026-10-09-én. Az NLnet szerint ez volt az **utolsó NGI Zero kör**, újabb kör nincs. |
 | **Tiny Tapeout** | **50–70 USD/tile** (IHP 50, Sky130 70) | Folyamatos, befogadás-alapon | Nyílt forráskódú design, nem kell hozzá pályázat | ✅ **Az egyetlen pályázatfüggetlen út az F3 szilíciumhoz.** |
-| **IHP Open Silicon MPW** | **1500 EUR/mm² (CMOS5L)** vagy **2800 EUR/mm² (SG13G2)** | **2026-10-26** (CMOS5L kör) | Nyílt forráskódú design, Apache-2.0 licenc kötelező | ⚠️ **Nem ingyenes.** A kör csak akkor indul el, ha az összes vevő összesített területe eléri a **90 mm²**-t; a 900 EUR/mm² küszöbárnál egyetlen kérelmező, aki önmagban rendeli meg a minimumot, **81 000 EUR**-ral szembesül, és szilícium akkor sem lesz, ha a küszöb mások nélkül nem teljesül. Maszkdíj 320 EUR/bonding diagram + csomagolás. |
+| **IHP Open Silicon MPW** | **1500 EUR/mm² (CMOS5L)** vagy **2800 EUR/mm² (SG13G2)** | SG13G2: **2026-09-21, lejárt** · CMOS5L: **2026-10-26** | Nyílt forráskódú design, Apache-2.0 licenc kötelező | ⚠️ **Nem ingyenes.** A kör csak akkor indul el, ha az összes vevő összesített területe eléri a **90 mm²**-t; a 900 EUR/mm² küszöbárnál egyetlen kérelmező, aki önmagban rendeli meg a minimumot, **81 000 EUR**-ral szembesül, és szilícium akkor sem lesz, ha a küszöb mások nélkül nem teljesül. Maszkdíj 320 EUR/bonding diagram + csomagolás. **A CMOS5L más technológia** (nincs izolált NMOS, nincs MIM kapacitás, a PDK fejlesztés alatt), nem közvetlenül cserélhető egy G2 designba. *Árak lekérve 2026-10-11-én.* |
 | **Google Open MPW** | $0 (szponzorált) | — | Sky130, Caravel harness, nyílt design | ⚠️ Nincs megerősítés 2026-ra nyitott körre; a Google-finanszírozású OpenMPW program kb. 2018–2024 között futott. |
 | **EU CHIPS Act** pályázatok | Változó | Folyamatos | Európai nyílt hardver | Hosszú táv, konzorciumi méret |
 
@@ -778,7 +778,7 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 ### Ütemezés
 
 ```
-2026 okt     ─── IHP Open Silicon MPW CMOS5L regisztrációs deadline (2026-10-26)
+2026 okt     ─── IHP Open Silicon MPW CMOS5L regisztrációs deadline (2026-10-26) -- csak CMOS5L; a G2 nyílt kör 2026-09-21-én lezárult
 2026 jún-szept── F2 RTL fejlesztés + FPGA bring-up
 2027 Q1      ─── F3 Tiny Tapeout submission (TTSKY26a vagy későbbi)
 2027 Q2-Q3   ─── F4–F5 FPGA fejlesztés (3× A7-Lite 200T)
@@ -787,7 +787,7 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 2028 Q3      ─── Első szilícium a kézben
 ```
 
-**A legfontosabb azonnali akció:** az F2.8 HW bring-up lezárása az A7-Lite-on, majd a beadás Tiny Tapeoutra az F3-hoz. A TT az egyetlen pályázatfüggetlen út az első szilíciumhoz (50–70 USD/tile). Az IHP CMOS5L regisztrációs határidő (2026-10-26) **közösen megosztott küszöbön alapuló** döntés, nem egyedi vásárlás — lásd a Pályázati lehetőségek szekciót, mielőtt bármilyen díjat befizetsz.
+**A legfontosabb azonnali akció:** az F2.8 HW bring-up lezárása az A7-Lite-on, majd a beadás Tiny Tapeoutra az F3-hoz. A TT az egyetlen pályázatfüggetlen út az első szilíciumhoz (50–70 USD/tile). Az IHP CMOS5L regisztrációs határidő (2026-10-26) **közösen megosztott küszöbön alapuló** döntés, nem egyedi vásárlás, és a CMOS5L más technológia, mint a roadmap G2 designjai — lásd a Pályázati lehetőségek szekciót, mielőtt bármilyen díjat befizetsz.
 
 ---
 

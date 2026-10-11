@@ -315,7 +315,7 @@ The compiler verifies that `[RunsOn(CoreType.Nano)]` code contains **only CIL-T0
 | F4 | FPGA multi-core | **4** | 0 | First shared-nothing fabric, pure Nano |
 | F5 | FPGA heterogeneous | **4** | **1** | **First heterogeneous system**, Rich core test |
 | F6-FPGA | 3x A7-Lite 200T multi-board (3x134K LUT, Ethernet mesh) | **8-10/board, ~26 total** | **2** | FPGA-verified distributed Cognitive Fabric |
-| F6-Silicon Zero | IHP SG13G2 MPW (3 mm², EUR 0-EUR 4,500) | **8** | **1** | **"Cognitive Fabric Zero"** — first heterogeneous silicon |
+| F6-Silicon Zero | IHP SG13G2 MPW (3 mm², ~EUR8,400 open-source rate) | **8** | **1** | **"Cognitive Fabric Zero"** — first heterogeneous silicon |
 | F6-Silicon One | ChipIgnite Sky130 (15 mm², ~$15K) | **23** | **2** | **"Cognitive Fabric One"** — full demonstration, benchmark |
 | F7 | Product chip (future) | **64+** | **4-8** | Commercial Cognitive Fabric |
 

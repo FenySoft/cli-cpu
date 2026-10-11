@@ -315,7 +315,7 @@ A fordító ellenőrzi, hogy a `[RunsOn(CoreType.Nano)]` kódban **csak a CIL-T0
 | F4 | FPGA multi-core | **4** | 0 | Első shared-nothing fabric, pure Nano |
 | F5 | FPGA heterogén | **4** | **1** | **Első heterogén rendszer**, Rich core teszt |
 | F6-FPGA | 3× A7-Lite 200T multi-board (3×134K LUT, Ethernet háló) | **8–10/board, ~26 összesen** | **2** | FPGA-verifikált elosztott Cognitive Fabric |
-| F6-Silicon Zero | IHP SG13G2 MPW (3 mm², €0–€4,500) | **8** | **1** | **„Cognitive Fabric Zero"** — első heterogén szilícium |
+| F6-Silicon Zero | IHP SG13G2 MPW (3 mm², ~8400 EUR nyílt forráskódú árral) | **8** | **1** | **„Cognitive Fabric Zero"** — első heterogén szilícium |
 | F6-Silicon One | ChipIgnite Sky130 (15 mm², ~$15K) | **23** | **2** | **„Cognitive Fabric One"** — teljes demonstráció, benchmark |
 | F7 | Termék-chip (jövő) | **64+** | **4–8** | Kereskedelmi Cognitive Fabric |
 
