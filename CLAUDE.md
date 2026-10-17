@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **CLI-CPU** — nyílt forráskódú processzor, amely .NET CIL bytecode-ot hajt végre natívan hardverben. "Cognitive Fabric": több kis, független core egyetlen chipben, mailbox-alapú üzenetküldéssel.
 
-Jelenlegi fázis: **F1.5 KÉSZ** (szimulátor + linker + CLI runner, TDD). A roadmap F0–F7-ig terjed (spec → RTL → FPGA → szilícium → Symphact).
+A roadmap F0–F7-ig terjed (spec → RTL → FPGA → szilícium → Symphact); az aktuális fázis a `docs/roadmap-hu.md`-ben áll.
 
 ## Build és teszt
 

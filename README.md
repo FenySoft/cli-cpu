@@ -89,9 +89,7 @@ C# programs use **`[RunsOn(CoreType.Nano)]`** or **`[RunsOn(CoreType.Rich)]`** a
 
 ## Status
 
-**F1.5 -- DONE.** The C# reference simulator (64/64 CIL-T0 opcodes, 187 green tests), the Roslyn-to-CIL-T0 linker, the CLI runner (`run` / `link` commands), and the PureMath sample program are all complete. The next step is **F2 -- RTL** (Verilog/Amaranth HDL).
-
-See [docs/roadmap-en.md](docs/roadmap-en.md) for the full phase breakdown.
+Phase status and milestones are kept in [docs/roadmap-en.md](docs/roadmap-en.md). Test counts and status are not stated here; measure them by running `dotnet test CLI-CPU.sln` (C# simulator) and `make test_*` in `rtl/tb` (RTL, cocotb).
 
 ## Blog
 

@@ -89,9 +89,7 @@ A C# programok **`[RunsOn(CoreType.Nano)]`** vagy **`[RunsOn(CoreType.Rich)]`** 
 
 ## Státusz
 
-**F1.5 — KÉSZ.** A C# referencia szimulátor (64/64 CIL-T0 opkód, 187 zöld teszt), a Roslyn→CIL-T0 linker, a CLI runner (`run` / `link` parancsok), és a PureMath példaprogram mind kész. A következő lépés az **F2 — RTL** (Verilog/Amaranth HDL).
-
-Lásd [docs/roadmap-hu.md](docs/roadmap-hu.md) a teljes fázisolásért.
+A fázisok állapota és mérföldkövei a [docs/roadmap-hu.md](docs/roadmap-hu.md) fájlban állnak. Tesztszám és állapot nem szerepel itt, futtatással mérhető: `dotnet test CLI-CPU.sln` (C# szimulátor), `make test_*` az `rtl/tb` mappában (RTL, cocotb).
 
 ## Blog
 
