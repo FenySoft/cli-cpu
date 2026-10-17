@@ -104,8 +104,6 @@ Last audit: **2026-05-03**
 
 | File pair | Note |
 |---|---|
-| `nlnet-application-draft-{hu,en}.md` | NLnet application material. |
-| `nlnet-corrections-{hu,en}.md` | Post-submission corrections. |
 | `symphact-{hu,en}.md` | Moved to `FenySoft/Symphact` repo. |
 
 ### `reference` (2 files, 1 pair)

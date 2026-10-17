@@ -107,8 +107,6 @@ Utolsó audit: **2026-05-03**
 
 | Fájl pár | Megjegyzés |
 |---|---|
-| `nlnet-application-draft-{hu,en}.md` | NLnet pályázati anyag. |
-| `nlnet-corrections-{hu,en}.md` | Beadás utáni korrekciók. |
 | `symphact-{hu,en}.md` | Átköltözött `FenySoft/Symphact` repóba. |
 
 ### `reference` (2 fájl, 1 pár)
