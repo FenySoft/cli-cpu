@@ -15,7 +15,7 @@ status: policy
 - **Nyelv:** Angol (nemzetközi elérés), magyar fordításokkal a clicpu.org-on
 - **Platform:** clicpu.org/en/blog/ + clicpu.org/hu/blog/ + Medium
 - **Ütemezés:** Heti egy cikk
-- **Cél:** Ismertség építése, GitHub csillagok, közösség, NLnet pályázat támogatása
+- **Cél:** Ismertség építése, GitHub csillagok, közösség
 
 ## Tervezett cikkek
 

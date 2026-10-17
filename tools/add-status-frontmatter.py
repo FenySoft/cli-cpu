@@ -57,8 +57,6 @@ STATUS_MAP = {
         "docs/STATUS-en.md", "docs/STATUS-hu.md",
     ],
     "archived": [
-        "docs/nlnet-submission-record.md",
-        "docs/nlnet-submission-record-hu.md",
         "docs/symphact-en.md", "docs/symphact-hu.md",
     ],
     "reference": [

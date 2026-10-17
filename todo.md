@@ -80,7 +80,7 @@ korlát (az írás gyors). Vault: `f2-flash-write-uart-throttle`.
 
 - **Roadmap:** F2.6, `docs/roadmap-hu.md` / `docs/roadmap-en.md`
 - **Státusz:** ⏳ VÁRAKOZIK — az F2.8 FPGA-validáció után indul (a sorrend saját technikai
-  függőség, nem a NLnet-pályázat horgonya: a támogatás nem lett odaítélve, nincs MoU)
+  függőség)
 - **Felvéve:** 2026-05-30
 
 ### Előkészítés (F2.6-prep)

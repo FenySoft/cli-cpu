@@ -117,7 +117,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 > **⚠️ Execution order ≠ numbering.** The subsection numbers are **stable identifiers**, not a step sequence (the git commit history also references them). Since the 2026-05-08 order pivot, the actual execution order is:
 > **F2.5 → F2.7 (single-core FPGA) → F2.8 (TT peripherals FPGA) → F2.6 (full-chip IHP synthesis) → F3 (Tiny Tapeout).**
 > **Engineering rationale:** *"No silicon tape-out with a design that hasn't run on FPGA."* — verify on FPGA first, synthesize to Sky130 only afterwards; bugs found on FPGA are cheap, bugs on the Tiny Tapeout chip are not.
-> **Scheduling rationale (updated after the grant decision):** F2.6 was originally placed after the FPGA validation because the Sky130 area/timing report was the NLnet M1 milestone deliverable, to be produced in the MoU period. The grant was not awarded (rejected 2026-10-09, no MoU), so that constraint no longer exists. F2.6 stays after F2.7 on its own technical merits: a full-chip synthesis is worth running on a core that has already passed single-core FPGA validation, which is the project's "no tape-out without FPGA" principle applied to synthesis.
+> **Scheduling rationale:** F2.6 follows F2.7: a full-chip synthesis is worth running on a core that has already passed single-core FPGA validation, which is the project's "no tape-out without FPGA" principle applied to synthesis.
 
 **Done criteria:**
 - Verilator simulation passes on all F1 tests
@@ -419,7 +419,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - **Sky130 @ eFabless ChipIgnite** — the **Caravel** harness offers 10 mm² user area, 38 GPIO; the **OpenFrame** harness offers **15 mm²**, 44 GPIO. ~$14,950 (2026 price), 100 QFN chips + eval board, ~5-month turnaround. **The reference configuration (6R+16N+1S) targets OpenFrame.**
 - **IHP Open Silicon MPW** — European, SG13G2 open-source rate **2800 EUR/mm²** (standard 7300 EUR/mm²), CMOS5L open-source rate 1500 EUR/mm². EUR8,400 for 3 mm² at the open-source rate. **There is no free IHP programme:** the FMD-QNC name in earlier roadmap revisions referred to a separate German research module, not to an IHP MPW programme. The run starts only if the aggregate ordered area reaches 90 mm². *Open-source prices retrieved 2026-10-11 from `https://dk.ihp-microelectronics.com/OpenSourceRequest.php`; the 7300 EUR/mm² standard rate from `https://www.ihp-microelectronics.com/services/research-and-prototyping-service/mpw-prototyping-service/schedule-price-list`.*
 - **Google Open MPW** — free shuttle (when available), Sky130, Caravel harness. No currently-open 2026 run is confirmed; the Google-funded OpenMPW programme ran roughly 2018–2024.
-- **Funding:** community crowdfunding (Crowd Supply, GitHub Sponsors, Open Collective), industry partner, EU programmes. NLnet NGI Zero Commons Fund is **closed** — the June 2026 round was the last NGI Zero call and the CLI-CPU application was rejected on 2026-10-09.
+- **Funding:** community crowdfunding (Crowd Supply, GitHub Sponsors, Open Collective), industry partner, EU programmes.
 
 **New features beyond F6-FPGA (silicon-specific):**
 - **Floorplan optimization** — Rich cores placed centrally, Nano cores grouped around them
@@ -611,34 +611,12 @@ Estimates assume **AI-assisted development** (Claude Code pair programming), whi
 - F6.7 (Cognitive Fabric Dense, 22FDX) is an **optional de-risk step** — like F6.5 it is **not included** in the "without F6.5" total; it only starts if funding is available or the dense-node measurement is critical for the next milestone
 - Estimates cover **pure engineering time** only — manufacturing lead times (TT ~5 months, ChipIgnite ~5 months, IHP ~4 months), shipping, and bring-up waiting are not included
 
-### NLnet NGI Zero Commons Fund Alignment (ARCHIVED — grant not awarded)
+### Pace evidence
 
-> **Status: REJECTED.** The CLI-CPU application (`2026-06-08c`, acknowledgement 2026-04-14) was rejected on **2026-10-09**. NLnet stated the June 2026 round was **the last NGI Zero call** (>1,200 applications). **No MoU exists; no grant money was awarded.**
->
-> The material below is kept as a record of what was requested and how it mapped onto the roadmap. It is **not** a funding plan — see the Funding Action Plan for the current options. Per milestone there was never a funded/in-MoU-period deliverable, so the "post-MoU anchor" reasoning that placed F2.6 after the FPGA validation does not apply; F2.6 is scheduled where its own technical dependencies put it.
-
-The application requested **€35,000** for **18 months**, assuming ~900 hours of part-time work (~€36/h, of which ~€2,440 is hardware).
-
-**Milestone mapping:**
-
-| NLnet Milestone | Roadmap Phase | Grant Budget | Grant Hours† | Roadmap Est. | Coverage |
-|-----------------|---------------|-------------|-------------|-------------|----------|
-| **M1:** RTL | F2 | €8,000 | ~222 h | ~350 h | full |
-| **M2:** Tiny Tapeout | F3 | €7,000 | ~159 h | ~220 h | full |
-| **M3:** FPGA multi-core | F4 | €8,000 | ~190 h | ~360 h | full |
-| **M4:** Rich core RTL start | F5 (start) | €7,000 | ~194 h | ~200 h (of 720) | ~28% |
-| **M5:** Docs & community | (built-in) | €5,000 | ~139 h | ~100 h | full |
-| **Total** | F2–F5 start | **€35,000** | **~904 h** | **~1,230 h** | |
-
-† Personnel hours = (budget − hardware cost) ÷ €36/h
-
-**Coverage gap (historical):** the roadmap's full estimate (~1,230 h for the scope that was proposed to NLnet) **exceeded the requested ~900 hours by ~330 h**. With no grant awarded, this entire ~1,230 h is the developer's **own unfunded contribution**.
-
-**What the pace evidence showed**, kept because it bears on whether the scope is deliverable at all, grant or no grant:
-1. Actual pace on F0–F2.2b (~260 h / ~2 weeks of intensive sprints) **exceeds** the 12–18 month window that was proposed
-2. AI-assisted development (Claude Code) delivers a proven ~30–40% speedup on code generation, testing, and documentation as demonstrated in DONE phases
-3. F2 RTL foundations (ALU, decoder, microcode ROM) are **already complete**
-4. F4 core instantiation directly reuses F2/F3 RTL — the substantive new work (router, sleep/wake) is well-scoped
+It bears on whether the scope is deliverable:
+1. AI-assisted development (Claude Code) delivers a proven ~30–40% speedup on code generation, testing, and documentation as demonstrated in DONE phases
+2. F2 RTL foundations (ALU, decoder, microcode ROM) are **already complete**
+3. F4 core instantiation directly reuses F2/F3 RTL — the substantive new work (router, sleep/wake) is well-scoped
 
 ---
 
@@ -742,7 +720,6 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 | Source | Amount | Deadline | Fit | Status |
 |--------|--------|----------|-----|--------|
-| **NLnet NGI Zero Commons Fund** | — | — | Was an explicit fit for "libre silicon", open-source projects | ❌ **Closed.** June 2026 round rejected the CLI-CPU application (2026-06-08c) on 2026-10-09. NLnet stated this was the **last NGI Zero call**; no further rounds. |
 | **Tiny Tapeout** | **$50–70/tile** (IHP $50, Sky130 $70) | Rolling, acceptance-based | Open-source design, no grant needed | ✅ **The only grant-independent route to F3 silicon.** |
 | **IHP Open Silicon MPW** | **1500 EUR/mm² (CMOS5L)** or **2800 EUR/mm² (SG13G2)** | SG13G2: **2026-09-21, expired** · CMOS5L: **2026-10-26** | Open-source design, Apache-2.0 required | ⚠️ **Not free.** Run starts only if total ordered area reaches **90 mm²**; at the 900 EUR/mm² threshold price a single applicant ordering the minimum alone faces **81 000 EUR** and still gets no silicon unless the threshold is met by others. Mask fee 320 EUR/bonding diagram + packaging. **CMOS5L is a different technology** (no isolated NMOS, no MIM caps, PDK under development), not a drop-in for a G2 design. *Prices retrieved 2026-10-11; the 900 EUR/mm² threshold price from the schedule-price-list page above.* |
 | **Google Open MPW** | $0 (sponsored) | — | Sky130, Caravel harness, open design | ⚠️ No confirmation of any currently-open 2026 run; the Google-funded OpenMPW programme ran roughly 2018–2024. |
@@ -758,14 +735,11 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 
 ### Budget Scenarios
 
-> The NLnet-based scenarios B/C/D are **void** — no grant was awarded. Scenarios E/F below are the actual alternatives.
-
 | Scenario | Amount | Covers | Status |
 |----------|--------|--------|--------|
 | **A: Out of pocket** | ~EUR2,400 | 3x A7-Lite 200T (F4–F6 FPGA) + 1x TT 16 tiles (F3) + bring-up | ✅ The only currently funded-in-kind scenario. TT tiles are $50–70 each, grant-independent. |
 | **E: IHP Open Silicon MPW (crowd-shared)** | Share of 90 mm² threshold × 1500–2800 EUR/mm², plus 320 EUR mask fee + packaging | IHP "Cognitive Fabric Zero" (1R+8N, 3 mm²) | ⚠️ Requires ≥10–30 co-applicants to reach the 90 mm² run threshold. **Non-zero risk: the run does not start without the threshold, so the fee can be spent without silicon.** |
 | **F: ChipIgnite OpenFrame** | ~$14,950 (2026 price), 15 mm², 100 QFN + eval board | "Cognitive Fabric One" (6R+16N+1S) | ⚠️ Single-applicant purchase, no shared threshold. Crowdfunding campaign required. |
-| **~~B: NLnet EUR15K~~ / ~~C: NLnet EUR30K~~ / ~~D: NLnet EUR50K~~** | — | — | ❌ **Void.** Grant rejected 2026-10-09. |
 
 ### Schedule
 
@@ -795,9 +769,9 @@ The CLI-CPU silicon milestones (F3 Tiny Tapeout, F6-Silicon Zero/One) require ex
 | 1.7 | 2026-05-17 | **F2.7 Sub5.A DONE** — config-flash app base offset root fix: parameterizable `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). The Sub5 build-infra "open HW question" (bitstream@0x0 ↔ app@0x0 collision) resolved: sim default 0 (bit-identical parity), FPGA 0xC00000 (12 MB, above the ~9.9 MB bitstream). Single source: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 new cocotb tests (test_30/31) RED→GREEN + 7 regression targets green. SEG_DATA intentionally not offset (rationale documented). `todo.md` F2.7.E, READMEs 0.5.1, Vault: project_flash_base_offset. |
 | 1.6 | 2026-05-16 | **F2.7.D DONE** — recursive CALL/RET caller eval depth preservation root fix (flush to SRAM + eval depth in header reserved field + RET SPFILL cache refill, 3 modules: `cilcpu_stack_cache.v` + `cilcpu_core.v`). The former "F2.5a simplification" (project_recursive_call_bug, `TRAP_STACK_UNDERFLOW` on recursive Fibonacci) is resolved. test_core 49/49, test_stack_cache 28/28 (3 new unit tests), wrapper/board all green, new regression `test_52c` (Fib(10)=55). CORE_SPEC v1.5. Work-hours table + Current Status updated. |
 | 1.5 | 2026-05-14 | F2.7 Sub1..Sub4 DONE — board-level top wrapper (`cilcpu_a7lite_board.v`) STARTUPE2 + 4× IOBUF wrapped around `cilcpu_a7lite_top`; sim stub file for Xilinx primitives; XDC updated with QSPI flash pins (T19, P22, R22, P21, R21) + `qspi_sck` generated clock. **5 new cocotb tests green** (4 smoke + 1 Fibonacci e2e through board.v). Current Status, Estimated Work Hours table updated. |
-| 1.5.1 | 2026-05-15 | Doc consistency: highlighted "Execution order ≠ numbering" block added to the F2 phase header (canonical place for the F2.7→F2.6→F3 order + NLnet M1 anchor rationale). No renumbering — the git commit history is immutable. |
+| 1.5.1 | 2026-05-15 | Doc consistency: highlighted "Execution order ≠ numbering" block added to the F2 phase header (canonical place for the F2.7→F2.6→F3 order). No renumbering — the git commit history is immutable. |
 | 1.4 | 2026-05-04 | F2.5a Devil's Advocate final-audit gap fixes: Sub4 INVALID_BRANCH (negative target) + Sub2 OVERFLOW test + Sub5 deferral explicit doc. 43 cocotb tests green (41 + 2 new), 9/13 trap codes covered, 0 Verilator warning. CORE_SPEC bumped to v1.3. Current Status, Estimated Work Hours table updated. |
 | 1.3 | 2026-05-04 | F2.5a Sub1..Sub4 + Sub6 DONE — 41 cocotb tests green (LDC, ALU, fetch fix, LDARG/STARG/LDLOC/STLOC, branch, stack/break/invalid traps). Sub5 (CALL/RET non-root) OPEN, deferred to next session. Current Status updated. |
 | 1.2 | 2026-05-04 | F2.5 subsection split into F2.5a (top-level Nano core) + F2.5b (golden vector harness). F2.4 marked DONE. F2 total ~370 hours. Current Status updated to F2.5a spec closed. |
-| 1.1 | 2026-04-17 | Added estimated work hours summary + NLnet grant alignment section. AI-assisted development estimates. |
+| 1.1 | 2026-04-17 | Added estimated work hours summary. AI-assisted development estimates. |
 | 1.0 | 2026-04-14 | Initial version, translated from Hungarian |

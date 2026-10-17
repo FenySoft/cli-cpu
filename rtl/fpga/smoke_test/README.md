@@ -44,7 +44,7 @@ rtl/fpga/smoke_test/
 **Vivado** — when:
 - You need fast iteration during development
 - Detailed timing report matters (WNS/TNS/WHS/THS)
-- Closed flow is acceptable (e.g. NLnet "libre silicon" assessment not urgent)
+- Closed flow is acceptable
 
 **OpenXC7** — when:
 - Full libre silicon flow is the goal (for CI, publication)

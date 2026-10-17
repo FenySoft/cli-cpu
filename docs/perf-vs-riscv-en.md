@@ -117,7 +117,7 @@ We propose this as **the next implementation step** in the `CilCpu.Sim` project:
 ## What we gain from the baseline
 
 - **Concrete, citable number** for each roadmap update
-- **NLnet and blog post numbers** based on actual measurement
+- **Blog post numbers** based on actual measurement
 - **Regression detection** — if a new opcode implementation worsens the count, it shows
 - **Linker optimization measurable** — before/after macro-op fusion on the same benchmark
 

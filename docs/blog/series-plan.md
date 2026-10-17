@@ -15,7 +15,7 @@ status: policy
 - **Language:** English (international reach), with Hungarian translations on clicpu.org
 - **Platform:** clicpu.org/en/blog/ + clicpu.org/hu/blog/ + Medium
 - **Cadence:** One article per week
-- **Goal:** Build awareness, GitHub stars, community, support NLnet application
+- **Goal:** Build awareness, GitHub stars, community
 
 ## Planned Articles
 

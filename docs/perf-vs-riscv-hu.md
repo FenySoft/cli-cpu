@@ -117,7 +117,7 @@ Ezt **a következő lépésként javasoljuk implementálni** a `CilCpu.Sim` proj
 ## Mit nyerünk a baseline-ből
 
 - **Konkrét, hivatkozható szám** minden roadmap-frissítésnél
-- **NLnet és blog-poszt számok** valós mérésen alapulva
+- **Blog-poszt számok** valós mérésen alapulva
 - **Regression detektálás** — ha új opkód-implementáció rontja a count-ot, kiderül
 - **Linker-optimalizáció eredménye mérhető** — a macro-op fusion előtt-után ugyanazon benchmarkon
 

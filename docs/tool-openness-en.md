@@ -8,7 +8,7 @@ status: policy
 >
 > Version: 1.2
 
-This document records the **licensing status** of tools used in CLI-CPU development and the project's **openness strategy**. The NLnet NGI Zero Commons Fund application explicitly mentions "libre silicon" as a funding criterion, making it important that the project's philosophy here is transparent and consistent.
+This document records the **licensing status** of tools used in CLI-CPU development and the project's **openness strategy**. It is important that the project's philosophy here is transparent and consistent.
 
 ## Core principle — two separated layers
 
@@ -19,7 +19,7 @@ CLI-CPU distinguishes between two independent openness dimensions:
 
 **The output is 100% libre; in the process, every tool is open where a realistic alternative exists, and we use closed tools only where the hardware or shuttle platform mandates it.**
 
-This strategy matches industry practice: **SpinalHDL, NaxRiscv, LibreCores**, and nearly every NLnet-funded libre silicon project follows the same model.
+This strategy matches industry practice: **SpinalHDL, NaxRiscv, LibreCores**, and nearly every libre silicon project follows the same model.
 
 ## Outputs — fully open source
 
@@ -194,7 +194,7 @@ The project's documented intent is that **as soon as OpenXC7 maturity allows** (
 | **PicoRV32** | Yosys + OpenLane (open) | Vivado / iCE40 open | Where possible, open |
 | **CVA6 (Ariane)** | PULP flow + OpenLane | Vivado (Genesys-2) | Same |
 
-**This is industry-standard for libre silicon projects.** NLnet evaluators and the community alike know and accept this model — as long as the **output** and the **silicon pipeline** are open, the closed FPGA dev tool is a **pragmatic necessity**, not an ideological compromise.
+**This is industry-standard for libre silicon projects.** The community knows and accepts this model — as long as the **output** and the **silicon pipeline** are open, the closed FPGA dev tool is a **pragmatic necessity**, not an ideological compromise.
 
 ## Summary — "What is CLI-CPU's libre silicon status?"
 
@@ -202,7 +202,7 @@ The project's documented intent is that **as soon as OpenXC7 maturity allows** (
 - **The silicon manufacturing pipeline (F3, F6-Silicon) is fully open source.** ✅
 - **In FPGA development phases (F2.7, F4–F5, F6-FPGA) Vivado is closed but free (gratis).** ⚠️
 - **The project proactively plans to migrate to an open FPGA toolchain (OpenXC7) once maturity allows.** ✅
-- **This is the industry standard for libre silicon projects; NLnet accepts this model.** ✅
+- **This is the industry standard for libre silicon projects.** ✅
 
 **CLI-CPU is unambiguously a libre silicon project** — the "libre" label applies to the project's outputs and silicon pipeline, not to every single dev tool. The **gratis but not libre** Vivado usage in FPGA dev phases is a pragmatic choice, not a compromise.
 

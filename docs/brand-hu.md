@@ -102,7 +102,6 @@ A CLI-CPU az **első** referencia-implementációja a CFPU kategóriának. Ide t
 - **CLI runner** (`CilCpu.Sim.Runner`) — `run` és `link` parancsok
 - **ISA spec** (`CIL-T0`) — a bytecode, amit a szilícium végrehajt
 - **RTL** (jövőben, F4–F6) — a Verilog/Chisel, amiből a chip lesz
-- **NLnet pályázat** és projekt terv
 
 Minden, ami **build artefakt**, **commit**, **teszt cél**, **roadmap mérföldkő**, vagy **licenc-deklaráció**, az a *CLI-CPU*-hoz tartozik. A név megjelenik a `git log`-ban, a `.csproj` fájlokban, az issue trackeren, a pályázati anyagban.
 
@@ -128,7 +127,7 @@ Ha a hármat egy névbe olvasztjuk, minden külső felület — tudományos cikk
 
 - A **projektről**, a **repóról**, a **kódbázisról**, vagy **build artefaktumokról** beszélsz.
 - A szimulátort, a linkert, a runnert, vagy az ISA-implementációt idézed.
-- Roadmap fázisokra (F0–F7), teszt célokra, NLnet pályázatra, licencre hivatkozol.
+- Roadmap fázisokra (F0–F7), teszt célokra, licencre hivatkozol.
 - Bármi, aminek `git log` bejegyzése, `.csproj`-ja, vagy GitHub issue-ja van.
 
 **Példák:**

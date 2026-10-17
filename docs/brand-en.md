@@ -102,7 +102,6 @@ CLI-CPU is the **first** reference implementation of the CFPU category. It is th
 - **CLI runner** (`CilCpu.Sim.Runner`) — `run` and `link` commands
 - **ISA spec** (`CIL-T0`) — the bytecode the silicon executes
 - **RTL** (forthcoming, F4–F6) — the Verilog/Chisel that becomes the chip
-- **NLnet grant** application and project plan
 
 Anything that is a **build artefact**, a **commit**, a **test target**, a **roadmap milestone**, or a **license declaration** belongs to *CLI-CPU*. The name appears in `git log`, in the `.csproj` files, on the issue tracker, on the funding application.
 
@@ -128,7 +127,7 @@ If we collapse the three into one name, every public-facing surface — academic
 
 - Talking about the **project**, the **repo**, the **codebase**, or **build artefacts**.
 - Citing the simulator, the linker, the runner, or the ISA implementation.
-- Referring to roadmap phases (F0–F7), test targets, NLnet grant, license.
+- Referring to roadmap phases (F0–F7), test targets, license.
 - Anything that has a `git log` entry, a `.csproj`, or a GitHub issue.
 
 **Examples:**

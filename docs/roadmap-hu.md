@@ -117,7 +117,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 > **⚠️ Végrehajtási sorrend ≠ számozás.** Az alszakasz-számok **stabil azonosítók**, nem lépés-sorrend (a git commit-history is ezekre hivatkozik). A 2026-05-08-i sorrend-pivot óta a tényleges végrehajtási sorrend:
 > **F2.5 → F2.7 (egymagos core FPGA) → F2.8 (TT-perifériák FPGA) → F2.6 (teljes chip IHP-szintézis) → F3 (Tiny Tapeout).**
 > **Mérnöki indok:** *„nincs silicon tape-out olyan design-nal, ami nem futott FPGA-n"* — előbb FPGA-n verifikálunk, csak utána szintetizálunk Sky130-ra; az FPGA-n talált hibák olcsók, a Tiny Tapeout chipen nem.
-> **Ütemezési indoklás (frissítve a pályázati döntés után):** az F2.6-ot eredetileg a FPGA-validáció után helyeztük, mert a Sky130 area/timing report volt az NLnet M1 mérföldkő deliverable, a MoU-időszakra tervezve. A támogatás nem lett odaítélve (elutasítva 2026-10-09, nincs MoU), tehát ez a megkötés megszűnt. Az F2.6 a saját technikai indoklása miatt marad F2.7 után: a teljes chip szintézis csak azon a core-on érdemes futtatni, amely az egymagos FPGA-validáción már átment — ez a projekt „nincs szintézis FPGA-futtás nélkül" elve.
+> **Ütemezési indoklás:** az F2.6 az F2.7 után áll: a teljes chip szintézis csak azon a core-on érdemes futtatni, amely az egymagos FPGA-validáción már átment — ez a projekt „nincs szintézis FPGA-futtás nélkül" elve.
 
 **Kész kritérium:**
 - Verilator szimuláció minden F1 teszten zöld
@@ -419,7 +419,7 @@ dotnet run --project src/CilCpu.Sim.Runner -- link assembly.dll --class Pure --m
 - **Sky130 @ eFabless ChipIgnite** — a **Caravel** harness 10 mm² user area, 38 GPIO; az **OpenFrame** harness **15 mm²**, 44 GPIO. ~$14,950 (2026 ár), 100 QFN chip + eval board, ~5 hónap átfutás. **A referencia konfiguráció (6R+16N+1S) az OpenFrame-re épül.**
 - **IHP Open Silicon MPW** — európai, SG13G2 nyílt forráskódú ár **2800 EUR/mm²** (standard 7300 EUR/mm²), CMOS5L nyílt forráskódú ár 1500 EUR/mm². 3 mm²-ért ~8400 EUR a nyílt forráskódú árral. **Nincs ingyenes IHP program:** a korábbi roadmap-verziókban szereplő FMD-QNC név egy külön német kutatási modulra utalt, nem IHP MPW programra. A kör csak akkor indul el, ha az összesített terület eléri a 90 mm²-t. *A nyílt forráskódú árak lekérve 2026-10-11-én innen: `https://dk.ihp-microelectronics.com/OpenSourceRequest.php`; a 7300 EUR/mm² standard ár innen: `https://www.ihp-microelectronics.com/services/research-and-prototyping-service/mpw-prototyping-service/schedule-price-list`.*
 - **Google Open MPW** — ingyenes shuttle (ha nyílik), Sky130, Caravel harness. Nincs megerősítés 2026-ra nyitott körre; a Google-finanszírozású OpenMPW program kb. 2018–2024 között futott.
-- **Finanszírozás:** közösségi crowdfunding (Crowd Supply, GitHub Sponsors, Open Collective), ipari partner, EU programok. Az NLnet NGI Zero Commons Fund **lezárt** — a 2026. júniusi kör volt az utolsó NGI Zero kör, a CLI-CPU pályázatát 2026-10-09-én utasították el.
+- **Finanszírozás:** közösségi crowdfunding (Crowd Supply, GitHub Sponsors, Open Collective), ipari partner, EU programok.
 
 **Új funkciók az F6-FPGA-hoz képest (silicon-specifikus):**
 - **Floorplan optimalizáció** — a Rich core-ok központi helyen, a Nano core-ok köré csoportosítva
@@ -611,34 +611,12 @@ A becslések **AI-asszisztált fejlesztést** feltételeznek (Claude Code pair p
 - Az F6.7 (Cognitive Fabric Dense, 22FDX) **opcionális de-risk lépcső** — az F6.5-höz hasonlóan **nem szerepel** a „F6.5 nélkül" összesenben; csak akkor indul, ha finanszírozás van vagy a sűrű-node mérés kritikus a következő mérföldkőhöz
 - A becslések **tiszta mérnöki munkaidőt** tartalmaznak — a gyártási átfutás (TT ~5 hó, ChipIgnite ~5 hó, IHP ~4 hó), szállítás és bring-up várakozás nincs benne
 
-### NLnet NGI Zero Commons Fund összehangolás (ARCHIVÁLT — a támogatás nem lett odaítélve)
+### Tempó-bizonyíték
 
-> **Státusz: ELUTASÍTVA.** A CLI-CPU pályázat (`2026-06-08c`, beadás-visszaigazolás 2026-04-14) elutasításra került **2026-10-09-én**. Az NLnet közölte, hogy a 2026. júniusi kör az **utolsó NGI Zero kör** volt (>1200 pályázat). **Nincs MoU, támogatási összeg nem lett kifizetve.**
->
-> Az alábbi anyag megmarad rekordként arról, mit kértünk és hogyan illeszkedett a roadmapre. **Nem finanszírozási terv** — a jelenlegi lehetőségek a Pályázati lehetőségek szekcióban vannak. Mivel mérföldkönként nem volt finanszírozott, MoU-időszakos deliverable, az az érv, amely az F2.6-ot az FPGA-validáció után helyezte, nem érvényes; az F2.6 ott van, ahova a saját technikai függőségei teszik.
-
-A pályázat **€35 000**-t kért **18 hónapra**, ~900 óra part-time munkát feltételezve (~€36/h, ebből ~€2 440 hardver).
-
-**Mérföldkő-megfeleltetés:**
-
-| NLnet mérföldkő | Roadmap fázis | Pályázat budget | Pályázat óra† | Roadmap becslés | Lefedettség |
-|------------------|---------------|-----------------|---------------|-----------------|-------------|
-| **M1:** RTL | F2 | €8 000 | ~222 h | ~350 h | teljes |
-| **M2:** Tiny Tapeout | F3 | €7 000 | ~159 h | ~220 h | teljes |
-| **M3:** FPGA multi-core | F4 | €8 000 | ~190 h | ~360 h | teljes |
-| **M4:** Rich core RTL start | F5 (kezdet) | €7 000 | ~194 h | ~200 h (a 720-ból) | ~28% |
-| **M5:** Doku & közösség | (beépítve) | €5 000 | ~139 h | ~100 h | teljes |
-| **Összesen** | F2–F5 start | **€35 000** | **~904 h** | **~1 230 h** | |
-
-† Személyi óra = (budget − hardverköltség) ÷ €36/h
-
-**Lefedettségi rés (történeti tény):** a roadmap teljes becslése (~1 230 h az NLnet-nek javasolt scope-ra) **~330 órával meghaladta** a kért ~900 órát. Támogatás nélkül ez a teljes ~1 230 h a fejlesztő **saját, finanszírozatlan hozzájárulása**.
-
-**A tempó-bizonyíték, ami azért marad meg, mert a scope teljesíthetőségét jelzi, pályázattól függetlenül**, mert:
-1. Az F0–F2.2b tényleges tempó (~260 h / ~2 hét intenzív sprint) **meghaladja** a javasolt 12–18 hónapos ablakot
-2. Az AI-asszisztált fejlesztés (Claude Code) a KÉSZ fázisoknál bizonyítottan ~30–40%-os gyorsulást ad a kódgenerálás, teszt és dokumentáció területén
-3. Az F2 RTL alapjai (ALU, decoder, microcode ROM) már **készen vannak**
-4. Az F4 core-instanciálás az F2/F3 RTL közvetlen újrafelhasználása — az érdemi új munka (router, sleep/wake) jól körülhatárolt
+A scope teljesíthetőségét jelzi, mert:
+1. Az AI-asszisztált fejlesztés (Claude Code) a KÉSZ fázisoknál bizonyítottan ~30–40%-os gyorsulást ad a kódgenerálás, teszt és dokumentáció területén
+2. Az F2 RTL alapjai (ALU, decoder, microcode ROM) már **készen vannak**
+3. Az F4 core-instanciálás az F2/F3 RTL közvetlen újrafelhasználása — az érdemi új munka (router, sleep/wake) jól körülhatárolt
 
 ---
 
@@ -750,7 +728,6 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 | Forrás | Összeg | Deadline | Illeszkedés | Állapot |
 |--------|--------|----------|-------------|---------|
-| **NLnet NGI Zero Commons Fund** | — | — | Kifejezetten „libre silicon"-t említ, nyílt forráskódú projekt | ❌ **Lezárt.** A 2026. júniusi körben a CLI-CPU pályázatát (`2026-06-08c`) elutasították 2026-10-09-én. Az NLnet szerint ez volt az **utolsó NGI Zero kör**, újabb kör nincs. |
 | **Tiny Tapeout** | **50–70 USD/tile** (IHP 50, Sky130 70) | Folyamatos, befogadás-alapon | Nyílt forráskódú design, nem kell hozzá pályázat | ✅ **Az egyetlen pályázatfüggetlen út az F3 szilíciumhoz.** |
 | **IHP Open Silicon MPW** | **1500 EUR/mm² (CMOS5L)** vagy **2800 EUR/mm² (SG13G2)** | SG13G2: **2026-09-21, lejárt** · CMOS5L: **2026-10-26** | Nyílt forráskódú design, Apache-2.0 licenc kötelező | ⚠️ **Nem ingyenes.** A kör csak akkor indul el, ha az összes vevő összesített területe eléri a **90 mm²**-t; a 900 EUR/mm² küszöbárnál egyetlen kérelmező, aki önmagban rendeli meg a minimumot, **81 000 EUR**-ral szembesül, és szilícium akkor sem lesz, ha a küszöb mások nélkül nem teljesül. Maszkdíj 320 EUR/bonding diagram + csomagolás. **A CMOS5L más technológia** (nincs izolált NMOS, nincs MIM kapacitás, a PDK fejlesztés alatt), nem közvetlenül cserélhető egy G2 designba. *Árak lekérve 2026-10-11-én; a 900 EUR/mm² küszöbár a fenti schedule-price-list oldalról.* |
 | **Google Open MPW** | $0 (szponzorált) | — | Sky130, Caravel harness, nyílt design | ⚠️ Nincs megerősítés 2026-ra nyitott körre; a Google-finanszírozású OpenMPW program kb. 2018–2024 között futott. |
@@ -766,14 +743,11 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 
 ### Költségvetés-szcenáriók
 
-> Az NLnet-alapú B/C/D szcenáriók **érvénytelenek** — nem lett támogatás. Az alábbi E/F az alternatíva.
-
 | Szcenárió | Összeg | Mit fedez | Állapot |
 |-----------|--------|-----------|---------|
 | **A: Saját zseb** | ~€2,400 | 3× A7-Lite 200T (F4–F6 FPGA) + 1× TT 16 tile (F3) + bring-up | ✅ Az egyetlen jelenleg fedezett szcenárió. A TT tile-ok 50–70 USD/db, pályázatfüggetlenek. |
 | **E: IHP Open Silicon MPW (közösen)** | A 90 mm² küszöb valamelyik hányada × 1500–2800 EUR/mm², plusz 320 EUR maszkdíj + csomagolás | IHP „Cognitive Fabric Zero" (1R+8N, 3 mm²) | ⚠️ A 90 mm² körküszöb eléréséhez ≥10–30 társ kérelmező kell. **Nem nulla kockázat: küszöb nélkül a kör nem indul, tehát a díj szilícium nélkül is elkölthető.** |
 | **F: ChipIgnite OpenFrame** | ~$14,950 (2026-os ár), 15 mm², 100 QFN + eval board | „Cognitive Fabric One" (6R+16N+1S) | ⚠️ Egyedi vásárlás, nincs közös küszöb. Crowdfunding kampány szükséges. |
-| **~~B: NLnet €15K~~ / ~~C: NLnet €30K~~ / ~~D: NLnet €50K~~** | — | — | ❌ **Érvénytelen.** A támogatást 2026-10-09-én utasították el. |
 
 ### Ütemezés
 
@@ -803,9 +777,9 @@ A CLI-CPU szilícium mérföldkövei (F3 Tiny Tapeout, F6-Silicon Zero/One) kül
 | 1.7 | 2026-05-17 | **F2.7 Sub5.A KÉSZ** — config-flash app-bázis-offszet gyökér-fix: paraméterezhető `CODE_BASE_OFFSET` generic (qspi_controller ← core ← a7lite_top ← board). A Sub5 build-infra „nyitott HW-kérdése" (bitstream@0x0 ↔ app@0x0 ütközés) megoldva: sim default 0 (bit-azonos paritás), FPGA 0xC00000 (12 MB, ~9,9 MB bitstream fölé). Egyetlen forrás: generic = write_cfgmem `CODE_BASE_OFFSET_HEX` = OpenXC7 chparam. 2 új cocotb teszt (test_30/31) RED→GREEN + 7 regressziós target zöld. SEG_DATA szándékosan offszetlen (indoklás dokumentálva). `todo.md` F2.7.E, README-k 0.5.1, Vault: project_flash_base_offset. |
 | 1.6 | 2026-05-16 | **F2.7.D KÉSZ** — rekurzív CALL/RET caller eval depth megőrzés gyökér-fix (flush SRAM-ba + eval depth a header reserved mezőjében + RET SPFILL cache-újratöltés, 3 modul: `cilcpu_stack_cache.v` + `cilcpu_core.v`). A korábbi „F2.5a egyszerűsítés" (project_recursive_call_bug, `TRAP_STACK_UNDERFLOW` rekurzív Fibonacci-nál) megoldva. test_core 49/49, test_stack_cache 28/28 (3 új unit teszt), wrapper/board mind zöld, új regresszió `test_52c` (Fib(10)=55). CORE_SPEC v1.5. Munkaóra-tábla + Mai státusz frissítve. |
 | 1.5 | 2026-05-14 | F2.7 Sub4 KÉSZ — board-szintű top wrapper (`cilcpu_a7lite_board.v`) STARTUPE2 + 4× IOBUF körül a `cilcpu_a7lite_top` köré; sim stub fájl Xilinx primitivekhez; XDC frissítve a QSPI flash pinekkel (T19, P22, R22, P21, R21) + `qspi_sck` generated clock. **5 új cocotb zöld** (4 smoke + 1 Fibonacci e2e a board.v-n át). Mai státusz, becsült munkaóra-tábla frissítve. |
-| 1.5.1 | 2026-05-15 | Doku-konzisztencia: az F2 fázis-fejlécbe kiemelt „Végrehajtási sorrend ≠ számozás" blokk (kanonikus hely a F2.7→F2.6→F3 sorrendre + NLnet M1 horgony-magyarázat). A Mai státusz „Sorrend-pivot" mondata hivatkozássá rövidítve (nincs átszámozás — a git commit-history immutable). |
+| 1.5.1 | 2026-05-15 | Doku-konzisztencia: az F2 fázis-fejlécbe kiemelt „Végrehajtási sorrend ≠ számozás" blokk (kanonikus hely a F2.7→F2.6→F3 sorrendre). A Mai státusz „Sorrend-pivot" mondata hivatkozássá rövidítve (nincs átszámozás — a git commit-history immutable). |
 | 1.4 | 2026-05-04 | F2.5a Devil's Advocate végaudit hiánypótlás: Sub4 INVALID_BRANCH (negatív target) + Sub2 OVERFLOW teszt + Sub5 halasztás explicit dokumentáció. 43 cocotb teszt zöld (41 + 2 új), 9/13 trap kód lefedett, 0 Verilator warning. CORE_SPEC v1.3-ra emelve. Mai státusz, becsült munkaóra-tábla frissítve. |
 | 1.3 | 2026-05-04 | F2.5a Sub1..Sub4 + Sub6 KÉSZ — 41 cocotb teszt zöld (LDC, ALU, fetch fix, LDARG/STARG/LDLOC/STLOC, branch, stack/break/invalid trap-ek). Sub5 (CALL/RET nem-root) NYITOTT, a következő ülésre marad. Mai státusz frissítve. |
 | 1.2 | 2026-05-04 | F2.5 alszakasz F2.5a (top-level Nano core) + F2.5b (golden vector harness) bontásra. F2.4 KÉSZ státuszra váltva. F2 össz. ~370 óra. Mai státusz frissítve F2.5a spec lezártra. |
-| 1.1 | 2026-04-17 | Becsült munkaóra összesítő + NLnet pályázati összehangolás hozzáadva. AI-asszisztált fejlesztési becslések. |
+| 1.1 | 2026-04-17 | Becsült munkaóra összesítő hozzáadva. AI-asszisztált fejlesztési becslések. |
 | 1.0 | 2026-04-14 | Kezdeti verziózott kiadás |

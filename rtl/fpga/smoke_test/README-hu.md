@@ -44,7 +44,7 @@ A `led_blink.v` **egyetlen** shared fájl — 10 sor Verilog, 25-bit counter, k�
 **Vivado** — amikor:
 - Gyors iteráció kell fejlesztés közben
 - Részletes timing riport kell (WNS/TNS/WHS/THS)
-- Zárt flow bevett (pl. NLnet-féle „libre silicon" értékelés nem fontos most)
+- Zárt flow bevett
 
 **OpenXC7** — amikor:
 - Full libre silicon flow a cél (CI-ban, publikációban)

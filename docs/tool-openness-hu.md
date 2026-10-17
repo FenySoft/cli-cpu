@@ -8,7 +8,7 @@ status: policy
 >
 > Version: 1.2
 
-Ez a dokumentum a CLI-CPU projekt fejlesztéséhez használt eszközök **licencelési státuszát** és a **nyitottsági stratégiát** rögzíti. Az NLnet NGI Zero Commons Fund pályázat explicit módon említi a „libre silicon"-t mint támogatási kritériumot, és ezért fontos, hogy a projekt filozófiája ebben a kérdésben átlátható és konzisztens legyen.
+Ez a dokumentum a CLI-CPU projekt fejlesztéséhez használt eszközök **licencelési státuszát** és a **nyitottsági stratégiát** rögzíti. Fontos, hogy a projekt filozófiája ebben a kérdésben átlátható és konzisztens legyen.
 
 ## Alapelv — két elkülönített szint
 
@@ -19,7 +19,7 @@ A CLI-CPU projekt **két különálló nyitottsági dimenziót** különböztet 
 
 **Az output 100%-ban libre, a process-ben minden olyan eszköz nyílt, ahol reális alternatíva van, és csak ott használunk zárt eszközt, ahol a hardver vagy a shuttle platform ezt megköveteli.**
 
-Ez a stratégia megfelel az iparági gyakorlatnak: a **SpinalHDL, NaxRiscv, LibreCores** projektek, valamint szinte minden NLnet-támogatott libre silicon projekt hasonló modellt követ.
+Ez a stratégia megfelel az iparági gyakorlatnak: a **SpinalHDL, NaxRiscv, LibreCores** projektek, valamint szinte minden libre silicon projekt hasonló modellt követ.
 
 ## Az outputok — teljesen nyílt forráskódú
 
@@ -194,7 +194,7 @@ A projekt dokumentált szándéka, hogy **amint az OpenXC7 érettsége engedi** 
 | **PicoRV32** | Yosys + OpenLane (nyílt) | Vivado / iCE40 nyílt | Ahol tud, nyitott |
 | **CVA6 (Ariane)** | PULP flow + OpenLane | Vivado (Genesys-2) | Ugyanaz |
 
-**Ez az iparági norma libre silicon projekteknél.** Az NLnet evaluátorok és a közösség egyaránt ismerik és elfogadják — amíg az **output** és a **silicon pipeline** nyílt, a zárt FPGA dev tool **pragmatikus kényszer**, nem ideológiai megalkuvás.
+**Ez az iparági norma libre silicon projekteknél.** A közösség ismeri és elfogadja — amíg az **output** és a **silicon pipeline** nyílt, a zárt FPGA dev tool **pragmatikus kényszer**, nem ideológiai megalkuvás.
 
 ## Összefoglalás — „Mi a CLI-CPU libre silicon státusza?"
 
@@ -202,7 +202,7 @@ A projekt dokumentált szándéka, hogy **amint az OpenXC7 érettsége engedi** 
 - **A silicon gyártási pipeline (F3, F6-Silicon) teljesen nyílt forráskódú.** ✅
 - **Az FPGA fejlesztési fázisokban (F2.7, F4–F5, F6-FPGA) a Vivado zárt, de ingyenes.** ⚠️
 - **A projekt proaktívan tervez átállni nyílt FPGA toolchain-re (OpenXC7), amint az érettsége engedi.** ✅
-- **Ez az iparági standard libre silicon projekteknél, az NLnet elfogadja ezt a modellt.** ✅
+- **Ez az iparági standard libre silicon projekteknél.** ✅
 
 **A CLI-CPU egyértelműen libre silicon projekt** — a „libre" jelző a projekt outputjára és a silicon pipeline-re vonatkozik, nem minden egyes dev tool-ra. Az **gratis de nem libre** Vivado-használat az FPGA dev fázisokban pragmatikus választás, nem kompromisszum.
 
